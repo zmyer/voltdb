@@ -29,6 +29,7 @@ import org.voltdb.client.ClientResponse;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import java.util.HashMap;
 
 /**
  * Agent responsible for collecting stats on this host.
@@ -37,6 +38,7 @@ public class StatsAgent extends OpsAgent
 {
     private final NonBlockingHashMap<StatsSelector, NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>>> registeredStatsSources =
             new NonBlockingHashMap<StatsSelector, NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>>>();
+    private Map<StatsSource, Boolean> m_tableBuild = new HashMap<StatsSource, Boolean>();
 
     public StatsAgent()
     {
@@ -590,6 +592,7 @@ public class StatsAgent extends OpsAgent
 
         // Append to previous results if provided.
         final VoltTable resultTable = prevResults != null ? prevResults : new VoltTable(columns);
+        final VoltTable transactionTable = prevResults != null ? prevResults : new VoltTable(columns);
 
         for (NonBlockingHashSet<StatsSource> statsSources : siteIdToStatsSources.values()) {
 
@@ -601,6 +604,7 @@ public class StatsAgent extends OpsAgent
             assert statsSources != null;
             for (final StatsSource ss : statsSources) {
                 assert ss != null;
+                ss.buildStatsTable();
                 /*
                  * Some sources like TableStats use VoltTable to keep track of
                  * statistics
@@ -611,6 +615,7 @@ public class StatsAgent extends OpsAgent
                     if (table != null) {
                         while (table.advanceRow()) {
                             resultTable.add(table);
+                            transactionTable.add(table);
                         }
                         table.resetRowPosition();
                     }
@@ -618,8 +623,11 @@ public class StatsAgent extends OpsAgent
                     Object statsRows[][] = ss.getStatsRows(interval, now);
                     for (Object[] row : statsRows) {
                         resultTable.addRow(row);
+                        transactionTable.addRow(row);
                     }
                 }
+                ss.persistStats(transactionTable, true);
+                transactionTable.clearRowData();
             }
         }
         return resultTable;

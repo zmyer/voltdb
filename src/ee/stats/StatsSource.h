@@ -116,7 +116,7 @@ protected:
      * Update the stats tuple with the latest statistics available to this StatsSource. Implemented by derived classes.
      * @parameter tuple TableTuple pointing to a row in the stats table.
      */
-    virtual void updateStatsTuple(voltdb::TableTuple *tuple) = 0;
+    virtual void updateStatsTuple(voltdb::TableTuple *tuple, int64_t now, int64_t siteId) = 0;
 
     /**
      * Generates the list of column names that will be in the statTable_. Derived classes must override this method and call

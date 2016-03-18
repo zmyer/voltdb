@@ -31,8 +31,8 @@ public abstract class SiteStatsSource extends StatsSource {
      */
     private final long m_siteId;
 
-    public SiteStatsSource(long siteId, boolean isEE) {
-        super(isEE);
+    public SiteStatsSource(String name, long siteId, boolean isEE) {
+        super(name, isEE);
         this.m_siteId = siteId;
     }
 
@@ -47,4 +47,27 @@ public abstract class SiteStatsSource extends StatsSource {
         rowValues[columnNameToIndex.get(VoltSystemProcedure.CNAME_SITE_ID)] = CoreUtils.getSiteIdFromHSId(m_siteId);
         super.updateStatsRow(rowKey, rowValues);
     }
+
+    @Override
+    public String getPartitionColumn() {
+        return "TIMESTAMP";
+    }
+
+    @Override
+    public VoltType getPartitionColumnType() {
+        return VoltType.BIGINT;
+    }
+
+    @Override
+    public int getPartitionColumnIndex() {
+        return 0;
+    }
+
+    @Override
+    public VoltTable[] splitTables(VoltTable values) {
+        VoltTable[] tables = new VoltTable[1];
+        tables[0] = values;
+        return tables;
+    }
+
 }

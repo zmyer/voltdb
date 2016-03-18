@@ -18,13 +18,15 @@
 package org.voltdb;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 
 import org.voltdb.VoltTable.ColumnInfo;
 
 public class TableStats extends SiteStatsSource {
     public TableStats(long siteId) {
-        super( siteId, true);
+        super( "TableStats", siteId, true);
     }
 
     @Override
@@ -48,5 +50,41 @@ public class TableStats extends SiteStatsSource {
         columns.add(new ColumnInfo("STRING_DATA_MEMORY", VoltType.INTEGER));
         columns.add(new ColumnInfo("TUPLE_LIMIT", VoltType.INTEGER));
         columns.add(new ColumnInfo("PERCENT_FULL", VoltType.INTEGER));
+        columns.add(new ColumnInfo("KEY", VoltType.STRING));
     }
+
+
+    @Override
+    public String getPartitionColumn() {
+        return "KEY";
+    }
+
+    @Override
+    public VoltType getPartitionColumnType() {
+        return VoltType.STRING;
+    }
+
+    @Override
+    public int getPartitionColumnIndex() {
+        return 13;
+    }
+
+    @Override
+    public VoltTable[] splitTables(VoltTable values) {
+        Map<String, VoltTable> sameTables = new HashMap<>();
+        values.resetRowPosition();
+        while (values.advanceRow()) {
+            String key = values.getString(getPartitionColumnIndex());
+            VoltTable newTab;
+            if (!sameTables.containsKey(key)) {
+                newTab = new VoltTable(getColumns());
+                sameTables.put(key, newTab);
+            } else {
+                newTab = sameTables.get(key);
+            }
+            newTab.add(values.fetchRow(values.getActiveRowIndex()));
+        }
+        return sameTables.values().toArray(new VoltTable[sameTables.size()]);
+    }
+
 }

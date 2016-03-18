@@ -36,7 +36,7 @@ public class MockStatsSource extends StatsSource{
     private final Object retvals[][];
     private final List<VoltTable.ColumnInfo> instanceColumns;
     public MockStatsSource(Object retvals[][]) {
-        super(false);
+        super("MockStats", false);
         this.retvals = retvals;
         this.instanceColumns = columns;
     }

@@ -46,7 +46,7 @@ public class InitiatorStats extends SiteStatsSource {
      * @param siteId
      */
     public InitiatorStats(long hostId) {
-        super(hostId, false);
+        super("InitiatorStats", hostId, false);
         VoltDB.instance().getStatsAgent().registerStatsSource(StatsSelector.INITIATOR, 0, this);
     }
 

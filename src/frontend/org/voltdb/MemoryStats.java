@@ -38,7 +38,7 @@ public class MemoryStats extends StatsSource {
     Map<Long, PartitionMemRow> m_memoryStats = new TreeMap<Long, PartitionMemRow>();
 
     public MemoryStats() {
-        super(false);
+        super("MemoryStats", false);
     }
 
     @Override

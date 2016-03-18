@@ -169,7 +169,7 @@ vector<string> IndexStats::generateStatsColumnNames()
 /**
  * Update the stats tuple with the latest statistics available to this StatsSource.
  */
-void IndexStats::updateStatsTuple(TableTuple *tuple) {
+void IndexStats::updateStatsTuple(TableTuple *tuple, int64_t now, int64_t siteId) {
     tuple->setNValue( StatsSource::m_columnName2Index["INDEX_NAME"], m_indexName);
     tuple->setNValue( StatsSource::m_columnName2Index["TABLE_NAME"], m_tableName);
     tuple->setNValue( StatsSource::m_columnName2Index["INDEX_TYPE"], m_indexType);

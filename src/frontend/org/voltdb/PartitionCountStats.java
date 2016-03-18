@@ -31,7 +31,7 @@ public class PartitionCountStats extends StatsSource {
 
     /** IV2 constructor */
     public PartitionCountStats(Cartographer cartographer) {
-        super(false);
+        super("PartitionCoutStats", false);
         m_cartographer = cartographer;
     }
 

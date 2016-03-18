@@ -52,7 +52,7 @@ public class ImporterStatsCollector extends SiteStatsSource
 
     public ImporterStatsCollector(long siteId)
     {
-        super(siteId, false);
+        super("ImporterStats", siteId, false);
     }
 
     @Override

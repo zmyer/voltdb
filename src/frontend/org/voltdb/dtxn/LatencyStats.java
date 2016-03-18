@@ -26,7 +26,6 @@ import java.util.concurrent.TimeUnit;
 import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.HdrHistogram_voltpatches.AtomicHistogram;
 import org.HdrHistogram_voltpatches.Histogram;
-import org.voltcore.utils.CompressionStrategySnappy;
 import org.voltdb.ClientInterface;
 import org.voltdb.SiteStatsSource;
 import org.voltdb.VoltDB;
@@ -35,6 +34,7 @@ import org.voltdb.VoltType;
 
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
+import org.voltcore.utils.Pair;
 
 /**
  * Class that provides latency information in buckets. Each bucket contains the
@@ -83,50 +83,55 @@ public class LatencyStats extends SiteStatsSource {
     private WeakReference<byte[]> m_serializedCache = null;
 
     private AbstractHistogram m_totals = constructHistogram(false);
+    private long m_total_latency = 0;
 
     private final static int EXPIRATION = Integer.getInteger("LATENCY_CACHE_EXPIRATION", 900);
 
-    private Supplier<AbstractHistogram> getHistogramSupplier() {
-        return Suppliers.memoizeWithExpiration(new Supplier<AbstractHistogram>() {
+    private Supplier<Pair<Long, AbstractHistogram>> getHistogramSupplier() {
+        return Suppliers.memoizeWithExpiration(new Supplier<Pair<Long, AbstractHistogram>>() {
             @Override
-            public AbstractHistogram get() {
+            public Pair<Long, AbstractHistogram> get() {
                 m_totals.reset();
+                m_total_latency = 0;
                 ClientInterface ci = VoltDB.instance().getClientInterface();
                 if (ci != null) {
                     List<AbstractHistogram> thisci = ci.getLatencyStats();
                     for (AbstractHistogram info : thisci) {
                         m_totals.add(info);
+                        m_total_latency += info.getHighestTrackableValue();
                     }
                 }
                 m_compressedCache = null;
                 m_serializedCache = null;
 
-                return m_totals;
+                return new Pair(m_total_latency, m_totals);
             }
         }, EXPIRATION, TimeUnit.MILLISECONDS);
     }
-    private Supplier<AbstractHistogram> m_histogramSupplier = getHistogramSupplier();
+    private Supplier<Pair<Long, AbstractHistogram>> m_histogramSupplier = getHistogramSupplier();
 
     public byte[] getSerializedCache() {
-        byte[] retval = null;
-        if (m_serializedCache == null || (retval = m_serializedCache.get()) == null) {
-            retval = m_histogramSupplier.get().toUncompressedBytes();
-            m_serializedCache = new WeakReference<byte[]>(retval);
-        }
-        return retval;
+        return new byte[1];
+//        byte[] retval = null;
+//        if (m_serializedCache == null || (retval = m_serializedCache.get()) == null) {
+//            retval = m_histogramSupplier.get().toUncompressedBytes();
+//            m_serializedCache = new WeakReference<byte[]>(retval);
+//        }
+//        return retval;
     }
 
     public byte[] getCompressedCache() {
-        byte[] retval = null;
-        if (m_compressedCache == null || (retval = m_compressedCache.get()) == null) {
-            retval = AbstractHistogram.toCompressedBytes(getSerializedCache(), CompressionStrategySnappy.INSTANCE);
-            m_compressedCache = new WeakReference<byte[]>(retval);
-        }
-        return retval;
+        return new byte[1];
+//        byte[] retval = null;
+//        if (m_compressedCache == null || (retval = m_compressedCache.get()) == null) {
+//            retval = AbstractHistogram.toCompressedBytes(getSerializedCache(), CompressionStrategySnappy.INSTANCE);
+//            m_compressedCache = new WeakReference<byte[]>(retval);
+//        }
+//        return retval;
     }
 
-    public LatencyStats(long siteId) {
-        super(siteId, false);
+    public LatencyStats(String name, long siteId) {
+        super(name, siteId, false);
     }
 
     @Override
@@ -143,7 +148,8 @@ public class LatencyStats extends SiteStatsSource {
 
     @Override
     protected void updateStatsRow(Object rowKey, Object[] rowValues) {
-        rowValues[columnNameToIndex.get("HISTOGRAM")] = getCompressedCache();
+        Pair<Long, AbstractHistogram> p = m_histogramSupplier.get();
+        rowValues[columnNameToIndex.get("HISTOGRAM")] = new byte[1];
         super.updateStatsRow(rowKey, rowValues);
     }
 }

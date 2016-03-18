@@ -1364,6 +1364,107 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     }
 
     /**
+     * Returns a {@link java.lang.String String} representation of this table.
+     * Resulting string will contain schema and all data and will be formatted.
+     * @return a {@link java.lang.String String} representation of this table.
+     */
+    public String valuesClause() {
+        assert(verifyTableInvariants());
+        StringBuilder buffer = new StringBuilder();
+
+        VoltTableRow r = cloneRow();
+        r.resetRowPosition();
+        while (r.advanceRow()) {
+            buffer.append("  (");
+            for (int i = 0; i < m_colCount; i++) {
+                switch(getColumnType(i)) {
+                case TINYINT:
+                case SMALLINT:
+                case INTEGER:
+                case BIGINT:
+                    long lval = r.getLong(i);
+                    if (r.wasNull())
+                        buffer.append("NULL");
+                    else
+                        buffer.append(lval);
+                    break;
+                case FLOAT:
+                    double dval = r.getDouble(i);
+                    if (r.wasNull())
+                        buffer.append("NULL");
+                    else
+                        buffer.append(dval);
+                    break;
+                case TIMESTAMP:
+                    TimestampType tstamp = r.getTimestampAsTimestamp(i);
+                    if (r.wasNull()) {
+                        buffer.append("NULL");
+                        assert (tstamp == null);
+                    } else {
+                        buffer.append(tstamp);
+                    }
+                    break;
+                case STRING:
+                    String string = r.getString(i);
+                    if (r.wasNull()) {
+                        buffer.append("NULL");
+                        assert (string == null);
+                    } else {
+                        buffer.append("'").append(string).append("'");
+                    }
+                    break;
+                case VARBINARY:
+                    byte[] bin = r.getVarbinary(i);
+                    if (r.wasNull()) {
+                        buffer.append("NULL");
+                        assert (bin == null);
+                    } else {
+                        buffer.append("'").append(Encoder.hexEncode(bin)).append("'");
+                    }
+                    break;
+                case DECIMAL:
+                    BigDecimal bd = r.getDecimalAsBigDecimal(i);
+                    if (r.wasNull()) {
+                        buffer.append("NULL");
+                        assert (bd == null);
+                    } else {
+                        buffer.append(bd.toString());
+                    }
+                    break;
+                case GEOGRAPHY_POINT:
+                    GeographyPointValue pt = r.getGeographyPointValue(i);
+                    if (r.wasNull()) {
+                        buffer.append("NULL");
+                    }
+                    else {
+                        buffer.append(pt.toString());
+                    }
+                    break;
+                case GEOGRAPHY:
+                    GeographyValue gv = r.getGeographyValue(i);
+                    if (r.wasNull()) {
+                        buffer.append("NULL");
+                    }
+                    else {
+                        buffer.append(gv.toString());
+                    }
+                    break;
+                default:
+                    // should not get here ever
+                    throw new IllegalStateException("Table column had unexpected type.");
+                }
+                if (i < m_colCount - 1) {
+                    buffer.append(",");
+                }
+            }
+            buffer.append("),\n");
+        }
+
+        assert(verifyTableInvariants());
+        return buffer.toString();
+    }
+
+    /**
      * Return a "pretty print" representation of this table with column names.  Output will
      * be formatted in a tabular textual format suitable for display.
      * @return A string containing a pretty-print formatted representation of this table.

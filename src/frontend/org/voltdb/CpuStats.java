@@ -30,7 +30,7 @@ public class CpuStats extends StatsSource {
     com.sun.management.OperatingSystemMXBean m_osBean;
 
     public CpuStats() {
-        super(false);
+        super("CpuStats", false);
         m_osBean = (com.sun.management.OperatingSystemMXBean )ManagementFactory.getPlatformMXBean(OperatingSystemMXBean.class);
     }
 

@@ -24,7 +24,7 @@ import org.voltdb.VoltTable.ColumnInfo;
 
 public class IndexStats extends SiteStatsSource {
     public IndexStats(long siteId) {
-        super(siteId, true);
+        super("IndexStats", siteId, true);
     }
 
     @Override

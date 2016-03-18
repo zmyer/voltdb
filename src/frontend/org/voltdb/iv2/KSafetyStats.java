@@ -32,7 +32,7 @@ public class KSafetyStats extends StatsSource {
     private volatile NavigableSet<StatsPoint> m_kSafetySet;
 
     public KSafetyStats() {
-        super(false);
+        super("KSafetyStats", false);
         m_kSafetySet = ImmutableSortedSet.<StatsPoint>of();
     }
 

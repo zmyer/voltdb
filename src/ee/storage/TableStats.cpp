@@ -39,6 +39,7 @@ vector<string> TableStats::generateTableStatsColumnNames() {
     columnNames.push_back("STRING_DATA_MEMORY");
     columnNames.push_back("TUPLE_LIMIT");
     columnNames.push_back("PERCENT_FULL");
+    columnNames.push_back("KEY");
     return columnNames;
 }
 
@@ -56,6 +57,7 @@ void TableStats::populateTableStatsSchema(
     types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);inBytes.push_back(false);
     types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);inBytes.push_back(false);
     types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);inBytes.push_back(false);
+    types.push_back(VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);inBytes.push_back(false);
 }
 
 Table*
@@ -125,7 +127,7 @@ vector<string> TableStats::generateStatsColumnNames() {
 /**
  * Update the stats tuple with the latest statistics available to this StatsSource.
  */
-void TableStats::updateStatsTuple(TableTuple *tuple) {
+void TableStats::updateStatsTuple(TableTuple *tuple, int64_t now, int64_t siteId) {
     tuple->setNValue( StatsSource::m_columnName2Index["TABLE_NAME"], m_tableName);
     tuple->setNValue( StatsSource::m_columnName2Index["TABLE_TYPE"], m_tableType);
     int64_t tupleCount = m_table->activeTupleCount();
@@ -183,6 +185,9 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
         percentage = static_cast<int32_t> (ceil(static_cast<double>(tupleCount) * 100.0 / tupleLimit));
     }
     tuple->setNValue(StatsSource::m_columnName2Index["PERCENT_FULL"],ValueFactory::getIntegerValue(percentage));
+    char str_key[1024];
+    snprintf(str_key, sizeof(str_key), "%s-%lld-%d", m_tableName.toString().c_str(), now, static_cast<int32_t>(siteId >> 32));
+    tuple->setNValue( StatsSource::m_columnName2Index["KEY"], ValueFactory::getStringValue(str_key, NULL));
 }
 
 /**

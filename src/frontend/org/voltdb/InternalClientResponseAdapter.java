@@ -289,8 +289,10 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                 public void handle() {
                     try {
                         if (resp.getStatus() != ClientResponse.SUCCESS) {
-                            String fmt = "InternalClientResponseAdapter stored procedure failed: %s Error: %s failures: %d";
-                            rateLimitedLog(Level.WARN, null, fmt, callback.getProcedureName(), resp.getStatusString(), m_failures.incrementAndGet());
+                            if (resp.getStatus() != ClientResponse.GRACEFUL_FAILURE) {
+                                String fmt = "InternalClientResponseAdapter stored procedure failed: %s Error: %s failures: %d";
+                                rateLimitedLog(Level.WARN, null, fmt, callback.getProcedureName(), resp.getStatusString(), m_failures.incrementAndGet());
+                            }
                         }
                         callback.handleResponse(resp);
                     } catch (Exception ex) {

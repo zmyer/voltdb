@@ -67,7 +67,7 @@ public class BalancePartitionsStatistics extends StatsSource {
 
     public BalancePartitionsStatistics(long totalRangeSize)
     {
-        super(false);
+        super("BalancePartitionStats", false);
         initialize(totalRangeSize);
     }
 

@@ -131,7 +131,7 @@ class ProcedureStatsCollector extends SiteStatsSource {
      * Constructor requires no args because it has access to the enclosing classes members.
      */
     public ProcedureStatsCollector(long siteId, int partitionId, Procedure catProc) {
-        super(siteId, false);
+        super("ProcedureStats", siteId, false);
         m_partitionId = partitionId;
         m_catProc = catProc;
     }

@@ -57,7 +57,7 @@ public class IOStats extends StatsSource {
     }
 
     public IOStats() {
-        super(false);
+        super("IOStats", false);
     }
 
     @Override

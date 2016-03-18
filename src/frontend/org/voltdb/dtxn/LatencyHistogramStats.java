@@ -25,7 +25,7 @@ import org.voltdb.VoltType;
 public class LatencyHistogramStats extends LatencyStats {
 
     public LatencyHistogramStats(long siteId) {
-        super(siteId);
+        super("LatencyHistogramStats", siteId);
     }
 
     @Override

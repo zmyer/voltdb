@@ -35,7 +35,7 @@ public class CommandLogStats extends StatsSource {
     };
 
     public CommandLogStats(CommandLog commandLog) {
-        super(false);
+        super("CommandLogStats", false);
         m_commandLog = commandLog;
     }
 

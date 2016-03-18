@@ -167,7 +167,7 @@ public class Cartographer extends StatsSource
     }
 
     public Cartographer(HostMessenger hostMessenger, int configuredReplicationFactor, boolean partitionDetectionEnabled) {
-        super(false);
+        super("CartographerStats", false);
         m_hostMessenger = hostMessenger;
         m_zk = hostMessenger.getZK();
         m_iv2Masters = new LeaderCache(m_zk, VoltZK.iv2masters, m_SPIMasterCallback);
@@ -189,6 +189,16 @@ public class Cartographer extends StatsSource
         columns.add(new ColumnInfo("Sites", VoltType.STRING));
         columns.add(new ColumnInfo("Leader", VoltType.STRING));
 
+    }
+
+    @Override
+    protected void buildStatsTable() {
+        //ANISH no implementation
+    }
+
+    @Override
+    protected boolean isTableBuilt() {
+        return false;
     }
 
     @Override

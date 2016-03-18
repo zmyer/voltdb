@@ -79,7 +79,7 @@ protected:
     /**
      * Update the stats tuple with the latest statistics available to this StatsSource.
      */
-    virtual void updateStatsTuple(voltdb::TableTuple *tuple);
+    virtual void updateStatsTuple(voltdb::TableTuple *tuple, int64_t now, int64_t siteId);
 
     /**
      * Generates the list of column names that will be in the statTable_. Derived classes must override this method and call

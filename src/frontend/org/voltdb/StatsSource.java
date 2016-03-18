@@ -18,13 +18,23 @@ package org.voltdb;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.voltcore.logging.VoltLogger;
+import org.voltdb.AuthSystem.AuthUser;
 
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.client.BatchTimeoutOverrideType;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.HashinatorLite;
+import org.voltdb.client.SyncCallback;
 
 /**
  * Abstract superclass of all sources of statistical information inside the Java frontend.
  */
 public abstract class StatsSource {
+
+    private static final VoltLogger m_logger = new VoltLogger("HOST");
 
     private final Integer m_hostId;
     private final String m_hostname;
@@ -36,7 +46,7 @@ public abstract class StatsSource {
 
     //Volatile for safe publication of the table objects
     private volatile VoltTable m_table = null;
-
+    private final String m_name;
     /**
      * Column schema for statistical result rows
      */
@@ -57,7 +67,8 @@ public abstract class StatsSource {
      * @param name
      * @param isEE If this source represents statistics from EE
      */
-    public StatsSource(boolean isEE) {
+    public StatsSource(String name, boolean isEE) {
+        m_name = name;
         populateColumnSchema(columns);
 
         for (int ii = 0; ii < columns.size(); ii++) {
@@ -103,6 +114,18 @@ public abstract class StatsSource {
      */
     public ArrayList<ColumnInfo> getColumnSchema() {
         return columns;
+    }
+
+    public String getPartitionColumn() {
+        return "TIMESTAMP";
+    }
+
+    public VoltType getPartitionColumnType() {
+        return VoltType.BIGINT;
+    }
+
+    public int getPartitionColumnIndex() {
+        return 0;
     }
 
     /**
@@ -170,6 +193,10 @@ public abstract class StatsSource {
         m_table = new VoltTable(columns.toArray(new ColumnInfo[columns.size()]));
     }
 
+    public VoltTable.ColumnInfo[] getColumns() {
+        return columns.toArray(new ColumnInfo[columns.size()]);
+    }
+
     private Long now = System.currentTimeMillis();
 
     /**
@@ -194,4 +221,129 @@ public abstract class StatsSource {
      * @return Iterator of Objects representing keys that identify unique stats rows
      */
     abstract protected Iterator<Object> getStatsRowKeyIterator(boolean interval);
+
+    private InternalConnectionHandler getConnectionHadler()
+    {
+        return VoltDB.instance().getClientInterface().getInternalConnectionHandler();
+    }
+
+    private AuthUser getInternalUser()
+    {
+        return VoltDB.instance().getCatalogContext().authSystem.getInternalAdminUser();
+    }
+
+    private static final Map<String, AtomicBoolean> m_tableBuiltMap = new HashMap<>();
+    protected void buildStatsTable() {
+        AtomicBoolean built = null;
+        synchronized(m_tableBuiltMap) {
+            String name = this.getClass().toString().trim();
+            built = m_tableBuiltMap.get(this.getClass().toString().trim());
+            if (built == null) {
+                built = new AtomicBoolean(false);
+                m_tableBuiltMap.put(name, built);
+            }
+        }
+
+        if (built.get()) {
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("CREATE TABLE ").append(m_name).append(" (\n");
+        int i = 0;
+        String pkeyStr = "";
+        for (ColumnInfo c : columns) {
+            sb.append("COL_").append(c.name).append(" ").append(c.type.toSQLString());
+            if (c.name.equalsIgnoreCase(getPartitionColumn())) {
+                sb.append(" NOT NULL");
+                pkeyStr = new StringBuilder().append(",\n CONSTRAINT PK_").append(m_name).append(" PRIMARY KEY ( COL_").append(c.name).append(")\n").toString();
+            }
+            sb = (i < columns.size()-1) ? sb.append(",\n") : sb.append(pkeyStr);
+            i++;
+        }
+        sb.append(");\n");
+        sb.append("PARTITION TABLE ").append(m_name).append(" ON COLUMN ").append("COL_").append(getPartitionColumn()).append(";");
+        SyncCallback cb = new SyncCallback();
+        if (!getConnectionHadler().callProcedure(getInternalUser(), true, BatchTimeoutOverrideType.NO_TIMEOUT, cb, "@AdHoc", sb.toString())) {
+            built.set(false);
+            return;
+        }
+        try {
+            cb.waitForResponse();
+        } catch (InterruptedException e) {
+            m_logger.error("Interrupted while pausing cluster for resource overusage", e);
+            return;
+        }
+        ClientResponseImpl r = ClientResponseImpl.class.cast(cb.getResponse());
+        if (r.getStatus() != ClientResponse.SUCCESS) {
+            if (r.getStatusString().contains("object name already exists")) {
+                synchronized(m_tableBuiltMap) {
+                    String name = this.getClass().toString().trim();
+                    built = m_tableBuiltMap.get(this.getClass().toString().trim());
+                    if (built == null) {
+                        built = new AtomicBoolean(true);
+                        m_tableBuiltMap.put(name, built);
+                    } else {
+                        built.set(true);
+                    }
+                }
+            }
+            return;
+        }
+        m_logger.info("Built Table: " + sb.toString());
+        built.set(true);
+    }
+
+    protected boolean isTableBuilt() {
+        AtomicBoolean built = m_tableBuiltMap.get(this.getClass().toString().trim());
+        if (built == null) {
+            return false;
+        }
+        return built.get();
+    }
+
+    protected boolean skipCollection() {
+//        String name = this.getClass().toString().trim();
+//        if (name.contains("TableStats"))
+//            return true;
+        return false;
+    }
+
+    public VoltTable[] splitTables(VoltTable values) {
+        VoltTable[] tables = new VoltTable[1];
+        tables[0] = values;
+        return tables;
+    }
+
+    protected boolean persistStats(VoltTable values, boolean sync) {
+        if (!isTableBuilt() || skipCollection()) {
+            return false;
+        }
+        if (values == null || values.getRowCount() <= 0) {
+            return false;
+        }
+        VoltTable[] tables = splitTables(values);
+        for (int i = 0; i < tables.length; i++) {
+            SyncCallback cb = new SyncCallback();
+            Object rpartitionParam = HashinatorLite.valueToBytes(tables[i].fetchRow(0).get(getPartitionColumnIndex(), getPartitionColumnType()));
+            if (!getConnectionHadler().callProcedure(getInternalUser(), true, BatchTimeoutOverrideType.NO_TIMEOUT, cb,
+                    "@LoadSinglepartitionTable", rpartitionParam, m_name, (byte )1, tables[i])) {
+                return false;
+            }
+            if (sync) {
+                try {
+                    cb.waitForResponse();
+                } catch (InterruptedException e) {
+                    m_logger.error("Interrupted while pausing cluster for resource overusage", e);
+                    return false;
+                }
+                ClientResponseImpl r = ClientResponseImpl.class.cast(cb.getResponse());
+                if (r.getStatus() != ClientResponse.SUCCESS) {
+                    m_logger.info("Failed to insert: " + r.getStatusString());
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
 }

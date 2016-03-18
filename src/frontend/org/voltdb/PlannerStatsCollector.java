@@ -161,7 +161,7 @@ public class PlannerStatsCollector extends StatsSource {
      * @param siteId  site id
      */
     public PlannerStatsCollector(long siteId) {
-        super(false);
+        super("PlannerStats", false);
         m_siteId = siteId;
     }
 

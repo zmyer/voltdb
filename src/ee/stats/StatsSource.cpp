@@ -130,7 +130,7 @@ TableTuple* StatsSource::getStatsTuple(bool interval, int64_t now) {
     m_statsTuple.setNValue(2, m_hostname);
     m_statsTuple.setNValue(3, ValueFactory::getIntegerValue(static_cast<int32_t>(m_siteId >> 32)));
     m_statsTuple.setNValue(4, ValueFactory::getBigIntValue(m_partitionId));
-    updateStatsTuple(&m_statsTuple);
+    updateStatsTuple(&m_statsTuple, now, m_siteId);
 
     // this was put in to collect history, but wasn't bounded so it leaked
     // also maybe better to collect history elsewhere
