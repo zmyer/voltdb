@@ -766,6 +766,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         calculateColumnNames(child, col);
 
+        // This index calculation is only used for sanity checking
+        // materialized views (which use the parsed select statement but
+        // don't go through the planner pass that does more involved
+        // column index resolution).
+        col.index = index;
+
         insertAggExpressionsToAggResultColumns(m_aggregationList, col);
         if (m_aggregationList.size() >= 1) {
             m_hasAggregateExpression = true;
