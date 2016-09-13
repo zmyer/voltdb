@@ -16,6 +16,7 @@
  */
 package org.voltdb;
 
+import java.io.IOException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -23,9 +24,12 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.settings.ClusterSettings;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -45,7 +49,25 @@ public interface VoltDBInterface
     public void readBuildInfo(String editionTag);
 
     public CommandLog getCommandLog();
+    public boolean isRunningWithOldVerbs();
 
+    public String getVoltDBRootPath(PathsType.Voltdbroot path);
+    public String getCommandLogPath(PathsType.Commandlog path);
+    public String getCommandLogSnapshotPath(PathsType.Commandlogsnapshot path);
+    public String getSnapshotPath(PathsType.Snapshots path);
+    public String getExportOverflowPath(PathsType.Exportoverflow path);
+    public String getHighVolumeOutputPath(PathsType.Highvolumeoutput path);
+    public String getDROverflowPath(PathsType.Droverflow path);
+
+    public String getVoltDBRootPath();
+    public String getCommandLogSnapshotPath();
+    public String getCommandLogPath();
+    public String getSnapshotPath();
+    public String getExportOverflowPath();
+    public String getHighVolumeOutputPath();
+    public String getDROverflowPath();
+
+    public boolean isBare();
     /**
      * Initialize all the global components, then initialize all the m_sites.
      * @param config Configuration from command line.
@@ -89,6 +111,8 @@ public interface VoltDBInterface
     public String getLocalMetadata();
     public SiteTracker getSiteTrackerForSnapshot();
 
+    public void loadLegacyPathProperties(DeploymentType deployment) throws IOException;
+
     /**
      * Update the global logging context in the server.
      *
@@ -120,6 +144,14 @@ public interface VoltDBInterface
             long currentTxnTimestamp,
             byte[] deploymentBytes,
             byte[] deploymentHash);
+
+    /**
+     * Updates the cluster setting of this VoltDB
+     * @param settings the {@link ClusterSettings} update candidate
+     * @param expectedVersionId version of the current instance (same as the Zookeeper node)
+     * @return a {@link Pair} of {@link CatalogContext} and {@link CatalogSpecificPlanner}
+     */
+    public Pair<CatalogContext, CatalogSpecificPlanner> settingsUpdate(ClusterSettings settings, int expectedVersionId);
 
    /**
      * Tells if the VoltDB is running. m_isRunning needs to be set to true

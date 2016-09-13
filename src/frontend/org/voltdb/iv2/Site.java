@@ -96,7 +96,6 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.sysprocs.SysProcFragmentId;
-import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
@@ -381,6 +380,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
+        public boolean updateSettings(CatalogContext context, CatalogSpecificPlanner csp)
+        {
+            return Site.this.updateSettings(context, csp);
+        }
+
+        @Override
         public TheHashinator getCurrentHashinator()
         {
             return m_hashinator;
@@ -647,7 +652,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     ExecutionEngine initializeEE()
     {
         String hostname = CoreUtils.getHostnameOrAddress();
-        String highVolumeDirPath = m_context.cluster.getHighvolumeoutput();
+        String highVolumeDirPath = VoltDB.instance().getHighVolumeOutputPath();
         HashinatorConfig hashinatorConfig = TheHashinator.getCurrentConfig();
         ExecutionEngine eeTemp = null;
         Deployment deploy = m_context.cluster.getDeployment().get("deployment");
@@ -746,7 +751,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 } else if (m_rejoinState == kStateReplayingRejoin) {
                     // Rejoin operation poll and try to do some catchup work. Tasks
                     // are responsible for logging any rejoin work they might have.
-                    SiteTasker task = m_scheduler.poll();
+                    SiteTasker task = m_scheduler.peek();
                     boolean didWork = false;
                     if (task != null) {
                         didWork = true;
@@ -758,9 +763,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             replayFromTaskLog(mrm);
                         }
                         mrm.didRestricted();
-                        if (m_rejoinState == kStateRunning) {
-                            task.run(getSiteProcedureConnection());
-                        } else {
+                        // If m_rejoinState didn't change to kStateRunning because of replayFromTaskLog(),
+                        // remove the task from the scheduler and give it to task log.
+                        // Otherwise, keep the task in the scheduler and let the next loop take and handle it
+                        if (m_rejoinState != kStateRunning) {
+                            m_scheduler.poll();
                             task.runForRejoin(getSiteProcedureConnection(), m_rejoinTaskLog);
                         }
                     } else {
@@ -846,7 +853,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 // Only complete transactions that are open...
                 if (global_replay_mpTxn != null) {
                     CompleteTransactionMessage m = (CompleteTransactionMessage)tibm;
-                    CompleteTransactionTask t = new CompleteTransactionTask(global_replay_mpTxn,
+                    CompleteTransactionTask t = new CompleteTransactionTask(m_initiatorMailbox, global_replay_mpTxn,
                             null, m, m_drGateway);
                     if (!m.isRestart()) {
                         global_replay_mpTxn = null;
@@ -1449,6 +1456,19 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     spHandle, catalogCommands.getSecond().getBytes(Charsets.UTF_8));
         }
 
+        return true;
+    }
+
+    /**
+     * Update the system settings
+     * @param context catalog context
+     * @param csp catalog specific planner
+     * @return true if it succeeds
+     */
+    public boolean updateSettings(CatalogContext context, CatalogSpecificPlanner csp) {
+        m_context = context;
+        // here you could bring the timeout settings
+        m_loadedProcedures.loadProcedures(m_context, m_backend, csp);
         return true;
     }
 

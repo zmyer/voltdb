@@ -87,7 +87,6 @@ class ServerInputs(Inputs):
         ],
         'hostname': [
             DataRequired('Host name is required.'),
-            IPAddress('Invalid IP address.')
         ],
         'enabled': [
             Optional(),
@@ -790,6 +789,48 @@ class DatabaseInputs(Inputs):
             Regexp('^[a-zA-Z0-9_.]+$', 0, 'Only alphabets, numbers, _ and . are allowed.')
         ]
     }
+
+
+def ValidateDbFieldType(request):
+    result = {'status': 'success'}
+    if request and request is not None:
+        if 'name' in request and type(request['name']) is not unicode:
+            return {'status': 'error', 'errors': 'Invalid datatype for field database name.'}
+    return result
+
+
+def ValidateServerFieldType(request):
+    result = {'status': 'success'}
+    if request and request is not None:
+        if 'hostname' in request and type(request['hostname']) is not unicode:
+            return {'status': 'error', 'errors': 'Invalid value for field hostname.'}
+        if 'enabled' in request and type(request['enabled']) is not bool:
+            return {'status': 'error', 'errors': 'Invalid value for field enabled.'}
+        if 'admin-listener' in request and type(request['admin-listener']) is not unicode:
+            return {'status': 'error', 'errors': 'Invalid value for field admin-listener.'}
+        if 'zookeeper-listener' in request and type(request['zookeeper-listener']) is not unicode:
+            return {'status': 'error', 'errors': 'Invalid value for field zookeeper-listener.'}
+        if 'replication-listener' in request and type(request['replication-listener']) is not unicode:
+            return {'status': 'error', 'errors': 'Invalid value for field replication-listener.'}
+        if 'client-listener' in request and type(request['client-listener']) is not unicode:
+            return {'status': 'error', 'errors': 'Invalid value for field client-listener.'}
+        if 'internal-listener' in request and type(request['internal-listener']) is not unicode:
+            return {'status': 'error', 'errors': 'Invalid value for field internal-listener.'}
+        if 'http-listener' in request and type(request['http-listener']) is not unicode:
+            return {'status': 'error', 'errors': 'Invalid value for field http-listener.'}
+        if 'internal-interface' in request and type(request['internal-interface']) is not unicode:
+            return {'status': 'error', 'errors': 'Invalid value for field internal-interface.'}
+        if 'external-interface' in request and type(request['external-interface']) is not unicode:
+            return {'status': 'error', 'errors': 'Invalid value for field external-interface.'}
+        if 'public-interface' in request and type(request['public-interface']) is not unicode:
+            return {'status': 'error', 'errors': 'Invalid value for field public-interface.'}
+        if 'name' in request and type(request['name']) is not unicode:
+            return {'status': 'error', 'errors': 'Invalid value for field name.'}
+        if 'description' in request and type(request['description']) is not unicode:
+            return {'status': 'error', 'errors': 'Invalid value for field description.'}
+        if 'placement-group' in request and type(request['placement-group']) is not unicode:
+            return {'status': 'error', 'errors': 'Invalid value for field placement-group.'}
+    return result
 
 
 class ConfigValidation(Inputs):

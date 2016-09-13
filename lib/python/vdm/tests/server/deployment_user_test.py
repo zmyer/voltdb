@@ -16,8 +16,8 @@
 
 import unittest
 import requests
-import xmlrunner
 import socket
+import xmlrunner
 
 
 __host_name__ = socket.gethostname()
@@ -79,7 +79,7 @@ class UpdateDeploymentUser(DeploymentUser):
             db_data = {"name": "test", "password": "voltdb", "plaintext": True, "roles": "Administrator", "databaseid": 1}
             response = requests.post(user_url, json=db_data, headers=headers)
             value = response.json()
-            self.assertEqual(value['error'], u'user name already exists')
+            self.assertEqual(value['statusString'], u'user name already exists')
 
             self.assertEqual(response.status_code, 404)
         else:
@@ -96,7 +96,7 @@ class UpdateDeploymentUser(DeploymentUser):
             response = requests.post(user_url,
                                     json=db_data, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "'name' is a required property")
+            self.assertEqual(value['statusString'][0], "'name' is a required property")
             self.assertEqual(response.status_code, 200)
         else:
             print "The database list is empty"
@@ -110,7 +110,7 @@ class UpdateDeploymentUser(DeploymentUser):
             response = requests.post(user_url,
                                     json=db_data, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "u'@@@@' does not match '^[a-zA-Z0-9_.]+$'")
+            self.assertEqual(value['statusString'][0], "u'@@@@' does not match '^[a-zA-Z0-9_.]+$'")
             self.assertEqual(response.status_code, 200)
         else:
             print "The database list is empty"
@@ -126,7 +126,7 @@ class UpdateDeploymentUser(DeploymentUser):
             response = requests.post(user_url,
                                     json=db_data, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "'password' is a required property")
+            self.assertEqual(value['statusString'][0], "'password' is a required property")
             self.assertEqual(response.status_code, 200)
         else:
             print "The database list is empty"
@@ -142,7 +142,7 @@ class UpdateDeploymentUser(DeploymentUser):
             response = requests.post(user_url,
                                     json=db_data, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "'roles' is a required property")
+            self.assertEqual(value['statusString'][0], "'roles' is a required property")
             self.assertEqual(response.status_code, 200)
         else:
             print "The database list is empty"
@@ -156,14 +156,14 @@ class UpdateDeploymentUser(DeploymentUser):
             response = requests.post(user_url,
                                     json=db_data, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "u'@@@@' does not match '^[a-zA-Z0-9_.,-]+$'")
+            self.assertEqual(value['statusString'][0], "u'@@@@' does not match '^[a-zA-Z0-9_.,-]+$'")
             self.assertEqual(response.status_code, 200)
 
             db_data = {"name": "voltdb", "password": "test", "plaintext": True,"roles":",", "databaseid": 1}
             response = requests.post(user_url,
                                     json=db_data, headers=headers)
             value = response.json()
-            self.assertEqual(value['error'], "Invalid user roles.")
+            self.assertEqual(value['statusString'], "Invalid user roles.")
             self.assertEqual(response.status_code, 200)
         else:
             print "The database list is empty"
@@ -208,6 +208,53 @@ class UpdateDeploymentUser(DeploymentUser):
                 self.assertEqual(value['statusstring'], "User Updated")
                 self.assertEqual(response.status_code, 200)
 
+    def test_get_user_with_non_existing_id(self):
+        __user_url = 'http://%s:8000/api/1.0/databases/3/users/' % \
+                    __host_or_ip__
+        response = requests.get(__user_url)
+        value = response.json()
+        self.assertEqual(value['statusString'], "No database found for id: 3")
+        self.assertEqual(response.status_code, 404)
+
+    def test_add_user_with_non_existing_id(self):
+        db_data = {"name":"user", "password": "voltdb", "plaintext": True, "roles": "Administrator", "databaseid": 1}
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        last_db_id = 3
+        if last_db_id != -1:
+            user_url = '%s%u/users/' % (__db_url__, last_db_id)
+            response = requests.post(user_url,
+                                    json=db_data, headers=headers)
+            value = response.json()
+            self.assertEqual(value['statusString'], "No database found for id: 3")
+            self.assertEqual(response.status_code, 404)
+        else:
+            print "The database list is empty"
+
+    def test_delete_user_with_non_existing_databaseid(self):
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_data = {"name":"user", "password": "voltdb", "plaintext": True, "roles": "Administrator", "databaseid": 1}
+            headers = {'Content-Type': 'application/json; charset=utf-8'}
+            last_db_id = GetLastDbId()
+            if last_db_id != -1:
+                user_url = '%s%u/users/' % (__db_url__, last_db_id)
+                response = requests.post(user_url,
+                                        json=db_data, headers=headers)
+                value = response.json()
+                self.assertEqual(response.status_code, 200)
+
+                last_db_id = 3
+                last_user_id = 1
+                user_delete_url = '%s%u/users/%u/' % (__db_url__, last_db_id, last_user_id)
+                response = requests.delete(user_delete_url)
+                value1 = response.json()
+                self.assertEqual(response.status_code, 404)
+                self.assertEqual(value1['statusString'], "No database found for id: 3")
+        else:
+            print "The database list is empty"
+
+
 
 def GetLastDbId():
     last_db_id = -1
@@ -220,4 +267,3 @@ def GetLastDbId():
 
 if __name__ == '__main__':
     unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))
-    unittest.main()

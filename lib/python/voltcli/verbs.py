@@ -433,10 +433,6 @@ class ServerBundle(JavaBundle):
                                  'specify the location of the deployment file',
                                  default = None))
         verb.add_options(
-            cli.StringOption('-D', '--dbroot', 'voltdbroot',
-                             'specify the location of voltdbroot',
-                             default = None))
-        verb.add_options(
             cli.StringOption('-g', '--placement-group', 'placementgroup',
                              'placement group',
                              default = '0'))
@@ -493,7 +489,7 @@ class ServerBundle(JavaBundle):
                 else:
                     utility.error(v[1])
         final_args = None
-        if self.subcommand in ('create', 'recover'):
+        if self.subcommand in ('create', 'recover', 'probe'):
             if runner.opts.replica:
                 final_args = [self.subcommand, 'replica']
         if self.supports_live:
@@ -542,8 +538,6 @@ class ServerBundle(JavaBundle):
             final_args.extend(['externalinterface', runner.opts.externalinterface])
         if runner.opts.publicinterface:
             final_args.extend(['publicinterface', runner.opts.publicinterface])
-        if runner.opts.voltdbroot:
-            final_args.extend(['voltdbroot', runner.opts.voltdbroot])
         if self.subcommand in ('create', 'initialize'):
             if runner.opts.force:
                 final_args.extend(['force'])

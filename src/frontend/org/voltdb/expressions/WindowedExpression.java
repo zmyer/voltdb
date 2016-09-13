@@ -17,14 +17,9 @@
 package org.voltdb.expressions;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
-import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Database;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.SortDirectionType;
 
@@ -55,6 +50,13 @@ public class WindowedExpression extends AbstractExpression {
     private List<AbstractExpression> m_orderByExpressions = new ArrayList<>();
     private List<SortDirectionType>  m_orderByDirections = new ArrayList<>();
 
+    // This object is not in the display list.  It's squirreled away in the ParsedSelectStatment.  But
+    // the display list has a TVE which references the column which holds the values this aggregate
+    // expression will compute.  This field holds this TVE.
+    private TupleValueExpression m_displayListExpression;
+
+    private int m_xmlID = -1;
+
     public WindowedExpression() {
         //
         // This is needed for serialization
@@ -67,13 +69,15 @@ public class WindowedExpression extends AbstractExpression {
             List<AbstractExpression> partitionbyExprs,
             List<AbstractExpression> orderbyExprs,
             List<SortDirectionType>  orderByDirections,
-            Database db, boolean isDecending, boolean isPercentRank)
+            int                      id)
     {
         super(operationType);
         m_partitionByExpressions.addAll(partitionbyExprs);
         m_orderByExpressions.addAll(orderbyExprs);
         m_orderByDirections.addAll(orderByDirections);
-
+        setValueType(VoltType.BIGINT);
+        setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
+        m_xmlID = id;
     }
 
 
@@ -117,59 +121,6 @@ public class WindowedExpression extends AbstractExpression {
         hash += m_orderByExpressions.hashCode();
         hash += m_partitionByExpressions.hashCode();
         return hash;
-    }
-
-    private Collection<? extends AbstractExpression> copyPartitionByExpressions() {
-        List<AbstractExpression> copy = new ArrayList<AbstractExpression>();
-        for (AbstractExpression ae : m_partitionByExpressions) {
-            copy.add((AbstractExpression)ae.clone());
-        }
-        return copy;
-    }
-
-    private Collection<? extends AbstractExpression> copyOrderByExpressions() {
-        List<AbstractExpression> copy = new ArrayList<AbstractExpression>();
-        for (AbstractExpression ae : m_orderByExpressions) {
-            copy.add((AbstractExpression)ae.clone());
-        }
-        return copy;
-    }
-
-    @Override
-    protected void loadFromJSONObject(JSONObject jobj) throws JSONException {
-        super.loadFromJSONObject(jobj);
-        m_partitionByExpressions.clear();
-
-        /*
-         * Load the array of partition expressions.  The AbstractExpression class
-         * has a useful routine to do just this for us.
-         */
-        AbstractExpression.loadFromJSONArrayChild(m_partitionByExpressions, jobj, Members.PARTITION_BY_EXPRESSIONS.name(), null);
-
-        /*
-         * Unfortunately we cannot use AbstractExpression.loadFromJSONArrayChild here,
-         * as we need to get a sort expression and a sort order for each column.
-         */
-        AbstractExpression.loadSortListFromJSONArray(m_orderByExpressions, m_orderByDirections, jobj);
-    }
-
-    @Override
-    public void toJSONString(JSONStringer stringer) throws JSONException {
-        super.toJSONString(stringer);
-        assert (m_orderByExpressions.size() == m_orderByDirections.size());
-        /*
-         * Serialize the partition expressions.  The orderby
-         * expressions which are not redundant with the PartitionBy
-         * expressions will be serialized in the orderby node which preceeds
-         * the PartitionByPlanNode.
-         */
-        stringer.key(Members.PARTITION_BY_EXPRESSIONS.name()).array();
-        for (int idx = 0; idx < m_partitionByExpressions.size(); idx += 1) {
-            stringer.object();
-            m_partitionByExpressions.get(idx).toJSONString(stringer);
-            stringer.endObject();
-        }
-        stringer.endArray();
     }
 
     @Override
@@ -243,6 +194,23 @@ public class WindowedExpression extends AbstractExpression {
             }
         }
         return -1;
+    }
+
+    public final TupleValueExpression getDisplayListExpression() {
+        return m_displayListExpression;
+    }
+
+    public final void setDisplayListExpression(TupleValueExpression displayListExpression) {
+        m_displayListExpression = displayListExpression;
+    }
+
+    /**
+     * When a VoltXMLElement is translated to an expression, we remember the
+     * ID.  We may see it again in the order by expression.  This gets the ID number.
+     * @return
+     */
+    public final int getXMLID() {
+        return m_xmlID;
     }
 }
 

@@ -73,12 +73,12 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     // those will be ignored (similar to
     // voltdb/tests/scripts/examples/sql_coverage/StandardNormalzer.py)
     private static final Pattern orderByQuery = Pattern.compile(
-            "ORDER BY(?<column1>\\s+(\\w*\\s*\\(\\s*)*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?)"
-            + "((?<column2>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?"
-            + "((?<column3>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?"
-            + "((?<column4>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?"
-            + "((?<column5>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?"
-            + "((?<column6>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?",
+            "ORDER BY(?<column1>\\s+(\\w*\\s*\\(\\s*)*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/)\\s*\\w+)*(\\s+(ASC|DESC))?)"
+            + "((?<column2>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/)\\s*\\w+)*(\\s+(ASC|DESC))?))?"
+            + "((?<column3>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/)\\s*\\w+)*(\\s+(ASC|DESC))?))?"
+            + "((?<column4>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/)\\s*\\w+)*(\\s+(ASC|DESC))?))?"
+            + "((?<column5>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/)\\s*\\w+)*(\\s+(ASC|DESC))?))?"
+            + "((?<column6>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/)\\s*\\w+)*(\\s+(ASC|DESC))?))?",
             Pattern.CASE_INSENSITIVE);
     // Modifies a query containing an ORDER BY clause, by adding (for each
     // order-by column) either NULLS FIRST or (after "DESC") NULL LAST, so
@@ -114,15 +114,23 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             = new QueryTransformer(dayOfYearQuery)
             .initialText("EXTRACT ( ").prefix("DOY FROM").suffix(")").groups("column");
 
-    // Captures the use of AVG(columnName), which PostgreSQL handles
-    // differently, when the columnName is of one of the integer types
+    // Regex pattern for a typical column or column expression (including
+    // functions, operators, etc.) - currently only used for AVG, though this
+    // could be expanded in the future; note that AS or FROM can occur
+    // (rarely) if certain functions occur within the AVG function, e.g.,
+    // AVG(CAST(VCHAR AS INTEGER)) or AVG(EXTRACT(DAY FROM PAST))
+    private static final String COLUMN_PATTERN = "(\\s*\\w*\\s*\\()*\\s*(\\w+\\.)?(?<column>\\w+)(\\s+(AS|FROM)\\s+\\w+)?(\\s*\\))*"
+            + "\\s*((\\+|\\-|\\*|\\/)(\\s*\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+(\\s+(AS|FROM)\\s+\\w+)?(\\s*\\))*)*\\s*";
+
+    // Captures the use of AVG(columnExpression), which PostgreSQL handles
+    // differently, when the columnExpression is of one of the integer types
     private static final Pattern avgQuery = Pattern.compile(
-            "AVG\\s*\\((\\s*\\w*\\s*\\()*\\s*(\\w+\\.)?(?<column>\\w+)(\\s*\\)(\\s+(AS|FROM)\\s+\\w+)?)*\\s*\\)",
+            "AVG\\s*\\("+COLUMN_PATTERN+"\\)",
             Pattern.CASE_INSENSITIVE);
-    // Modifies a query containing an AVG(columnName) function, where
+    // Modifies a query containing an AVG(columnExpression) function, where
     // <i>columnName</i> is of an integer type, for which PostgreSQL returns
     // a numeric (non-integer) value, unlike VoltDB, which returns an integer;
-    // so change it to: TRUNC ( AVG(columnName) )
+    // so change it to: TRUNC ( AVG(columnExpression) )
     private static final QueryTransformer avgQueryTransformer
             = new QueryTransformer(avgQuery)
             .prefix("TRUNC ( ").suffix(" )").groups("column")
