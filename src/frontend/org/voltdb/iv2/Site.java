@@ -1430,7 +1430,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                                             long txnId,
                                             long spHandle,
                                             long uniqueId,
-                                            boolean readOnly)
+                                            boolean readOnly,
+                                            boolean traceOn)
             throws EEException
     {
         return m_ee.executePlanFragments(
@@ -1443,7 +1444,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 spHandle,
                 m_lastCommittedSpHandle,
                 uniqueId,
-                readOnly ? Long.MAX_VALUE : getNextUndoTokenBroken());
+                readOnly ? Long.MAX_VALUE : getNextUndoTokenBroken(),
+                traceOn);
     }
 
     @Override

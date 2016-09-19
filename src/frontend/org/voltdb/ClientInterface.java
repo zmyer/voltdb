@@ -49,6 +49,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
@@ -66,6 +67,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.AuthSystem.AuthProvider;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
@@ -86,14 +88,14 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.security.AuthenticationRequest;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import org.voltcore.logging.Level;
-import org.voltcore.utils.RateLimitedLogger;
+
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -930,6 +932,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     delta,
                     clientResponse.getStatus());
 
+            VoltTrace.add(() -> VoltTrace.endAsync("recvtxn", VoltTrace.Category.CI,
+                                                   clientData.m_clientHandle,
+                                                   "status", Byte.toString(clientResponse.getStatus()),
+                                                   "statusString", clientResponse.getStatusString()));
+
             clientResponse.setClientHandle(clientData.m_clientHandle);
             clientResponse.setClusterRoundtrip((int)TimeUnit.NANOSECONDS.toMillis(delta));
             clientResponse.setHash(null); // not part of wire protocol
@@ -1354,7 +1361,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return errorResponse(ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, errorMessage, null, false);
         }
 
-        return m_dispatcher.dispatch(task, handler, ccxn, user, null);
+        final ClientResponseImpl errResp = m_dispatcher.dispatch(task, handler, ccxn, user, null);
+
+        if (errResp != null) {
+            VoltTrace.add(() -> VoltTrace.endAsync("recvtxn", VoltTrace.Category.CI,
+                                                   task.getClientHandle(),
+                                                   "status", Byte.toString(errResp.getStatus()),
+                                                   "statusString", errResp.getStatusString()));
+        }
+
+        return errResp;
     }
 
     public Procedure getProcedureFromName(String procName, CatalogContext catalogContext) {

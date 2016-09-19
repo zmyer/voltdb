@@ -167,6 +167,7 @@ import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.TopologyZKUtils;
 import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltSampler;
+import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Joiner;
