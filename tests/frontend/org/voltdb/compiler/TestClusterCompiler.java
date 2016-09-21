@@ -69,7 +69,7 @@ public class TestClusterCompiler extends TestCase
             assertEquals(0, partition.getInt("partition_id"));
             JSONArray replicas = partition.getJSONArray("replicas");
             assertEquals(3, replicas.length());
-            HashSet<Integer> replicasContents = new HashSet<Integer>();
+            HashSet<Integer> replicasContents = new HashSet<>();
             for (int zz = 0; zz < replicas.length(); zz++) {
                 replicasContents.add(replicas.getInt(zz));
             }
@@ -470,7 +470,8 @@ public class TestClusterCompiler extends TestCase
         runConfigAndVerifyTopology(hostGroups, 2);
     }
 
-    public void testFourNodesOneGroup() throws JSONException
+    // This test case is very slow in original algorithm
+    public void testSlowFourNodesOneGroup() throws JSONException
     {
         Map<Integer, ExtensibleGroupTag> hostGroups = Maps.newHashMap();
         hostGroups.put(0, new ExtensibleGroupTag("2", "0"));
@@ -492,14 +493,6 @@ public class TestClusterCompiler extends TestCase
         final int Kfactor = 2;
         final int nodes = 50;
         for (int hostCount = 3; hostCount <= nodes; hostCount++) {
-            runBuddyGroupPlacement(hostCount, hostCount / (Kfactor + 1), Kfactor);
-        }
-    }
-
-    public void testBuddyGroupsKfactorThree() throws JSONException {
-        final int Kfactor = 3;
-        final int nodes = 50;
-        for (int hostCount = 4; hostCount <= nodes; hostCount++) {
             runBuddyGroupPlacement(hostCount, hostCount / (Kfactor + 1), Kfactor);
         }
     }
