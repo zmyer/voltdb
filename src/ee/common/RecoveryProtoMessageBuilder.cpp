@@ -19,7 +19,6 @@
 #include "common/FatalException.hpp"
 #include "common/types.h"
 #include "common/Pool.hpp"
-#include "common/TupleSerializer.h"
 
 namespace voltdb {
 /*
@@ -29,12 +28,11 @@ RecoveryProtoMsgBuilder::RecoveryProtoMsgBuilder(
         const RecoveryMsgType type,
         CatalogId tableId,
         uint32_t totalTupleCount,
-        SerializeOutput<ReferenceSerializeOutput> *out,
-        TupleSerializer *serializer,
+        ReferenceSerializeOutput *out,
         const TupleSchema *schema) :
     m_out(out),
     m_tupleCount(0),
-    m_maxSerializedSize(serializer->getMaxSerializedTupleSize(schema))
+    m_maxSerializedSize(schema->getMaxSerializedTupleSize(true))
 {
     assert(m_out);
     m_out->writeByte(static_cast<int8_t>(type));
@@ -49,7 +47,7 @@ RecoveryProtoMsgBuilder::RecoveryProtoMsgBuilder(
 void RecoveryProtoMsgBuilder::addTuple(TableTuple tuple) {
     assert(m_out);
     assert(canAddMoreTuples());
-    tuple.serializeTo(*m_out);
+    tuple.serializeTo(*m_out, true);
     m_tupleCount++;
 }
 
@@ -61,7 +59,7 @@ void RecoveryProtoMsgBuilder::finalize() {
 }
 
 bool RecoveryProtoMsgBuilder::canAddMoreTuples() {
-    if (m_out->getSerializer()->remaining() >= m_maxSerializedSize) {
+    if (m_out->remaining() >= m_maxSerializedSize) {
         return true;
     }
     return false;
