@@ -186,16 +186,6 @@ public:
         return bytes;
     }
 
-    // return the number of bytes when serialized for regular usage (other
-    // than export and DR).
-    size_t serializationSizeNoHeader() const {
-        size_t bytes = 0;
-        for (int colIdx = 0; colIdx < sizeInValues(); ++colIdx) {
-            bytes += maxSerializedColumnSize(colIdx);
-        }
-        return bytes;
-    }
-
     // Return the amount of memory allocated for non-inlined objects
     size_t getNonInlinedMemorySize() const
     {
@@ -424,7 +414,7 @@ public:
 
     void deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *stringPool);
     void deserializeFromDR(voltdb::SerializeInputLE &tupleIn, Pool *stringPool);
-    template<class T> void serializeTo(voltdb::SerializeOutput<T> &output, bool includeHiddenColumns = false);
+    template <class T> void serializeTo(T& output, bool includeHiddenColumns = false) const;
     void serializeToExport(voltdb::ExportSerializeOutput &io,
                           int colOffset, uint8_t *nullArray);
     void serializeToDR(voltdb::ExportSerializeOutput &io,
@@ -961,7 +951,7 @@ inline void TableTuple::deserializeFromDR(voltdb::SerializeInputLE &tupleIn,  Po
     }
 }
 
-template<class T> inline void TableTuple::serializeTo(voltdb::SerializeOutput<T> &output, bool includeHiddenColumns) {
+template<class T> inline void TableTuple::serializeTo(T &output, bool includeHiddenColumns) const {
     size_t start = output.reserveBytes(4);
 
     for (int j = 0; j < m_schema->columnCount(); ++j) {

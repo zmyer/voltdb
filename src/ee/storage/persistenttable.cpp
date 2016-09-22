@@ -1413,7 +1413,6 @@ template void PersistentTable::processLoadedTupleShared <FallbackSerializeOutput
 
 /** Prepare table for streaming from serialized data. */
 bool PersistentTable::activateStream(
-    TupleSerializer &tupleSerializer,
     TableStreamType streamType,
     int32_t partitionId,
     CatalogId tableId,
@@ -1441,7 +1440,7 @@ bool PersistentTable::activateStream(
         }
     }
 
-    return m_tableStreamer->activateStream(m_surgeon, tupleSerializer, streamType, predicateStrings);
+    return m_tableStreamer->activateStream(m_surgeon, streamType, predicateStrings);
 }
 
 /**
@@ -1449,8 +1448,7 @@ bool PersistentTable::activateStream(
  * Use custom TableStreamer provided.
  * Return true on success or false if it was already active.
  */
-bool PersistentTable::activateWithCustomStreamer(TupleSerializer &tupleSerializer,
-                                                 TableStreamType streamType,
+bool PersistentTable::activateWithCustomStreamer(TableStreamType streamType,
         boost::shared_ptr<TableStreamerInterface> tableStreamer,
         CatalogId tableId,
         std::vector<std::string> &predicateStrings,
@@ -1461,7 +1459,6 @@ bool PersistentTable::activateWithCustomStreamer(TupleSerializer &tupleSerialize
     bool success = !skipInternalActivation;
     if (!skipInternalActivation) {
         success = m_tableStreamer->activateStream(m_surgeon,
-                                                  tupleSerializer,
                                                   streamType,
                                                   predicateStrings);
     }
