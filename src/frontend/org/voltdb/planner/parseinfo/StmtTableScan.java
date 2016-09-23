@@ -77,9 +77,9 @@ public abstract class StmtTableScan {
         return m_stmtId;
     }
 
-    abstract public String getColumnName(int m_columnIndex);
+    abstract public String getColumnName(int columnIndex);
 
-    abstract public AbstractExpression processTVE(TupleValueExpression expr, String columnName);
+    abstract public void processTVE(TupleValueExpression expr, String columnName);
 
     public AbstractExpression resolveTVE(TupleValueExpression expr) {
         AbstractExpression resolvedExpr = processTVE(expr, expr.getColumnName());
