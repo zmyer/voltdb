@@ -44,15 +44,8 @@
  */
 
 #include "receiveexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/tabletuple.h"
 #include "plannodes/receivenode.h"
 #include "execution/VoltDBEngine.h"
-#include "storage/table.h"
-#include "storage/tablefactory.h"
-#include "storage/tableiterator.h"
-#include "storage/tableutil.h"
 
 namespace voltdb {
 
@@ -70,17 +63,12 @@ bool ReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
 
 bool ReceiveExecutor::p_execute(const NValueArray &params) {
     int loadedDeps = 0;
-    ReceivePlanNode* node = dynamic_cast<ReceivePlanNode*>(m_abstractNode);
-    Table* output_table = dynamic_cast<Table*>(node->getOutputTable());
+    TempTable* outputTable = m_abstractNode->getTempOutputTable();
 
-    // iterate dependencies stored in the frontend and union them
-    // into the output_table. The engine does this work for peanuts.
-
-    // todo: should pass the transaction's string pool through
-    // as the underlying table loader would use it.
+    // Iterate dependencies stored in the frontend and concatenate them
+    // into the output table.
     do {
-        loadedDeps =
-        engine->loadNextDependency(output_table);
+        loadedDeps = engine->loadNextDependency(outputTable);
     } while (loadedDeps > 0);
 
     return true;

@@ -271,8 +271,7 @@ size_t Table::getColumnHeaderSizeToSerialize(bool includeTotalSize) const {
     return bytes;
 }
 
-template<class T> bool Table::serializeColumnHeaderTo(SerializeOutput<T> &serialize_io) {
-
+template <class T> void Table::serializeColumnHeaderTo(T& serializeOut) {
     /* NOTE:
        VoltDBEngine uses a binary template to create tables of single integers.
        It's called m_templateSingleLongTable and if you are seeing a serialization
@@ -285,24 +284,24 @@ template<class T> bool Table::serializeColumnHeaderTo(SerializeOutput<T> &serial
     // use a cache
     if (m_columnHeaderData) {
         assert(m_columnHeaderSize != -1);
-        serialize_io.writeBytes(m_columnHeaderData, m_columnHeaderSize);
-        return true;
+        serializeOut.writeBytes(m_columnHeaderData, m_columnHeaderSize);
+        return;
     }
     assert(m_columnHeaderSize == -1);
 
     // skip header position
-    start = serialize_io.reserveBytes(sizeof(int));
+    start = serializeOut.reserveBytes(sizeof(int));
 
     //status code
-    serialize_io.writeByte(-128);
+    serializeOut.writeByte(-128);
 
     // column counts as a short
-    serialize_io.writeShort(static_cast<int16_t>(m_columnCount));
+    serializeOut.writeShort(static_cast<int16_t>(m_columnCount));
 
     // write an array of column types as bytes
     for (int i = 0; i < m_columnCount; ++i) {
         ValueType type = m_schema->columnType(i);
-        serialize_io.writeByte(static_cast<int8_t>(type));
+        serializeOut.writeByte(static_cast<int8_t>(type));
     }
 
     // write the array of column names as voltdb strings
@@ -315,33 +314,29 @@ template<class T> bool Table::serializeColumnHeaderTo(SerializeOutput<T> &serial
         assert(length >= 0);
 
         // this is standard string serialization for voltdb
-        serialize_io.writeInt(length);
-        serialize_io.writeBytes(name.data(), length);
+        serializeOut.writeInt(length);
+        serializeOut.writeBytes(name.data(), length);
     }
 
 
     // write the header size which is a non-inclusive int
-    size_t position = serialize_io.position();
+    size_t position = serializeOut.position();
     size_t columnHeaderSize = static_cast<int32_t>(position - start);
     int32_t nonInclusiveHeaderSize = static_cast<int32_t>(columnHeaderSize - sizeof(int32_t));
-    serialize_io.writeIntAt(start, nonInclusiveHeaderSize);
+    serializeOut.writeIntAt(start, nonInclusiveHeaderSize);
 
     // cache the results
-    if (serialize_io.getSerializer()->data() != NULL) {
+    if (serializeOut.data() != NULL) {
         m_columnHeaderSize = columnHeaderSize;
         m_columnHeaderData = new char[m_columnHeaderSize];
-        memcpy(m_columnHeaderData, static_cast<const char*>(serialize_io.getSerializer()->data()) + start, m_columnHeaderSize);
+        memcpy(m_columnHeaderData, static_cast<const char*>(serializeOut.data()) + start, m_columnHeaderSize);
     }
-
-    return true;
-
 }
-template bool Table::serializeColumnHeaderTo<ReferenceSerializeOutput>(SerializeOutput<ReferenceSerializeOutput> &serialize_io);
-template bool Table::serializeColumnHeaderTo<CopySerializeOutput>(SerializeOutput<CopySerializeOutput> &serialize_io);
-template bool Table::serializeColumnHeaderTo<SerializeOutputFile>(SerializeOutput<SerializeOutputFile> &serialize_io);
+template void Table::serializeColumnHeaderTo<ReferenceSerializeOutput>(ReferenceSerializeOutput&);
+template void Table::serializeColumnHeaderTo<FileSerializeOutput>(FileSerializeOutput&);
+template void Table::serializeColumnHeaderTo<TestableSerializeOutput>(TestableSerializeOutput&);
 
-
-template<class T> bool Table::serializeTo(SerializeOutput<T> &serialize_io) {
+template <class T> void Table::serializeTo(T& serializeOut) {
     // The table is serialized as:
     // [(int) total size]
     // [(int) header size] [num columns] [column types] [column names]
@@ -354,74 +349,65 @@ template<class T> bool Table::serializeTo(SerializeOutput<T> &serialize_io) {
     */
 
     // a placeholder for the total table size
-    std::size_t pos = serialize_io.reserveBytes(sizeof(int));
+    std::size_t pos = serializeOut.reserveBytes(sizeof(int));
 
-    if (!serializeColumnHeaderTo(serialize_io))
-        return false;
+    serializeColumnHeaderTo(serializeOut);
 
     // active tuple counts
-    serialize_io.writeInt(static_cast<int32_t>(m_tupleCount));
+    serializeOut.writeInt(static_cast<int32_t>(m_tupleCount));
     int64_t written_count = 0;
     TableIterator titer = iterator();
     TableTuple tuple(m_schema);
     while (titer.next(tuple)) {
-        tuple.serializeTo(serialize_io);
+        tuple.serializeTo(serializeOut);
         ++written_count;
     }
     assert(written_count == m_tupleCount);
 
     // length prefix is non-inclusive
-    int32_t sz = static_cast<int32_t>(serialize_io.position() - pos - sizeof(int32_t));
+    int32_t sz = static_cast<int32_t>(serializeOut.position() - pos - sizeof(int32_t));
     assert(sz > 0);
-    serialize_io.writeIntAt(pos, sz);
-
-    return true;
+    serializeOut.writeIntAt(pos, sz);
 }
-template bool Table::serializeTo<ReferenceSerializeOutput>(SerializeOutput<ReferenceSerializeOutput> &serialize_io);
-template bool Table::serializeTo<FallbackSerializeOutput>(SerializeOutput<FallbackSerializeOutput> &serialize_io);
-template bool Table::serializeTo<CopySerializeOutput>(SerializeOutput<CopySerializeOutput> &serialize_io);
-template bool Table::serializeTo<SerializeOutputFile>(SerializeOutput<SerializeOutputFile> &serialize_io);
+template void Table::serializeTo<ReferenceSerializeOutput>(ReferenceSerializeOutput&);
+template void Table::serializeTo<FallbackSerializeOutput>(FallbackSerializeOutput&);
+template void Table::serializeTo<FileSerializeOutput>(FileSerializeOutput&);
+template void Table::serializeTo<TestableSerializeOutput>(TestableSerializeOutput&);
 
-bool Table::serializeToWithoutTotalSize(SerializeOutput<ReferenceSerializeOutput> &serialize_io) {
-    if (!serializeColumnHeaderTo(serialize_io))
-        return false;
+void Table::serializeToWithoutTotalSize(ReferenceSerializeOutput& serializeOut) {
+    serializeColumnHeaderTo(serializeOut);
 
     // active tuple counts
-    serialize_io.writeInt(static_cast<int32_t>(m_tupleCount));
+    serializeOut.writeInt(static_cast<int32_t>(m_tupleCount));
     int64_t written_count = 0;
     TableIterator titer = iterator();
     TableTuple tuple(m_schema);
     while (titer.next(tuple)) {
-        tuple.serializeTo(serialize_io);
+        tuple.serializeTo(serializeOut);
         ++written_count;
     }
     assert(written_count == m_tupleCount);
-
-    return true;
 }
 
 /**
  * Serialized the table, but only includes the tuples specified (columns data and all).
  * Used by the exception stuff Ariel put in.
  */
-bool Table::serializeTupleTo(SerializeOutput<ReferenceSerializeOutput> &serialize_io, voltdb::TableTuple *tuples, int numTuples) {
+void Table::serializeTupleTo(ReferenceSerializeOutput& serializeOut, voltdb::TableTuple *tuples, int numTuples) {
     //assert(m_schema->equals(tuples[0].getSchema()));
 
-    std::size_t pos = serialize_io.reserveBytes(sizeof(int));
+    std::size_t pos = serializeOut.reserveBytes(sizeof(int));
 
     assert(!tuples[0].isNullTuple());
 
-    if (!serializeColumnHeaderTo(serialize_io))
-        return false;
+    serializeColumnHeaderTo(serializeOut);
 
-    serialize_io.writeInt(static_cast<int32_t>(numTuples));
+    serializeOut.writeInt(static_cast<int32_t>(numTuples));
     for (int ii = 0; ii < numTuples; ii++) {
-        tuples[ii].serializeTo(serialize_io);
+        tuples[ii].serializeTo(serializeOut);
     }
 
-    serialize_io.writeIntAt(pos, static_cast<int32_t>(serialize_io.position() - pos - sizeof(int32_t)));
-
-    return true;
+    serializeOut.writeIntAt(pos, static_cast<int32_t>(serializeOut.position() - pos - sizeof(int32_t)));
 }
 
 bool Table::equals(voltdb::Table *other) {
@@ -445,11 +431,11 @@ bool Table::equals(voltdb::Table *other) {
     return true;
 }
 
-template <class T> void Table::loadTuplesFromNoHeader(SerializeInputBE &serialize_io,
+template <class T> void Table::loadTuplesFromNoHeader(SerializeInputBE& serializeIn,
                                    Pool *stringPool,
-                                   SerializeOutput<T> *uniqueViolationOutput,
+                                   T* uniqueViolationOutput,
                                    bool shouldDRStreamRow) {
-    int tupleCount = serialize_io.readInt();
+    int tupleCount = serializeIn.readInt();
     assert(tupleCount >= 0);
 
     TableTuple target(m_schema);
@@ -469,7 +455,7 @@ template <class T> void Table::loadTuplesFromNoHeader(SerializeInputBE &serializ
         target.setPendingDeleteFalse();
         target.setPendingDeleteOnUndoReleaseFalse();
 
-        target.deserializeFrom(serialize_io, stringPool);
+        target.deserializeFrom(serializeIn, stringPool);
 
         processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition, shouldDRStreamRow);
     }
@@ -486,18 +472,18 @@ template <class T> void Table::loadTuplesFromNoHeader(SerializeInputBE &serializ
         }
     }
 }
-template void Table::loadTuplesFromNoHeader <ReferenceSerializeOutput> (SerializeInputBE &serialize_io,
-                                   Pool *stringPool,
-                                   SerializeOutput<ReferenceSerializeOutput> *uniqueViolationOutput,
-                                   bool shouldDRStreamRow);
-template void Table::loadTuplesFromNoHeader <FallbackSerializeOutput> (SerializeInputBE &serialize_io,
-                                   Pool *stringPool,
-                                   SerializeOutput<FallbackSerializeOutput> *uniqueViolationOutput,
-                                   bool shouldDRStreamRow);
+template void Table::loadTuplesFromNoHeader<ReferenceSerializeOutput>(SerializeInputBE& serializeIn,
+        Pool* stringPool,
+        ReferenceSerializeOutput* uniqueViolationOutput,
+        bool shouldDRStreamRow);
+template void Table::loadTuplesFromNoHeader<FallbackSerializeOutput>(SerializeInputBE& serializeIn,
+        Pool* stringPool,
+        FallbackSerializeOutput* uniqueViolationOutput,
+        bool shouldDRStreamRow);
 
-template <class T> void Table::loadTuplesFrom(SerializeInputBE &serialize_io,
+template <class T> void Table::loadTuplesFrom(SerializeInputBE& serializeIn,
                            Pool *stringPool,
-                           SerializeOutput<T> *uniqueViolationOutput,
+                           T* uniqueViolationOutput,
                            bool shouldDRStreamRow) {
     /*
      * directly receives a VoltTable buffer.
@@ -515,11 +501,11 @@ template <class T> void Table::loadTuplesFrom(SerializeInputBE &serialize_io,
      */
 
     // todo: just skip ahead to this position
-    serialize_io.readInt(); // rowstart
+    serializeIn.readInt(); // rowstart
 
-    serialize_io.readByte();
+    serializeIn.readByte();
 
-    int16_t colcount = serialize_io.readShort();
+    int16_t colcount = serializeIn.readShort();
     assert(colcount >= 0);
 
     // Store the following information so that we can provide them to the user
@@ -529,12 +515,12 @@ template <class T> void Table::loadTuplesFrom(SerializeInputBE &serialize_io,
 
     // skip the column types
     for (int i = 0; i < colcount; ++i) {
-        types[i] = (ValueType) serialize_io.readEnumInSingleByte();
+        types[i] = (ValueType) serializeIn.readEnumInSingleByte();
     }
 
     // skip the column names
     for (int i = 0; i < colcount; ++i) {
-        names[i] = serialize_io.readTextString();
+        names[i] = serializeIn.readTextString();
     }
 
     // Check if the column count matches what the temp table is expecting
@@ -556,15 +542,15 @@ template <class T> void Table::loadTuplesFrom(SerializeInputBE &serialize_io,
                                       message.str().c_str());
     }
 
-    loadTuplesFromNoHeader(serialize_io, stringPool, uniqueViolationOutput, shouldDRStreamRow);
+    loadTuplesFromNoHeader(serializeIn, stringPool, uniqueViolationOutput, shouldDRStreamRow);
 }
-template void Table::loadTuplesFrom <ReferenceSerializeOutput> (SerializeInputBE &serialize_io,
-                           Pool *stringPool,
-                           SerializeOutput<ReferenceSerializeOutput> *uniqueViolationOutput,
-                           bool shouldDRStreamRow);
-template void Table::loadTuplesFrom <FallbackSerializeOutput> (SerializeInputBE &serialize_io,
-                           Pool *stringPool,
-                           SerializeOutput<FallbackSerializeOutput> *uniqueViolationOutput,
-                           bool shouldDRStreamRow);
+template void Table::loadTuplesFrom<ReferenceSerializeOutput>(SerializeInputBE& serializeIn,
+        Pool *stringPool,
+        ReferenceSerializeOutput* uniqueViolationOutput,
+        bool shouldDRStreamRow);
+template void Table::loadTuplesFrom<FallbackSerializeOutput>(SerializeInputBE& serializeIn,
+        Pool *stringPool,
+        FallbackSerializeOutput* uniqueViolationOutput,
+        bool shouldDRStreamRow);
 
 }

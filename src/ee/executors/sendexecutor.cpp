@@ -85,25 +85,17 @@ bool SendExecutor::p_execute(const NValueArray &params) {
     // Just blast the input table on through VoltDBEngine!
     if (m_highVolume) {
         // For large result sets serialize input table to a file on disk
-        if (!m_engine->writeToDisk(inputTable)) {
-            VOLT_ERROR("Failed to write table '%s'", inputTable->name().c_str());
-            return false;
-        }
+        m_engine->writeToDisk(inputTable);
         // Place file name in output table
         Table * outputTable = m_abstractNode->getOutputTable();
         TableTuple& filename_tuple = outputTable->tempTuple();
         filename_tuple.setNValue(0,ValueFactory::getStringValue(m_engine->getLastOutFileName().c_str()));
         // put the tuple into the output table
         outputTable->insertTuple(filename_tuple);
-        if (!m_engine->send(outputTable)) {
-                VOLT_ERROR("Failed to send table '%s'", outputTable->name().c_str());
-                return false;
-        }
-    } else {
-        if (!m_engine->send(inputTable)) {
-                VOLT_ERROR("Failed to send table '%s'", inputTable->name().c_str());
-                return false;
-        }
+        m_engine->send(outputTable);
+    }
+    else {
+        m_engine->send(inputTable);
     }
     VOLT_DEBUG("SEND TABLE: %s", inputTable->debug().c_str());
 

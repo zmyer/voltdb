@@ -16,10 +16,17 @@
  */
 #include "common/serializeio.h"
 #include "common/executorcontext.hpp"
+#include "common/SQLException.h"
 
 using namespace voltdb;
 
-void FallbackSerializeOutput::expand(size_t minimum_desired) {
+void ReferenceByteSerializer::expand(size_t minimum_desired) {
+    throw SQLException(SQLException::volt_output_buffer_overflow,
+                       "Output from SQL stmt overflowed output/network buffer of 10mb. "
+                       "Try a \"limit\" clause or a stronger predicate.");
+}
+
+void FallbackByteSerializer::expand(size_t minimum_desired) {
     /*
      * Leave some space for message headers and such, almost 50 megabytes
      */
@@ -35,9 +42,9 @@ void FallbackSerializeOutput::expand(size_t minimum_desired) {
             "Try a \"limit\" clause or a stronger predicate.");
     }
     fallbackBuffer_ = new char[maxAllocationSize];
-    ::memcpy(fallbackBuffer_, data(), position_);
-    setPosition(position_);
-    initialize(fallbackBuffer_, maxAllocationSize);
+    size_t pos = position();
+    ::memcpy(fallbackBuffer_, data(), pos);
+    initialize(fallbackBuffer_, maxAllocationSize, pos);
     ExecutorContext::getExecutorContext()->getTopend()->fallbackToEEAllocatedBuffer(fallbackBuffer_, maxAllocationSize);
 }
 

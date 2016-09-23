@@ -46,22 +46,11 @@
 #ifndef HSTORESERIALIZEIO_H
 #define HSTORESERIALIZEIO_H
 
-#include <limits>
-#include <vector>
-#include <string>
-#include <sstream>
-#include <fstream>
-#include <iomanip>
-#include <iostream>
-#include <exception>
-#include <arpa/inet.h>
-#include <cassert>
-#include <boost/ptr_container/ptr_vector.hpp>
-
-#include "bytearray.h"
-#include "debuglog.h"
-#include "common/SQLException.h"
+#include "common/bytearray.h"
+#include "common/debuglog.h"
 #include "common/types.h"
+
+#include <fstream>
 
 namespace voltdb {
 
@@ -246,13 +235,54 @@ private:
     SerializeInput& operator=(const SerializeInput&);
 };
 
-/** Abstract class for writing to memory buffers. Subclasses may optionally support resizing. */
-class SerializeOutputBuffer {
-protected:
-    SerializeOutputBuffer() : buffer_(NULL), position_(0), capacity_(0) {}
+/** Implementation of SerializeInput that references an existing buffer. */
+template <Endianess E> class ReferenceSerializeInput : public SerializeInput<E> {
+public:
+    ReferenceSerializeInput(const void* data, size_t length) {
+        this->initialize(data, length);
+    }
 
-    /** Set the buffer to buffer with capacity. Note this does not change the position. */
-    void initialize(void* buffer, size_t capacity) {
+    // Destructor does nothing: nothing to clean up!
+    virtual ~ReferenceSerializeInput() {}
+};
+
+/** Implementation of SerializeInput that makes a copy of the buffer. */
+template <Endianess E> class CopySerializeInput : public SerializeInput<E> {
+public:
+    CopySerializeInput(const void* data, size_t length)
+      : bytes_(reinterpret_cast<const char*>(data), static_cast<int>(length))
+    {
+        SerializeInput<E>::initialize(bytes_.data(), static_cast<int>(length));
+    }
+
+    // Destructor frees the ByteArray.
+    virtual ~CopySerializeInput() {}
+
+private:
+    ByteArray bytes_;
+};
+
+#ifndef SERIALIZE_IO_DECLARATIONS
+#define SERIALIZE_IO_DECLARATIONS
+typedef SerializeInput<BYTE_ORDER_BIG_ENDIAN> SerializeInputBE;
+typedef SerializeInput<BYTE_ORDER_LITTLE_ENDIAN> SerializeInputLE;
+
+typedef ReferenceSerializeInput<BYTE_ORDER_BIG_ENDIAN> ReferenceSerializeInputBE;
+typedef ReferenceSerializeInput<BYTE_ORDER_LITTLE_ENDIAN> ReferenceSerializeInputLE;
+
+typedef CopySerializeInput<BYTE_ORDER_BIG_ENDIAN> CopySerializeInputBE;
+typedef CopySerializeInput<BYTE_ORDER_LITTLE_ENDIAN> CopySerializeInputLE;
+#endif
+
+
+/** Abstract class for writing to memory buffers. Subclasses may optionally support resizing. */
+class ByteBufferOutput {
+protected:
+    ByteBufferOutput() : buffer_(NULL), position_(0), capacity_(0) {}
+
+    /** Set the buffer to buffer with capacity and position. */
+    void initialize(void* buffer, size_t capacity, size_t position = 0) {
+        position_ = position;
         buffer_ = reinterpret_cast<char*>(buffer);
         assert(position_ <= capacity);
         capacity_ = capacity;
@@ -262,14 +292,11 @@ protected:
     }
 
 public:
-    virtual ~SerializeOutputBuffer() {};
-
     /** Returns a pointer to the beginning of the buffer, for reading the serialized data. */
     const char* data() const { return buffer_; }
 
     /** Returns the number of bytes written in to the buffer. */
     size_t size() const { return position_; }
-
 
     inline void writeBytes(const void *value, size_t length) {
         assureExpand(length);
@@ -301,44 +328,24 @@ public:
         return offset + length;
     }
 
-    // this explicitly accepts char* and length (or ByteArray)
-    // as std::string's implicit construction is unsafe!
-    inline void writeBinaryString(const void* value, size_t length) {
-        int32_t stringLength = static_cast<int32_t>(length);
-        assureExpand(length + sizeof(stringLength));
-
-        // do a newtork order conversion
-        int32_t networkOrderLen = htonl(stringLength);
-
-        char* current = buffer_ + position_;
-        memcpy(current, &networkOrderLen, sizeof(networkOrderLen));
-        current += sizeof(stringLength);
-        memcpy(current, value, length);
-        position_ += sizeof(stringLength) + length;
-    }
-
     std::size_t position() const {
         return position_;
     }
 
-    template <typename T>
-    void writePrimitive(T value) {
-        assureExpand(sizeof(value));
-        memcpy(buffer_ + position_, &value, sizeof(value));
-        position_ += sizeof(value);
+    size_t remaining() const {
+        return capacity_ - position_;
     }
 
 protected:
-
-    /** Called when trying to write past the end of the
-    buffer. Subclasses can optionally resize the buffer by calling
-    initialize. If this function returns and size() < minimum_desired,
-    the program will crash.  @param minimum_desired the minimum length
-    the resized buffer needs to have. */
+    /** Called when trying to write past the end of the buffer.
+     * Subclasses can optionally resize the buffer by calling initialize.
+     * If this function returns and size() < minimum_desired,
+     * the program will crash.
+     * @param minimum_desired the minimum length
+     * the resized buffer needs to have. **/
     virtual void expand(size_t minimum_desired) = 0;
 
 private:
-
     inline void assureExpand(size_t next_write) {
         size_t minimum_desired = position_ + next_write;
         if (minimum_desired > capacity_) {
@@ -347,134 +354,78 @@ private:
         assert(capacity_ >= minimum_desired);
     }
 
+    // No implicit copies
+    ByteBufferOutput(const ByteBufferOutput&);
+    ByteBufferOutput& operator=(const ByteBufferOutput&);
+
     // Beginning of the buffer.
     char* buffer_;
-
-    // No implicit copies
-    SerializeOutputBuffer(const SerializeOutputBuffer&);
-    SerializeOutputBuffer& operator=(const SerializeOutputBuffer&);
-
-protected:
     // Current write position in the buffer.
     size_t position_;
     // Total bytes this buffer can contain.
     size_t capacity_;
 };
 
-/** Implementation of SerializeInput that references an existing buffer. */
-template <Endianess E> class ReferenceSerializeInput : public SerializeInput<E> {
-public:
-    ReferenceSerializeInput(const void* data, size_t length) {
-        this->initialize(data, length);
-    }
-
-    // Destructor does nothing: nothing to clean up!
-    virtual ~ReferenceSerializeInput() {}
-};
-
-/** Implementation of SerializeInput that makes a copy of the buffer. */
-template <Endianess E> class CopySerializeInput : public SerializeInput<E> {
-public:
-    CopySerializeInput(const void* data, size_t length) :
-            bytes_(reinterpret_cast<const char*>(data), static_cast<int>(length)) {
-        this->initialize(bytes_.data(), static_cast<int>(length));
-    }
-
-    // Destructor frees the ByteArray.
-    virtual ~CopySerializeInput() {}
-
-private:
-    ByteArray bytes_;
-};
-
-#ifndef SERIALIZE_IO_DECLARATIONS
-#define SERIALIZE_IO_DECLARATIONS
-typedef SerializeInput<BYTE_ORDER_BIG_ENDIAN> SerializeInputBE;
-typedef SerializeInput<BYTE_ORDER_LITTLE_ENDIAN> SerializeInputLE;
-
-typedef ReferenceSerializeInput<BYTE_ORDER_BIG_ENDIAN> ReferenceSerializeInputBE;
-typedef ReferenceSerializeInput<BYTE_ORDER_LITTLE_ENDIAN> ReferenceSerializeInputLE;
-
-typedef CopySerializeInput<BYTE_ORDER_BIG_ENDIAN> CopySerializeInputBE;
-typedef CopySerializeInput<BYTE_ORDER_LITTLE_ENDIAN> CopySerializeInputLE;
-#endif
-
 /** Implementation of SerializeOutput that references an existing buffer. */
-class ReferenceSerializeOutput : public SerializeOutputBuffer {
+class ReferenceByteSerializer : public ByteBufferOutput {
 public:
-    ReferenceSerializeOutput() : SerializeOutputBuffer() {
-    }
-    ReferenceSerializeOutput(void* data, size_t length) : SerializeOutputBuffer() {
-        initialize(data, length);
-    }
+    ReferenceByteSerializer() : ByteBufferOutput() { }
 
-    /** Set the buffer to buffer with capacity and sets the position. */
-    virtual void initializeWithPosition(void* buffer, size_t capacity, size_t position) {
-        setPosition(position);
-        initialize(buffer, capacity);
+    /** Make the protected method public for this class */
+    void initialize(void* buffer, size_t capacity, size_t position) {
+        ByteBufferOutput::initialize(buffer, capacity, position);
     }
-
-    size_t remaining() const {
-        return capacity_ - position_;
-    }
-
-    // Destructor does nothing: nothing to clean up!
-    virtual ~ReferenceSerializeOutput() {}
 
 protected:
     /** Reference output can't resize the buffer: Frowny-Face. */
-    virtual void expand(size_t minimum_desired) {
-        throw SQLException(SQLException::volt_output_buffer_overflow,
-            "Output from SQL stmt overflowed output/network buffer of 10mb. "
-            "Try a \"limit\" clause or a stronger predicate.");
-    }
+    virtual void expand(size_t minimum_desired);
 };
 
 /*
  * A serialize output class that falls back to allocating a 50 meg buffer
  * if the regular allocation runs out of space. The topend is notified when this occurs.
  */
-class FallbackSerializeOutput : public ReferenceSerializeOutput {
+class FallbackByteSerializer : public ReferenceByteSerializer {
 public:
-    FallbackSerializeOutput() :
-        ReferenceSerializeOutput(), fallbackBuffer_(NULL) {
-    }
+    FallbackByteSerializer()
+      : fallbackBuffer_(NULL)
+    { }
 
     /** Set the buffer to buffer with capacity and sets the position. */
-    void initializeWithPosition(void* buffer, size_t capacity, size_t position) {
+    void initialize(void* buffer, size_t capacity, size_t position) {
         if (fallbackBuffer_ != NULL) {
             char *temp = fallbackBuffer_;
             fallbackBuffer_ = NULL;
-            delete []temp;
+            delete[] temp;
         }
-        setPosition(position);
-        initialize(buffer, capacity);
+        ReferenceByteSerializer::initialize(buffer, capacity, position);
     }
 
     // Destructor frees the fallback buffer if it is allocated
-    virtual ~FallbackSerializeOutput() {
-        delete []fallbackBuffer_;
+    ~FallbackByteSerializer() {
+        delete[] fallbackBuffer_;
     }
 
     /** Expand once to a fallback size, and if that doesn't work abort */
     void expand(size_t minimum_desired);
+
 private:
     char *fallbackBuffer_;
 };
 
 /** Implementation of SerializeOutput that makes a copy of the buffer. */
-class CopySerializeOutput : public SerializeOutputBuffer {
+class ExpandableByteBufferOutput : public ByteBufferOutput {
 public:
     // Start with something sizeable so we avoid a ton of initial
     // allocations.
     static const int INITIAL_SIZE = 8388608;
 
-    CopySerializeOutput() : bytes_(INITIAL_SIZE) {
+    ExpandableByteBufferOutput() : bytes_(INITIAL_SIZE) {
         initialize(bytes_.data(), INITIAL_SIZE);
     }
 
     // Destructor frees the ByteArray.
-    virtual ~CopySerializeOutput() {}
+    virtual ~ExpandableByteBufferOutput() {}
 
     void reset() {
         setPosition(0);
@@ -499,114 +450,77 @@ private:
 
 
 /** Class for writing to disk. */
-class SerializeOutputFile {
+class ByteFileOutput {
 public:
-    SerializeOutputFile() : ofile(){}
+    ByteFileOutput() { }
 
-    /** Set the buffer to buffer with capacity. Note this does not change the position. */
+    ~ByteFileOutput() {};
+
     void initialize(std::string outputFileName) {
-        ofile.open(outputFileName.c_str(),std::ofstream::binary | std::ofstream::trunc);
+        m_ofile.open(outputFileName.c_str(),
+                     std::ofstream::binary | std::ofstream::trunc);
     }
 
     void close() {
-        ofile.flush();
-        ofile.close();
+        m_ofile.flush();
+        m_ofile.close();
     }
-private:
-    std::ofstream ofile;
-public:
-    virtual ~SerializeOutputFile() {};
-
-    const char* data() const { return NULL;}
 
     /** Returns the number of bytes written. */
-    size_t size() { return ofile.tellp(); }
+    size_t size() { return m_ofile.tellp(); }
 
-    std::size_t position() {
-        return ofile.tellp();
-    }
-
-    inline void writeZeros(size_t length) {
-    }
-    // this explicitly accepts char* and length (or ByteArray)
-    // as std::string's implicit construction is unsafe!
-    inline void writeBinaryString(const void* value, size_t length) {
-        int32_t stringLength = static_cast<int32_t>(length);
-
-        // do a network order conversion
-        int32_t networkOrderLen = htonl(stringLength);
-        ofile.write((char*)&networkOrderLen, sizeof(networkOrderLen));
-        ofile.write((char*)&value,length);
-    }
+    std::size_t position() { return m_ofile.tellp(); }
 
     inline void writeBytes(const void *value, size_t length) {
-        ofile.write((const char*)value,length);
+        m_ofile.write((const char*)value,length);
     }
 
     /** Copies length bytes from value to this buffer, starting at
-    offset. Offset should have been obtained from reserveBytes. This
-    does not affect the current write position.  * @return offset +
-    length */
+     *  offset. Offset should have been obtained from reserveBytes. This
+     *  does not affect the current write position. 
+     * @return offset + length
+     */
     inline size_t writeBytesAt(size_t offset, const void *value, size_t length) {
-        size_t position = ofile.tellp();
+        size_t position = m_ofile.tellp();
         assert(offset + length <= position);
-        ofile.seekp(offset);
-        ofile.write((const char*)value,length);
-        ofile.seekp(position);
+        m_ofile.seekp(offset);
+        m_ofile.write((const char*)value, length);
+        m_ofile.seekp(position);
         return offset + length;
     }
 
     /** Reserves length bytes of space for writing. Returns the offset to the bytes. */
     size_t reserveBytes(size_t length) {
-        size_t offset = ofile.tellp();
-        ofile.seekp(offset + length);
+        size_t offset = m_ofile.tellp();
+        m_ofile.seekp(offset + length);
         return offset;
     }
 
-    template <typename T>
-    void writePrimitive(T value) {
-        ofile.write((char*)&value,sizeof(value));
-    }
-
-    template <typename T>
-    void writePrimitiveAt(T value) {
-        ofile.write((char*)&value,sizeof(value));
-    }
-
 private:
-
     // No implicit copies
-    SerializeOutputFile(const SerializeOutputFile&);
-    SerializeOutputFile& operator=(const SerializeOutputFile&);
+    ByteFileOutput(const ByteFileOutput&);
+    ByteFileOutput& operator=(const ByteFileOutput&);
 
+    std::ofstream m_ofile;
 };
 
 /** Template class for serializing output. */
-template <class SO> class SerializeOutput {
+template <class BS> class SerializeOutput {
 public:
-    SerializeOutput() : serialize_output_(NULL) { };
-    SerializeOutput(SO * serializer) : serialize_output_(serializer) { };
-private:
-    SO * serialize_output_;
-public:
-    void setSerializer(SO * serializer) {
-        serialize_output_ = serializer;
-    }
-
-    SO * getSerializer() {
-        return serialize_output_;
-    }
+    SerializeOutput(BS& serializer)
+      : m_byteSerializer(serializer)
+    { };
 
     /** Returns the number of bytes written. */
-    size_t size() { return serialize_output_->size(); }
+    size_t size() { return m_byteSerializer.size(); }
 
     std::size_t position() {
-        return serialize_output_->position();
+        return m_byteSerializer.position();
     }
 
     /** Reserves length bytes of space for writing. Returns the offset to the bytes. */
     size_t reserveBytes(size_t length) {
-        return serialize_output_->reserveBytes(length);
+        return m_byteSerializer.reserveBytes(length);
     }
 
     // functions for serialization
@@ -654,8 +568,10 @@ public:
 
     // this explicitly accepts char* and length (or ByteArray)
     // as std::string's implicit construction is unsafe!
-    inline void writeBinaryString(const void* value, size_t length) {
-        serialize_output_->writeBinaryString(value,length);
+    void writeBinaryString(const void* value, size_t length) {
+        int32_t stringLength = static_cast<int32_t>(length);
+        writePrimitive(htonl(stringLength));
+        writeBytes(value, length);
     }
 
     inline void writeBinaryString(const ByteArray &value) {
@@ -667,19 +583,7 @@ public:
     }
 
     inline void writeBytes(const void *value, size_t length) {
-        serialize_output_->writeBytes(value,length);
-    }
-
-    inline size_t writeCharAt(size_t position, char value) {
-        return writePrimitiveAt(position, value);
-    }
-
-    inline size_t writeByteAt(size_t position, int8_t value) {
-        return writePrimitiveAt(position, value);
-    }
-
-    inline size_t writeShortAt(size_t position, int16_t value) {
-        return writePrimitiveAt(position, htons(value));
+        m_byteSerializer.writeBytes(value,length);
     }
 
     inline size_t writeIntAt(size_t position, int32_t value) {
@@ -690,24 +594,8 @@ public:
         return writePrimitiveAt(position, value ? int8_t(1) : int8_t(0));
     }
 
-    inline size_t writeLongAt(size_t position, int64_t value) {
-        return writePrimitiveAt(position, htonll(value));
-    }
-
-    inline size_t writeFloatAt(size_t position, float value) {
-        int32_t data;
-        memcpy(&data, &value, sizeof(data));
-        return writePrimitiveAt(position, htonl(data));
-    }
-
-    inline size_t writeDoubleAt(size_t position, double value) {
-        int64_t data;
-        memcpy(&data, &value, sizeof(data));
-        return writePrimitiveAt(position, htonll(data));
-    }
-
     inline void writeZeros(size_t length) {
-        serialize_output_->writeZeros(length);
+        m_byteSerializer.writeZeros(length);
     }
 
     static bool isLittleEndian() {
@@ -718,13 +606,13 @@ public:
     }
 
     inline size_t writeBytesAt(size_t offset, const void *value, size_t length) {
-        return serialize_output_->writeBytesAt(offset, value, length);
+        return m_byteSerializer.writeBytesAt(offset, value, length);
     }
 
 private:
     template <typename T>
     void writePrimitive(T value) {
-        serialize_output_->writePrimitive(value);
+        m_byteSerializer.writeBytes(&value, sizeof(value));
     }
 
     template <typename T>
@@ -732,6 +620,85 @@ private:
         return writeBytesAt(position, &value, sizeof(value));
     }
 
+    BS& m_byteSerializer;
 };
-}
+
+template <class BS> class SelfContainedSerializeOutput : public SerializeOutput<BS> {
+public:
+    SelfContainedSerializeOutput()
+      : SerializeOutput<BS>(m_byteSerializer)
+      , m_byteSerializer()
+    { }
+
+protected:
+     BS m_byteSerializer;
+};
+
+class ReferenceSerializeOutput : public SelfContainedSerializeOutput<ReferenceByteSerializer> {
+public:
+    ReferenceSerializeOutput()
+      : SelfContainedSerializeOutput<ReferenceByteSerializer>()
+    { }
+
+    ReferenceSerializeOutput(void* buffer, size_t capacity)
+      : SelfContainedSerializeOutput<ReferenceByteSerializer>()
+    {
+        m_byteSerializer.initialize(buffer, capacity, 0);
+    }
+
+    void initializeWithPosition(void* buffer, size_t capacity, size_t position) {
+        m_byteSerializer.initialize(buffer, capacity, position);
+    }
+
+    size_t remaining() const { return m_byteSerializer.remaining(); }
+    const char* data() const { return m_byteSerializer.data(); }
+};
+
+ 
+class FallbackSerializeOutput : public SelfContainedSerializeOutput<FallbackByteSerializer> {
+public:
+    FallbackSerializeOutput()
+      : SelfContainedSerializeOutput<FallbackByteSerializer>()
+    { }
+
+    void initializeWithPosition(void* buffer, size_t capacity, size_t position) {
+        m_byteSerializer.initialize(buffer, capacity, position);
+    }
+
+    size_t size() const {
+        return m_byteSerializer.size();
+    }
+    const char* data() const { return m_byteSerializer.data(); }
+};
+
+class FileSerializeOutput : public SelfContainedSerializeOutput<ByteFileOutput> {
+public:
+    FileSerializeOutput(std::string outFileName)
+      : SelfContainedSerializeOutput<ByteFileOutput>()
+    {
+        m_byteSerializer.initialize(outFileName);
+    }
+
+    const char* data() const { return NULL; }
+};
+
+class TestableSerializeOutput : public SelfContainedSerializeOutput<ExpandableByteBufferOutput> {
+public:
+    TestableSerializeOutput()
+      : SelfContainedSerializeOutput<ExpandableByteBufferOutput>()
+    { }
+
+     //    TestableSerializeOutput(void* data, size_t length)
+     // : voltdb::SerializeOutput<voltdb::ExpandableByteBufferOutput>(&m_byteSerializer)
+     //{ }
+
+     //void initializeWithPosition(void* buffer, size_t capacity, size_t position) {
+     //    m_byteSerializer.initializeWithPosition(buffer, capacity, position);
+     //}
+
+     //size_t remaining() const { return m_byteSerializer.remaining(); }
+    const char* data() const { return m_byteSerializer.data(); }
+};
+
+} // namespace voltdb
 #endif

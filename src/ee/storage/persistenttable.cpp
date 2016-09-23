@@ -1363,16 +1363,16 @@ std::string PersistentTable::debug() {
  * to do additional processing for views and Export and non-inline
  * memory tracking
  */
-void PersistentTable::processLoadedTuple(TableTuple &tuple,
-                                         SerializeOutput<ReferenceSerializeOutput> *uniqueViolationOutput,
-                                         int32_t &serializedTupleCount,
-                                         size_t &tupleCountPosition,
+void PersistentTable::processLoadedTuple(TableTuple& tuple,
+                                         ReferenceSerializeOutput* uniqueViolationOutput,
+                                         int32_t& serializedTupleCount,
+                                         size_t& tupleCountPosition,
                                          bool shouldDRStreamRows) {
     processLoadedTupleShared(tuple, uniqueViolationOutput, serializedTupleCount, tupleCountPosition, shouldDRStreamRows);
 }
 
 void PersistentTable::processLoadedTuple(TableTuple &tuple,
-                                         SerializeOutput<FallbackSerializeOutput> *uniqueViolationOutput,
+                                         FallbackSerializeOutput* uniqueViolationOutput,
                                          int32_t &serializedTupleCount,
                                          size_t &tupleCountPosition,
                                          bool shouldDRStreamRows) {
@@ -1380,7 +1380,7 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple,
 }
 
 template <class T> void PersistentTable::processLoadedTupleShared(TableTuple &tuple,
-                                         SerializeOutput<T> *uniqueViolationOutput,
+                                         T* uniqueViolationOutput,
                                          int32_t &serializedTupleCount,
                                          size_t &tupleCountPosition,
                                          bool shouldDRStreamRows) {
@@ -1400,15 +1400,15 @@ template <class T> void PersistentTable::processLoadedTupleShared(TableTuple &tu
         deleteTupleStorage(tuple);
     }
 }
-template void PersistentTable::processLoadedTupleShared <ReferenceSerializeOutput> (TableTuple &tuple,
-                                         SerializeOutput<ReferenceSerializeOutput> *uniqueViolationOutput,
-                                         int32_t &serializedTupleCount,
-                                         size_t &tupleCountPosition,
+template void PersistentTable::processLoadedTupleShared<ReferenceSerializeOutput>(TableTuple& tuple,
+                                         ReferenceSerializeOutput* uniqueViolationOutput,
+                                         int32_t& serializedTupleCount,
+                                         size_t& tupleCountPosition,
                                          bool shouldDRStreamRows);
-template void PersistentTable::processLoadedTupleShared <FallbackSerializeOutput> (TableTuple &tuple,
-                                         SerializeOutput<FallbackSerializeOutput> *uniqueViolationOutput,
-                                         int32_t &serializedTupleCount,
-                                         size_t &tupleCountPosition,
+template void PersistentTable::processLoadedTupleShared<FallbackSerializeOutput> (TableTuple& tuple,
+                                         FallbackSerializeOutput* uniqueViolationOutput,
+                                         int32_t& serializedTupleCount,
+                                         size_t& tupleCountPosition,
                                          bool shouldDRStreamRows);
 
 /** Prepare table for streaming from serialized data. */
@@ -1416,7 +1416,7 @@ bool PersistentTable::activateStream(
     TableStreamType streamType,
     int32_t partitionId,
     CatalogId tableId,
-    ReferenceSerializeInputBE &serializeIn) {
+    ReferenceSerializeInputBE& serializeIn) {
     /*
      * Allow multiple stream types for the same partition by holding onto the
      * TableStreamer object. TableStreamer enforces which multiple stream type

@@ -30,6 +30,7 @@
 #include <algorithm>
 #include <vector>
 
+#include "boost/scoped_array.hpp"
 #include "boost/scoped_ptr.hpp"
 #include "boost/functional/hash.hpp"
 #include "ttmath/ttmathint.h"
@@ -312,7 +313,7 @@ class NValue {
     void deserializeFromAllocateForStorage(ValueType vt, SerializeInputBE& input, Pool* tempPool);
 
     /* Serialize this NValue to a SerializeOutput */
-    template<class T> void serializeTo(SerializeOutput<T> &output) const;
+    template <class T> void serializeTo(T& output) const;
 
     /* Serialize this NValue to an Export stream */
     void serializeToExport_withoutNull(ExportSerializeOutput&) const;
@@ -1748,7 +1749,7 @@ private:
         }
     }
 
-    template<typename T>
+    template <typename T>
     int compareValue (const T lhsValue, const T rhsValue) const {
         if (lhsValue == rhsValue) {
             return VALUE_COMPARE_EQUAL;
@@ -3090,7 +3091,7 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
 /**
  * Serialize this NValue to the provided SerializeOutput
  */
-template<class T> inline void NValue::serializeTo(SerializeOutput<T> &output) const {
+template <class T> inline void NValue::serializeTo(T& output) const {
     const ValueType type = getValueType();
     switch (type) {
     case VALUE_TYPE_VARCHAR:

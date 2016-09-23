@@ -26,7 +26,7 @@
 
 #include "execution/VoltDBEngine.h"
 #include "logging/StdoutLogProxy.h"
-#include "storage/table.h"
+#include "storage/temptable.h"
 
 #include "common/ElasticHashinator.h"
 #include "common/LegacyHashinator.h"
@@ -37,6 +37,7 @@
 
 #include <signal.h>
 #include <sys/socket.h>
+#include <netinet/in.h> // for sockaddr_in
 #include <netinet/tcp.h> // for TCP_NODELAY
 
 // Please don't make this different from the JNI result buffer size.
@@ -78,7 +79,10 @@ public:
 
     ~VoltDBIPC();
 
-    int loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool, voltdb::Table* destination);
+    int loadNextDependency(
+            int32_t dependencyId,
+            voltdb::Pool *stringPool,
+            voltdb::TempTable* destination);
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length) { }
 
     /**
@@ -802,8 +806,7 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
 void VoltDBIPC::sendException(int8_t errorCode) {
     writeOrDie(m_fd, (unsigned char*)&errorCode, sizeof(int8_t));
 
-    const void* exceptionData =
-      m_engine->getExceptionOutputSerializer()->getSerializer()->data();
+    const void* exceptionData = m_engine->getExceptionOutputSerializer()->data();
     int32_t exceptionLength =
       static_cast<int32_t>(ntohl(*reinterpret_cast<const int32_t*>(exceptionData)));
     if (staticDebugVerbose) {
@@ -867,7 +870,9 @@ void VoltDBIPC::terminate() {
     m_terminate = true;
 }
 
-int VoltDBIPC::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool, Table* destination) {
+int VoltDBIPC::loadNextDependency(int32_t dependencyId,
+        Pool *stringPool,
+        TempTable* destination) {
     if (staticDebugVerbose) {
         std::cout << "iterating java dependency for id " << dependencyId << std::endl;
     }
@@ -881,7 +886,7 @@ int VoltDBIPC::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
 
     if (dependencySz > 0) {
         ReferenceSerializeInputBE serialize_in(buf, dependencySz);
-        destination->loadTuplesFrom<ReferenceSerializeOutput>(serialize_in, stringPool);
+        destination->loadTuplesFrom(serialize_in, stringPool);
         delete [] origBuf;
         return 1;
     }
@@ -1284,8 +1289,7 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
         ReferenceSerializeInputBE in2(inptr, sz);
         // 1 byte status and 4 byte count
         size_t offset = 5;
-        ReferenceSerializeOutput out1Serializer(m_reusedResultBuffer, MAX_MSG_SZ);
-        SerializeOutput<ReferenceSerializeOutput> out1(&out1Serializer);
+        ReferenceSerializeOutput out1(m_reusedResultBuffer, MAX_MSG_SZ);
         out1.writeInt(bufferCount);
         for (size_t i = 0; i < bufferCount; i++) {
             in2.readLong(); in2.readInt(); // skip address and offset, used for jni only

@@ -96,7 +96,6 @@
 #include <boost/multi_index/mem_fun.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
 
-#include <iostream>
 #include <sstream>
 #include <locale>
 #include <typeinfo>
@@ -326,8 +325,7 @@ catalog::Table* VoltDBEngine::getCatalogTable(const std::string& name) const {
     return NULL;
 }
 
-template<class T> void VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput<T> &out) const
-{
+template <class T> void VoltDBEngine::serializeTable(int32_t tableId, T& out) const {
     // Just look in our list of tables
     Table* table = getTable(tableId);
     if ( ! table) {
@@ -335,7 +333,8 @@ template<class T> void VoltDBEngine::serializeTable(int32_t tableId, SerializeOu
     }
     table->serializeTo(out);
 }
-template void VoltDBEngine::serializeTable <ReferenceSerializeOutput> (int32_t tableId, SerializeOutput<ReferenceSerializeOutput> &out) const;
+template void VoltDBEngine::serializeTable<ReferenceSerializeOutput> (
+        int32_t tableId, ReferenceSerializeOutput &out) const;
 
 // ------------------------------------------------------------------
 // EXECUTION FUNCTIONS
@@ -444,7 +443,6 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     assert(planfragmentId != 0);
 
     m_currentInputDepId = static_cast<int32_t>(inputDependencyId);
-
 
     /*
      * Reserve space in the result output buffer for the number of
@@ -557,31 +555,21 @@ void VoltDBEngine::serializeException(const SerializableEEException& e) {
 // -------------------------------------------------
 // RESULT FUNCTIONS
 // -------------------------------------------------
-bool VoltDBEngine::send(Table* dependency) {
+void VoltDBEngine::send(Table* dependency) {
     VOLT_DEBUG("Sending Dependency from C++");
     m_resultOutput.writeInt(-1); // legacy placeholder for old output id
-    if (!dependency->serializeTo(m_resultOutput))
-        return false;
+    dependency->serializeTo(m_resultOutput);
     m_numResultDependencies++;
-    return true;
 }
 
-bool VoltDBEngine::writeToDisk(Table* dependency) {
+void VoltDBEngine::writeToDisk(Table* dependency) {
     VOLT_DEBUG("Writing Dependency from C++");
-
-    SerializeOutputFile serialize_iof;
     string outFileName = m_executorContext->nextHighVolumeFileName();
-    serialize_iof.initialize(outFileName);
-
-    SerializeOutput<SerializeOutputFile> serialize_io(&serialize_iof);
-    if (!dependency->serializeTo(serialize_io))
-            return false;
-    serialize_iof.close();
-
-    return true;
+    FileSerializeOutput serializeOut(outFileName);
+    dependency->serializeTo(serializeOut);
 }
 
-int VoltDBEngine::loadNextDependency(Table* destination) {
+int VoltDBEngine::loadNextDependency(TempTable* destination) {
     return m_topend->loadNextDependency(m_currentInputDepId, &m_stringPool, destination);
 }
 
@@ -1321,6 +1309,7 @@ void VoltDBEngine::setExecutorVectorForFragmentId(int64_t fragId)
         PlanSet::iterator iter = plans.get<0>().begin();
         plans.erase(iter);
     }
+
     m_currExecutorVec = ev_guard.get();
     assert(m_currExecutorVec);
     // update the context
@@ -1362,8 +1351,8 @@ static bool updateMaterializedViewTargetTable(std::vector<MATVIEW*> & views,
 // their MatViewType member typedefs, but this may need to change
 // in the future if there are different view types with different
 // triggered behavior defined on the same class of table.
-template<class TABLE> void VoltDBEngine::initMaterializedViews(catalog::Table *catalogTable,
-                                                                        TABLE *table)
+template <class TABLE> void VoltDBEngine::initMaterializedViews(catalog::Table *catalogTable,
+                                                                TABLE *table)
 {
     // walk views
     BOOST_FOREACH (LabeledView labeledView, catalogTable->views()) {
@@ -1441,7 +1430,7 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans() {
 }
 
 int VoltDBEngine::getResultsSize() const {
-    return static_cast<int>(m_resultOutputSerializer.size());
+    return static_cast<int>(m_resultOutput.size());
 }
 
 void VoltDBEngine::setBuffers(char *parameterBuffer, int parameterBuffercapacity,
@@ -1602,7 +1591,7 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
     if (resultTable != NULL) {
         resultTable->serializeTo(m_resultOutput);
         m_resultOutput.writeIntAt(lengthPosition,
-                                  static_cast<int32_t>(m_resultOutputSerializer.size()
+                                  static_cast<int32_t>(m_resultOutput.size()
                                                        - sizeof(int32_t)));
         return 1;
     }
@@ -1690,8 +1679,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
             if (resultBufferCapacity < sizeof(jint) * positions.size()) {
                 throwFatalException("tableStreamSerializeMore: result buffer not large enough");
             }
-            ReferenceSerializeOutput resultsSerializer(resultBuffer, resultBufferCapacity);
-            SerializeOutput<ReferenceSerializeOutput> results(&resultsSerializer);
+            ReferenceSerializeOutput results(resultBuffer, resultBufferCapacity);
             // Write the array size as a regular integer.
             assert(positions.size() <= std::numeric_limits<int32_t>::max());
             results.writeInt((int32_t)positions.size());

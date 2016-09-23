@@ -15,9 +15,6 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "common/Topend.h"
-#include "common/StreamBlock.h"
-#include "storage/table.h"
-#include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
 
 namespace voltdb {
@@ -41,7 +38,7 @@ namespace voltdb {
     }
 
     int DummyTopend::loadNextDependency(
-        int32_t dependencyId, voltdb::Pool *pool, Table* destination) {
+        int32_t dependencyId, voltdb::Pool* pool, TempTable* destination) {
         return 0;
     }
 

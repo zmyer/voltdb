@@ -28,9 +28,10 @@
 #include <boost/shared_array.hpp>
 
 namespace voltdb {
-class Table;
 class Pool;
 class StreamBlock;
+class TempTable;
+class Table;
 
 /*
  * Topend abstracts the EE's calling interface to Java to
@@ -40,7 +41,7 @@ class StreamBlock;
 class Topend {
   public:
     virtual int loadNextDependency(
-        int32_t dependencyId, voltdb::Pool *pool, Table* destination) = 0;
+        int32_t dependencyId, voltdb::Pool* pool, TempTable* destination) = 0;
 
     // Update the topend on query progress and give the topend a chance to tell the
     // query to stop.
@@ -89,7 +90,7 @@ public:
     DummyTopend();
 
     int loadNextDependency(
-        int32_t dependencyId, voltdb::Pool *pool, Table* destination);
+        int32_t dependencyId, voltdb::Pool* pool, TempTable* destination);
 
     virtual int64_t fragmentProgressUpdate(
             int32_t batchIndex,

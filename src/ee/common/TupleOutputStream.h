@@ -18,19 +18,16 @@
 #ifndef TUPLEOUTPUTSTREAM_H_
 #define TUPLEOUTPUTSTREAM_H_
 
-#include <cstddef>
-#include <boost/ptr_container/ptr_vector.hpp>
-#include "serializeio.h"
+#include "common/serializeio.h"
 
 namespace voltdb {
 class TableTuple;
-class PersistentTable;
 
 /**
  * Serialization output class with some additional data that allows the
  * filtered COW processing to manage the stream.
  */
-class TupleOutputStream : public SerializeOutput<ReferenceSerializeOutput> {
+class TupleOutputStream : public ReferenceSerializeOutput {
 
 public:
 
@@ -84,7 +81,6 @@ private:
     std::size_t m_rowCountPosition;
     /** Keep track of bytes written for throttling to yield control. */
     std::size_t m_totalBytesSerialized;
-    ReferenceSerializeOutput m_serializer;
 };
 
 } // namespace voltdb

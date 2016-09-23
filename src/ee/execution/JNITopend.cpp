@@ -20,7 +20,7 @@
 
 #include "common/debuglog.h"
 #include "common/StreamBlock.h"
-#include "storage/table.h"
+#include "storage/temptable.h"
 
 using namespace std;
 
@@ -237,7 +237,7 @@ void JNITopend::fallbackToEEAllocatedBuffer(char *buffer, size_t length) {
     }
 }
 
-int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool, Table* destination) {
+int JNITopend::loadNextDependency(int32_t dependencyId, Pool* stringPool, TempTable* destination) {
     VOLT_DEBUG("iterating java dependency for id %d", dependencyId);
 
     JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, 10);
@@ -262,7 +262,7 @@ int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
         // so it'll get cleaned up if loadTuplesFrom throws
         jni_frame.addDependencyRef(is_copy, jbuf, bytes);
         ReferenceSerializeInputBE serialize_in(bytes, length);
-        destination->loadTuplesFrom<ReferenceSerializeOutput>(serialize_in, stringPool);
+        destination->loadTuplesFrom(serialize_in, stringPool);
         return 1;
     }
     else {
@@ -481,8 +481,7 @@ static boost::shared_array<char> serializeToDirectByteBuffer(JNIEnv *jniEngine, 
     if (table) {
         size_t serializeSize = table->getAccurateSizeToSerialize(false);
         boost::shared_array<char> backingArray(new char[serializeSize]);
-        ReferenceSerializeOutput conflictReferenceSerializeOutput(backingArray.get(), serializeSize);
-        SerializeOutput<ReferenceSerializeOutput> conflictSerializeOutput(&conflictReferenceSerializeOutput);
+        ReferenceSerializeOutput conflictSerializeOutput(backingArray.get(), serializeSize);
         table->serializeToWithoutTotalSize(conflictSerializeOutput);
         byteBuffer = jniEngine->NewDirectByteBuffer(static_cast<void*>(backingArray.get()),
                                                             static_cast<int32_t>(serializeSize));

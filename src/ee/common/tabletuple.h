@@ -60,6 +60,8 @@
 #include <vector>
 #include <jsoncpp/jsoncpp.h>
 
+#include "boost/scoped_array.hpp"
+
 #ifndef NDEBUG
 #include "debuglog.h"
 #endif /* !define(NDEBUG) */

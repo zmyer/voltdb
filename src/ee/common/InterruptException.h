@@ -21,8 +21,6 @@
 #include "common/SerializableEEException.h"
 
 namespace voltdb {
-template <class SO> class SerializeOutput;
-class ReferenceSerializeOutput;
 
 /**
  * Thrown when it has been decided that a query is taking too
@@ -30,13 +28,11 @@ class ReferenceSerializeOutput;
  */
 class InterruptException : public SerializableEEException {
 public:
-
     InterruptException(std::string message);
     virtual ~InterruptException() {}
 
 protected:
-    void p_serialize(SerializeOutput<ReferenceSerializeOutput> *output) const;
-private:
+   void p_serialize(ReferenceSerializeOutput* output) const;
 };
 }
 

@@ -125,7 +125,7 @@ class Table {
     virtual void deleteAllTuples(bool freeAllocatedStrings, bool fallible=true) = 0;
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     // -- Most callers should be using TempTable::insertTempTuple, anyway.
-    virtual bool insertTuple(TableTuple &tuple) = 0;
+    virtual bool insertTuple(TableTuple& tuple) = 0;
 
     // ------------------------------------------------------------------
     // TUPLES AND MEMORY USAGE
@@ -165,7 +165,7 @@ class Table {
     // ------------------------------------------------------------------
     // COLUMNS
     // ------------------------------------------------------------------
-    int columnIndex(const std::string &name) const;
+    int columnIndex(const std::string& name) const;
     const std::vector<std::string>& getColumnNames() const {
         return m_columnNames;
     }
@@ -203,32 +203,36 @@ class Table {
     size_t getColumnHeaderSizeToSerialize(bool includeTotalSize) const;
     size_t getAccurateSizeToSerialize(bool includeTotalSize);
 
-    template<class T> bool serializeTo(SerializeOutput<T> &serialize_out);
-    bool serializeToWithoutTotalSize(SerializeOutput<ReferenceSerializeOutput> &serialize_io);
-    template<class T> bool serializeColumnHeaderTo(SerializeOutput<T> &serialize_io);
+    template <class T> void serializeTo(T& serializeOut);
+    void serializeToWithoutTotalSize(ReferenceSerializeOutput& serializeOut);
+    template <class T> void serializeColumnHeaderTo(T& serializeOut);
 
     /*
      * Serialize a single tuple as a table so it can be sent to Java.
      */
-    bool serializeTupleTo(SerializeOutput<ReferenceSerializeOutput> &serialize_out, TableTuple *tuples, int numTuples);
+    void serializeTupleTo(ReferenceSerializeOutput& serializeOut, TableTuple* tuples, int numTuples);
 
     /**
      * Loads only tuple data and assumes there is no schema present.
      * Used for recovery where the schema is not sent.
      */
-    template <class T> void loadTuplesFromNoHeader(SerializeInputBE &serialize_in,
-                                Pool *stringPool = NULL,
-                                SerializeOutput<T> *uniqueViolationOutput = NULL,
+    template <class T> void loadTuplesFromNoHeader(SerializeInputBE& serialize_in,
+                                Pool* stringPool = NULL,
+                                T* uniqueViolationOutput = NULL,
                                 bool shouldDRStreamRows = false);
 
     /**
      * Loads only tuple data, not schema, from the serialized table.
      * Used for initial data loading and receiving dependencies.
      */
-    template <class T> void loadTuplesFrom(SerializeInputBE &serialize_in,
-                        Pool *stringPool = NULL,
-                        SerializeOutput<T> *uniqueViolationOutput = NULL,
-                        bool shouldDRStreamRows = false);
+    void loadTuplesFrom(SerializeInputBE& serialize_in, Pool* stringPool) {
+        loadTuplesFrom(serialize_in, stringPool, (ReferenceSerializeOutput*)NULL, false);
+    }
+    template <class T> void loadTuplesFrom(SerializeInputBE& serialize_in,
+                                           Pool* stringPool,
+                                           T* uniqueViolationOutput,
+                                           bool shouldDRStreamRows);
+
 
 
     // ------------------------------------------------------------------
@@ -248,7 +252,7 @@ class Table {
      * Get the current offset in bytes of the export stream for this Table
      * since startup (used for rejoin/recovery).
      */
-    virtual void getExportStreamPositions(int64_t &seqNo, size_t &streamBytesUsed) {
+    virtual void getExportStreamPositions(int64_t& seqNo, size_t& streamBytesUsed) {
         // this should be overidden by any table involved in an export
         assert(false);
     }
@@ -299,27 +303,27 @@ protected:
      * Implemented by persistent table and called by Table::loadTuplesFrom
      * to do additional processing for views and Export
      */
-    virtual void processLoadedTuple(TableTuple &tuple,
-                                    SerializeOutput<ReferenceSerializeOutput> *uniqueViolationOutput,
-                                    int32_t &serializedTupleCount,
-                                    size_t &tupleCountPosition,
+    virtual void processLoadedTuple(TableTuple& tuple,
+                                    ReferenceSerializeOutput* uniqueViolationOutput,
+                                    int32_t& serializedTupleCount,
+                                    size_t& tupleCountPosition,
                                     bool shouldDRStreamRow) {
     };
 
-    virtual void processLoadedTuple(TableTuple &tuple,
-                                    SerializeOutput<FallbackSerializeOutput> *uniqueViolationOutput,
-                                    int32_t &serializedTupleCount,
-                                    size_t &tupleCountPosition,
+    virtual void processLoadedTuple(TableTuple& tuple,
+                                    FallbackSerializeOutput* uniqueViolationOutput,
+                                    int32_t& serializedTupleCount,
+                                    size_t& tupleCountPosition,
                                     bool shouldDRStreamRow) {
     };
 
-    virtual void swapTuples(TableTuple &sourceTupleWithNewValues, TableTuple &destinationTuple) {
+    virtual void swapTuples(TableTuple& sourceTupleWithNewValues, TableTuple& destinationTuple) {
         throwFatalException("Unsupported operation");
     }
 
 public:
 
-    bool equals(voltdb::Table *other);
+    bool equals(Table* other);
     virtual voltdb::TableStats* getTableStats() = 0;
 
 protected:
@@ -346,7 +350,7 @@ protected:
         return allocatedTupleCount() - activeTupleCount() > std::max(static_cast<int64_t>((m_tuplesPerBlock * 3)), (allocatedTupleCount() * (100 - m_compactionThreshold)) / 100);  /* using the integer percentage */
     }
 
-    virtual void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema, int32_t compactionThreshold = 95);
+    virtual void initializeWithColumns(TupleSchema *schema, const std::vector<std::string>& columnNames, bool ownsTupleSchema, int32_t compactionThreshold = 95);
 
     // ------------------------------------------------------------------
     // DATA

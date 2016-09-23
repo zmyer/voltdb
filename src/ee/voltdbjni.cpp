@@ -637,8 +637,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSeria
     try {
         updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
         void* data = env->GetDirectBufferAddress(output_buffer);
-        ReferenceSerializeOutput outSerializer(data, output_capacity);
-        SerializeOutput<ReferenceSerializeOutput> out(&outSerializer);
+        ReferenceSerializeOutput out(data, output_capacity);
         engine->serializeTable(table_id, out);
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
     } catch (const FatalException &e) {

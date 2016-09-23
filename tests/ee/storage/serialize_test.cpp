@@ -115,10 +115,9 @@ class TableSerializeTest : public Test {
             delete table_;
         }
 
-        template <class T> size_t serializeTable(T* serializer) {
-            SerializeOutput<T> serialize_out(serializer);
-            table_->serializeTo(serialize_out);
-            return serializer->size();
+        template <class T> size_t serializeTable(T& serializer) {
+            table_->serializeTo(serializer);
+            return serializer.size();
         }
 
         TableTuple& setupNullStrings() {
@@ -183,15 +182,15 @@ TEST_F(TableSerializeTest, RoundTrip) {
         VOLT_DEBUG(" %s", tuple.debug(table_.get()).c_str());
     }*/
     // Serialize the table
-    CopySerializeOutput serializer;
-    size_t size = serializeTable(&serializer);
+    TestableSerializeOutput serializer;
+    size_t size = serializeTable(serializer);
 
     // Deserialize the table: verify that it matches the existing table
-    ReferenceSerializeInputBE serialize_in(serializer.data() + sizeof(int32_t), serializer.size() - sizeof(int32_t));
+    ReferenceSerializeInputBE serializeIn(serializer.data() + sizeof(int32_t), serializer.size() - sizeof(int32_t));
     TempTableLimits limits;
     TupleSchema *schema = TupleSchema::createTupleSchema(table_->schema());
     TempTable* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, columnNames, &limits);
-    deserialized->loadTuplesFrom<ReferenceSerializeOutput>(serialize_in, NULL);
+    deserialized->loadTuplesFrom(serializeIn, NULL);
     int colnum = table_->columnCount();
     EXPECT_EQ(colnum, deserialized->columnCount());
     for (int i = 0; i < colnum; ++i) {
@@ -199,8 +198,8 @@ TEST_F(TableSerializeTest, RoundTrip) {
     }
 
     // Serialize the table a second time, verify that it's the same
-    CopySerializeOutput serializer2;
-    size_t size2 = serializeTable(&serializer2);
+    TestableSerializeOutput serializer2;
+    size_t size2 = serializeTable(serializer2);
     ASSERT_EQ(size, size2);
     const void *data1 = serializer.data();
     const void *data2 = serializer2.data();
@@ -213,23 +212,24 @@ TEST_F(TableSerializeTest, FileRoundTrip) {
     // Serialize the table
     ChTempDir tempdir;
     std::string filename = tempdir.name() + "/test";
-    SerializeOutputFile serializer;
-    serializer.initialize(filename);
-    size_t size = serializeTable(&serializer);
-    serializer.close();
+    size_t size;
+    {   // Limit the serializer's lifetime to this block.
+        FileSerializeOutput serializer(filename);
+        size = serializeTable(serializer);
+    }
 
     std::fstream serialize_stream;
-    serialize_stream.open(filename.c_str(),std::fstream::in);
-    char * buffer = new char [size];
-    serialize_stream.read(buffer,size);
+    serialize_stream.open(filename.c_str(), std::fstream::in);
+    char * buffer = new char[size];
+    serialize_stream.read(buffer, size);
     serialize_stream.close();
 
     // Deserialize the table: verify that it matches the existing table
-    CopySerializeInputBE serialize_in(buffer + sizeof(int32_t), size - sizeof(int32_t));
+    ReferenceSerializeInputBE serializeIn(buffer + sizeof(int32_t), size - sizeof(int32_t));
     TempTableLimits limits;
     TupleSchema *schema = TupleSchema::createTupleSchema(table_->schema());
     Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, columnNames, &limits);
-    deserialized->loadTuplesFrom<ReferenceSerializeOutput>(serialize_in, NULL);
+    deserialized->loadTuplesFrom(serializeIn, NULL);
     int colnum = table_->columnCount();
     EXPECT_EQ(colnum, deserialized->columnCount());
     for (int i = 0; i < colnum; ++i) {
@@ -239,16 +239,17 @@ TEST_F(TableSerializeTest, FileRoundTrip) {
     // Serialize the table a second time, verify that it's the same
 
     std::string filename2 = tempdir.name() + "/test2";
-    SerializeOutputFile serializer2;
-    serializer2.initialize(filename2);
-    size_t size2 = serializeTable(&serializer2);
-    serializer2.close();
+    size_t size2;
+    {   // Limit the serializer's lifetime to this block.
+        FileSerializeOutput serializer(filename2);
+        size2 = serializeTable(serializer);
+    }
 
     std::fstream serialize_stream2;
-    serialize_stream2.open(filename2.c_str(),std::fstream::in);
+    serialize_stream2.open(filename2.c_str(), std::fstream::in);
 
-    char * buffer2 = new char [size2];
-    serialize_stream2.read(buffer2,size2);
+    char * buffer2 = new char[size2];
+    serialize_stream2.read(buffer2, size2);
     serialize_stream2.close();
 
     ASSERT_EQ(size, size2);
@@ -265,15 +266,15 @@ TEST_F(TableSerializeTest, NullStrings) {
     TableTuple& tuple = setupNullStrings();
 
     // Serialize the table
-    CopySerializeOutput serializer;
-    serializeTable(&serializer);
+    TestableSerializeOutput serializer;
+    serializeTable(serializer);
 
     // Deserialize the table: verify that it matches the existing table
-    ReferenceSerializeInputBE serialize_in(serializer.data() + sizeof(int32_t), serializer.size() - sizeof(int32_t));
+    ReferenceSerializeInputBE serializeIn(serializer.data() + sizeof(int32_t), serializer.size() - sizeof(int32_t));
     TempTableLimits limits;
     voltdb::TupleSchema *schema = TupleSchema::createTupleSchema(table_->schema());
     Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, nullColumnNames, &limits);
-    deserialized->loadTuplesFrom<ReferenceSerializeOutput>(serialize_in, NULL);
+    deserialized->loadTuplesFrom(serializeIn, NULL);
 
     checkNullStrings(deserialized, tuple);
 
@@ -286,23 +287,24 @@ TEST_F(TableSerializeTest, NullStringsFile) {
     // Serialize the table
     ChTempDir tempdir;
     std::string filename = tempdir.name() + "/test";
-    SerializeOutputFile serializer;
-    serializer.initialize(filename);
-    size_t size = serializeTable(&serializer);
-    serializer.close();
+    size_t size;
+    {   // Limit the serializer's lifetime to this block.
+        FileSerializeOutput serializer(filename);
+        size = serializeTable(serializer);
+    }
 
     std::fstream serialize_stream;
-    serialize_stream.open(filename.c_str(),std::fstream::in);
-    char * buffer = new char [size];
-    serialize_stream.read(buffer,size);
+    serialize_stream.open(filename.c_str(), std::fstream::in);
+    char * buffer = new char[size];
+    serialize_stream.read(buffer, size);
     serialize_stream.close();
 
     // Deserialize the table: verify that it matches the existing table
-    CopySerializeInputBE serialize_in(buffer + sizeof(int32_t), size - sizeof(int32_t));
+    ReferenceSerializeInputBE serializeIn(buffer + sizeof(int32_t), size - sizeof(int32_t));
     TempTableLimits limits;
     voltdb::TupleSchema *schema = TupleSchema::createTupleSchema(table_->schema());
     Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, nullColumnNames, &limits);
-    deserialized->loadTuplesFrom<ReferenceSerializeOutput>(serialize_in, NULL);
+    deserialized->loadTuplesFrom(serializeIn, NULL);
 
     checkNullStrings(deserialized, tuple);
     delete deserialized;

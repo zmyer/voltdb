@@ -61,54 +61,53 @@ public:
     SerializeIOTest() : TEXT("hello world") {}
 protected:
     const string TEXT;
-    void writeTestSuite(SerializeOutput<CopySerializeOutput>* out) {
-        out->writeBool(true);
-        out->writeBool(false);
-        out->writeByte(numeric_limits<int8_t>::min());
-        out->writeByte(numeric_limits<int8_t>::max());
-        out->writeShort(numeric_limits<int16_t>::min());
-        out->writeShort(numeric_limits<int16_t>::max());
-        out->writeInt(numeric_limits<int32_t>::min());
-        out->writeInt(numeric_limits<int32_t>::max());
-        out->writeLong(numeric_limits<int64_t>::min());
-        out->writeLong(numeric_limits<int64_t>::max());
-        out->writeFloat(numeric_limits<float>::min());
-        out->writeFloat(numeric_limits<float>::max());
-        out->writeDouble(numeric_limits<double>::min());
-        out->writeDouble(numeric_limits<double>::max());
-        out->writeTextString(TEXT);
+    void writeTestSuite(TestableSerializeOutput& out) {
+        out.writeBool(true);
+        out.writeBool(false);
+        out.writeByte(numeric_limits<int8_t>::min());
+        out.writeByte(numeric_limits<int8_t>::max());
+        out.writeShort(numeric_limits<int16_t>::min());
+        out.writeShort(numeric_limits<int16_t>::max());
+        out.writeInt(numeric_limits<int32_t>::min());
+        out.writeInt(numeric_limits<int32_t>::max());
+        out.writeLong(numeric_limits<int64_t>::min());
+        out.writeLong(numeric_limits<int64_t>::max());
+        out.writeFloat(numeric_limits<float>::min());
+        out.writeFloat(numeric_limits<float>::max());
+        out.writeDouble(numeric_limits<double>::min());
+        out.writeDouble(numeric_limits<double>::max());
+        out.writeTextString(TEXT);
     }
 
-    void readTestSuite(SerializeInputBE* in) {
-        EXPECT_EQ(true, in->readBool());
-        EXPECT_EQ(false, in->readBool());
-        EXPECT_EQ(numeric_limits<int8_t>::min(), in->readByte());
-        EXPECT_EQ(numeric_limits<int8_t>::max(), in->readByte());
-        EXPECT_EQ(numeric_limits<int16_t>::min(), in->readShort());
-        EXPECT_EQ(numeric_limits<int16_t>::max(), in->readShort());
-        EXPECT_EQ(numeric_limits<int32_t>::min(), in->readInt());
-        EXPECT_EQ(numeric_limits<int32_t>::max(), in->readInt());
-        EXPECT_EQ(numeric_limits<int64_t>::min(), in->readLong());
-        EXPECT_EQ(numeric_limits<int64_t>::max(), in->readLong());
-        EXPECT_EQ(numeric_limits<float>::min(), in->readFloat());
-        EXPECT_EQ(numeric_limits<float>::max(), in->readFloat());
-        EXPECT_EQ(numeric_limits<double>::min(), in->readDouble());
-        EXPECT_EQ(numeric_limits<double>::max(), in->readDouble());
-        EXPECT_EQ(TEXT, in->readTextString());
+    void readTestSuite(SerializeInputBE& in) {
+        EXPECT_EQ(true, in.readBool());
+        EXPECT_EQ(false, in.readBool());
+        EXPECT_EQ(numeric_limits<int8_t>::min(), in.readByte());
+        EXPECT_EQ(numeric_limits<int8_t>::max(), in.readByte());
+        EXPECT_EQ(numeric_limits<int16_t>::min(), in.readShort());
+        EXPECT_EQ(numeric_limits<int16_t>::max(), in.readShort());
+        EXPECT_EQ(numeric_limits<int32_t>::min(), in.readInt());
+        EXPECT_EQ(numeric_limits<int32_t>::max(), in.readInt());
+        EXPECT_EQ(numeric_limits<int64_t>::min(), in.readLong());
+        EXPECT_EQ(numeric_limits<int64_t>::max(), in.readLong());
+        EXPECT_EQ(numeric_limits<float>::min(), in.readFloat());
+        EXPECT_EQ(numeric_limits<float>::max(), in.readFloat());
+        EXPECT_EQ(numeric_limits<double>::min(), in.readDouble());
+        EXPECT_EQ(numeric_limits<double>::max(), in.readDouble());
+        EXPECT_EQ(TEXT, in.readTextString());
     }
 };
 
 TEST_F(SerializeIOTest, ReadWrite) {
-    CopySerializeOutput serializer;
-    SerializeOutput<CopySerializeOutput> out(&serializer);
-    writeTestSuite(&out);
+    TestableSerializeOutput out;
+    writeTestSuite(out);
 
-    ReferenceSerializeInputBE in(serializer.data(), serializer.size());
-    readTestSuite(&in);
+    ReferenceSerializeInputBE in(out.data(), out.size());
+    readTestSuite(in);
 
-    CopySerializeInputBE in2(serializer.data(), serializer.size());
-    memset(const_cast<char*>(serializer.data()), 0, serializer.size());
-    readTestSuite(&in2);
+    CopySerializeInputBE in2(out.data(), out.size());
+    memset(const_cast<char*>(out.data()), 0, out.size());
+    readTestSuite(in2);
 }
 
 TEST_F(SerializeIOTest, Unread) {
@@ -120,12 +119,11 @@ TEST_F(SerializeIOTest, Unread) {
     EXPECT_EQ(0x01020304, in.readInt());
 }
 
-TEST(SerializeOutput, ReserveBytes) {
-    CopySerializeOutput serializer;
-    SerializeOutput<CopySerializeOutput> out(&serializer);
+TEST(SerializeIOTest, ReserveBytes) {
+    TestableSerializeOutput out;
     size_t offset = out.reserveBytes(4);
     EXPECT_EQ(0, offset);
-    EXPECT_EQ(4, serializer.size());
+    EXPECT_EQ(4, out.size());
 
     static const uint32_t DATA = 0x01020304;
     // Writing past the end = bad
@@ -133,11 +131,11 @@ TEST(SerializeOutput, ReserveBytes) {
 
     size_t offset2 = out.reserveBytes(5);
     EXPECT_EQ(4, offset2);
-    EXPECT_EQ(9, serializer.size());
+    EXPECT_EQ(9, out.size());
 
     size_t nextOffset = out.writeBytesAt(1, &DATA, sizeof(DATA));
     EXPECT_EQ(1+sizeof(DATA), nextOffset);
-    EXPECT_EQ(0, memcmp(static_cast<const char*>(serializer.data()) + 1, &DATA, sizeof(DATA)));
+    EXPECT_EQ(0, memcmp(static_cast<const char*>(out.data()) + 1, &DATA, sizeof(DATA)));
 }
 
 int main() {

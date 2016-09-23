@@ -118,7 +118,7 @@ TempTable *loadTableFrom(const char *buffer,
                                        schema, // Transfers ownership to the table.
                                        columnNames,
                                        NULL);
-    table->loadTuplesFromNoHeader<ReferenceSerializeOutput>(result);
+    table->loadTuplesFromNoHeader(result, pool, uniqueViolationOutput, shouldDRStreamRows);
     return table;
 }
 }
