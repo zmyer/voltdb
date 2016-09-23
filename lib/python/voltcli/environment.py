@@ -87,6 +87,8 @@ if 'JAVA_OPTS' in os.environ:
     java_opts.extend(shlex.split(os.environ['JAVA_OPTS']))
 if not [opt for opt in java_opts if opt.startswith('-Xmx')]:
     java_opts.append('-Xmx2048m')
+    java_opts.append('-XX:NewSize=768m')
+    java_opts.append('-XX:MaxNewSize=768m')
     if specifyMinimumHeapSize:
         java_opts.append('-Xms2048m')
         java_opts.append('-XX:+AlwaysPreTouch')
