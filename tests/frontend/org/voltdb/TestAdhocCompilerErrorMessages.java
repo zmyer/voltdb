@@ -23,11 +23,13 @@
 
 package org.voltdb;
 
+import java.io.File;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.junit.Test;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.utils.VoltFile;
 
 public class TestAdhocCompilerErrorMessages extends AdhocDDLTestBase
 {
@@ -43,6 +45,17 @@ public class TestAdhocCompilerErrorMessages extends AdhocDDLTestBase
     {
         try {
             VoltDB.Configuration config = new VoltDB.Configuration();
+
+            // Prevent test flakes from reading a leftover deployment file.
+            File configDir =
+                    new VoltFile(config.m_voltdbRoot, VoltDB.CONFIG_DIR);
+            if (configDir.exists()) {
+                File depFH = new VoltFile(configDir, "deployment.xml");
+                if (depFH.exists()) {
+                    depFH.delete();
+                }
+            }
+
             startSystem(config);
             boolean threw = false;
             try {
