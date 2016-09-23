@@ -808,6 +808,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 col.columnName = child.attributes.get("column");
                 col.tableName = child.attributes.get("table");
                 col.tableAlias = child.attributes.get("tablealias");
+            }
         }
         else if (child.name.equals("tablesubquery")) {
             // Scalar subquery like 'select c, (select count(*) from t1) from t2;'
