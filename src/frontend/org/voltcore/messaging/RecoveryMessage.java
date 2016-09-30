@@ -17,7 +17,12 @@
 
 package org.voltcore.messaging;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
+
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.VoltProtocolHandler;
+import org.voltcore.utils.HBBPool.SharedBBContainer;
 
 /**
  *  Message containing recovery data for a partition/table pair.
@@ -108,7 +113,7 @@ public class RecoveryMessage extends VoltMessage {
         buf.put(m_isSourceReady ? 1 : (byte) 0);
         buf.putLong( m_hsId);
 
-        assert(buf.capacity() == buf.position());
+        assert(buf.limit() == buf.position());
         buf.limit(buf.position());
     }
 
@@ -129,13 +134,31 @@ public class RecoveryMessage extends VoltMessage {
     }
 
     @Override
-    public void initFromBuffer(ByteBuffer buf) {
+    protected void initFromBuffer(ByteBuffer buf) throws IOException {
+        assert(false);
+    }
+
+    @Override
+    protected void initFromContainer(SharedBBContainer container) throws IOException {
+        ByteBuffer buf = container.b();
         m_recoveryMessagesAvailable = false;
         m_sourceHSId = buf.getLong();
         m_txnId = buf.getLong();
         m_isSourceReady = buf.get() == 1;
         m_hsId = buf.getLong();
 
-        assert(buf.capacity() == buf.position());
+        assert(buf.limit() == buf.position());
+        container.discard(getClass().getSimpleName());
     }
+
+    @Override
+    public void initFromInputHandler(VoltProtocolHandler handler, NIOReadStream inputStream) throws IOException {
+        initFromContainer(handler.getNextHBBMessage(inputStream, getClass().getSimpleName()));
+    }
+
+    @Override
+    public void implicitReference(String tag) {}
+
+    @Override
+    public void discard(String tag) {}
 }

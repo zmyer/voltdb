@@ -17,10 +17,14 @@
 
 package org.voltcore.messaging;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Set;
 
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.HBBPool.SharedBBContainer;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
 
@@ -73,7 +77,17 @@ public final class FaultMessage extends VoltMessage {
     }
 
     @Override
-    protected void initFromBuffer(ByteBuffer buf) {
+    protected void initFromBuffer(ByteBuffer buf) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    protected void initFromContainer(SharedBBContainer container) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void initFromInputHandler(VoltProtocolHandler handler, NIOReadStream inputStream) throws IOException {
         throw new UnsupportedOperationException();
     }
 
@@ -87,6 +101,12 @@ public final class FaultMessage extends VoltMessage {
             && survivors.size() == 1
             && survivors.contains(reportingSite);
     }
+
+    @Override
+    public void implicitReference(String tag) {}
+
+    @Override
+    public void discard(String tag) {}
 
     @Override
     public String toString() {

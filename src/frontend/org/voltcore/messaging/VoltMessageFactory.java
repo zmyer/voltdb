@@ -20,6 +20,10 @@ package org.voltcore.messaging;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.VoltProtocolHandler;
+import org.voltcore.utils.HBBPool.SharedBBContainer;
+
 public class VoltMessageFactory {
     // Identify each message
     final public static byte AGREEMENT_TASK_ID = 1;
@@ -35,10 +39,10 @@ public class VoltMessageFactory {
     // will be sad, and I will have no sympathy. --izzy
     final public static byte VOLTCORE_MESSAGE_ID_MAX = 7;
 
-    public VoltMessage createMessageFromBuffer(ByteBuffer buffer, long sourceHSId)
+    public VoltMessage createMessageFromBuffer(ByteBuffer buf, long sourceHSId)
     throws IOException
     {
-        byte type = buffer.get();
+        byte type = buf.get();
 
         // instantiate a new message instance according to the id
         VoltMessage message = instantiate_local(type);
@@ -47,7 +51,38 @@ public class VoltMessageFactory {
             message = instantiate(type);
         }
         message.m_sourceHSId = sourceHSId;
-        message.initFromBuffer(buffer.slice().asReadOnlyBuffer());
+        message.initFromBuffer(buf.duplicate());
+        return message;
+    }
+
+    public VoltMessage createMessageFromContainer(SharedBBContainer container, long sourceHSId)
+    throws IOException
+    {
+        byte type = container.b().get();
+
+        // instantiate a new message instance according to the id
+        VoltMessage message = instantiate_local(type);
+        if (message == null)
+        {
+            message = instantiate(type);
+        }
+        message.m_sourceHSId = sourceHSId;
+        message.initFromContainer(container.duplicate(message.getClass().getSimpleName()));
+        return message;
+    }
+
+    public VoltMessage createMessageFromHandler(byte type, VoltProtocolHandler handler, NIOReadStream inputStream, long sourceHSId)
+    throws IOException
+    {
+        // instantiate a new message instance according to the id
+        VoltMessage message = instantiate_local(type);
+        if (message == null)
+        {
+            message = instantiate(type);
+        }
+        message.m_sourceHSId = sourceHSId;
+
+        message.initFromInputHandler(handler, inputStream);
         return message;
     }
 

@@ -71,7 +71,7 @@ public class Iv2TransactionCreator implements TransactionCreator
     }
 
     @Override
-    public ClientResponseImpl dispatch(StoredProcedureInvocation invocation,
+    public ClientResponseImpl dispatch(SPIfromSerialization invocation,
             Connection connection, boolean isAdmin, OverrideCheck bypass) {
 
         final InvocationClientHandler handler = new InvocationClientHandler() {

@@ -30,7 +30,7 @@ import static org.mockito.Mockito.when;
 import org.junit.Assert;
 import org.junit.Test;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
-import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.SPIfromSerialization;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
@@ -47,7 +47,7 @@ public class TestReplaySequencer {
     TransactionInfoBaseMessage makeIv2InitTask(long unused, String procName)
     {
         Iv2InitiateTaskMessage m = mock(Iv2InitiateTaskMessage.class);
-        StoredProcedureInvocation invocation = mock(StoredProcedureInvocation.class);
+        SPIfromSerialization invocation = mock(SPIfromSerialization.class);
         when(invocation.getProcName()).thenReturn(procName);
         when(m.getStoredProcedureInvocation()).thenReturn(invocation);
         when(m.isForReplay()).thenReturn(true);

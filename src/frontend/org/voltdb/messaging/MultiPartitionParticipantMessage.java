@@ -21,7 +21,10 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.HBBPool.SharedBBContainer;
 
 public class MultiPartitionParticipantMessage extends TransactionInfoBaseMessage {
 
@@ -91,16 +94,35 @@ public class MultiPartitionParticipantMessage extends TransactionInfoBaseMessage
         super.flattenToBuffer(buf);
         buf.putLong(m_ciHandle);
         buf.putLong(m_connectionId);
-        assert(buf.capacity() == buf.position());
+        assert(buf.limit() == buf.position());
         buf.limit(buf.position());
     }
 
     @Override
-    public void initFromBuffer(ByteBuffer buf) throws IOException {
-        super.initFromBuffer(buf);
+    protected void initFromBuffer(ByteBuffer buf) throws IOException {
+        assert(false);
+    }
+
+    @Override
+    public void initFromContainer(SharedBBContainer container) throws IOException {
+        super.initFromContainer(container);
+        ByteBuffer buf = container.b();
         m_ciHandle = buf.getLong();
         m_connectionId = buf.getLong();
+        assert(buf.limit() == buf.position());
+        container.discard(getClass().getSimpleName());
     }
+
+    @Override
+    public void initFromInputHandler(VoltProtocolHandler handler, NIOReadStream inputStream) throws IOException {
+        initFromContainer(handler.getNextHBBMessage(inputStream, getClass().getSimpleName()));
+    }
+
+    @Override
+    public void implicitReference(String tag) {}
+
+    @Override
+    public void discard(String tag) {}
 
     @Override
     public String toString() {

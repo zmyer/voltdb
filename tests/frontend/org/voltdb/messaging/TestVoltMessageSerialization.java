@@ -28,13 +28,17 @@ import java.nio.ByteBuffer;
 
 import junit.framework.TestCase;
 
+import org.junit.After;
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HeartbeatResponseMessage;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.HBBPool;
+import org.voltcore.utils.HBBPool.SharedBBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterSet;
-import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.SPIfromParameterArray;
+import org.voltdb.SPIfromSerialization;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.ClientResponse;
@@ -44,7 +48,13 @@ import com.google_voltpatches.common.collect.Sets;
 
 public class TestVoltMessageSerialization extends TestCase {
 
-    VoltMessage checkVoltMessage(VoltMessage msg) throws IOException {
+    @After
+    public void tearDown() throws Exception {
+        assertTrue(HBBPool.debugAllBuffersReturned());
+    }
+
+
+    VoltMessage checkVoltBufferMessage(VoltMessage msg) throws IOException {
         ByteBuffer buf1 = ByteBuffer.allocate(msg.getSerializedSize());
         msg.flattenToBuffer(buf1);
         buf1.flip();
@@ -52,6 +62,7 @@ public class TestVoltMessageSerialization extends TestCase {
         VoltDbMessageFactory vdbmf = new VoltDbMessageFactory();
 
         VoltMessage msg2 = vdbmf.createMessageFromBuffer(buf1, -1);
+        // reference is now in msg2 (containing the slice)
         ByteBuffer buf2 = ByteBuffer.allocate(msg2.getSerializedSize());
         msg2.flattenToBuffer(buf2);
         buf1.rewind();
@@ -63,14 +74,36 @@ public class TestVoltMessageSerialization extends TestCase {
         return msg2;
     }
 
+    VoltMessage checkVoltContainerMessage(VoltMessage msg) throws IOException {
+        SharedBBContainer container1 = HBBPool.allocateHeapAndPool(msg.getSerializedSize(), "Placeholder1");
+        msg.flattenToBuffer(container1.b());
+        container1.b().flip();
+
+        VoltDbMessageFactory vdbmf = new VoltDbMessageFactory();
+
+        VoltMessage msg2 = vdbmf.createMessageFromContainer(container1, -1);
+        // reference is now in msg2 (containing the slice)
+        SharedBBContainer container2 = HBBPool.allocateHeapAndPool(msg2.getSerializedSize(), "Placeholder2");
+        msg2.flattenToBuffer(container2.b());
+        container1.b().rewind();
+        container2.b().rewind();
+
+        assertEquals(container1.b().remaining(), container2.b().remaining());
+        assertTrue(container1.b().compareTo(container2.b()) == 0);
+        container1.discard("Placeholder1");
+        container2.discard("Placeholder2");
+
+        return msg2;
+    }
+
     public void testInitiateTask() throws IOException {
-        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        SPIfromParameterArray spi = new SPIfromParameterArray();
         spi.setClientHandle(25);
         spi.setProcName("johnisgreat");
         spi.setParams(57, "gooniestoo", "dudemandude");
 
         InitiateTaskMessage itask = new InitiateTaskMessage(23, 8, 100045, true, false, spi, 2101);
-        InitiateTaskMessage itask2 = (InitiateTaskMessage) checkVoltMessage(itask);
+        InitiateTaskMessage itask2 = (InitiateTaskMessage) checkVoltContainerMessage(itask);
 
         assertEquals(itask.getInitiatorHSId(), itask2.getInitiatorHSId());
         assertEquals(itask.getTxnId(), itask2.getTxnId());
@@ -79,17 +112,18 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(itask.getStoredProcedureName(), itask2.getStoredProcedureName());
         assertEquals(itask.getParameterCount(), itask2.getParameterCount());
         assertEquals(itask.getLastSafeTxnId(), itask2.getLastSafeTxnId());
+        itask2.discard("Params");
     }
 
     public void testIv2InitiateTask() throws IOException {
-        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        SPIfromParameterArray spi = new SPIfromParameterArray();
         spi.setClientHandle(25);
         spi.setProcName("johnisgreat");
         spi.setParams(57, "gooniestoo", "dudemandude");
 
         Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 10L, 100045, 99, true, false, spi, 2101, 3101, true);
         itask.setSpHandle(31337);
-        Iv2InitiateTaskMessage itask2 = (Iv2InitiateTaskMessage) checkVoltMessage(itask);
+        Iv2InitiateTaskMessage itask2 = (Iv2InitiateTaskMessage) checkVoltContainerMessage(itask);
 
         assertEquals(10L, itask.getTruncationHandle());
         assertEquals(itask.getInitiatorHSId(), itask2.getInitiatorHSId());
@@ -106,10 +140,11 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(itask.getSpHandle(), itask2.getSpHandle());
         assertEquals(31337, itask.getSpHandle());
         assertTrue(itask.isForReplay());
+        itask2.discard("Params");
     }
 
     public void testInitiateResponse() throws IOException {
-        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        SPIfromParameterArray spi = new SPIfromParameterArray();
         spi.setClientHandle(25);
         spi.setProcName("elmerfudd");
         spi.setParams(57, "wrascallywabbit");
@@ -126,13 +161,14 @@ public class TestVoltMessageSerialization extends TestCase {
                 new VoltTable[] { table, table }, "knockknockbananna"));
         iresponse.setClientHandle(99);
 
-        InitiateResponseMessage iresponse2 = (InitiateResponseMessage) checkVoltMessage(iresponse);
+        InitiateResponseMessage iresponse2 = (InitiateResponseMessage) checkVoltContainerMessage(iresponse);
 
         assertEquals(iresponse.getTxnId(), iresponse2.getTxnId());
+        iresponse2.discard("Params");
     }
 
     public void testInitiateResponseForIv2() throws IOException {
-        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        SPIfromParameterArray spi = new SPIfromParameterArray();
         spi.setClientHandle(25);
         spi.setProcName("elmerfudd");
         spi.setParams(57, "wrascallywabbit");
@@ -149,25 +185,26 @@ public class TestVoltMessageSerialization extends TestCase {
                 new VoltTable[] { table, table }, "knockknockbananna"));
         iresponse.setClientHandle(99);
 
-        InitiateResponseMessage iresponse2 = (InitiateResponseMessage) checkVoltMessage(iresponse);
+        InitiateResponseMessage iresponse2 = (InitiateResponseMessage) checkVoltContainerMessage(iresponse);
 
         assertEquals(iresponse.getTxnId(), iresponse2.getTxnId());
         assertTrue(iresponse2.isReadOnly());
     }
 
     public void testMispartitionedResponse() throws IOException {
-        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        SPIfromParameterArray spi = new SPIfromParameterArray();
         spi.setClientHandle(25);
         spi.setProcName("elmerfudd");
         spi.setParams(57, "wrascallywabbit");
+        SPIfromSerialization serializedSPI = spi.roundTripForCL();
 
-        Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 10L, 100045, 99, true, false, spi, 2101, 3101, true);
+        Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 10L, 100045, 99, true, false, serializedSPI, 2101, 3101, true);
 
         InitiateResponseMessage iresponse = new InitiateResponseMessage(itask);
-        iresponse.setMispartitioned(true, spi, Pair.of(3l, new byte[] {1, 2, 3}));
+        iresponse.setMispartitioned(true, serializedSPI, Pair.of(3l, new byte[] {1, 2, 3}));
         iresponse.setClientHandle(99);
 
-        InitiateResponseMessage iresponse2 = (InitiateResponseMessage) checkVoltMessage(iresponse);
+        InitiateResponseMessage iresponse2 = (InitiateResponseMessage) checkVoltContainerMessage(iresponse);
 
         assertEquals(iresponse.getTxnId(), iresponse2.getTxnId());
         assertTrue(iresponse2.isReadOnly());
@@ -176,6 +213,9 @@ public class TestVoltMessageSerialization extends TestCase {
         assertNotNull(iresponse2.getInvocation());
         assertNotNull(iresponse2.getCurrentHashinatorConfig());
         assertEquals(ClientResponse.TXN_RESTART, iresponse2.getClientResponseData().getStatus());
+        serializedSPI.discard("Params");
+        iresponse.discard("Params");
+        iresponse2.discard("Params");
     }
 
     public void testFragmentTask() throws IOException {
@@ -184,7 +224,7 @@ public class TestVoltMessageSerialization extends TestCase {
         ft.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_PARTITION);
         ft.setBatch(75);
 
-        FragmentTaskMessage ft2 = (FragmentTaskMessage) checkVoltMessage(ft);
+        FragmentTaskMessage ft2 = (FragmentTaskMessage) checkVoltContainerMessage(ft);
 
         assertEquals(ft.getInitiatorHSId(), ft2.getInitiatorHSId());
         assertEquals(ft.getCoordinatorHSId(), ft2.getCoordinatorHSId());
@@ -220,7 +260,7 @@ public class TestVoltMessageSerialization extends TestCase {
         ft.addFragment(new byte[20], 24, param2_buf);
         ft.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_PARTITION);
 
-        FragmentTaskMessage ft2 = (FragmentTaskMessage) checkVoltMessage(ft);
+        FragmentTaskMessage ft2 = (FragmentTaskMessage) checkVoltContainerMessage(ft);
 
         assertEquals(ft.getInitiatorHSId(), ft2.getInitiatorHSId());
         assertEquals(ft.getCoordinatorHSId(), ft2.getCoordinatorHSId());
@@ -259,7 +299,7 @@ public class TestVoltMessageSerialization extends TestCase {
         ft.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_PARTITION);
 
         // The initiate task.
-        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        SPIfromParameterArray spi = new SPIfromParameterArray();
         spi.setClientHandle(25);
         spi.setProcName("johnisgreat");
         spi.setParams(57, "gooniestoo", "dudemandude");
@@ -270,10 +310,10 @@ public class TestVoltMessageSerialization extends TestCase {
         // this is the important part.
         ft.setStateForDurability(itask, Sets.newHashSet(0, 1, 2));
         assertTrue(ft.getInitiateTask() != null);
-        assertTrue(ft.m_initiateTaskBuffer != null);
-        assertTrue(ft.m_initiateTaskBuffer.remaining() > 0);
+        assertTrue(ft.m_initiateTaskContainer != null);
+        assertTrue(ft.m_initiateTaskContainer.b().remaining() > 0);
 
-        FragmentTaskMessage ft2 = (FragmentTaskMessage) checkVoltMessage(ft);
+        FragmentTaskMessage ft2 = (FragmentTaskMessage) checkVoltContainerMessage(ft);
 
         assertTrue(ft2.getInitiateTask() != null);
         assertEquals(ft.getInitiatorHSId(), ft2.getInitiatorHSId());
@@ -304,6 +344,8 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(itask.getSpHandle(), itask2.getSpHandle());
         assertEquals(31337, itask.getSpHandle());
         assertTrue(itask.isForReplay());
+        ft.discard("Params");
+        ft2.discard("Params");
     }
 
 
@@ -319,7 +361,7 @@ public class TestVoltMessageSerialization extends TestCase {
         fr.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, new EEException(1));
         fr.addDependency(99, table);
 
-        FragmentResponseMessage fr2 = (FragmentResponseMessage) checkVoltMessage(fr);
+        FragmentResponseMessage fr2 = (FragmentResponseMessage) checkVoltBufferMessage(fr);
 
         assertEquals(fr.getExecutorSiteId(), fr2.getExecutorSiteId());
         assertEquals(fr.getDestinationSiteId(), fr2.getDestinationSiteId());
@@ -330,24 +372,26 @@ public class TestVoltMessageSerialization extends TestCase {
         VoltTable t1 = fr.getTableAtIndex(0);
         VoltTable t2 = fr2.getTableAtIndex(0);
         assertEquals(t1.fetchRow(0).getString(0), t2.fetchRow(0).getString(0));
+        fr2.discard("Params");
     }
 
     public void testMembershipNotice() throws IOException {
         MultiPartitionParticipantMessage mn = new MultiPartitionParticipantMessage(100222, -75, 555555555555L, false);
 
         MultiPartitionParticipantMessage mn2 =
-            (MultiPartitionParticipantMessage) checkVoltMessage(mn);
+            (MultiPartitionParticipantMessage) checkVoltContainerMessage(mn);
 
         assertEquals(mn.getInitiatorHSId(), mn2.getInitiatorHSId());
         assertEquals(mn.getCoordinatorHSId(), mn2.getCoordinatorHSId());
         assertEquals(mn.getTxnId(), mn2.getTxnId());
         assertEquals(mn.isReadOnly(), mn2.isReadOnly());
+        mn2.discard("Params");
     }
 
     public void testHeartbeat() throws IOException {
         HeartbeatMessage mn = new HeartbeatMessage(100222, 555555555555L, 97L);
 
-        HeartbeatMessage mn2 = (HeartbeatMessage) checkVoltMessage(mn);
+        HeartbeatMessage mn2 = (HeartbeatMessage) checkVoltContainerMessage(mn);
 
         assertEquals(mn.getInitiatorHSId(), mn2.getInitiatorHSId());
         assertEquals(mn.getCoordinatorHSId(), mn2.getCoordinatorHSId());
@@ -359,7 +403,7 @@ public class TestVoltMessageSerialization extends TestCase {
     public void testHeartbeatResponse() throws IOException {
         HeartbeatResponseMessage mn = new HeartbeatResponseMessage(55, 100222, true);
 
-        HeartbeatResponseMessage mn2 = (HeartbeatResponseMessage) checkVoltMessage(mn);
+        HeartbeatResponseMessage mn2 = (HeartbeatResponseMessage) checkVoltContainerMessage(mn);
 
         assertEquals(mn.getExecHSId(), mn2.getExecHSId());
         assertEquals(mn.getLastReceivedTxnId(), mn2.getLastReceivedTxnId());
@@ -372,7 +416,7 @@ public class TestVoltMessageSerialization extends TestCase {
             new CompleteTransactionMessage(12345, 54321, 67890, false, 77, false,
                                            true, false, true);
 
-        CompleteTransactionMessage ctm2 = (CompleteTransactionMessage) checkVoltMessage(ctm);
+        CompleteTransactionMessage ctm2 = (CompleteTransactionMessage) checkVoltContainerMessage(ctm);
         assertEquals(ctm.m_isRollback, ctm2.m_isRollback);
         assertEquals(ctm.m_requiresAck, ctm2.m_requiresAck);
         assertEquals(ctm.m_rollbackForFault, ctm2.m_rollbackForFault);
@@ -389,7 +433,7 @@ public class TestVoltMessageSerialization extends TestCase {
             new CompleteTransactionResponseMessage(ctm);
 
         CompleteTransactionResponseMessage ctrm2 =
-            (CompleteTransactionResponseMessage) checkVoltMessage(ctrm);
+            (CompleteTransactionResponseMessage) checkVoltContainerMessage(ctrm);
         assertEquals(ctrm.getTxnId(), ctrm2.getTxnId());
         assertEquals(ctrm.getSpHandle(), ctrm2.getSpHandle());
         assertEquals(ctrm.isRestart(), ctrm2.isRestart());
@@ -398,15 +442,16 @@ public class TestVoltMessageSerialization extends TestCase {
     public void testIv2RepairLogRequestMessage() throws IOException
     {
         Iv2RepairLogRequestMessage rlm = new Iv2RepairLogRequestMessage(100, Iv2RepairLogRequestMessage.SPREQUEST);
-        Iv2RepairLogRequestMessage rlm2 = (Iv2RepairLogRequestMessage) checkVoltMessage(rlm);
+        Iv2RepairLogRequestMessage rlm2 = (Iv2RepairLogRequestMessage) checkVoltContainerMessage(rlm);
         assertEquals(rlm.getRequestId(), rlm2.getRequestId());
         assertEquals(rlm.isMPIRequest(), rlm2.isMPIRequest());
+        rlm2.discard("Params");
     }
 
     public void testIv2RepairLogResponseMessage() throws Exception
     {
         // make a first itask
-        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        SPIfromParameterArray spi = new SPIfromParameterArray();
         spi.setClientHandle(25);
         spi.setProcName("johnisgreat");
         spi.setParams(57, "gooniestoo", "dudemandude");
@@ -416,7 +461,7 @@ public class TestVoltMessageSerialization extends TestCase {
         itask.setSpHandle(31337);
 
         Iv2RepairLogResponseMessage r1 = new Iv2RepairLogResponseMessage(0, 1, 2, 3L, 3L, itask);
-        Iv2RepairLogResponseMessage r2 = (Iv2RepairLogResponseMessage)checkVoltMessage(r1);
+        Iv2RepairLogResponseMessage r2 = (Iv2RepairLogResponseMessage)checkVoltContainerMessage(r1);
         assertEquals(r1.getOfTotal(), r2.getOfTotal());
         assertEquals(r1.getHandle(), r2.getHandle());
         assertEquals(r1.getTxnId(), r2.getTxnId());
@@ -439,6 +484,7 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(itask.getSpHandle(), itask2.getSpHandle());
         assertEquals(31337, itask.getSpHandle());
         assertFalse(itask.isForReplay());
+        itask2.discard("Params");
     }
 
     public void testFirstIv2RepairLogResponseMessage() throws Exception
@@ -448,7 +494,7 @@ public class TestVoltMessageSerialization extends TestCase {
                 0, 10, Long.MAX_VALUE, Long.MAX_VALUE,
                 Pair.<Long, byte[]>of(2L, new byte[] {(byte)1,(byte)2,(byte)3})
                 );
-        Iv2RepairLogResponseMessage r2 = (Iv2RepairLogResponseMessage)checkVoltMessage(r1);
+        Iv2RepairLogResponseMessage r2 = (Iv2RepairLogResponseMessage)checkVoltContainerMessage(r1);
         assertEquals(r1.getOfTotal(), r2.getOfTotal());
         assertEquals(r1.getHandle(), r2.getHandle());
         assertEquals(r1.getTxnId(), r2.getTxnId());
@@ -456,6 +502,7 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(r1.getSequence(), r2.getSequence());
         assertTrue(r1.hasHashinatorConfig());
         assertEquals(r1.getHashinatorVersionedConfig().getFirst(),new Long(2));
+        r2.discard("Params");
     }
 
     public void testInvalidTableCount() throws Exception

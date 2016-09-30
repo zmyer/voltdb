@@ -18,7 +18,6 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,9 +25,9 @@ import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
-
-import org.voltdb.rejoin.TaskLog;
+import org.voltcore.utils.HBBPool;
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.LogKeys;
 
 /**
@@ -46,7 +45,7 @@ public class EveryPartitionTask extends TransactionTask
     EveryPartitionTask(Mailbox mailbox, TransactionTaskQueue queue,
                   TransactionInfoBaseMessage msg, List<Long> pInitiators)
     {
-        super(new EveryPartTransactionState(msg), queue);
+        super(new EveryPartTransactionState(mailbox, msg), queue);
         m_initiationMsg = msg;
         m_initiatorHSIds.addAll(pInitiators);
         m_mailbox = mailbox;
@@ -57,6 +56,9 @@ public class EveryPartitionTask extends TransactionTask
     public void run(SiteProcedureConnection siteConnection)
     {
         hostLog.debug("STARTING: " + this);
+        for (long hsid: m_initiatorHSIds) {
+            m_initiationMsg.implicitReference(HBBPool.debugUniqueTag("SendOrDone", hsid));
+        }
         m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_initiatorHSIds), m_initiationMsg);
         m_txnState.setDone();
         m_queue.flush(getTxnId());

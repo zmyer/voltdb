@@ -17,9 +17,11 @@
 
 package org.voltcore.messaging;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.HBBPool.SharedBBContainer;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
@@ -47,17 +49,21 @@ public class SiteFailureForwardMessage extends SiteFailureMessage {
         super.flattenToBuffer(buf, VoltMessageFactory.SITE_FAILURE_FORWARD_ID);
         buf.putLong(m_reportingHSId);
 
-        assert(buf.capacity() == buf.position());
+        assert(buf.limit() == buf.position());
         buf.limit(buf.position());
     }
 
     @Override
-    public void initFromBuffer(ByteBuffer buf) {
-        super.initFromBuffer(buf);
-        m_reportingHSId = buf.getLong();
-        assert(m_subject != Subject.SITE_FAILURE_FORWARD.getId()
-                || buf.capacity() == buf.position());
+    protected void initFromBuffer(ByteBuffer buf) throws IOException {
+        assert(false);
+    }
 
+    @Override
+    public void initFromContainer(SharedBBContainer container) throws IOException {
+        super.initFromContainer(container);
+        m_reportingHSId = container.b().getLong();
+        assert(container.b().limit() == container.b().position());
+        container.discard(getClass().getSimpleName());
     }
 
     @Override

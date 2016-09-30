@@ -21,6 +21,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.VoltProtocolHandler;
+import org.voltcore.utils.HBBPool.SharedBBContainer;
 
 /**
  * Used between CommandLogReinitiators to informs the MP replayer that the
@@ -57,10 +60,21 @@ public class Iv2EndOfLogMessage extends TransactionInfoBaseMessage
     }
 
     @Override
-    public void initFromBuffer(ByteBuffer buf) throws IOException
+    protected void initFromBuffer(ByteBuffer buf) throws IOException {
+        assert(false);
+    }
+
+    @Override
+    public void initFromContainer(SharedBBContainer container) throws IOException
     {
-        super.initFromBuffer(buf);
-        m_pid = buf.getInt();
+        super.initFromContainer(container);
+        m_pid = container.b().getInt();
+        container.discard(getClass().getName());
+    }
+
+    @Override
+    public void initFromInputHandler(VoltProtocolHandler handler, NIOReadStream inputStream) throws IOException {
+        initFromContainer(handler.getNextHBBMessage(inputStream, getClass().getName()));
     }
 
     @Override
@@ -70,9 +84,15 @@ public class Iv2EndOfLogMessage extends TransactionInfoBaseMessage
         super.flattenToBuffer(buf);
         buf.putInt(m_pid);
 
-        assert(buf.capacity() == buf.position());
+        assert(buf.limit() == buf.position());
         buf.limit(buf.position());
     }
+
+    @Override
+    public void implicitReference(String tag) {}
+
+    @Override
+    public void discard(String tag) {}
 
     @Override
     public String toString() {

@@ -36,6 +36,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -67,6 +68,7 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.messaging.SnapshotCheckRequestMessage;
 import org.voltdb.messaging.SnapshotCheckResponseMessage;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.VoltTableUtil;
 
@@ -76,8 +78,6 @@ import com.google_voltpatches.common.util.concurrent.Callables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
-import java.util.concurrent.atomic.AtomicBoolean;
-import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 
 /**
  * A scheduler of automated snapshots and manager of archived and retained snapshots.
@@ -1639,11 +1639,13 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * one to try and complete the work. C'est la vie.
      */
     public void requestUserSnapshot(final StoredProcedureInvocation invocation, final Connection c) {
+        invocation.implicitReference("Snapshot");
         m_es.submit(new Runnable() {
             @Override
             public void run() {
                 try {
                     submitUserSnapshotRequest(invocation, c);
+                    invocation.discard("Snapshot");
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Exception submitting user snapshot request", true, e);
                 }

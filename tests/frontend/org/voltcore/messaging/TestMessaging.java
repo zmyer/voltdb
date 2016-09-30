@@ -30,9 +30,12 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.voltcore.utils.PortGenerator;
-
 import junit.framework.TestCase;
+
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.VoltProtocolHandler;
+import org.voltcore.utils.HBBPool.SharedBBContainer;
+import org.voltcore.utils.PortGenerator;
 
 public class TestMessaging extends TestCase {
 
@@ -56,10 +59,24 @@ public class TestMessaging extends TestCase {
         }
 
         @Override
-        public void initFromBuffer(ByteBuffer buf) {
+        protected void initFromBuffer(ByteBuffer buf) throws IOException {
             m_length = buf.limit() - buf.position();
             m_localValue = new byte[m_length];
             buf.get(m_localValue);
+        }
+
+        @Override
+        protected void initFromContainer(SharedBBContainer container) throws IOException {
+            ByteBuffer buf = container.b();
+            m_length = buf.limit() - buf.position();
+            m_localValue = new byte[m_length];
+            buf.get(m_localValue);
+            container.discard(getClass().getSimpleName());
+        }
+
+        @Override
+        public void initFromInputHandler(VoltProtocolHandler handler, NIOReadStream inputStream) throws IOException {
+            initFromContainer(handler.getNextHBBMessage(inputStream, getClass().getSimpleName()));
         }
 
         @Override
@@ -86,6 +103,12 @@ public class TestMessaging extends TestCase {
             }
             return true;
         }
+
+        @Override
+        public void implicitReference(String tag) {}
+
+        @Override
+        public void discard(String tag) {}
     }
 
     public static class MessageFactory extends org.voltcore.messaging.VoltMessageFactory {

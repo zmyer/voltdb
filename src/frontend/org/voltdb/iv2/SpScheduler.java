@@ -36,6 +36,7 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.HBBPool;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
@@ -533,6 +534,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             msg.isForReplay());
                 // Update the handle in the copy since the constructor doesn't set it
                 replmsg.setSpHandle(newSpHandle);
+                for (long ii : m_sendToHSIds) {
+                    replmsg.implicitReference(HBBPool.debugUniqueTag("SendOrDone", ii));
+                }
                 m_mailbox.send(m_sendToHSIds, replmsg);
 
                 DuplicateCounter counter = new DuplicateCounter(
@@ -758,7 +762,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // Do not track the borrow task as outstanding - it completes
             // immediately and is not a valid transaction state for
             // full MP participation (it claims everything can run as SP).
-            txn = new BorrowTransactionState(newSpHandle, message);
+            txn = new BorrowTransactionState(m_mailbox, newSpHandle, message);
         }
 
         // BorrowTask is a read only task embedded in a MP transaction
@@ -830,6 +834,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 FragmentTaskMessage replmsg =
                     new FragmentTaskMessage(m_mailbox.getHSId(),
                             m_mailbox.getHSId(), msg);
+                for (long hsid : m_sendToHSIds) {
+                    msg.implicitReference(HBBPool.debugUniqueTag("SendOrDone", hsid));
+                }
                 m_mailbox.send(m_sendToHSIds,
                         replmsg);
                 DuplicateCounter counter;
@@ -878,7 +885,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // offer FragmentTasks for txn ids that don't match if we have
         // something in progress already
         if (txn == null) {
-            txn = new ParticipantTransactionState(msg.getSpHandle(), msg, msg.isReadOnly());
+            txn = new ParticipantTransactionState(m_mailbox, msg.getSpHandle(), msg, msg.isReadOnly());
             m_outstandingTxns.put(msg.getTxnId(), txn);
             // Only want to send things to the command log if it satisfies this predicate
             // AND we've never seen anything for this transaction before.  We can't

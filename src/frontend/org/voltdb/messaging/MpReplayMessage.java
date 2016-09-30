@@ -17,15 +17,20 @@
 
 package org.voltdb.messaging;
 
-import com.google_voltpatches.common.collect.ImmutableSet;
-import com.google_voltpatches.common.collect.Sets;
-import org.voltcore.messaging.VoltMessage;
-import org.voltdb.StoredProcedureInvocation;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Set;
+
+import org.voltcore.messaging.VoltMessage;
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.VoltProtocolHandler;
+import org.voltcore.utils.HBBPool.SharedBBContainer;
+import org.voltdb.SPIfromSerialization;
+import org.voltdb.SPIfromSerializedBuffer;
+
+import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.Sets;
 
 /**
  * A message sent from the involved partitions to the
@@ -36,7 +41,7 @@ public class MpReplayMessage extends VoltMessage {
     long m_uniqueId;
     int m_partitionId;
     Set<Integer> m_involvedPartitions;
-    StoredProcedureInvocation m_invocation;
+    SPIfromSerialization m_invocation;
 
     /** Empty constructor for de-serialization */
     MpReplayMessage() {
@@ -44,8 +49,7 @@ public class MpReplayMessage extends VoltMessage {
     }
 
     public MpReplayMessage(long txnId, long uniqueId, int partitionId, Collection<Integer> involvedPartitions,
-                           StoredProcedureInvocation invocation)
-    {
+                           SPIfromSerialization invocation) {
         super();
 
         m_txnId = txnId;
@@ -55,34 +59,33 @@ public class MpReplayMessage extends VoltMessage {
         m_invocation = invocation;
     }
 
-    public long getTxnId()
-    {
+    public long getTxnId() {
         return m_txnId;
     }
 
-    public long getUniqueId()
-    {
+    public long getUniqueId() {
         return m_uniqueId;
     }
 
-    public int getPartitionId()
-    {
+    public int getPartitionId() {
         return m_partitionId;
     }
 
-    public Set<Integer> getInvolvedPartitions()
-    {
+    public Set<Integer> getInvolvedPartitions() {
         return m_involvedPartitions;
     }
 
-    public StoredProcedureInvocation getInvocation()
-    {
+    public SPIfromSerialization getInvocation() {
         return m_invocation;
     }
 
     @Override
-    public int getSerializedSize()
-    {
+    public void initFromInputHandler(VoltProtocolHandler handler, NIOReadStream inputStream) throws IOException {
+        initFromBuffer(handler.getNextBBMessage(inputStream));
+    }
+
+    @Override
+    public int getSerializedSize() {
         int size = super.getSerializedSize();
         size +=   8 // m_txnId
                 + 8 // m_uniqueId
@@ -98,8 +101,9 @@ public class MpReplayMessage extends VoltMessage {
     }
 
     @Override
-    protected void initFromBuffer(ByteBuffer buf) throws IOException
-    {
+    protected void initFromContainer(SharedBBContainer container) throws IOException {}
+
+    protected void initFromBuffer(ByteBuffer buf) throws IOException {
         m_txnId = buf.getLong();
         m_uniqueId = buf.getLong();
         m_partitionId = buf.getInt();
@@ -110,16 +114,16 @@ public class MpReplayMessage extends VoltMessage {
         }
 
         if (buf.remaining() > 0) {
-            m_invocation = new StoredProcedureInvocation();
-            m_invocation.initFromBuffer(buf);
+            SPIfromSerializedBuffer invocation = new SPIfromSerializedBuffer();
+            invocation.initFromByteBuffer(buf);
+            m_invocation = invocation;
         } else {
             m_invocation = null;
         }
     }
 
     @Override
-    public void flattenToBuffer(ByteBuffer buf) throws IOException
-    {
+    public void flattenToBuffer(ByteBuffer buf) throws IOException {
         buf.put(VoltDbMessageFactory.MP_REPLAY_ID);
         buf.putLong(m_txnId);
         buf.putLong(m_uniqueId);
@@ -133,7 +137,17 @@ public class MpReplayMessage extends VoltMessage {
             m_invocation.flattenToBuffer(buf);
         }
 
-        assert(buf.capacity() == buf.position());
+        assert(buf.limit() == buf.position());
         buf.limit(buf.position());
+    }
+
+    @Override
+    public void implicitReference(String tag) {
+        m_invocation.discard(tag);
+    }
+
+    @Override
+    public void discard(String tag) {
+        m_invocation.discard(tag);
     }
 }

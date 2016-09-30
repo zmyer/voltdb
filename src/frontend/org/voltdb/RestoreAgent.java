@@ -32,10 +32,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.FutureTask;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -1239,20 +1237,20 @@ SnapshotCompletionInterest, Promotable
      */
     private void initSnapshotWork(final Object[] procParams) {
         final String procedureName = "@SnapshotRestore";
-        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        SPIfromParameterArray spi = new SPIfromParameterArray();
         spi.setProcName(procedureName);
-        spi.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
-            @Override
-            public ParameterSet call() throws Exception {
-                ParameterSet params = ParameterSet.fromArrayWithCopy(procParams);
-                return params;
-            }
-        });
+        spi.setSafeParams(procParams);
         spi.setClientHandle(m_restoreAdapter.registerCallback(m_clientAdapterCallback));
-        // admin mode invocation as per third parameter
-        ClientResponseImpl cr = m_initiator.dispatch(spi, m_restoreAdapter, true, OverrideCheck.INVOCATION);
-        if (cr != null) {
-            m_clientAdapterCallback.handleResponse(cr);
+        SPIfromSerialization serializedSPI;
+        try {
+            serializedSPI = spi.roundTripForCL();
+            ClientResponseImpl cr = m_initiator.dispatch(serializedSPI, m_restoreAdapter, true, OverrideCheck.INVOCATION);
+            if (cr != null) {
+                m_clientAdapterCallback.handleResponse(cr);
+            }
+        } catch (Exception e) {
+            LOG.fatal(e);
+            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
     }
 

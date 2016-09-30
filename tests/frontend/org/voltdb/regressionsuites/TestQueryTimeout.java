@@ -530,10 +530,10 @@ public class TestQueryTimeout extends RegressionSuite {
 
         boolean success;
 
-        config = new LocalCluster("querytimeout-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
+//        config = new LocalCluster("querytimeout-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+//        success = config.compile(project);
+//        assertTrue(success);
+//        builder.addServerConfig(config);
 /* disabled until we work the kinks out of ipc support for fragment progress updates
         config = new LocalCluster("querytimeout-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
         success = config.compile(project);

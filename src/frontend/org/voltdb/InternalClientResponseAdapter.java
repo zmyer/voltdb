@@ -78,14 +78,14 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         private final InternalConnectionStatsCollector m_statsCollector;
         private final int m_partition;
         private final InternalAdapterTaskAttributes m_kattrs;
-        private final StoredProcedureInvocation m_task;
+        private final SPIfromSerialization m_task;
         private final Procedure m_proc;
         private final AuthSystem.AuthUser m_user;
         private final String m_procName;
         public InternalCallback(
                 final InternalAdapterTaskAttributes kattrs,
                 Procedure proc,
-                StoredProcedureInvocation task,
+                SPIfromSerialization task,
                 String procName,
                 int partition,
                 ProcedureCallback cb,
@@ -165,7 +165,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             final Procedure catProc,
             final ProcedureCallback proccb,
             final InternalConnectionStatsCollector statsCollector,
-            final StoredProcedureInvocation task,
+            final SPIfromSerialization task,
             final AuthSystem.AuthUser user,
             final int partition, final long nowNanos) {
 
@@ -177,6 +177,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
 
         ExecutorService executor = m_partitionExecutor.get(partition);
         try {
+            task.implicitReference("AsyncRunnable");
             executor.submit(new Runnable() {
                 @Override
                 public void run() {
@@ -202,6 +203,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                             m_logger.error("failed to process dispatch response " + r.getStatusString(), e);
                         } finally {
                             m_callbacks.remove(handle);
+                            task.discard("AsyncRunnable");
                         }
                         return bval;
                     }
@@ -211,6 +213,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                         // Supposedly this will never happen and is OK to ignore from stats collection perspective.
                         // Hence it is OK that this is not getting reported to callbacks.
                         m_logger.error("Failed to submit transaction.");
+                        task.discard("AsyncRunnable");
                         m_callbacks.remove(handle);
                     }
                     return bval;

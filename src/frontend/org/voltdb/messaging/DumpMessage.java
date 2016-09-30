@@ -21,7 +21,10 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.HBBPool.SharedBBContainer;
 
 /**
  * Message from a client interface to an initiator, instructing the
@@ -31,30 +34,41 @@ import org.voltcore.utils.CoreUtils;
  */
 public class DumpMessage extends VoltMessage
 {
-    public DumpMessage()
-    {
+    public DumpMessage() {
         super();
     }
 
     @Override
-    public int getSerializedSize()
-    {
+    public int getSerializedSize() {
         int msgsize = super.getSerializedSize();
         return msgsize;
     }
 
     @Override
-    public void flattenToBuffer(ByteBuffer buf) throws IOException
-    {
+    public void flattenToBuffer(ByteBuffer buf) throws IOException {
         buf.put(VoltDbMessageFactory.DUMP);
 
-        assert(buf.capacity() == buf.position());
+        assert(buf.limit() == buf.position());
         buf.limit(buf.position());
     }
 
     @Override
-    public void initFromBuffer(ByteBuffer buf) throws IOException {
+    protected void initFromBuffer(ByteBuffer buf) throws IOException {
     }
+
+    @Override
+    protected void initFromContainer(SharedBBContainer container) {
+    }
+
+    @Override
+    public void initFromInputHandler(VoltProtocolHandler handler, NIOReadStream inputStream) throws IOException {
+    }
+
+    @Override
+    public void implicitReference(String tag) {}
+
+    @Override
+    public void discard(String tag) {}
 
     @Override
     public String toString() {

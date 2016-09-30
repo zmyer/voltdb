@@ -17,9 +17,13 @@
 
 package org.voltcore.messaging;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.agreement.DtxnConstants;
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.VoltProtocolHandler;
+import org.voltcore.utils.HBBPool.SharedBBContainer;
 
 public class HeartbeatResponseMessage extends VoltMessage {
 
@@ -66,17 +70,35 @@ public class HeartbeatResponseMessage extends VoltMessage {
         buf.putLong(m_lastReceivedTxnId);
         buf.put((byte) (m_siteIsBlocked ? 1 : 0));
 
-        assert(buf.capacity() == buf.position());
+        assert(buf.limit() == buf.position());
         buf.limit(buf.position());
     }
 
     @Override
-    public void initFromBuffer(ByteBuffer buf) {
+    protected void initFromBuffer(ByteBuffer buf) throws IOException {
+        assert(false);
+    }
+
+    @Override
+    protected void initFromContainer(SharedBBContainer container) {
+        ByteBuffer buf = container.b();
         m_execHSId = buf.getLong();
         m_lastReceivedTxnId = buf.getLong();
         m_siteIsBlocked = (buf.get() == 1);
-        assert(buf.capacity() == buf.position());
+        assert(buf.limit() == buf.position());
+        container.discardNoLogging(getClass().getSimpleName());
     }
+
+    @Override
+    public void initFromInputHandler(VoltProtocolHandler handler, NIOReadStream inputStream) throws IOException {
+        initFromContainer(handler.getNextHBBMessageNoLogging(inputStream, getClass().getSimpleName()));
+    }
+
+    @Override
+    public void implicitReference(String tag) {}
+
+    @Override
+    public void discard(String tag) {}
 
     @Override
     public String toString() {

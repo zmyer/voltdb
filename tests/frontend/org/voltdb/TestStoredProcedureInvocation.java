@@ -89,9 +89,9 @@ public class TestStoredProcedureInvocation extends TestCase {
     };
 
 
-    void roundTripBuffer(boolean expectSuccess, ByteBuffer buf, String procName, long handle, int timeout, boolean allPartition) throws IOException {
-        StoredProcedureInvocation spi = new StoredProcedureInvocation();
-        spi.initFromBuffer(buf);
+    void roundTripBuffer(boolean expectSuccess, ByteBuffer buf, String procName, long handle, int timeout) throws IOException {
+        SPIfromSerializedBuffer spi = new SPIfromSerializedBuffer();
+        spi.initFromByteBuffer(buf);
 
         if (expectSuccess) {
             assertEquals(handle, spi.getClientHandle());
@@ -144,7 +144,7 @@ public class TestStoredProcedureInvocation extends TestCase {
 
         // try StoredProcedureInvocation
         try {
-            StoredProcedureInvocation spi = new StoredProcedureInvocation();
+            SPIfromParameterArray spi = new SPIfromParameterArray();
             spi.setProcName(procName);
             spi.setClientHandle(handle);
             spi.setBatchTimeout(timeout);

@@ -194,7 +194,6 @@ public class FragmentTask extends TransactionTask
     {
         // Check and see if we can flush early
         // right now, this is just read-only and final task
-        // This
         if (m_fragmentMsg.isFinalTask() && m_txnState.isReadOnly())
         {
             doCommonSPICompleteActions();

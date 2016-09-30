@@ -23,6 +23,7 @@ import java.util.Map;
 
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
+import org.voltcore.utils.HBBPool;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
@@ -92,6 +93,7 @@ public abstract class TransactionState extends OrderableTransaction  {
 
     // Assume that done-ness is a latch.
     public void setDone() {
+        m_notice.discard(HBBPool.debugUniqueTag("SendOrDone", m_mbox.getHSId()));
         m_done = true;
     }
 

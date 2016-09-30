@@ -21,7 +21,10 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.HBBPool.SharedBBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.iv2.TxnEgo;
 
@@ -171,12 +174,18 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
             buf.put(m_hashinatorConfig);
         }
 
-        assert(buf.capacity() == buf.position());
+        assert(buf.limit() == buf.position());
         buf.limit(buf.position());
     }
 
     @Override
     protected void initFromBuffer(ByteBuffer buf) throws IOException {
+        assert(false);
+    }
+
+    @Override
+    protected void initFromContainer(SharedBBContainer container) throws IOException {
+        ByteBuffer buf = container.b();
         m_requestId = buf.getLong();
         m_sequence = buf.getInt();
         m_ofTotal = buf.getInt();
@@ -188,7 +197,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         // ack, so don't try to deserialize a message that won't exist.
         if (m_sequence != 0) {
             VoltDbMessageFactory messageFactory = new VoltDbMessageFactory();
-            m_payload = messageFactory.createMessageFromBuffer(buf, m_sourceHSId);
+            m_payload = messageFactory.createMessageFromContainer(container, m_sourceHSId);
         }
         // only the first packet with sequence 0 has the hashinator configurations
         else {
@@ -196,6 +205,26 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
             m_hashinatorVersion = buf.getLong();
             m_hashinatorConfig = new byte[buf.getInt()];
             buf.get(m_hashinatorConfig);
+        }
+        container.discard(getClass().getSimpleName());
+    }
+
+    @Override
+    public void initFromInputHandler(VoltProtocolHandler handler, NIOReadStream inputStream) throws IOException {
+        initFromContainer(handler.getNextHBBMessage(inputStream, getClass().getSimpleName()));
+    }
+
+    @Override
+    public void implicitReference(String tag) {
+        if (m_payload != null) {
+            m_payload.implicitReference(tag);
+        }
+    }
+
+    @Override
+    public void discard(String tag) {
+        if (m_payload != null) {
+            m_payload.discard(tag);
         }
     }
 

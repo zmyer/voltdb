@@ -31,12 +31,14 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
+import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.PicoNetwork;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
+import org.voltcore.utils.HBBPool;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
@@ -85,13 +87,13 @@ public class ForeignHost {
         }
 
         @Override
-        public void handleMessage(ByteBuffer message, Connection c) throws IOException {
+        public void handleMessage(NIOReadStream inputStream, Connection c) throws IOException {
             // if this link is "gone silent" for partition tests, just drop the message on the floor
             if (m_linkCutForTest.get()) {
                 return;
             }
 
-            handleRead(message, c);
+            handleRead(inputStream, c);
         }
 
         @Override
@@ -231,13 +233,9 @@ public class ForeignHost {
                             }
                             message.flattenToBuffer(buf);
                             buf.flip();
-                        }
-
-                        @Override
-                        public final void cancel() {
-                        /*
-                         * Can this be removed?
-                         */
+                            for (int ii = 0; ii < destinations.length; ii++) {
+                                message.discard(HBBPool.debugUniqueTag("SendOrDone", destinations[ii]));
+                            }
                         }
 
                         @Override
@@ -333,26 +331,26 @@ public class ForeignHost {
      * data is available.
      * @throws IOException
      */
-    private void handleRead(ByteBuffer in, Connection c) throws IOException {
+    private void handleRead(NIOReadStream inputStream, Connection c) throws IOException {
         // port is locked by VoltNetwork when in valid use.
         // assert(m_port.m_lock.tryLock() == true);
         long recvDests[] = null;
 
-        final long sourceHSId = in.getLong();
-        final int destCount = in.getInt();
+        final long sourceHSId = m_handler.getNextMessageLong(inputStream);
+        final int destCount = m_handler.getNextMessageInt(inputStream);
         if (destCount == POISON_PILL) {//This is a poison pill
             //Ignore poison pill during shutdown, in tests we receive crash messages from
             //leader appointer during shutdown
             if (VoltDB.instance().getMode() == OperationMode.SHUTTINGDOWN) {
                 return;
             }
-            byte messageBytes[] = new byte[in.getInt()];
-            in.get(messageBytes);
+            byte messageBytes[] = new byte[m_handler.getNextMessageInt(inputStream)];
+            m_handler.getNextMessageByteArray(inputStream, messageBytes, messageBytes.length);
             String message = new String(messageBytes, "UTF-8");
             message = String.format("Fatal error from id,hostname(%d,%s): %s",
                     m_hostId, hostnameAndIPAndPort(), message);
             //if poison pill with particular cause handle it.
-            int cause = in.getInt();
+            int cause = m_handler.getNextMessageInt(inputStream);
             if (cause == ForeignHost.CRASH_ME) {
                 int hid = VoltDB.instance().getHostMessenger().getHostId();
                 hostLog.debug("Poison Pill with target me was sent.: " + hid);
@@ -369,11 +367,12 @@ public class ForeignHost {
 
         recvDests = new long[destCount];
         for (int i = 0; i < destCount; i++) {
-            recvDests[i] = in.getLong();
+            recvDests[i] = m_handler.getNextMessageLong(inputStream);
         }
+        byte type = m_handler.getNextMessageByte(inputStream);
 
         final VoltMessage message =
-            m_hostMessenger.getMessageFactory().createMessageFromBuffer(in, sourceHSId);
+                m_hostMessenger.getMessageFactory().createMessageFromHandler(type, m_handler, inputStream, sourceHSId);
 
         // ENG-1608.  We sniff for SiteFailureMessage here so
         // that a node will participate in the failure resolution protocol
@@ -388,8 +387,11 @@ public class ForeignHost {
         }
 
         for (int i = 0; i < destCount; i++) {
+            // These should cancel out
+            message.implicitReference(HBBPool.debugUniqueTag("SendOrDone", recvDests[i]));
             deliverMessage( recvDests[i], message);
         }
+        message.discard("Params");
 
         //m_lastMessageMillis = System.currentTimeMillis();
         m_lastMessageMillis.lazySet(EstTime.currentTimeMillis());

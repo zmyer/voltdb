@@ -41,9 +41,13 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.VoltProtocolHandler;
+import org.voltcore.utils.HBBPool;
+import org.voltcore.utils.HBBPool.SharedBBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.ParameterSet;
-import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.SPIfromParameterArray;
 import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -96,7 +100,22 @@ public class TestRepairLog
         }
 
         @Override
+        protected void initFromContainer(SharedBBContainer container) throws IOException {
+        }
+
+        @Override
+        public void initFromInputHandler(VoltProtocolHandler handler, NIOReadStream inputStream) throws IOException {
+        }
+
+        @Override
         public void flattenToBuffer(ByteBuffer buf) throws IOException {
+        }
+
+        @Override
+        public void implicitReference(String tag) {}
+
+        @Override
+        public void discard(String tag) {
         }
     }
 
@@ -255,6 +274,18 @@ public class TestRepairLog
         assertEquals(2, lastCommitted.get());
     }
 
+    private void cleanUpRepairLogContainers(List<Iv2RepairLogResponseMessage> stuff) {
+        for (Iv2RepairLogResponseMessage imsg : stuff) {
+            if (imsg.getSequence() > 0) {
+                VoltMessage payload = imsg.getPayload();
+                if (payload instanceof FragmentTaskMessage) {
+                    payload.discard("Params");
+                    payload.discard("RepairLog");
+                }
+            }
+        }
+    }
+
     // validate the invariants on the RepairLog contents:
     // Every entry in the log should have a unique, constantly increasing SP handle.
     // There should be only one FragmentTaskMessage per MP TxnID
@@ -268,10 +299,11 @@ public class TestRepairLog
             if (imsg.getSequence() > 0) {
                 assertTrue(imsg.getHandle() > prevHandle);
                 prevHandle = imsg.getHandle();
-                if (imsg.getPayload() instanceof FragmentTaskMessage) {
+                VoltMessage payload = imsg.getPayload();
+                if (payload instanceof FragmentTaskMessage) {
                     assertEquals(null, mpTxnId);
                     mpTxnId = imsg.getTxnId();
-                } else if (imsg.getPayload() instanceof CompleteTransactionMessage) {
+                } else if (payload instanceof CompleteTransactionMessage) {
                     // can see bare CompleteTransactionMessage, but if we've got an MP
                     // in progress this should close it
                     assertFalse(((CompleteTransactionMessage)imsg.getPayload()).isRestart());
@@ -334,12 +366,18 @@ public class TestRepairLog
             if (!msg.isReadOnly() || msg instanceof CompleteTransactionMessage) {
                 dut.deliver(msg);
             }
+            else {
+                msg.discard("Params");
+            }
         }
         List<Iv2RepairLogResponseMessage> stuff = dut.contents(1l, false);
         validateRepairLog(stuff, spBinaryLogSpUniqueId, spBinaryLogMpUniqueId);
         // Also check the MP version
         stuff = dut.contents(1l, true);
         validateRepairLog(stuff, Long.MIN_VALUE, mpBinaryLogMpUniqueId);
+        stuff = dut.contents(1l, false);
+        cleanUpRepairLogContainers(stuff);
+        assertTrue(HBBPool.debugAllBuffersReturned());
     }
 
     @Test
@@ -362,7 +400,7 @@ public class TestRepairLog
         // to the repair log, and see what we get
         final long endSpUniqueId = 42;
         final long endMpUniqueId = 25;
-        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        SPIfromParameterArray spi = new SPIfromParameterArray();
         spi.setProcName("@ApplyBinaryLogSP");
         spi.setParams(0, endSpUniqueId - 10, endSpUniqueId, endSpUniqueId, endMpUniqueId, new byte[]{0});
 

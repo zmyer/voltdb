@@ -31,6 +31,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.HBBPool;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
@@ -153,11 +154,13 @@ public class MpTransactionState extends TransactionState
         // there are no fragments to be done in this message
         // At some point maybe ProcedureRunner.slowPath() can get smarter
         if (task.getFragmentCount() > 0) {
+            boolean adjustReferenceCount = false;
             // Distribute the initiate task for command log replay.
             // Command log must log the initiate task;
             // Only send the fragment once.
             if (!m_haveDistributedInitTask && !isForReplay() && !isReadOnly()) {
                 m_haveDistributedInitTask = true;
+                adjustReferenceCount = (task.m_initiateTaskContainer == null);
                 task.setStateForDurability((Iv2InitiateTaskMessage) getNotice(), m_masterHSIds.keySet());
             }
 
@@ -166,11 +169,19 @@ public class MpTransactionState extends TransactionState
             // Distribute fragments to remote destinations.
             long[] non_local_hsids = new long[m_useHSIds.size()];
             for (int i = 0; i < m_useHSIds.size(); i++) {
-                non_local_hsids[i] = m_useHSIds.get(i);
+                long hsid = m_useHSIds.get(i);
+                non_local_hsids[i] = hsid;
+                // Paired with either SetDone() for local sites or Send() serialization for remote txns
+                m_remoteWork.implicitReference(HBBPool.debugUniqueTag("SendOrDone", hsid));
             }
             // send to all non-local sites
             if (non_local_hsids.length > 0) {
                 m_mbox.send(non_local_hsids, m_remoteWork);
+            }
+            if (adjustReferenceCount) {
+                // Hack because we made a local copy of the raw initiateTaskMessage that won't get cleaned
+                // up by setDone()
+                task.m_initiateTaskContainer.discard("Params_Raw");
             }
         }
         else {

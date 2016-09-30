@@ -22,6 +22,9 @@ import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.VoltProtocolHandler;
+import org.voltcore.utils.HBBPool.SharedBBContainer;
 import org.voltdb.utils.FixedDBBPool;
 
 /**
@@ -149,11 +152,28 @@ public class RejoinMessage extends VoltMessage {
 
     @Override
     protected void initFromBuffer(ByteBuffer buf) throws IOException {
+        assert(false);
+    }
+
+    @Override
+    protected void initFromContainer(SharedBBContainer container) throws IOException {
+        container.discard(getClass().getSimpleName());
         throw new RuntimeException("RejoinMessage: Attempted to deserialize a message which should never need it.");
+    }
+
+    @Override
+    public void initFromInputHandler(VoltProtocolHandler handler, NIOReadStream inputStream) throws IOException {
+        initFromContainer(handler.getNextHBBMessage(inputStream, getClass().getSimpleName()));
     }
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
         throw new RuntimeException("RejoinMessage: Attempted to serialize a message which should never need it.");
     }
+
+    @Override
+    public void implicitReference(String tag) {}
+
+    @Override
+    public void discard(String tag) {}
 }

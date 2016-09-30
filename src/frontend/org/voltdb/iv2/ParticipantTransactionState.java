@@ -17,6 +17,7 @@
 
 package org.voltdb.iv2;
 
+import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.dtxn.TransactionState;
@@ -34,9 +35,9 @@ public class ParticipantTransactionState extends TransactionState
      * @param notice
      * @param readOnly
      */
-    ParticipantTransactionState(long txnId, TransactionInfoBaseMessage notice, boolean readOnly)
+    ParticipantTransactionState(Mailbox mbox, long txnId, TransactionInfoBaseMessage notice, boolean readOnly)
     {
-        super(null, notice, readOnly);
+        super(mbox, notice, readOnly);
     }
 
     @Override

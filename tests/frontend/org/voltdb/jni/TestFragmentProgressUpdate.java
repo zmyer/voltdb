@@ -25,6 +25,7 @@ package org.voltdb.jni;
 
 import static org.mockito.Matchers.contains;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.verify;
 
 import java.util.Arrays;
 
@@ -49,7 +50,6 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
-import static org.mockito.Mockito.verify;
 
 public class TestFragmentProgressUpdate extends TestCase {
 

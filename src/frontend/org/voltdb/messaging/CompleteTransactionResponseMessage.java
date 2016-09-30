@@ -17,10 +17,14 @@
 
 package org.voltdb.messaging;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.HBBPool.SharedBBContainer;
 import org.voltdb.iv2.TxnEgo;
 
 public class CompleteTransactionResponseMessage extends VoltMessage
@@ -36,75 +40,83 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         super();
     }
 
-    public CompleteTransactionResponseMessage(CompleteTransactionMessage msg)
-    {
+    public CompleteTransactionResponseMessage(CompleteTransactionMessage msg) {
         m_txnId = msg.getTxnId();
         m_spHandle = msg.getSpHandle();
         m_isRestart = msg.isRestart();
         m_spiHSId = msg.getCoordinatorHSId();
     }
 
-    public long getTxnId()
-    {
+    public long getTxnId() {
         return m_txnId;
     }
 
-    public long getSpHandle()
-    {
+    public long getSpHandle() {
         return m_spHandle;
     }
 
-    public long getSPIHSId()
-    {
+    public long getSPIHSId() {
         return m_spiHSId;
     }
 
-    public boolean isRestart()
-    {
+    public boolean isRestart() {
         return m_isRestart;
     }
 
-    public boolean isRecovering()
-    {
+    public boolean isRecovering() {
         return m_isRecovering;
     }
 
-    public void setIsRecovering(boolean recovering)
-    {
+    public void setIsRecovering(boolean recovering) {
         m_isRecovering = recovering;
     }
 
     @Override
-    public int getSerializedSize()
-    {
+    public int getSerializedSize() {
         int msgsize = super.getSerializedSize();
         msgsize += 8 + 8 + 8 + 1 + 1;
         return msgsize;
     }
 
     @Override
-    public void flattenToBuffer(ByteBuffer buf)
-    {
+    public void flattenToBuffer(ByteBuffer buf) {
         buf.put(VoltDbMessageFactory.COMPLETE_TRANSACTION_RESPONSE_ID);
         buf.putLong(m_txnId);
         buf.putLong(m_spHandle);
         buf.putLong(m_spiHSId);
         buf.put((byte) (m_isRestart ? 1 : 0));
         buf.put((byte) (m_isRecovering ? 1 : 0));
-        assert(buf.capacity() == buf.position());
+        assert(buf.limit() == buf.position());
         buf.limit(buf.position());
     }
 
     @Override
-    protected void initFromBuffer(ByteBuffer buf)
-    {
+    protected void initFromBuffer(ByteBuffer buf) throws IOException {
+        assert(false);
+    }
+
+    @Override
+    protected void initFromContainer(SharedBBContainer container) {
+        ByteBuffer buf = container.b();
         m_txnId = buf.getLong();
         m_spHandle = buf.getLong();
         m_spiHSId = buf.getLong();
         m_isRestart = buf.get() == 1;
         m_isRecovering = buf.get() == 1;
-        assert(buf.capacity() == buf.position());
+        assert(buf.limit() == buf.position());
+        container.discard(getClass().getSimpleName());
     }
+
+    @Override
+    public void initFromInputHandler(VoltProtocolHandler handler, NIOReadStream inputStream) throws IOException {
+        initFromContainer(handler.getNextHBBMessage(inputStream, getClass().getSimpleName()));
+    }
+
+    @Override
+    public void implicitReference(String tag) {}
+
+    @Override
+    public void discard(String tag) {}
 
     @Override
     public String toString() {

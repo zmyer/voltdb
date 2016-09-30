@@ -28,6 +28,7 @@ import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExpectedProcedureException;
 import org.voltdb.ProcedureRunner;
+import org.voltdb.SPIfromSerialization;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
@@ -132,7 +133,7 @@ abstract public class ProcedureTask extends TransactionTask
                 }
             } else {
                 // mis-partitioned invocation, reject it and let the ClientInterface restart it
-                response.setMispartitioned(true, task.getStoredProcedureInvocation(),
+                response.setMispartitioned(true, (SPIfromSerialization)task.getStoredProcedureInvocation(),
                         TheHashinator.getCurrentVersionedConfig());
             }
         }

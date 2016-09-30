@@ -233,4 +233,9 @@ public class SpDurabilityListener implements DurabilityListener {
         }
     }
 
+    @Override
+    public long getHSId() {
+        return m_spScheduler.m_mailbox.getHSId();
+    }
+
 }

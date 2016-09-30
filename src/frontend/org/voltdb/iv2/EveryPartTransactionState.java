@@ -17,6 +17,7 @@
 
 package org.voltdb.iv2;
 
+import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.dtxn.TransactionState;
@@ -31,9 +32,9 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 public class EveryPartTransactionState extends TransactionState
 {
     final Iv2InitiateTaskMessage m_initiationMsg;
-    protected EveryPartTransactionState(TransactionInfoBaseMessage notice)
+    protected EveryPartTransactionState(Mailbox mbox, TransactionInfoBaseMessage notice)
     {
-        super(null, notice);
+        super(mbox, notice);
         if (notice instanceof Iv2InitiateTaskMessage) {
             m_initiationMsg = (Iv2InitiateTaskMessage)notice;
         } else {

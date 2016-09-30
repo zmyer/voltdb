@@ -34,6 +34,7 @@ import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -52,6 +53,7 @@ import java.util.HashSet;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.ScheduledExecutorService;
@@ -75,6 +77,8 @@ import org.voltcore.network.Connection;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
+import org.voltcore.utils.HBBPool;
+import org.voltcore.utils.HBBPool.SharedBBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientInterface.ClientInputHandler;
 import org.voltdb.VoltDB.Configuration;
@@ -139,6 +143,7 @@ public class TestClientInterface {
     BlockingQueue<ByteBuffer> responses = new LinkedTransferQueue<>();
     BlockingQueue<DeferredSerialization> responsesDS = new LinkedTransferQueue<>();
     private static final ScheduledExecutorService ses = Executors.newScheduledThreadPool(1);
+    private ConcurrentLinkedQueue<VoltMessage> sentMessages = new ConcurrentLinkedQueue<VoltMessage>();
 
     @Before
     public void setUp() throws Exception {
@@ -194,6 +199,15 @@ public class TestClientInterface {
             @Override
             public Object answer(InvocationOnMock invocation)
             {
+                Object[] args = invocation.getArguments();
+                sentMessages.add((VoltMessage)args[1]);
+                return null;
+            }
+        }).when(m_messenger).send(anyLong(), (VoltMessage)anyObject());
+        doAnswer(new Answer<Object>() {
+            @Override
+            public Object answer(InvocationOnMock invocation)
+            {
                 Object args[] = invocation.getArguments();
                 return ses.scheduleAtFixedRate((Runnable) args[0], (long) args[1], (long) args[2], (TimeUnit) args[3]);
             }
@@ -243,7 +257,11 @@ public class TestClientInterface {
         reset(m_handler);
         m_periodicWorkThread.shutdown();
         m_periodicWorkThread.awaitTermination(356, TimeUnit.DAYS);
-
+        VoltMessage msg;
+        while ((msg = sentMessages.poll()) != null) {
+            msg.discard(HBBPool.debugUniqueTag("SendOrDone", 0));
+        }
+        assertTrue(HBBPool.debugAllBuffersReturned());
     }
 
     /**
@@ -254,15 +272,15 @@ public class TestClientInterface {
      * @return
      * @throws IOException
      */
-    private static ByteBuffer createMsg(String name, final Object...params) throws IOException
+    private static SharedBBContainer createMsg(String name, final Object...params) throws IOException
     {
-        StoredProcedureInvocation proc = new StoredProcedureInvocation();
+        SPIfromParameterArray proc = new SPIfromParameterArray();
         proc.setProcName(name);
         proc.setParams(params);
-        ByteBuffer buf = ByteBuffer.allocate(proc.getSerializedSize());
-        proc.flattenToBuffer(buf);
-        buf.flip();
-        return buf;
+        SharedBBContainer rslt = HBBPool.allocateHeapAndPool(proc.getSerializedSize(), "Invocation");
+        proc.flattenToBuffer(rslt.b());
+        rslt.b().flip();
+        return rslt;
     }
 
     /**
@@ -281,7 +299,7 @@ public class TestClientInterface {
      * @return StoredProcedureInvocation object passed to createTransaction()
      * @throws IOException
      */
-    private Iv2InitiateTaskMessage readAndCheck(ByteBuffer msg, String procName, Object partitionParam,
+    private Iv2InitiateTaskMessage readAndCheck(SharedBBContainer msg, String procName, Object partitionParam,
                                                 boolean isReadonly, boolean isSinglePart) throws Exception {
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
@@ -297,7 +315,7 @@ public class TestClientInterface {
             ArgumentCaptor.forClass(Long.class);
         ArgumentCaptor<Iv2InitiateTaskMessage> messageCaptor =
             ArgumentCaptor.forClass(Iv2InitiateTaskMessage.class);
-        verify(m_messenger).send(destinationCaptor.capture(), messageCaptor.capture());
+        verify(m_messenger, atLeastOnce()).send(destinationCaptor.capture(), messageCaptor.capture());
 
         Iv2InitiateTaskMessage message = messageCaptor.getValue();
         assertEquals(isReadonly, message.isReadOnly()); // readonly
@@ -315,9 +333,10 @@ public class TestClientInterface {
 
     @Test
     public void testExplain() throws IOException {
-        ByteBuffer msg = createMsg("@Explain", "select * from a");
+        SharedBBContainer msg = createMsg("@Explain", "select * from a");
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
+        msg.discard("Invocation");
         ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
         verify(m_messenger).send(eq(32L), captor.capture());
         assertTrue(captor.getValue().payload instanceof AdHocPlannerWork );
@@ -328,7 +347,7 @@ public class TestClientInterface {
 
     @Test
     public void testAdHoc() throws IOException {
-        ByteBuffer msg = createMsg("@AdHoc", "select * from a");
+        SharedBBContainer msg = createMsg("@AdHoc", "select * from a");
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
         ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
@@ -336,6 +355,7 @@ public class TestClientInterface {
         assertTrue(captor.getValue().payload instanceof AdHocPlannerWork);
         String payloadString = captor.getValue().payload.toString();
         assertTrue(payloadString.contains("user partitioning: none"));
+        msg.discard("Invocation");
 
         // single-part adhoc
         reset(m_messenger);
@@ -347,6 +367,7 @@ public class TestClientInterface {
         payloadString = captor.getValue().payload.toString();
         assertTrue(payloadString.contains("user params: empty"));
         assertTrue(payloadString.contains("user partitioning: 3"));
+        msg.discard("Invocation");
     }
 
     @Test
@@ -433,23 +454,25 @@ public class TestClientInterface {
         // only makes sense in pro (sysproc suite has a complementary test for community)
         if (VoltDB.instance().getConfig().m_isEnterprise) {
             String catalogHex = Encoder.hexEncode("blah");
-            ByteBuffer msg = createMsg("@UpdateApplicationCatalog", catalogHex, "blah");
+            SharedBBContainer msg = createMsg("@UpdateApplicationCatalog", catalogHex, "blah");
             ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
             assertNull(resp);
             ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
             verify(m_messenger).send(eq(32L), // A fixed number set in setUpOnce()
                                      captor.capture());
             assertTrue(captor.getValue().payload instanceof CatalogChangeWork);
+            msg.discard("Params");
         }
     }
 
     @Test
     public void testNegativeUpdateCatalog() throws IOException {
-        ByteBuffer msg = createMsg("@UpdateApplicationCatalog", new Integer(1), new Long(0));
+        SharedBBContainer msg = createMsg("@UpdateApplicationCatalog", new Integer(1), new Long(0));
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         // expect an error response from handleRead.
         assertNotNull(resp);
         assertTrue(resp.getStatus() != 0);
+        msg.discard("Invocation");
     }
 
 
@@ -497,15 +520,16 @@ public class TestClientInterface {
 
     @Test
     public void testUserProc() throws Exception {
-        ByteBuffer msg = createMsg("hello", 1);
+        SharedBBContainer msg = createMsg("hello", 1);
         StoredProcedureInvocation invocation =
                 readAndCheck(msg, "hello", 1, true, true).getStoredProcedureInvocation();
         assertEquals(1, invocation.getParameterAtIndex(0));
+        msg.discard("Invocation");
     }
 
     @Test
     public void testGC() throws Exception {
-        ByteBuffer msg = createMsg("@GC");
+        SharedBBContainer msg = createMsg("@GC");
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
 
@@ -518,15 +542,17 @@ public class TestClientInterface {
         assertTrue(vt.advanceRow());
         //System.gc() should take at least a little time
         assertTrue(resp.getResults()[0].getLong(0) > 10000);
+        msg.discard("Invocation");
     }
 
     @Test
     public void testSystemInformation() throws Exception {
-        ByteBuffer msg = createMsg("@SystemInformation");
+        SharedBBContainer msg = createMsg("@SystemInformation");
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
         verify(m_sysinfoAgent).performOpsAction(any(Connection.class), anyInt(), eq(OpsSelector.SYSTEMINFORMATION),
                 any(ParameterSet.class));
+        msg.discard("Invocation");
     }
 
     /**
@@ -535,10 +561,11 @@ public class TestClientInterface {
      */
     @Test
     public void testDRStats() throws Exception {
-        ByteBuffer msg = createMsg("@Statistics", "DR", 0);
+        SharedBBContainer msg = createMsg("@Statistics", "DR", 0);
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
         assertEquals(drStatsInvoked, 1);
+        msg.discard("Invocation");
     }
 
     @Test
@@ -547,10 +574,11 @@ public class TestClientInterface {
         table.addRow(1);
 
         byte[] partitionParam = {0, 0, 0, 0, 0, 0, 0, 4};
-        ByteBuffer msg = createMsg("@LoadSinglepartitionTable", partitionParam, "a", (byte) 0, table);
+        SharedBBContainer msg = createMsg("@LoadSinglepartitionTable", partitionParam, "a", (byte) 0, table);
         StoredProcedureInvocation invocation =
                 readAndCheck(msg, "@LoadSinglepartitionTable", partitionParam, false, true).getStoredProcedureInvocation();
         assertEquals((byte) 0, invocation.getParameterAtIndex(2));
+        msg.discard("Invocation");
     }
 
     @Test
@@ -559,10 +587,11 @@ public class TestClientInterface {
         table.addRow(1);
 
         byte[] partitionParam = {0, 0, 0, 0, 0, 0, 0, 4};
-        ByteBuffer msg = createMsg("@LoadSinglepartitionTable", partitionParam, "a", (byte) 1, table);
+        SharedBBContainer msg = createMsg("@LoadSinglepartitionTable", partitionParam, "a", (byte) 1, table);
         StoredProcedureInvocation invocation =
                 readAndCheck(msg, "@LoadSinglepartitionTable", partitionParam, false, true).getStoredProcedureInvocation();
         assertEquals((byte) 1, invocation.getParameterAtIndex(2));
+        msg.discard("Invocation");
     }
 
     @Test
@@ -582,9 +611,10 @@ public class TestClientInterface {
         when(m_volt.getMode()).thenReturn(OperationMode.PAUSED);
 
         // reads are allowed
-        ByteBuffer msg = createMsg("hello", 1);
+        SharedBBContainer msg = createMsg("hello", 1);
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
+        msg.discard("Invocation");
 
         // writes are not allowed
         msg = createMsg("hellorw", "10");
@@ -598,6 +628,7 @@ public class TestClientInterface {
         }
 
         when(m_volt.getMode()).thenReturn(OperationMode.RUNNING);
+        msg.discard("Invocation");
     }
 
     @Test
@@ -618,7 +649,7 @@ public class TestClientInterface {
 
         responses.clear();
         String query = "select * from A";
-        ByteBuffer msg = createMsg("@AdHoc", query);
+        SharedBBContainer msg = createMsg("@AdHoc", query);
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
         // fake plan
@@ -627,6 +658,7 @@ public class TestClientInterface {
         plannedStmt.clientData = m_cxn;
         m_ci.getDispatcher().processFinishedCompilerWork(plannedStmt).run();
         assertEquals(0, responses.size());
+        msg.discard("Invocation");
 
         query = "insert into A values (10)";
         msg = createMsg("@AdHoc", query);
@@ -648,45 +680,56 @@ public class TestClientInterface {
         }
 
         when(m_volt.getMode()).thenReturn(OperationMode.RUNNING);
+        msg.discard("Invocation");
     }
 
     @Test
     public void testInvalidProcedure() throws IOException {
-        ByteBuffer msg = createMsg("hellooooo", 1);
+        SharedBBContainer msg = createMsg("hellooooo", 1);
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNotNull(resp);
         assertEquals(ClientResponse.UNEXPECTED_FAILURE, resp.getStatus());
+        // Message not sent so discard here
+        msg.discard("Invocation");
     }
 
     @Test
     public void testAdminProcsOnNonAdminPort() throws IOException {
-        ByteBuffer msg = createMsg("@Pause");
+        SharedBBContainer msg = createMsg("@Pause");
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNotNull(resp);
         assertEquals(ClientResponse.UNEXPECTED_FAILURE, resp.getStatus());
+        // Message not sent so discard here
+        msg.discard("Invocation");
 
         msg = createMsg("@Resume");
         resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNotNull(resp);
         assertEquals(ClientResponse.UNEXPECTED_FAILURE, resp.getStatus());
+        // Message not sent so discard here
+        msg.discard("Invocation");
     }
 
     @Test
     public void testPolicyRejection() throws IOException {
         // incorrect parameters to @AdHoc proc
-        ByteBuffer msg = createMsg("@AdHoc", 1, 3, 3);
+        SharedBBContainer msg = createMsg("@AdHoc", 1, 3, 3);
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNotNull(resp);
         assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
+        // Message not sent so discard here
+        msg.discard("Invocation");
     }
 
     @Test
     public void testPromoteWithoutCommandLogging() throws Exception {
-        final ByteBuffer msg = createMsg("@Promote");
+        final SharedBBContainer msg = createMsg("@Promote");
         m_ci.handleRead(msg, m_handler, m_cxn);
         // Verify that the truncation request node was not created.
         verify(m_zk, never()).create(eq(VoltZK.request_truncation_snapshot_node), any(byte[].class),
                                      eq(Ids.OPEN_ACL_UNSAFE), eq(CreateMode.PERSISTENT));
+        // Message not sent so discard here
+        msg.discard("Invocation");
     }
 
     @Test
@@ -695,11 +738,13 @@ public class TestClientInterface {
         boolean wasEnabled = logConfig.getEnabled();
         logConfig.setEnabled(true);
         try {
-            final ByteBuffer msg = createMsg("@Promote");
+            final SharedBBContainer msg = createMsg("@Promote");
             m_ci.handleRead(msg, m_handler, m_cxn);
             // Verify that the truncation request node was created.
             verify(m_zk, never()).create(eq(VoltZK.request_truncation_snapshot_node), any(byte[].class),
                                 eq(Ids.OPEN_ACL_UNSAFE), eq(CreateMode.PERSISTENT_SEQUENTIAL));
+            // Message not sent so discard here
+            msg.discard("Invocation");
         }
         finally {
             logConfig.setEnabled(wasEnabled);
@@ -729,17 +774,19 @@ public class TestClientInterface {
         Pair<Long, byte[]> hashinatorConfig = TheHashinator.getCurrentVersionedConfig();
         long newHashinatorVersion = hashinatorConfig.getFirst() + 1;
 
-        ByteBuffer msg = createMsg("hello", 1);
+        SharedBBContainer msg = createMsg("hello", 1);
         Iv2InitiateTaskMessage initMsg = readAndCheck(msg, "hello", 1, true, true);
         assertEquals(1, initMsg.getStoredProcedureInvocation().getParameterAtIndex(0));
 
         // fake a restart response
         InitiateResponseMessage respMsg = new InitiateResponseMessage(initMsg);
-        respMsg.setMispartitioned(true, initMsg.getStoredProcedureInvocation(),
+        respMsg.setMispartitioned(true, (SPIfromSerialization)initMsg.getStoredProcedureInvocation(),
                                   Pair.of(newHashinatorVersion, hashinatorConfig.getSecond()));
 
-        // reset the message so that we can check for restart later
-        reset(m_messenger);
+        if (!shouldRestart) {
+            // reset the messenger so that we can check that the restarted message was not sent
+            reset(m_messenger);
+        }
 
         // Deliver a restart response
         m_ci.m_mailbox.deliver(respMsg);
@@ -757,45 +804,53 @@ public class TestClientInterface {
 
         // the hashinator should've been updated in either case
         assertEquals(newHashinatorVersion, TheHashinator.getCurrentVersionedConfig().getFirst().longValue());
+        respMsg.discard("Params");
+        msg.discard("Invocation");
     }
 
     @Test
     public void testGetPartitionKeys() throws IOException {
         //Unsupported type
-        ByteBuffer msg = createMsg("@GetPartitionKeys", "BIGINT");
+        SharedBBContainer msg = createMsg("@GetPartitionKeys", "BIGINT");
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNotNull(resp);
         assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
+        msg.discard("Invocation");
 
         //Null param
         msg = createMsg("@GetPartitionKeys", new Object[] { null });
         resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNotNull(resp);
         assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
+        msg.discard("Invocation");
 
         //Empty string param
         msg = createMsg("@GetPartitionKeys", "");
         resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNotNull(resp);
         assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
+        msg.discard("Invocation");
 
         //Junk string
         msg = createMsg("@GetPartitionKeys", "ryanlikestheyankees");
         resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNotNull(resp);
         assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
+        msg.discard("Invocation");
 
         //No param
         msg = createMsg("@GetPartitionKeys");
         resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNotNull(resp);
         assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
+        msg.discard("Invocation");
 
         //Extra param
         msg = createMsg("@GetPartitionKeys", "INTEGER", 99);
         resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNotNull(resp);
         assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
+        msg.discard("Invocation");
 
         //Correct param with no case sensitivity
         msg = createMsg("@GetPartitionKeys", "InTeGeR");
@@ -805,6 +860,7 @@ public class TestClientInterface {
         VoltTable vt = resp.getResults()[0];
         assertEquals(3, vt.getRowCount());
         assertEquals(VoltType.INTEGER, vt.getColumnType(1));
+        msg.discard("Invocation");
 
         Set<Integer> partitions = new HashSet<>(Arrays.asList( 0, 1, 2));
         while (vt.advanceRow()) {
@@ -820,7 +876,7 @@ public class TestClientInterface {
         ClientInterface.TOPOLOGY_CHANGE_CHECK_MS = 1;
         try {
             m_ci.startAcceptingConnections();
-            ByteBuffer msg = createMsg("@Subscribe", "TOPOLOGY");
+            SharedBBContainer msg = createMsg("@Subscribe", "TOPOLOGY");
             ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
             assertNotNull(resp);
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
@@ -841,6 +897,7 @@ public class TestClientInterface {
             ByteBuffer actualBuf = ByteBuffer.allocate(ds.getSerializedSize());
             ds.serialize(actualBuf);
             assertEquals(expectedBuf, actualBuf);
+            msg.discard("Invocation");
         } finally {
             RateLimitedClientNotifier.WARMUP_MS = 1000;
             ClientInterface.TOPOLOGY_CHANGE_CHECK_MS = 5000;
@@ -854,8 +911,6 @@ public class TestClientInterface {
             public void serialize(final ByteBuffer outbuf) throws IOException {
                 outbuf.put(buf);
             }
-            @Override
-            public void cancel() {}
             @Override
             public int getSerializedSize() {
                 return buf.remaining();

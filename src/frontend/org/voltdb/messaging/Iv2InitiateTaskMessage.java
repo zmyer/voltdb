@@ -22,7 +22,12 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.HBBPool.SharedBBContainer;
+import org.voltdb.SPIfromSerialization;
+import org.voltdb.SPIfromSerializedContainer;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.iv2.UniqueIdGenerator;
@@ -167,19 +172,39 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         buf.put((byte)0);//Should never generate a response if we have to forward to a replica
         m_invocation.flattenToBuffer(buf);
 
-        assert(buf.capacity() == buf.position());
+        assert(buf.limit() == buf.position());
         buf.limit(buf.position());
     }
 
     @Override
-    public void initFromBuffer(ByteBuffer buf) throws IOException {
-        super.initFromBuffer(buf);
+    protected void initFromBuffer(ByteBuffer buf) throws IOException {
+        assert(false);
+    }
+
+    @Override
+    public void initFromContainer(SharedBBContainer container) throws IOException {
+        super.initFromContainer(container);
+        ByteBuffer buf = container.b();
         m_clientInterfaceHandle = buf.getLong();
         m_connectionId = buf.getLong();
         m_isSinglePartition = buf.get() == 1;
         m_shouldReturnResultTables = buf.get() != 0;
-        m_invocation = new StoredProcedureInvocation();
-        m_invocation.initFromBuffer(buf);
+        SPIfromSerializedContainer serializedSPI = new SPIfromSerializedContainer();
+        serializedSPI.initFromContainer(container, "Params");
+        container.discard(getClass().getSimpleName());
+        m_invocation = serializedSPI;
+    }
+
+    @Override
+    public void initFromInputHandler(VoltProtocolHandler handler, NIOReadStream inputStream) throws IOException {
+        initFromContainer(handler.getNextHBBMessage(inputStream, getClass().getSimpleName()));
+    }
+
+    @Override
+    public void discard(String tag) {
+        if (m_invocation != null) {
+            m_invocation.discard(tag);
+        }
     }
 
     @Override
@@ -232,7 +257,12 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         return sb.toString();
     }
 
+    public void implicitReference(String tag) {
+        m_invocation.implicitReference(tag);
+    }
+
     public ByteBuffer getSerializedParams() {
-        return m_invocation.getSerializedParams();
+        assert(m_invocation instanceof SPIfromSerialization);
+        return ((SPIfromSerialization)m_invocation).GetUnsafeSerializedBBParams();
     }
 }

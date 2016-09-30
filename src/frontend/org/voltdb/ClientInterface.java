@@ -38,7 +38,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledFuture;
@@ -67,6 +66,7 @@ import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
+import org.voltcore.utils.HBBPool.SharedBBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.AuthSystem.AuthProvider;
 import org.voltdb.AuthSystem.AuthUser;
@@ -87,7 +87,6 @@ import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.security.AuthenticationRequest;
-import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Predicate;
@@ -763,16 +762,21 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
-        public void handleMessage(ByteBuffer message, Connection c) {
+        public void handleMessage(NIOReadStream inputStream, Connection c) {
+            SharedBBContainer container = null;
             try {
-                final ClientResponseImpl error = handleRead(message, this, c);
+                container = getNextHBBMessage(inputStream, "Client");
+                final ClientResponseImpl error = handleRead(container, this, c);
                 if (error != null) {
                     ByteBuffer buf = ByteBuffer.allocate(error.getSerializedSize() + 4);
                     buf.putInt(buf.capacity() - 4);
                     error.flattenToBuffer(buf).flip();
                     c.writeStream().enqueue(buf);
                 }
+                container.discard("Client");
             } catch (Exception e) {
+                if (container != null)
+                    container.discard("Client");
                 throw new RuntimeException(e);
             }
         }
@@ -894,10 +898,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
-        public void cancel() {
-        }
-
-        @Override
         public int getSerializedSize() throws IOException {
             // HACK-O-RIFFIC
             // For now, figure out if this is a transaction that was ignored
@@ -983,16 +983,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                 try {
                     ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
+                    StoredProcedureInvocation invocation = response.getInvocation().getShallowCopy();
                     int partition = InvocationDispatcher.getPartitionForProcedure(ppi.index,
-                            ppi.type, response.getInvocation());
+                            ppi.type, invocation);
                     createTransaction(cihm.connection.connectionId(),
-                            response.getInvocation(),
+                            invocation,
                             isReadonly,
                             true, // Only SP could be mis-partitioned
                             false, // Only SP could be mis-partitioned
                             partition,
                             messageSize,
                             nowNanos);
+                    invocation.discard("Params");
                     return true;
                 } catch (Exception e) {
                     // unable to hash to a site, return an error
@@ -1344,11 +1346,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @param port
      * * return True if an error was generated and needs to be returned to the client
      */
-    final ClientResponseImpl handleRead(ByteBuffer buf, ClientInputHandler handler, Connection ccxn) {
-        StoredProcedureInvocation task = new StoredProcedureInvocation();
+    final ClientResponseImpl handleRead(SharedBBContainer container, ClientInputHandler handler, Connection ccxn) {
+        SPIfromSerializedContainer task = new SPIfromSerializedContainer();
         try {
-            task.initFromBuffer(buf);
+            task.initFromContainer(container, "ClientInterface");
         } catch (Exception ex) {
+            if (task.parametersSerialized()) {
+                task.discard("ClientInterface");
+            }
             return new ClientResponseImpl(
                     ClientResponseImpl.UNEXPECTED_FAILURE,
                     new VoltTable[0], ex.getMessage(), ccxn.connectionId());
@@ -1357,10 +1362,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (user == null) {
             String errorMessage = "User " + handler.getUserName() + " has been removed from the system via a catalog update";
             authLog.info(errorMessage);
-            return errorResponse(ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, errorMessage, null, false);
+            ClientResponseImpl err = errorResponse(ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, errorMessage, null, false);
+            task.discard("ClientInterface");
+            return err;
         }
 
-        return m_dispatcher.dispatch(task, handler, ccxn, user, null);
+        ClientResponseImpl response = m_dispatcher.dispatch(task, handler, ccxn, user);
+        task.discard("ClientInterface");
+        return response;
     }
 
     public Procedure getProcedureFromName(String procName, CatalogContext catalogContext) {
@@ -1471,8 +1480,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         public void serialize(ByteBuffer outbuf) throws IOException {
                             outbuf.put(buf.duplicate());
                         }
-                        @Override
-                        public void cancel() {}
 
                         @Override
                         public int getSerializedSize() {
@@ -1491,7 +1498,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
             }
         }, CoreUtils.SAMETHREADEXECUTOR);
-        final StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        final SPIfromParameterArray spi = new SPIfromParameterArray();
         spi.setProcName("@Statistics");
         spi.setParams("TOPO", 0);
         spi.setClientHandle(ASYNC_TOPO_HANDLE);
@@ -1598,15 +1605,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             " which is not a known procedure");
         }
         Procedure catProc = sysProc.asCatalogProcedure();
-        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        SPIfromParameterArray spi = new SPIfromParameterArray();
         spi.setProcName(procedureName);
-        spi.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
-            @Override
-            public ParameterSet call() {
-                ParameterSet paramSet = ParameterSet.fromArrayWithCopy(params);
-                return paramSet;
-            }
-        });
+        spi.setParams(params);
         spi.clientHandle = clientData;
         // Ugh, need to consolidate this with handleRead() somehow but not feeling it at the moment
         if (procedureName.equals("@SnapshotScan")) {
@@ -1617,12 +1618,23 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             InvocationDispatcher.dispatchStatistics(OpsSelector.SNAPSHOTDELETE, spi, m_snapshotDaemonAdapter);
             return;
         }
-        // initiate the transaction
-        createTransaction(m_snapshotDaemonAdapter.connectionId(),
-                spi, catProc.getReadonly(),
-                catProc.getSinglepartition(), catProc.getEverysite(),
-                0,
-                0, System.nanoTime());
+        /*
+         * Round trip the invocation to initialize it for command logging
+         */
+        SPIfromSerialization serializedSPI = null;
+        try {
+            serializedSPI = spi.roundTripForCL();
+            // initiate the transaction
+            createTransaction(m_snapshotDaemonAdapter.connectionId(),
+                    serializedSPI, catProc.getReadonly(),
+                    catProc.getSinglepartition(), catProc.getEverysite(),
+                    0,
+                    0, System.nanoTime());
+            serializedSPI.discard("Params");
+        } catch (Exception e) {
+            hostLog.fatal(e);
+            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+        }
     }
 
     /**
@@ -1875,19 +1887,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         final String procedureName = "@ExecuteTask";
         Config procedureConfig = SystemProcedureCatalog.listing.get(procedureName);
         Procedure proc = procedureConfig.asCatalogProcedure();
-        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        SPIfromParameterArray spi = new SPIfromParameterArray();
         spi.setProcName(procedureName);
         spi.setParams(params);
         SimpleClientResponseAdapter.SyncCallback syncCb = new SimpleClientResponseAdapter.SyncCallback();
         spi.setClientHandle(m_executeTaskAdpater.registerCallback(syncCb));
-        if (spi.getSerializedParams() == null) {
-            spi = MiscUtils.roundTripForCL(spi);
-        }
-        createTransaction(m_executeTaskAdpater.connectionId(), spi,
+        SPIfromSerialization serializedSPI = spi.roundTripForCL();
+        createTransaction(m_executeTaskAdpater.connectionId(), serializedSPI,
                 proc.getReadonly(), proc.getSinglepartition(), proc.getEverysite(),
                 0 /* Can provide anything for multi-part */,
-                spi.getSerializedSize(), System.nanoTime());
-
+                serializedSPI.getSerializedSize(), System.nanoTime());
+        serializedSPI.discard("Params");
         return syncCb.getResponse(timeoutMS);
     }
 
@@ -1904,18 +1914,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         final String procedureName = "@ExecuteTask";
         Config procedureConfig = SystemProcedureCatalog.listing.get(procedureName);
         Procedure proc = procedureConfig.asCatalogProcedure();
-        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        SPIfromParameterArray spi = new SPIfromParameterArray();
         spi.setProcName(procedureName);
         spi.setParams(params);
         spi.setClientHandle(m_executeTaskAdpater.registerCallback(cb));
-        if (spi.getSerializedParams() == null) {
-            spi = MiscUtils.roundTripForCL(spi);
-        }
-        createTransaction(m_executeTaskAdpater.connectionId(), spi,
+        SPIfromSerialization serializedSPI = spi.roundTripForCL();
+        createTransaction(m_executeTaskAdpater.connectionId(), serializedSPI,
                 proc.getReadonly(), proc.getSinglepartition(), proc.getEverysite(),
                 0 /* Can provide anything for multi-part */,
-                spi.getSerializedSize(), System.nanoTime());
-
+                serializedSPI.getSerializedSize(), System.nanoTime());
+        serializedSPI.discard("Params");
     }
 
     /**

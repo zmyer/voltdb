@@ -17,6 +17,7 @@
 
 package org.voltdb.iv2;
 
+import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.dtxn.TransactionState;
@@ -25,9 +26,9 @@ import org.voltdb.dtxn.TransactionState;
  *
  */
 public class MPIEndOfLogTransactionState extends TransactionState {
-    public MPIEndOfLogTransactionState(TransactionInfoBaseMessage notice)
+    public MPIEndOfLogTransactionState(Mailbox mbox, TransactionInfoBaseMessage notice)
     {
-        super(null, notice);
+        super(mbox, notice);
     }
 
     @Override

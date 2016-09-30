@@ -21,11 +21,14 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.VoltProtocolHandler;
+import org.voltcore.utils.HBBPool.SharedBBContainer;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 
 import com.google_voltpatches.common.base.Charsets;
-import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 
 public class SnapshotCheckResponseMessage extends VoltMessage {
 
@@ -69,9 +72,10 @@ public class SnapshotCheckResponseMessage extends VoltMessage {
         return size;
     }
 
+    // It is best to use a regular buffer here because we build VoltTables directly on top of the buffer
+    // and we don't know how to reference count them
     @Override
-    protected void initFromBuffer(ByteBuffer buf) throws IOException
-    {
+    protected void initFromBuffer(ByteBuffer buf) throws IOException {
         m_path = new byte[buf.getInt()];
         buf.get(m_path);
         m_stypeBytes = new byte[buf.getInt()];
@@ -80,6 +84,16 @@ public class SnapshotCheckResponseMessage extends VoltMessage {
         buf.get(m_nonce);
         m_response = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(buf);
         m_stype = SnapshotPathType.valueOf(new String(m_stypeBytes, Charsets.UTF_8));
+    }
+
+    @Override
+    protected void initFromContainer(SharedBBContainer container) throws IOException {
+        assert(false);
+    }
+
+    @Override
+    public void initFromInputHandler(VoltProtocolHandler handler, NIOReadStream inputStream) throws IOException {
+        initFromBuffer(handler.getNextBBMessage(inputStream));
     }
 
     @Override
@@ -94,4 +108,10 @@ public class SnapshotCheckResponseMessage extends VoltMessage {
         buf.put(m_nonce);
         m_response.flattenToBuffer(buf);
     }
+
+    @Override
+    public void implicitReference(String tag) {}
+
+    @Override
+    public void discard(String tag) {}
 }

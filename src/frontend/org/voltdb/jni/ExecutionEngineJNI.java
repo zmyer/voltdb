@@ -574,7 +574,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             Object value,
             HashinatorConfig config)
     {
-        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(value, config.type.typeId(), config.configBytes);
+        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(
+                value, config.type.typeId(), config.configBytes);
 
         // serialize the param set
         clearPsetAndEnsureCapacity(parameterSet.getSerializedSize());

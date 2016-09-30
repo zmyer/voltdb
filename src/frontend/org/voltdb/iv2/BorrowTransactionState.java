@@ -17,6 +17,7 @@
 
 package org.voltdb.iv2;
 
+import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 
 /**
@@ -29,9 +30,9 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
  */
 public class BorrowTransactionState extends ParticipantTransactionState
 {
-    BorrowTransactionState(long txnId, TransactionInfoBaseMessage notice)
+    BorrowTransactionState(Mailbox mbox, long txnId, TransactionInfoBaseMessage notice)
     {
-        super(txnId, notice, true);
+        super(mbox, txnId, notice, true);
     }
 
     @Override

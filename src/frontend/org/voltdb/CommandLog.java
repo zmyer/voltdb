@@ -173,6 +173,8 @@ public interface CommandLog {
          * @param completionChecks
          */
         void processDurabilityChecks(CompletionChecks completionChecks);
+
+        public long getHSId();
     }
 
     /**
