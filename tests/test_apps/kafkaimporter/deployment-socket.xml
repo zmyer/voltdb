@@ -1,0 +1,12 @@
+<deployment>
+    <cluster hostcount="1" kfactor="0"/>
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <import>
+        <configuration module="socketstream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="port">7072</property>
+            <property name="procedure">InsertOnly0</property>
+        </configuration>
+    </import>
+</deployment>

@@ -1,0 +1,290 @@
+<deployment>
+  <cluster hostcount="1" kfactor="0" schema="ddl" sitesperhost="4" />
+  <paths>
+    <voltdbroot path="/tmp/apprunner_voltdbroot/voltdist/voltdbroot" />
+  </paths>
+  <partition-detection enabled="false">
+    <snapshot prefix="voltdb_partition_detection" />
+  </partition-detection>
+  <admin-mode adminstartup="false" port="21211" />
+  <heartbeat timeout="15" />
+  <httpd>
+    <jsonapi enabled="true" />
+    <https enabled="true">
+      <keystore password="password" path="/home/pshaw/apprunner-keystore" />
+      <truststore password="password" path="/home/pshaw/apprunner-keystore" />
+    </https>
+  </httpd>
+  <export>
+    <configuration enabled="true" stream="default" type="kafka">
+      <property name="bootstrap.servers">pshawbox:9092</property>
+      <property name="acks">1</property>
+      <property name="skipinternals">true</property>
+      <property name="topic.prefix">T8_</property>
+    </configuration>
+  </export>
+  <import>
+    <configuration enabled="true" type="kafka">
+        <property name="groupid">A8</property>
+      <property name="procedure">InsertOnly0</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC0</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly1</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC1</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly2</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC2</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly3</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC3</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly4</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC4</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly5</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC5</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly6</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC6</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly7</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC7</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly8</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC8</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly9</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC9</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly10</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC10</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly11</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC11</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly12</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC12</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly13</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC13</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly14</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC14</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly15</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC15</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly16</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC16</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly17</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC17</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly18</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC18</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly19</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC19</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly20</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC20</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly21</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC21</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly22</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC22</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly23</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC23</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly24</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC24</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly25</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC25</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly26</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC26</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly27</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC27</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly28</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC28</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly29</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC29</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly30</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC30</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly31</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC31</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly32</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC32</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly33</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC33</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly34</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC34</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly35</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC35</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly36</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC36</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly37</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC37</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly38</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC38</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly39</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC39</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly40</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC40</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly41</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC41</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly42</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC42</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly43</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC43</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly44</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC44</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly45</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC45</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly46</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC46</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly47</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC47</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly48</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC48</property>
+    </configuration>
+    <configuration enabled="true" type="kafka">
+      <property name="procedure">InsertOnly49</property>
+      <property name="brokers">pshawbox:9092</property>
+      <property name="topics">TESTTOPIC49</property>
+    </configuration>
+  </import>
+  <commandlog enabled="false" synchronous="false">
+    <frequency />
+  </commandlog>
+  <systemsettings>
+    <temptables />
+    <snapshot priority="6" />
+    <resourcemonitor>
+      <memorylimit size="0" />
+    </resourcemonitor>
+  </systemsettings>
+  <dr id="1" />
+</deployment>

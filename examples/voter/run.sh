@@ -21,7 +21,7 @@ source $VOLTDB_BIN/voltenv
 # (once running, all nodes are the same -- no leaders)
 STARTUPLEADERHOST="localhost"
 # list of cluster nodes separated by commas in host:[port] format
-SERVERS="localhost"
+SERVERS=`hostname`
 
 # remove binaries, logs, runtime artifacts, etc... but keep the jars
 function clean() {

@@ -1,0 +1,737 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<deployment>
+    <cluster hostcount="1" sitesperhost="4" kfactor="0" schema="ddl"/>
+    <partition-detection enabled="false">
+        <snapshot prefix="voltdb_partition_detection"/>
+    </partition-detection>
+    <admin-mode port="21211" adminstartup="false"/>
+    <heartbeat timeout="15"/>
+    <httpd>
+        <jsonapi enabled="true"/>
+    </httpd>
+    <snapshot enabled="true"/>
+    <export>
+        <configuration stream="default" enabled="true" type="kafka">
+            <property name="bootstrap.servers">pshawbox:9092</property>
+            <property name="acks">1</property>
+            <property name="skipinternals">true</property>
+            <property name="topic.prefix">T8_</property>
+        </configuration>
+    </export>
+    <commandlog synchronous="false" enabled="false">
+        <frequency/>
+    </commandlog>
+    <systemsettings>
+        <temptables/>
+        <snapshot priority="6"/>
+        <elastic/>
+        <query/>
+        <resourcemonitor>
+            <memorylimit size="0"/>
+        </resourcemonitor>
+    </systemsettings>
+    <security/>
+    <dr id="1"/>
+    <import>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="procedure">InsertOnly0</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC0</property>
+            <property name="socket.timeout.ms">50</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly1</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC1</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly2</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC2</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly3</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC3</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly4</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC4</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly5</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC5</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly6</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC6</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly7</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC7</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly8</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC8</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly9</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC9</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly10</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC10</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly11</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC11</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly12</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC12</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly13</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC13</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly14</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC14</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly15</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC15</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly16</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC16</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly17</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC17</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly18</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC18</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly19</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC19</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly20</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC20</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly21</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC21</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly22</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC22</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly23</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC23</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly24</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC24</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly25</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC25</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly26</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC26</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly27</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC27</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly28</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC28</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly29</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC29</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly30</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC30</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly31</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC31</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly32</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC32</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly33</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC33</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly34</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC34</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly35</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC35</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly36</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC36</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly37</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC37</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly38</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC38</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly39</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC39</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly40</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC40</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly41</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC41</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly42</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC42</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly43</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC43</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly44</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC44</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly45</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC45</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly46</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC46</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly47</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC47</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly48</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC48</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly49</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC49</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly50</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC50</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly51</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC51</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly52</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC52</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly53</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC53</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly54</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC54</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly55</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC55</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly56</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC56</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly57</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC57</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly58</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC58</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly59</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC59</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly60</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC60</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly61</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC61</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly62</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC62</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly63</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC63</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly64</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC64</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly65</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC65</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly66</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC66</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly67</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC67</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly68</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC68</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly69</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC69</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly70</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC70</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly71</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC71</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly72</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC72</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly73</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC73</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly74</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC74</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly75</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC75</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly76</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC76</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly77</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC77</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly78</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC78</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly79</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC79</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly80</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC80</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly81</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC81</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly82</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC82</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly83</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC83</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly84</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC84</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly85</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC85</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly86</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC86</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly87</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC87</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly88</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC88</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly89</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC89</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly90</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC90</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly91</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC91</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly92</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC92</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly93</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC93</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly94</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC94</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly95</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC95</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly96</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC96</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly97</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC97</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly98</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC98</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="socket.timeout.ms">50</property>
+            <property name="procedure">InsertOnly99</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC99</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+    </import>
+</deployment>

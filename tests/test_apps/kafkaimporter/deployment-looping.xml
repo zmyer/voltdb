@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<deployment>
+    <cluster hostcount="1" sitesperhost="4" kfactor="0" schema="ddl"/>
+    <partition-detection enabled="false">
+        <snapshot prefix="voltdb_partition_detection"/>
+    </partition-detection>
+    <admin-mode port="21211" adminstartup="false"/>
+    <heartbeat timeout="15"/>
+    <httpd>
+        <jsonapi enabled="true"/>
+    </httpd>
+    <snapshot enabled="false"/>
+    <export>
+        <configuration stream="default" enabled="true" type="kafka">
+            <property name="bootstrap.servers">pshawbox:9092</property>
+            <property name="acks">1</property>
+            <property name="skipinternals">true</property>
+            <property name="topic.prefix">T8_</property>
+        </configuration>
+        <configuration stream="ke1" enabled="true" type="kafka">
+            <property name="bootstrap.servers">pshawbox:9092</property>
+            <property name="acks">1</property>
+            <property name="skipinternals">true</property>
+            <property name="topic.prefix"></property>
+        </configuration>
+    </export>
+    <commandlog synchronous="false" enabled="false">
+        <frequency/>
+    </commandlog>
+    <systemsettings>
+        <temptables/>
+        <snapshot priority="6"/>
+        <elastic/>
+        <query/>
+        <resourcemonitor>
+            <memorylimit size="0"/>
+        </resourcemonitor>
+    </systemsettings>
+    <security/>
+    <dr id="1"/>
+    <import>
+        <configuration type="kafka" enabled="true">
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC0</property>
+            <property name="procedure">InsertOnly0</property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="procedure">InsertOnly0</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC0</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="procedure">InsertOnly1</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC1</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="procedure">InsertOnly2</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC2</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="procedure">InsertOnly3</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC3</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="procedure">InsertOnly4</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC4</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="procedure">InsertOnly5</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC5</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="procedure">InsertOnly6</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC6</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="procedure">InsertOnly7</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC7</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="procedure">InsertOnly8</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC8</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="procedure">InsertOnly9</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC9</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="procedure">InsertOnly10</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC10</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="procedure">InsertOnly11</property>
+            <property name="brokers">pshawbox:9092</property>
+            <property name="topics">TESTTOPIC11</property>
+            <format-property name="errorrate">2</format-property>
+        </configuration>
+    </import>
+</deployment>

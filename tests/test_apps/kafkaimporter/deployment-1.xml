@@ -1,0 +1,14 @@
+<deployment>
+    <cluster hostcount="1" kfactor="0"/>
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <import>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="formatter.jar/ExampleFormatterFactory">
+            <property name="brokers">pshawbox:9092</property>
+            <property name="groupid">H8</property>
+            <property name="topics">TESTTOPIC0</property>
+            <property name="procedure">InsertOnly0</property>
+        </configuration>
+    </import>
+</deployment>
