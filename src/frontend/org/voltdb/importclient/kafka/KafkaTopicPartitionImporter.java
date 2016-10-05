@@ -498,6 +498,11 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         } catch (InterruptedException ie) {
                         }
                 }
+                if (noTransaction) {
+                    if (currentFetchCount > 32_768) {
+                        System.out.println("Fetched more than Gap can handle messages.");
+                    }
+                }
                 if (noTransaction && currentFetchCount != 0 && (submitCount % printEvery == 0)) {
                     System.out.print(".");
                 }
