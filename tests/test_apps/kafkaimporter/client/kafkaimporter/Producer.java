@@ -63,14 +63,17 @@ public class Producer extends Thread {
     // Validated CLI config
     KafkaProducerConfig config;
 
-    public Producer(KafkaProducerConfig config, int topicnum) {
+    public Producer(KafkaProducerConfig config, int topicnum, int rate) {
         // TODO: add topic check/create, with appropriate replication & partitioning
         // Meanwhile topic creation is done in kafkautils.py from the runapp.py
         // or if auto-create is enabled in the Kafka cluster properties
         this.config = config;
         m_topic = config.topic;
         m_servers = config.brokers;
-        m_rate = config.producerrate;
+        if (rate == -1)
+            m_rate = config.producerrate;
+        else
+            m_rate = rate;
         m_cycletime = config.cycletime;
         // if (topicnum % 2 == 0)      // alternate compression strategies, if any
         //     m_compression = config.compression;
@@ -161,19 +164,19 @@ public class Producer extends Thread {
         int ntopics = 1;    // 1 means 1 topic: TOPIC0, for example
 
         @Option(desc = "Rate in rows per second")
-        int producerrate = 1_000_000;
+        int producerrate = 5;
 
         @Option(desc = "Cycle Time in seconds.")
         int cycletime = 60;
 
         @Option (desc = "Pause time in seconds.")
-        int pausetime = 10;
+        int pausetime = 0;
 
         @Option(desc = "Total rows in rows.")
         int totalrows = 6_000_000;
 
         @Option(desc = "Number of producer cycles")
-        int cycles = 5;
+        int cycles = 1;
 
         @Option(desc = "Compression codec: none, gzip, snappy, lz4 or all to cycle through choices.")
         String compression = "all";
@@ -185,7 +188,7 @@ public class Producer extends Thread {
             if (brokers.length() < 0) exitWithMessageAndUsage("Broker list required");
             if (producerrate <= 0) exitWithMessageAndUsage("Producer rate must be > 0");
             if (cycletime <= 0) exitWithMessageAndUsage("Cycle time must be > 0");
-            if (pausetime <= 0) exitWithMessageAndUsage("Pause time must be > 0");
+            if (pausetime < 0) exitWithMessageAndUsage("Pause time must be >= 0");
             if (totalrows <= 0) exitWithMessageAndUsage("Total rows must be > 0");
             if (cycles <= 0) exitWithMessageAndUsage("Cycle count must be > 0");
             if (! compression_types.contains(compression) && !compression.equals("all"))
@@ -194,13 +197,18 @@ public class Producer extends Thread {
     }
 
     public static void main(String[] args) {
+        int rate = -1;
         KafkaProducerConfig config = new KafkaProducerConfig();
         config.parse(Producer.class.getName(), args);
         System.out.println(config.getConfigDumpString());
 
         List<Producer>  producers = new ArrayList<Producer>();
         for (int topic = 0; topic < config.ntopics; topic++) {
-            Producer producer = new Producer(config, topic);
+            if (topic <= 1) // set the first 2 topics to high rate, rest to command line value
+                rate = 1_000_000;
+            else
+                rate = config.producerrate;
+            Producer producer = new Producer(config, topic, rate);
             producer.start();
             producers.add(producer);
         }
