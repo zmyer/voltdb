@@ -364,6 +364,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     protected void accept() {
         info(null, "Starting partition fetcher for " + m_topicAndPartition);
         long submitCount = 0;
+        final int printEvery = Integer.getInteger("PrintEvery", 10000);
         AtomicLong cbcnt = new AtomicLong(0);
         @SuppressWarnings("unchecked")
         Formatter<String> formatter = (Formatter<String>) m_config.getFormatterBuilder().create();
@@ -469,8 +470,15 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                               }
                               m_gapTracker.commit(messageAndOffset.nextOffset());
                          }
+                         if (noTransaction) {
+                             m_gapTracker.commit(messageAndOffset.nextOffset());
+                         }
                      } catch (FormatException e) {
-                        rateLimitedLog(Level.WARN, e, "Failed to tranform data: %s" ,line);
+                        if (noTransaction && (submitCount % printEvery == 0)) {
+                            System.out.println("Failed to tranform data: " + line);
+                        } else {
+                            rateLimitedLog(Level.WARN, e, "Failed to tranform data: %s" ,line);
+                        }
                         m_gapTracker.commit(messageAndOffset.nextOffset());
                     }
                     submitCount++;
@@ -489,6 +497,9 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                             Thread.sleep(m_waitSleepMs);
                         } catch (InterruptedException ie) {
                         }
+                }
+                if (noTransaction && currentFetchCount != 0 && (submitCount % printEvery == 0)) {
+                    System.out.print(".");
                 }
                 commitOffset();
             }
