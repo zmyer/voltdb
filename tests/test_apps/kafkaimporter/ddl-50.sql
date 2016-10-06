@@ -11,7 +11,7 @@ CREATE TABLE kafkaimporttable0
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table0 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable0 ON COLUMN instance_id;
@@ -22,7 +22,7 @@ CREATE TABLE kafkaimporttable1
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table1 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable1 ON COLUMN instance_id;
@@ -33,7 +33,7 @@ CREATE TABLE kafkaimporttable2
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table2 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable2 ON COLUMN instance_id;
@@ -46,7 +46,7 @@ CREATE TABLE kafkaimporttable3
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table3 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable3 ON COLUMN instance_id;
@@ -59,7 +59,7 @@ CREATE TABLE kafkaimporttable4
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table4 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable4 ON COLUMN instance_id;
@@ -72,7 +72,7 @@ CREATE TABLE kafkaimporttable5
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table5 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable5 ON COLUMN instance_id;
@@ -85,7 +85,7 @@ CREATE TABLE kafkaimporttable6
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table6 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable6 ON COLUMN instance_id;
@@ -98,7 +98,7 @@ CREATE TABLE kafkaimporttable7
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table7 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable7 ON COLUMN instance_id;
@@ -111,7 +111,7 @@ CREATE TABLE kafkaimporttable8
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table8 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable8 ON COLUMN instance_id;
@@ -124,7 +124,7 @@ CREATE TABLE kafkaimporttable9
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table9 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable9 ON COLUMN instance_id;
@@ -137,7 +137,7 @@ CREATE TABLE kafkaimporttable10
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table10 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable10 ON COLUMN instance_id;
@@ -150,7 +150,7 @@ CREATE TABLE kafkaimporttable11
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table11 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable11 ON COLUMN instance_id;
@@ -163,7 +163,7 @@ CREATE TABLE kafkaimporttable12
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table12 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable12 ON COLUMN instance_id;
@@ -176,7 +176,7 @@ CREATE TABLE kafkaimporttable13
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table13 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable13 ON COLUMN instance_id;
@@ -189,7 +189,7 @@ CREATE TABLE kafkaimporttable14
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table14 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable14 ON COLUMN instance_id;
@@ -202,7 +202,7 @@ CREATE TABLE kafkaimporttable15
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table15 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable15 ON COLUMN instance_id;
@@ -215,7 +215,7 @@ CREATE TABLE kafkaimporttable16
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table16 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable16 ON COLUMN instance_id;
@@ -228,7 +228,7 @@ CREATE TABLE kafkaimporttable17
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table17 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable17 ON COLUMN instance_id;
@@ -241,7 +241,7 @@ CREATE TABLE kafkaimporttable18
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table18 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable18 ON COLUMN instance_id;
@@ -254,7 +254,7 @@ CREATE TABLE kafkaimporttable19
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table19 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable19 ON COLUMN instance_id;
@@ -267,7 +267,7 @@ CREATE TABLE kafkaimporttable20
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table20 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable20 ON COLUMN instance_id;
@@ -280,7 +280,7 @@ CREATE TABLE kafkaimporttable21
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table21 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable21 ON COLUMN instance_id;
@@ -293,7 +293,7 @@ CREATE TABLE kafkaimporttable22
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table22 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable22 ON COLUMN instance_id;
@@ -306,7 +306,7 @@ CREATE TABLE kafkaimporttable23
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table23 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable23 ON COLUMN instance_id;
@@ -319,7 +319,7 @@ CREATE TABLE kafkaimporttable24
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table24 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable24 ON COLUMN instance_id;
@@ -332,7 +332,7 @@ CREATE TABLE kafkaimporttable25
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table25 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable25 ON COLUMN instance_id;
@@ -345,7 +345,7 @@ CREATE TABLE kafkaimporttable26
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table26 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable26 ON COLUMN instance_id;
@@ -358,7 +358,7 @@ CREATE TABLE kafkaimporttable27
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table27 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable27 ON COLUMN instance_id;
@@ -371,7 +371,7 @@ CREATE TABLE kafkaimporttable28
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table28 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable28 ON COLUMN instance_id;
@@ -384,7 +384,7 @@ CREATE TABLE kafkaimporttable29
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table29 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable29 ON COLUMN instance_id;
@@ -397,7 +397,7 @@ CREATE TABLE kafkaimporttable30
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table30 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable30 ON COLUMN instance_id;
@@ -410,7 +410,7 @@ CREATE TABLE kafkaimporttable31
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table31 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable31 ON COLUMN instance_id;
@@ -423,7 +423,7 @@ CREATE TABLE kafkaimporttable32
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table32 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable32 ON COLUMN instance_id;
@@ -436,7 +436,7 @@ CREATE TABLE kafkaimporttable33
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table33 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable33 ON COLUMN instance_id;
@@ -449,7 +449,7 @@ CREATE TABLE kafkaimporttable34
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table34 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable34 ON COLUMN instance_id;
@@ -462,7 +462,7 @@ CREATE TABLE kafkaimporttable35
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table35 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable35 ON COLUMN instance_id;
@@ -475,7 +475,7 @@ CREATE TABLE kafkaimporttable36
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table36 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable36 ON COLUMN instance_id;
@@ -488,7 +488,7 @@ CREATE TABLE kafkaimporttable37
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table37 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable37 ON COLUMN instance_id;
@@ -501,7 +501,7 @@ CREATE TABLE kafkaimporttable38
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table38 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable38 ON COLUMN instance_id;
@@ -514,7 +514,7 @@ CREATE TABLE kafkaimporttable39
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table39 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable39 ON COLUMN instance_id;
@@ -527,7 +527,7 @@ CREATE TABLE kafkaimporttable40
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table40 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable40 ON COLUMN instance_id;
@@ -540,7 +540,7 @@ CREATE TABLE kafkaimporttable41
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table41 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable41 ON COLUMN instance_id;
@@ -553,7 +553,7 @@ CREATE TABLE kafkaimporttable42
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table42 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable42 ON COLUMN instance_id;
@@ -566,7 +566,7 @@ CREATE TABLE kafkaimporttable43
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table43 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable43 ON COLUMN instance_id;
@@ -579,7 +579,7 @@ CREATE TABLE kafkaimporttable44
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table44 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable44 ON COLUMN instance_id;
@@ -592,7 +592,7 @@ CREATE TABLE kafkaimporttable45
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table45 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable45 ON COLUMN instance_id;
@@ -605,7 +605,7 @@ CREATE TABLE kafkaimporttable46
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table46 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable46 ON COLUMN instance_id;
@@ -618,7 +618,7 @@ CREATE TABLE kafkaimporttable47
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table47 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable47 ON COLUMN instance_id;
@@ -631,7 +631,7 @@ CREATE TABLE kafkaimporttable48
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table48 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable48 ON COLUMN instance_id;
@@ -644,12 +644,12 @@ CREATE TABLE kafkaimporttable49
   SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
-  TRANS              VARCHAR(1000),
+  TRANS              VARCHAR(100),
   CONSTRAINT pk_kafka_import_table49 PRIMARY KEY (instance_id)
 );
 PARTITION TABLE kafkaimporttable49 ON COLUMN instance_id;
 
-
+CREATE PROCEDURE PARTITION ON TABLE KafkaImportTable0 COLUMN instance_id FROM class kafkaimporter.db.procedures.InsertSleep200us;
 
 CREATE PROCEDURE ImportCountMinMax as select count(instance_id), min(instance_id), max(instance_id) from kafkaimporttable0;
 

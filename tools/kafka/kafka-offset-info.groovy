@@ -149,7 +149,8 @@ ofstldr = new Attempter(brokers).attempt {
     chnl
 }
 
-printf("%-36s %4s %16s %16s %16s\n",'TOPIC','PRTN','EARLIEST','LATEST','COMMITTED')
+println new Date()
+printf("%-36s %4s %16s %16s %16s %16s\n",'TOPIC','PRTN','EARLIEST','LATEST','COMMITTED','% COMMITTED')
 
 prtldrs.each { int p, Broker b ->
     cnsmr = new SimpleConsumer(b.host(), b.port(), SO_TIMEOUT, SO_BUFFSIZE, clientid)
@@ -190,7 +191,7 @@ prtldrs.each { int p, Broker b ->
         throw ErrorMapping.exceptionFor(code)
     }
 
-    printf("%-36s %4d %,16d %,16d %,16d\n",topic,p,earliest,latest,committed)
+    printf("%-36s %4d %,16d %,16d %,16d %,16.2f\n",topic,p,earliest,latest,committed,(committed.toFloat()/latest.toFloat())*100.0)
 }
 
 ofstldr.disconnect()
