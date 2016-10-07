@@ -240,13 +240,13 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             if (response.hasError()) {
                 short code = response.errorCode(topic, partition);
                 fault = ErrorMapping.exceptionFor(code);
-                resetLeader();
+                resetLeader(true);
             } else {
                 return response;
             }
         } catch (Exception e) {
             if (e instanceof IOException) {
-                resetLeader();
+                resetLeader(true);
             }
             fault = e;
         }
@@ -339,9 +339,15 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         return fetchFailedCount;
     }
 
-    private void resetLeader() {
-        KafkaStreamImporterConfig.closeConsumer(m_consumer);
-        m_consumer = null;
+    private void resetLeader(boolean close) {
+        if (close) {
+            if (m_consumer != null) {
+                KafkaStreamImporterConfig.closeConsumer(m_consumer);
+                m_consumer = null;
+            }
+        } else if (m_consumer != null) {
+            return;
+        }
         HostAndPort leaderBroker = findNewLeader();
         if (leaderBroker == null) {
             //point to original leader which will fail and we fall back again here.
@@ -367,11 +373,11 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         @SuppressWarnings("unchecked")
         Formatter<String> formatter = (Formatter<String>) m_config.getFormatterBuilder().create();
         try {
-            //Start with the starting leader.
-            resetLeader();
 
             int sleepCounter = 1;
             while (shouldRun()) {
+                //Start with the starting leader. Dont close consumer here.
+                resetLeader(false);
                 if (m_currentOffset.get() < 0) {
                     getOffsetCoordinator();
                     if (m_offsetManager.get() == null) {
@@ -413,7 +419,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                     rateLimitedLog(Level.WARN, ex, "Failed to fetch from " +  m_topicAndPartition);
                     //See if its network error and find new leader for this partition.
                     if (ex instanceof IOException) {
-                        resetLeader();
+                        resetLeader(true);
                         //find leader in resetLeader would sleep and backoff
                         continue;
                     }
@@ -433,7 +439,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         m_currentOffset.set(-1L);
                         continue;
                     }
-                    resetLeader();
+                    resetLeader(true);
                     continue;
                 }
                 sleepCounter = 1;
