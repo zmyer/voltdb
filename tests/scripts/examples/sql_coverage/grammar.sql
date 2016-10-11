@@ -68,7 +68,8 @@
 {_cmp |= ">"}
 {_cmp |= "<="}
 {_cmp |= ">="}
-{_cmp |= "IS _maybe DISTINCT FROM"}
+-- TODO: should change NOT to _maybe, once this works fully
+{_cmp |= "IS NOT DISTINCT FROM"}
 
 -- A smaller list of comparison operators, used to reduce the
 -- explosion of generated queries that result from 7 _cmp values
