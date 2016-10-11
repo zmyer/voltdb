@@ -197,7 +197,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                     + "(?<where>WHERE\\s+((?!"+SORT_KEYWORDS+").)+)?"
                     + "(?<sort>("+SORT_KEYWORDS+").+)?",
             Pattern.CASE_INSENSITIVE);
-    // Modifies an UPSERT INTO VALUES statement, as described above, such as:
+    // Modifies an UPSERT INTO SELECT statement, as described above, such as:
     //     UPSERT INTO T1 (C1, C2, C3) SELECT (C4, C5, C6) FROM T2
     // which PostgreSQL does not support, and replaces it with an INSERT
     // statement using ON CONFLICT DO UPDATE, such as:
