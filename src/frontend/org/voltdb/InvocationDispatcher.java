@@ -426,9 +426,10 @@ public final class InvocationDispatcher {
                 if (task.getParams().size() == 1) {
                     return takeShutdownSaveSnapshot(task, handler, ccxn, user);
                 }
-            }
-            else if ("@Rebalance".equals(procName)) {
+            } else if ("@Rebalance".equals(procName)) {
                 return dispatchRebalance(task);
+            } else if ("@Replicate".equals(procName)) {
+                return dispatchReplicate(task);
             }
             // Verify that admin mode sysprocs are called from a client on the
             // admin port, otherwise return a failure
@@ -704,6 +705,31 @@ public final class InvocationDispatcher {
          }
          return new ClientResponseImpl(ClientResponse.SUCCESS, tbls, "SUCCESS", task.clientHandle);
      }
+
+    private ClientResponseImpl dispatchReplicate(StoredProcedureInvocation task) {
+        Object params[] = task.getParams().toArray();
+        if (params.length != 2) {
+            return gracefulFailureResponse("@Replicate must provide site id and hostId", task.clientHandle);
+        }
+        if (params[0]  == null || !(params[0] instanceof Integer)) {
+            return gracefulFailureResponse("@Replicate must have one Integer parameter for site id.", task.clientHandle);
+        }
+
+        if (params[1]  == null || !(params[1] instanceof Integer)) {
+            return gracefulFailureResponse("@Replicate must have one Integer parameter for host id.", task.clientHandle);
+        }
+
+        int siteId = (Integer) params[0];
+        int hostId = (Integer) params[1];
+
+        final HostMessenger hostMessenger = VoltDB.instance().getHostMessenger();
+        int ownHostId = hostMessenger.getHostId();
+        if (hostId != ownHostId) {
+            return gracefulFailureResponse(String.format("@Replicate can not run on host %d for target host %d.", ownHostId, hostId), task.clientHandle);
+        }
+
+        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
+    }
 
     private ClientResponseImpl dispatchStopNode(StoredProcedureInvocation task) {
         Object params[] = task.getParams().toArray();
