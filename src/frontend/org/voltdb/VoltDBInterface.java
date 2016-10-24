@@ -300,4 +300,10 @@ public interface VoltDBInterface
 
 
     public <T> ListenableFuture<T> submitSnapshotIOWork(Callable<T> work);
+
+    /**
+     * create a new Site for partition replica on the host
+     * @param partitionId  The id of the partition to be replicated on the host
+     */
+    public void createSiteForReplica(int partitionId);
 }

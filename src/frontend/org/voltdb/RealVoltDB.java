@@ -1330,6 +1330,74 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
+
+    @Override
+    public void createSiteForReplica(int partitionId) {
+
+        //update topology
+        while (true) {
+            try {
+                Stat stat = new Stat();
+                JSONObject topo = new JSONObject(new String(m_messenger.getZK().getData(VoltZK.topology, false, stat),
+                        Charsets.UTF_8));
+
+                if (!ClusterConfig.addPartitionReplica(topo, m_messenger.getHostId(), partitionId)){
+                    return; //topology is not updated.
+                }
+                m_messenger.getZK().setData(VoltZK.topology, topo.toString().getBytes(Constants.UTF8ENCODING),stat.getVersion());
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("Updated topology in ZooKeeper: " + topo.toString(2));
+                }
+                break;
+            } catch (KeeperException e) {
+                if (e.code() == KeeperException.Code.BADVERSION || e.code() == KeeperException.Code.NONODE) {
+                    if (hostLog.isDebugEnabled()) {
+                        hostLog.debug("Recoverable exception thrown while updating topology to ZK", e);
+                    }
+                    continue;
+                }
+                VoltDB.crashLocalVoltDB("Failed to update topo to ZooKeeper", true, e);
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Failed to update topo to ZooKeeper", true, e);
+            }
+        }
+
+        Initiator initiator = new SpInitiator(m_messenger, partitionId, getStatsAgent(),
+                m_snapshotCompletionMonitor, StartAction.REJOIN);
+
+        m_iv2Initiators.put(partitionId, initiator);
+        m_partitionsToSitesAtStartupForExportInit.add(partitionId);
+        m_iv2InitiatorStartingTxnIds.put( partitionId, TxnEgo.makeZero(partitionId).getTxnId());
+
+        //update MpInitiator with new buddy
+        m_MPI.addBuddyHSId(initiator.getInitiatorHSId());
+        final String serializedCatalog = m_catalogContext.catalog.serialize();
+        final CatalogSpecificPlanner csp = new CatalogSpecificPlanner(m_asyncCompilerAgent, m_catalogContext);
+
+        try {
+            initiator.configure(
+                    getBackendTargetType(),
+                    m_catalogContext,
+                    serializedCatalog,
+                    m_catalogContext.getDeployment().getCluster().getKfactor(),
+                    csp,
+                    m_configuredNumberOfPartitions,
+                    StartAction.REJOIN,
+                    getStatsAgent(),
+                    m_memoryStats,
+                    m_commandLog,
+                    m_producerDRGateway,
+                    true,
+                    m_config.m_executionCoreBindings.poll());
+        } catch (Exception e) {
+            Throwable toLog = e;
+            if (e instanceof ExecutionException) {
+                toLog = ((ExecutionException)e).getCause();
+            }
+            VoltDB.crashLocalVoltDB("Error configuring IV2 initiator.", true, toLog);
+        }
+    }
+
     @Override
     public void hostsFailed(Set<Integer> failedHosts)
     {

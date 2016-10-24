@@ -82,6 +82,47 @@ public class ClusterConfig
     }
 
     /**
+     * add a partition replica to a host
+     * @param topo The existing topology, which will have the partition updated in-place.
+     * @param hostId  The id of the host to host the partition replica
+     * @param partitionId  The id of partition to be replicated.
+     * @return true if added.
+     * @throws JSONException
+     */
+    public static boolean addPartitionReplica(JSONObject topo, int hostId, int partitionId) throws JSONException {
+
+        if (topo.has("partitions")) {
+            JSONArray parts = topo.getJSONArray("partitions");
+            for (int p = 0; p < parts.length(); p++) {
+                JSONObject aPartition = parts.getJSONObject(p);
+                if (partitionId == aPartition.getInt("partition_id")) {
+                    JSONArray replicas = aPartition.getJSONArray("replicas");
+                    for (int h = 0; h < replicas.length(); h++) {
+                        if (replicas.getInt(h) == hostId) {
+                            //The host already has the partition
+                            return false;
+                        }
+                    }
+                    replicas.put(hostId);
+                    return true;
+                }
+            }
+        } else {
+            //zero site on the host to start with
+            JSONObject partObj = new JSONObject();
+            partObj.put("partition_id", partitionId);
+            Collection<Integer> hosts = Lists.newArrayList();
+            hosts.add(hostId);
+            partObj.put("replicas", hosts);
+            Collection<JSONObject> parts = Lists.newArrayList();
+            parts.add(partObj);
+            topo.put("partitions", parts);
+            return true;
+        }
+        return false;
+    }
+
+    /**
      * Add a list of hosts to the current topology.
      *
      * This method modifies the topology in place.

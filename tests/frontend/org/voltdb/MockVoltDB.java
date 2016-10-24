@@ -764,4 +764,8 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public void setShuttingdown(boolean shuttingdown) {
     }
+
+    @Override
+    public void createSiteForReplica(int partitionId) {
+    }
 }

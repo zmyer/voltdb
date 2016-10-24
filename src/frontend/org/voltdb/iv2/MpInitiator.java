@@ -215,4 +215,9 @@ public class MpInitiator extends BaseInitiator implements Promotable
     public void enableWritingIv2FaultLog() {
         m_initiatorMailbox.enableWritingIv2FaultLog();
     }
+
+    public void addBuddyHSId( long hsid) {
+        MpScheduler sched = (MpScheduler)m_scheduler;
+        sched.addBuddyHSId(hsid);
+    }
 }

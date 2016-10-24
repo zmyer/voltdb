@@ -116,6 +116,9 @@ public class MpScheduler extends Scheduler
         m_pendingTasks.repair(m_nullTask, m_iv2Masters, m_partitionMasters);
     }
 
+    public void addBuddyHSId( long hsid) {
+        m_buddyHSIds.add(hsid);
+    }
 
     @Override
     public void updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters)
