@@ -20,7 +20,7 @@ from voltcli.hostinfo import Hosts
 @VOLT.Command(
     bundles = VOLT.AdminBundle(),
     options = (
-        VOLT.IntegerOption('-x', '--hsid', 'site_id', 'host site id in the cluster'),
+        VOLT.IntegerOption('-s', '--hsid', 'site_id', 'host site id in the cluster'),
         VOLT.StringOption('-t', '--target', 'target_host', 'target host in the cluster'),
     ),
     description = 'Replicate a partition on the target host.',
@@ -29,7 +29,7 @@ from voltcli.hostinfo import Hosts
 
 def replicate(runner):
 
-    if not runner.opts.site_id:
+    if not runner.opts.site_id and runner.opts.site_id <>0:
         runner.abort('The site id is missing.')
 
     if not runner.opts.target_host:

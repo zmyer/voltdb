@@ -39,6 +39,7 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -1346,46 +1347,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
-    public void createSiteForReplica(int hsid) throws Throwable{
-
-        //update topology
-        CountDownLatch latch = new CountDownLatch(1);
-        CreateReplicaSiteTopologyUpdateTask task = new CreateReplicaSiteTopologyUpdateTask(hsid, latch);
-        m_es.submit(task);
-        latch.await();
-
-        if (task.error != null) {
-            throw task.error;
-        }
-        Initiator initiator = new SpInitiator(m_messenger, hsid, getStatsAgent(),
-                m_snapshotCompletionMonitor, StartAction.REJOIN);
-
-        m_iv2Initiators.put(hsid, initiator);
-        m_partitionsToSitesAtStartupForExportInit.add(hsid);
-        m_iv2InitiatorStartingTxnIds.put( hsid, TxnEgo.makeZero(hsid).getTxnId());
-
-        //update MpInitiator with new buddy
-        m_MPI.addBuddyHSId(initiator.getInitiatorHSId());
-        final String serializedCatalog = m_catalogContext.catalog.serialize();
-        final CatalogSpecificPlanner csp = new CatalogSpecificPlanner(m_asyncCompilerAgent, m_catalogContext);
-
-        initiator.configure(
-                getBackendTargetType(),
-                m_catalogContext,
-                serializedCatalog,
-                m_catalogContext.getDeployment().getCluster().getKfactor(),
-                csp,
-                m_configuredNumberOfPartitions,
-                StartAction.REJOIN,
-                getStatsAgent(),
-                m_memoryStats,
-                m_commandLog,
-                m_producerDRGateway,
-                true,
-                m_config.m_executionCoreBindings.poll());
-    }
-
-    @Override
     public void hostsFailed(Set<Integer> failedHosts)
     {
         final ScheduledExecutorService es = getSES(true);
@@ -1421,53 +1382,134 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    class CreateReplicaSiteTopologyUpdateTask implements Runnable {
+    @Override
+    public void createSiteForReplica(int hsid) throws Throwable{
+        CountDownLatch latch = new CountDownLatch(1);
+        CreateReplicaSiteTask task = new CreateReplicaSiteTask(hsid, latch);
+        m_es.submit(task);
+        latch.await();
+        if (task.error != null) {
+            throw task.error;
+        }
+    }
+
+    class CreateReplicaSiteTask implements Runnable {
 
         final int hsid;
         final CountDownLatch latch;
         Throwable error;
 
-        public CreateReplicaSiteTopologyUpdateTask(int hsid, CountDownLatch latch) {
+        public CreateReplicaSiteTask(int hsid, CountDownLatch latch) {
             this.hsid = hsid;
             this.latch = latch;
         }
 
         @Override
         public void run() {
-            while (true) {
-                try {
-                    Stat stat = new Stat();
-                    byte[] data = m_messenger.getZK().getData(VoltZK.topology, false, stat);
-                    JSONObject topo = new JSONObject(new String(data, Charsets.UTF_8));
-                    if (hostLog.isDebugEnabled()) {
-                        hostLog.debug("Topo before update:" + topo.toString());
-                    }
-
-                    if (!ClusterConfig.addPartitionReplica(topo, m_messenger.getHostId(), hsid)){
-                        throw new IllegalArgumentException(String.format("The host %d alreayd has the site %d", m_messenger.getHostId(), hsid));
-                    }
-
-                    m_messenger.getZK().setData(VoltZK.topology, topo.toString().getBytes(Constants.UTF8ENCODING),stat.getVersion());
-
-                    if (hostLog.isDebugEnabled()) {
-                        hostLog.debug("Topo after update:" + topo.toString());
-                    }
-                    break;
-                } catch (KeeperException e) {
-                    if (e.code() == KeeperException.Code.BADVERSION || e.code() == KeeperException.Code.NONODE) {
-                        if (hostLog.isDebugEnabled()) {
-                            hostLog.debug("Recoverable exception thrown while updating topology to ZK", e);
-                        }
-                        continue;
-                    }
-                    error = e;
-                    break;
-                } catch (Exception e) {
-                    error = e;
-                    break;
-                }
+            try {
+                runCreateReplicaSiteTask(hsid);
+            } catch (Exception e) {
+                error = e;
             }
             latch.countDown();
+        }
+    }
+
+    void runCreateReplicaSiteTask(int hsid) throws Exception {
+
+        int hostid = m_messenger.getHostId();
+        while (true) {
+            try {
+                Stat stat = new Stat();
+                byte[] data = m_messenger.getZK().getData(VoltZK.topology, false, stat);
+                JSONObject topo = new JSONObject(new String(data, Charsets.UTF_8));
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("Topo before update:" + topo.toString());
+                }
+
+                if (!ClusterConfig.addPartitionReplica(topo, hostid, hsid)){
+                    throw new IllegalArgumentException(String.format("The host %d alreayd has the site %d", m_messenger.getHostId(), hsid));
+                }
+
+                m_messenger.getZK().setData(VoltZK.topology, topo.toString().getBytes(Constants.UTF8ENCODING),stat.getVersion());
+
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("Topo after update:" + topo.toString());
+                }
+                break;
+            } catch (KeeperException e) {
+                if (e.code() == KeeperException.Code.BADVERSION || e.code() == KeeperException.Code.NONODE) {
+                    if (hostLog.isDebugEnabled()) {
+                        hostLog.debug("Recoverable exception thrown while updating topology to ZK", e);
+                    }
+                    continue;
+                }
+                throw e;
+            } catch (Exception e) {
+                throw e;
+            }
+        }
+
+        while (true) {
+            try {
+                Stat stat = new Stat();
+                List<String> children = m_messenger.getZK().getChildren(VoltZK.sitesPerHost, false);
+                for (String child : children) {
+                    if (hostid == Integer.parseInt(child)) {
+                        byte[] payload = m_messenger.getZK().getData(ZKUtil.joinZKPath(VoltZK.sitesPerHost, child), false, stat);
+                        int sitesperhost = ByteBuffer.wrap(payload).getInt();
+                        sitesperhost++;
+                        String path = ZKUtil.joinZKPath(VoltZK.sitesPerHost, String.valueOf(hostid));
+                        ByteBuffer b = ByteBuffer.allocate(4);
+                        b.putInt(sitesperhost);
+                        m_messenger.getZK().setData(path, b.array(), stat.getVersion());
+                        return;
+                    }
+                }
+                m_messenger.registerSitesPerHostToZK(1);
+                break;
+            } catch (KeeperException e) {
+                if (e.code() == KeeperException.Code.BADVERSION || e.code() == KeeperException.Code.NONODE) {
+                    if (hostLog.isDebugEnabled()) {
+                        hostLog.debug("Recoverable exception thrown while updating site per host to ZK", e);
+                    }
+                    continue;
+                }
+                throw e;
+            } catch (Exception e) {
+                throw e;
+            }
+        }
+
+        Initiator initiator = new SpInitiator(m_messenger, hsid, getStatsAgent(),
+                m_snapshotCompletionMonitor, StartAction.REJOIN);
+
+        m_iv2Initiators.put(hsid, initiator);
+        m_partitionsToSitesAtStartupForExportInit.add(hsid);
+        m_iv2InitiatorStartingTxnIds.put( hsid, TxnEgo.makeZero(hsid).getTxnId());
+
+        //update MpInitiator with new buddy
+        m_MPI.addBuddyHSId(initiator.getInitiatorHSId());
+        final String serializedCatalog = m_catalogContext.catalog.serialize();
+        final CatalogSpecificPlanner csp = new CatalogSpecificPlanner(m_asyncCompilerAgent, m_catalogContext);
+
+        try {
+            initiator.configure(
+                    getBackendTargetType(),
+                    m_catalogContext,
+                    serializedCatalog,
+                    m_catalogContext.getDeployment().getCluster().getKfactor(),
+                    csp,
+                    m_configuredNumberOfPartitions,
+                    StartAction.REJOIN,
+                    getStatsAgent(),
+                    m_memoryStats,
+                    m_commandLog,
+                    m_producerDRGateway,
+                    false,
+                    m_config.m_executionCoreBindings.poll());
+        } catch (KeeperException | InterruptedException | ExecutionException e) {
+            throw e;
         }
     }
 
