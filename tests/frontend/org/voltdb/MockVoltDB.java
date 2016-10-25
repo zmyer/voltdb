@@ -766,6 +766,6 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void createSiteForReplica(int partitionId) {
+    public void createSiteForReplica(int hsid) {
     }
 }

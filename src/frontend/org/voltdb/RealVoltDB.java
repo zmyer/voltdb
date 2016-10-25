@@ -56,6 +56,7 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -1344,72 +1345,44 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-
     @Override
-    public void createSiteForReplica(int partitionId) {
+    public void createSiteForReplica(int hsid) throws Throwable{
 
         //update topology
-        while (true) {
-            try {
-                Stat stat = new Stat();
-                JSONObject topo = new JSONObject(new String(m_messenger.getZK().getData(VoltZK.topology, false, stat),
-                        Charsets.UTF_8));
+        CountDownLatch latch = new CountDownLatch(1);
+        CreateReplicaSiteTopologyUpdateTask task = new CreateReplicaSiteTopologyUpdateTask(hsid, latch);
+        m_es.submit(task);
+        latch.await();
 
-                if (!ClusterConfig.addPartitionReplica(topo, m_messenger.getHostId(), partitionId)){
-                    return; //topology is not updated.
-                }
-                m_messenger.getZK().setData(VoltZK.topology, topo.toString().getBytes(Constants.UTF8ENCODING),stat.getVersion());
-                if (hostLog.isDebugEnabled()) {
-                    hostLog.debug("Updated topology in ZooKeeper: " + topo.toString(2));
-                }
-                break;
-            } catch (KeeperException e) {
-                if (e.code() == KeeperException.Code.BADVERSION || e.code() == KeeperException.Code.NONODE) {
-                    if (hostLog.isDebugEnabled()) {
-                        hostLog.debug("Recoverable exception thrown while updating topology to ZK", e);
-                    }
-                    continue;
-                }
-                VoltDB.crashLocalVoltDB("Failed to update topo to ZooKeeper", true, e);
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Failed to update topo to ZooKeeper", true, e);
-            }
+        if (task.error != null) {
+            throw task.error;
         }
-
-        Initiator initiator = new SpInitiator(m_messenger, partitionId, getStatsAgent(),
+        Initiator initiator = new SpInitiator(m_messenger, hsid, getStatsAgent(),
                 m_snapshotCompletionMonitor, StartAction.REJOIN);
 
-        m_iv2Initiators.put(partitionId, initiator);
-        m_partitionsToSitesAtStartupForExportInit.add(partitionId);
-        m_iv2InitiatorStartingTxnIds.put( partitionId, TxnEgo.makeZero(partitionId).getTxnId());
+        m_iv2Initiators.put(hsid, initiator);
+        m_partitionsToSitesAtStartupForExportInit.add(hsid);
+        m_iv2InitiatorStartingTxnIds.put( hsid, TxnEgo.makeZero(hsid).getTxnId());
 
         //update MpInitiator with new buddy
         m_MPI.addBuddyHSId(initiator.getInitiatorHSId());
         final String serializedCatalog = m_catalogContext.catalog.serialize();
         final CatalogSpecificPlanner csp = new CatalogSpecificPlanner(m_asyncCompilerAgent, m_catalogContext);
 
-        try {
-            initiator.configure(
-                    getBackendTargetType(),
-                    m_catalogContext,
-                    serializedCatalog,
-                    m_catalogContext.getDeployment().getCluster().getKfactor(),
-                    csp,
-                    m_configuredNumberOfPartitions,
-                    StartAction.REJOIN,
-                    getStatsAgent(),
-                    m_memoryStats,
-                    m_commandLog,
-                    m_producerDRGateway,
-                    true,
-                    m_config.m_executionCoreBindings.poll());
-        } catch (Exception e) {
-            Throwable toLog = e;
-            if (e instanceof ExecutionException) {
-                toLog = ((ExecutionException)e).getCause();
-            }
-            VoltDB.crashLocalVoltDB("Error configuring IV2 initiator.", true, toLog);
-        }
+        initiator.configure(
+                getBackendTargetType(),
+                m_catalogContext,
+                serializedCatalog,
+                m_catalogContext.getDeployment().getCluster().getKfactor(),
+                csp,
+                m_configuredNumberOfPartitions,
+                StartAction.REJOIN,
+                getStatsAgent(),
+                m_memoryStats,
+                m_commandLog,
+                m_producerDRGateway,
+                true,
+                m_config.m_executionCoreBindings.poll());
     }
 
     @Override
@@ -1445,6 +1418,56 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     }
                 }
             });
+        }
+    }
+
+    class CreateReplicaSiteTopologyUpdateTask implements Runnable {
+
+        final int hsid;
+        final CountDownLatch latch;
+        Throwable error;
+
+        public CreateReplicaSiteTopologyUpdateTask(int hsid, CountDownLatch latch) {
+            this.hsid = hsid;
+            this.latch = latch;
+        }
+
+        @Override
+        public void run() {
+            while (true) {
+                try {
+                    Stat stat = new Stat();
+                    byte[] data = m_messenger.getZK().getData(VoltZK.topology, false, stat);
+                    JSONObject topo = new JSONObject(new String(data, Charsets.UTF_8));
+                    if (hostLog.isDebugEnabled()) {
+                        hostLog.debug("Topo before update:" + topo.toString());
+                    }
+
+                    if (!ClusterConfig.addPartitionReplica(topo, m_messenger.getHostId(), hsid)){
+                        throw new IllegalArgumentException(String.format("The host %d alreayd has the site %d", m_messenger.getHostId(), hsid));
+                    }
+
+                    m_messenger.getZK().setData(VoltZK.topology, topo.toString().getBytes(Constants.UTF8ENCODING),stat.getVersion());
+
+                    if (hostLog.isDebugEnabled()) {
+                        hostLog.debug("Topo after update:" + topo.toString());
+                    }
+                    break;
+                } catch (KeeperException e) {
+                    if (e.code() == KeeperException.Code.BADVERSION || e.code() == KeeperException.Code.NONODE) {
+                        if (hostLog.isDebugEnabled()) {
+                            hostLog.debug("Recoverable exception thrown while updating topology to ZK", e);
+                        }
+                        continue;
+                    }
+                    error = e;
+                    break;
+                } catch (Exception e) {
+                    error = e;
+                    break;
+                }
+            }
+            latch.countDown();
         }
     }
 

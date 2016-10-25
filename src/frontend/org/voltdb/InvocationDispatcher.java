@@ -728,7 +728,12 @@ public final class InvocationDispatcher {
             return gracefulFailureResponse(String.format("@Replicate can not run on host %d for target host %d.", ownHostId, hostId), task.clientHandle);
         }
 
-        VoltDB.instance().createSiteForReplica(siteId);
+        try {
+            VoltDB.instance().createSiteForReplica(siteId);
+        } catch (Throwable e) {
+            hostLog.error("@Replicare failed with error:" + e.getMessage(), e);
+            return gracefulFailureResponse("@Replicare failed with error:" + e.getMessage(), task.clientHandle);
+        }
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
     }
 
