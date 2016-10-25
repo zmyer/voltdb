@@ -91,6 +91,7 @@ public class ClusterConfig
      */
     public static boolean addPartitionReplica(JSONObject topo, int hostId, int partitionId) throws JSONException {
 
+        //update partitions
         if (topo.has("partitions")) {
             JSONArray parts = topo.getJSONArray("partitions");
             for (int p = 0; p < parts.length(); p++) {
@@ -104,7 +105,6 @@ public class ClusterConfig
                         }
                     }
                     replicas.put(hostId);
-                    return true;
                 }
             }
         } else {
@@ -117,9 +117,26 @@ public class ClusterConfig
             Collection<JSONObject> parts = Lists.newArrayList();
             parts.add(partObj);
             topo.put("partitions", parts);
-            return true;
         }
-        return false;
+
+        //update site per host
+        if (topo.has("host_id_to_sph")) {
+            JSONArray sphs = topo.getJSONArray("host_id_to_sph");
+            for(int s = 0; s < sphs.length(); s++) {
+                JSONObject sph = sphs.getJSONObject(s);
+                int host = sph.getInt("host_id");
+                if (host == hostId) {
+                    sph.increment("sites_per_host");
+                }
+            }
+        } else {
+            JSONObject sph = new JSONObject();
+            sph.put("host_id", hostId);
+            sph.increment("sites_per_host");
+            Collection<JSONObject> sphs = Lists.newArrayList();
+            topo.put("host_id_to_sph", sphs);
+        }
+        return true;
     }
 
     /**
