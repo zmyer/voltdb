@@ -39,11 +39,9 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
-import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -947,33 +945,30 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_configuredNumberOfPartitions = clusterConfig.getPartitionCount();
                     partitions = ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
                 }
-                for (int ii = 0; ii < partitions.size(); ii++) {
-                    Integer partition = partitions.get(ii);
+                m_iv2Initiators= new TreeMap<>();
+                for (Integer partition : partitions) {
                     m_iv2InitiatorStartingTxnIds.put( partition, TxnEgo.makeZero(partition).getTxnId());
+                    m_iv2Initiators.put(partition, createIv2Initiator(partition, m_config.m_startAction));
                 }
-                m_iv2Initiators = createIv2Initiators(
-                        partitions,
-                        m_config.m_startAction,
-                        m_partitionsToSitesAtStartupForExportInit);
                 m_iv2InitiatorStartingTxnIds.put(
                         MpInitiator.MP_INIT_PID,
                         TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId());
                 // Pass the local HSIds to the MPI so it can farm out buddy sites
                 // to the RO MP site pool
                 List<Long> localHSIds = new ArrayList<>();
+
+                // Make a list of HDIds to join
+                Map<Integer, Long> partsToHSIdsToRejoin = new HashMap<>();
+
                 for (Initiator ii : m_iv2Initiators.values()) {
                     localHSIds.add(ii.getInitiatorHSId());
+                    if (ii.isRejoinable()) {
+                        partsToHSIdsToRejoin.put(ii.getPartitionId(), ii.getInitiatorHSId());
+                    }
                 }
                 m_MPI = new MpInitiator(m_messenger, localHSIds, getStatsAgent());
                 m_iv2Initiators.put(MpInitiator.MP_INIT_PID, m_MPI);
 
-                // Make a list of HDIds to join
-                Map<Integer, Long> partsToHSIdsToRejoin = new HashMap<>();
-                for (Initiator init : m_iv2Initiators.values()) {
-                    if (init.isRejoinable()) {
-                        partsToHSIdsToRejoin.put(init.getPartitionId(), init.getInitiatorHSId());
-                    }
-                }
                 OnDemandBinaryLogger.path = VoltDB.instance().getVoltDBRootPath();
                 if (isRejoin) {
                     SnapshotSaveAPI.recoveringSiteCount.set(partsToHSIdsToRejoin.size());
@@ -1371,9 +1366,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
-    public void createSiteForReplica(int hsid) throws Throwable{
+    public void createSite(int partitionId) throws Throwable{
         CountDownLatch latch = new CountDownLatch(1);
-        CreateReplicaSiteTask task = new CreateReplicaSiteTask(hsid, latch);
+        CreateSiteTask task = new CreateSiteTask(partitionId, latch);
         m_es.submit(task);
         latch.await();
         if (task.error != null) {
@@ -1381,21 +1376,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    class CreateReplicaSiteTask implements Runnable {
+    class CreateSiteTask implements Runnable {
 
-        final int hsid;
+        final int partitionId;
         final CountDownLatch latch;
         Throwable error;
 
-        public CreateReplicaSiteTask(int hsid, CountDownLatch latch) {
-            this.hsid = hsid;
+        public CreateSiteTask(int partitionId, CountDownLatch latch) {
+            this.partitionId= partitionId;
             this.latch = latch;
         }
 
         @Override
         public void run() {
             try {
-                runCreateReplicaSiteTask(hsid);
+                runCreateSiteTask(partitionId);
             } catch (Exception e) {
                 error = e;
             }
@@ -1403,48 +1398,27 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    void runCreateReplicaSiteTask(int hsid) throws Exception {
-
-        int hostid = m_messenger.getHostId();
-        while (true) {
-            try {
-                Stat stat = new Stat();
-                byte[] data = m_messenger.getZK().getData(VoltZK.topology, false, stat);
-                JSONObject topo = new JSONObject(new String(data, Charsets.UTF_8));
-                if (hostLog.isDebugEnabled()) {
-                    hostLog.debug("Topo before update:" + topo.toString());
-                }
-
-                if (!ClusterConfig.addPartitionReplica(topo, hostid, hsid)){
-                    throw new IllegalArgumentException(String.format("The host %d alreayd has the site %d", m_messenger.getHostId(), hsid));
-                }
-
-                m_messenger.getZK().setData(VoltZK.topology, topo.toString().getBytes(Constants.UTF8ENCODING),stat.getVersion());
-
-                if (hostLog.isDebugEnabled()) {
-                    hostLog.debug("Topo after update:" + topo.toString());
-                }
-                break;
-            } catch (KeeperException e) {
-                if (e.code() == KeeperException.Code.BADVERSION || e.code() == KeeperException.Code.NONODE) {
-                    if (hostLog.isDebugEnabled()) {
-                        hostLog.debug("Recoverable exception thrown while updating topology to ZK", e);
-                    }
-                    continue;
-                }
-                throw e;
-            } catch (Exception e) {
-                throw e;
+    void runCreateSiteTask(int partitionId) throws Exception {
+        try {
+            Stat stat = new Stat();
+            JSONObject topo = new JSONObject(new String(m_messenger.getZK().getData(VoltZK.topology, false, stat), Charsets.UTF_8));
+            if (!ClusterConfig.addPartitionReplica(topo, m_messenger.getHostId(), partitionId)){
+                throw new IllegalArgumentException(String.format("The host %d alreayd has the partition %d or there is no such a partition in the cluster.", m_messenger.getHostId(), partitionId));
             }
+            m_messenger.getZK().setData(VoltZK.topology, topo.toString().getBytes(Constants.UTF8ENCODING),stat.getVersion());
+        } catch (KeeperException e) {
+            throw e;
+        } catch (Exception e) {
+            throw e;
         }
 
+        //update sites per host
         m_messenger.incrementSitesPerHost();
-        Initiator initiator = new SpInitiator(m_messenger, hsid, getStatsAgent(),
-                m_snapshotCompletionMonitor, StartAction.REJOIN);
 
-        m_iv2Initiators.put(hsid, initiator);
-        m_partitionsToSitesAtStartupForExportInit.add(hsid);
-        m_iv2InitiatorStartingTxnIds.put( hsid, TxnEgo.makeZero(hsid).getTxnId());
+        //initiate the site
+        Initiator initiator = createIv2Initiator(partitionId, StartAction.REJOIN);
+        m_iv2Initiators.put(partitionId, initiator);
+        m_iv2InitiatorStartingTxnIds.put( partitionId, TxnEgo.makeZero(partitionId).getTxnId());
 
         //update MpInitiator with new buddy
         m_MPI.addBuddyHSId(initiator.getInitiatorHSId());
@@ -1718,19 +1692,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return topo;
     }
 
-    private TreeMap<Integer, Initiator> createIv2Initiators(Collection<Integer> partitions,
-                                                StartAction startAction,
-                                                List<Integer> m_partitionsToSitesAtStartupForExportInit)
-    {
-        TreeMap<Integer, Initiator> initiators = new TreeMap<>();
-        for (Integer partition : partitions)
-        {
-            Initiator initiator = new SpInitiator(m_messenger, partition, getStatsAgent(),
-                    m_snapshotCompletionMonitor, startAction);
-            initiators.put(partition, initiator);
-            m_partitionsToSitesAtStartupForExportInit.add(partition);
-        }
-        return initiators;
+    private Initiator createIv2Initiator(int partitionId,StartAction startAction) {
+        Initiator initiator = new SpInitiator(m_messenger, partitionId, getStatsAgent(),
+                m_snapshotCompletionMonitor, startAction);
+        m_partitionsToSitesAtStartupForExportInit.add(partitionId);
+        return initiator;
     }
 
     private JSONObject registerClusterConfig(ClusterConfig config, Map<Integer, String> hostGroups)

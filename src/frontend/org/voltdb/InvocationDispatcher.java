@@ -748,27 +748,24 @@ public final class InvocationDispatcher {
     private ClientResponseImpl dispatchReplicate(StoredProcedureInvocation task) {
         Object params[] = task.getParams().toArray();
         if (params.length != 2) {
-            return gracefulFailureResponse("@Replicate must provide site id and hostId", task.clientHandle);
+            return gracefulFailureResponse("@Replicate must provide partition id and target hostId", task.clientHandle);
         }
-        if (params[0]  == null || !(params[0] instanceof Integer)) {
-            return gracefulFailureResponse("@Replicate must have one Integer parameter for site id.", task.clientHandle);
-        }
-
-        if (params[1]  == null || !(params[1] instanceof Integer)) {
-            return gracefulFailureResponse("@Replicate must have one Integer parameter for host id.", task.clientHandle);
+        //partition id
+        if (params[0] == null || !(params[0] instanceof Integer)) {
+            return gracefulFailureResponse("@Replicate must have one Integer parameter for partition id.", task.clientHandle);
         }
 
-        int siteId = (Integer) params[0];
-        int hostId = (Integer) params[1];
-
-        final HostMessenger hostMessenger = VoltDB.instance().getHostMessenger();
-        int ownHostId = hostMessenger.getHostId();
-        if (hostId != ownHostId) {
-            return gracefulFailureResponse(String.format("@Replicate can not run on host %d for target host %d.", ownHostId, hostId), task.clientHandle);
+        //target host id
+        if (params[1] == null || !(params[1] instanceof Integer)) {
+            return gracefulFailureResponse("@Replicate must have one Integer parameter for target host id.", task.clientHandle);
         }
-
+        int targetHostId = (Integer) params[1];
+        int thisHostId = VoltDB.instance().getHostMessenger().getHostId();
+        if (targetHostId != thisHostId) {
+            return gracefulFailureResponse(String.format("@Replicate can not be executed on host %d for target host %d.", thisHostId, targetHostId), task.clientHandle);
+        }
         try {
-            VoltDB.instance().createSiteForReplica(siteId);
+            VoltDB.instance().createSite((Integer) params[0]);
         } catch (Throwable e) {
             hostLog.error("@Replicare failed with error:" + e.getMessage(), e);
             return gracefulFailureResponse("@Replicare failed with error:" + e.getMessage(), task.clientHandle);

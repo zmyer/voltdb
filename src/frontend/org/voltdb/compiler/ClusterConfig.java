@@ -92,6 +92,7 @@ public class ClusterConfig
     public static boolean addPartitionReplica(JSONObject topo, int hostId, int partitionId) throws JSONException {
 
         //update partitions
+        boolean partitionFound = false;
         if (topo.has("partitions")) {
             JSONArray parts = topo.getJSONArray("partitions");
             for (int p = 0; p < parts.length(); p++) {
@@ -105,6 +106,7 @@ public class ClusterConfig
                         }
                     }
                     replicas.put(hostId);
+                    partitionFound = true;
                 }
             }
         } else {
@@ -117,6 +119,11 @@ public class ClusterConfig
             Collection<JSONObject> parts = Lists.newArrayList();
             parts.add(partObj);
             topo.put("partitions", parts);
+        }
+
+        //there is no such partition in the topo
+        if (!partitionFound) {
+            return false;
         }
 
         //update site per host
