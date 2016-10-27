@@ -1438,37 +1438,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         }
 
-        while (true) {
-            try {
-                Stat stat = new Stat();
-                List<String> children = m_messenger.getZK().getChildren(VoltZK.sitesPerHost, false);
-                for (String child : children) {
-                    if (hostid == Integer.parseInt(child)) {
-                        byte[] payload = m_messenger.getZK().getData(ZKUtil.joinZKPath(VoltZK.sitesPerHost, child), false, stat);
-                        int sitesperhost = ByteBuffer.wrap(payload).getInt();
-                        sitesperhost++;
-                        String path = ZKUtil.joinZKPath(VoltZK.sitesPerHost, String.valueOf(hostid));
-                        ByteBuffer b = ByteBuffer.allocate(4);
-                        b.putInt(sitesperhost);
-                        m_messenger.getZK().setData(path, b.array(), stat.getVersion());
-                        return;
-                    }
-                }
-                m_messenger.registerSitesPerHostToZK(1);
-                break;
-            } catch (KeeperException e) {
-                if (e.code() == KeeperException.Code.BADVERSION || e.code() == KeeperException.Code.NONODE) {
-                    if (hostLog.isDebugEnabled()) {
-                        hostLog.debug("Recoverable exception thrown while updating site per host to ZK", e);
-                    }
-                    continue;
-                }
-                throw e;
-            } catch (Exception e) {
-                throw e;
-            }
-        }
-
+        m_messenger.incrementSitesPerHost();
         Initiator initiator = new SpInitiator(m_messenger, hsid, getStatsAgent(),
                 m_snapshotCompletionMonitor, StartAction.REJOIN);
 

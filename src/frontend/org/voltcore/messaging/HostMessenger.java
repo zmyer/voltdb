@@ -1090,6 +1090,26 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         return sphMap;
     }
 
+    public void incrementSitesPerHost() {
+        try {
+            String ip = m_config.coordinatorIp.toString();
+            List<String> children = m_zk.getChildren(CoreZK.hosts, false);
+            for (String child : children) {
+                Stat stat = new Stat();
+                String path = ZKUtil.joinZKPath(CoreZK.hosts, child);
+                byte[] payload = m_zk.getData( path, false, stat);
+                final HostInfo info = HostInfo.fromBytes(payload);
+                if (ip.equals(info.m_hostIp)) {
+                    HostInfo hostInfo = new HostInfo(info.m_hostIp, info.m_group, (info.m_localSitesCount + 1));
+                    m_zk.setData(path, hostInfo.toBytes(), stat.getVersion());
+                    break;
+                }
+            }
+        } catch (Exception e) {
+            VoltDB.crashGlobalVoltDB("Unable to update sitesperhost from Zookeeper", false, e);
+        }
+    }
+
     public boolean isPaused() {
         return m_paused.get();
     }
