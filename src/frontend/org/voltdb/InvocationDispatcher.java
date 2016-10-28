@@ -544,7 +544,7 @@ public final class InvocationDispatcher {
 
         if (voltdb.getMode() == OperationMode.SHUTTINGDOWN) {
             return serverUnavailableResponse(
-                    "Server is shutding down.",
+                    "Server is shutting down.",
                     task.clientHandle);
         }
 
