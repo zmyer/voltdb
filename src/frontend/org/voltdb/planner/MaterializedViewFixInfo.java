@@ -140,7 +140,6 @@ public class MaterializedViewFixInfo {
         Set<String> mvDDLGroupbyColumnNames = new HashSet<>();
         List<Column> mvColumnArray =
                 CatalogUtil.getSortedCatalogItems(table.getColumns(), "index");
-
         String mvTableAlias = getMVTableAlias();
 
         // Get the number of group-by columns.
@@ -192,11 +191,10 @@ public class MaterializedViewFixInfo {
         // Start to do real materialized view processing to fix the duplicates problem.
         // (1) construct new projection columns for scan plan node.
         Set<SchemaColumn> mvDDLGroupbyColumns = new HashSet<>();
-        NodeSchema inlineProjSchema = new NodeSchema();
+        NodeSchema inlineProjSchema = new NodeSchema(scanColumns.size() + numOfGroupByColumns);
         for (SchemaColumn scol: scanColumns) {
             inlineProjSchema.addColumn(scol);
         }
-
 
         for (int i = 0; i < numOfGroupByColumns; i++) {
             Column mvCol = mvColumnArray.get(i);
@@ -241,7 +239,7 @@ public class MaterializedViewFixInfo {
         m_reAggNode = new HashAggregatePlanNode();
         int outputColumnIndex = 0;
         // inlineProjSchema contains the group by columns, while aggSchema may do not.
-        NodeSchema aggSchema = new NodeSchema();
+        NodeSchema aggSchema = new NodeSchema(scanColumns.size());
 
         // Construct reAggregation node's aggregation and group by list.
         for (SchemaColumn scol: inlineProjSchema.getColumns()) {

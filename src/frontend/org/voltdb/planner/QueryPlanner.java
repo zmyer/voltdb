@@ -471,7 +471,7 @@ public class QueryPlanner {
         SendPlanNode sendNode = (SendPlanNode) childNode;
 
         // disconnect the send and receive nodes
-        sendNode.clearParents();
+        sendNode.clearParent();
         recvNode.clearChildren();
 
         plan.subPlanGraph = sendNode;

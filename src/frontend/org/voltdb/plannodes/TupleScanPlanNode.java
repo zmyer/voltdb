@@ -68,7 +68,7 @@ public class TupleScanPlanNode extends AbstractScanPlanNode {
     @Override
     public void generateOutputSchema(Database db) {
         if (m_tableSchema == null) {
-            m_tableSchema = new NodeSchema();
+            m_tableSchema = new NodeSchema(m_columnList.size());
             int columnIdx = 1;
             for (AbstractExpression colExpr : m_columnList) {
                 assert(colExpr instanceof ParameterValueExpression);

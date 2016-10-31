@@ -115,7 +115,7 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
         // LIMIT can be already inline with ORDER BY node
         AbstractPlanNode limitNode = orderbyNode.getInlinePlanNode(PlanNodeType.LIMIT);
         AbstractPlanNode aggregateNode = null;
-        AbstractPlanNode inlineCandidate = receive.getParent(0);
+        AbstractPlanNode inlineCandidate = receive.getParent();
         while (orderbyNode != inlineCandidate) {
             if (inlineCandidate instanceof AbstractScanPlanNode) {
                 // it's a subquery
@@ -137,8 +137,8 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
                 return orderbyNode;
             }
             // move up one node
-            assert(inlineCandidate.getParentCount() == 1);
-            inlineCandidate = inlineCandidate.getParent(0);
+            inlineCandidate = inlineCandidate.getParent();
+            assert(inlineCandidate != null);
         }
 
         assert(receive.getChildCount() == 1);
@@ -151,15 +151,15 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
         // At this point we confirmed that the optimization is applicable.
         // Short circuit the current ORDER BY parent (if such exists) and
         // the new MERGERECIEVE node.. All in-between nodes will be inlined
-        assert (orderbyNode.getParentCount() <= 1);
-        AbstractPlanNode rootNode = (orderbyNode.getParentCount() == 1) ? orderbyNode.getParent(0) : null;
         MergeReceivePlanNode mergeReceive = new MergeReceivePlanNode();
         assert(receive.getChildCount() == 1);
         mergeReceive.addAndLinkChild(receive.getChild(0));
         receive.removeFromGraph();
+        AbstractPlanNode rootNode = orderbyNode.getParent();
         if (rootNode == null) {
             rootNode = mergeReceive;
-        } else {
+        }
+        else {
             rootNode.clearChildren();
             rootNode.addAndLinkChild(mergeReceive);
         }

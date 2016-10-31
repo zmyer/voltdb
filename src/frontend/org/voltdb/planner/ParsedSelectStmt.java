@@ -522,7 +522,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
 
         // Replace TVE for display columns
-        m_projectSchema = new NodeSchema();
+        m_projectSchema = new NodeSchema(m_displayColumns.size());
         for (ParsedColInfo col : m_displayColumns) {
             AbstractExpression expr = col.expression;
             if (hasComplexAgg()) {
@@ -1187,7 +1187,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         // DISTINCT with GROUP BY
         m_distinctGroupByColumns = new ArrayList<>();
-        m_distinctProjectSchema = new NodeSchema();
+        m_distinctProjectSchema = new NodeSchema(m_displayColumns.size());
 
         // Iterate the Display columns
         for (ParsedColInfo col : m_displayColumns) {

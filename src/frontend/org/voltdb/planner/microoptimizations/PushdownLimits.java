@@ -47,7 +47,7 @@ public class PushdownLimits extends MicroOptimization {
         for (AbstractPlanNode child : children) {
             // TODO this will break when children feed multiple parents
             child = recursivelyApply(child);
-            child.clearParents();
+            child.clearParent();
             plan.addAndLinkChild(child);
         }
 
@@ -72,7 +72,7 @@ public class PushdownLimits extends MicroOptimization {
             }
 
             plan.clearChildren();
-            child.clearParents();
+            child.clearParent();
             child.addInlinePlanNode(plan);
             return child;
         }
@@ -84,11 +84,11 @@ public class PushdownLimits extends MicroOptimization {
         if (child instanceof ProjectionPlanNode) {
             assert (child.getChildCount() == 1);
             AbstractPlanNode leaf = child.getChild(0);
-            leaf.clearParents();
+            leaf.clearParent();
             plan.clearChildren();
             plan.addAndLinkChild(leaf);
             child.clearChildren();
-            child.clearParents();
+            child.clearParent();
             child.addAndLinkChild(plan);
             return recursivelyApply(child);
         }
@@ -96,7 +96,7 @@ public class PushdownLimits extends MicroOptimization {
         // push into JOINs
         if (child instanceof AbstractJoinPlanNode) {
             plan.clearChildren();
-            child.clearParents();
+            child.clearParent();
             child.addInlinePlanNode(plan);
             // TODO: ENG-5399 for LEFT OUTER join with no post-filter, can also push a modified
             // preliminary pushdown-style limit+offset limit node to the left child.

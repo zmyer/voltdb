@@ -93,7 +93,7 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
         }
         // Our output schema isn't ever going to change, only generate this once
         if (m_outputSchema == null) {
-            m_outputSchema = new NodeSchema();
+            m_outputSchema = new NodeSchema(1);
             // If there is a child node, its output schema will depend on that.
             // If not, mark this flag true to get initialized in EE.
             m_hasSignificantOutputSchema = (m_children.size() == 0);

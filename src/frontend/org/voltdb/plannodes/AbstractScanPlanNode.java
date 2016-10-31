@@ -56,7 +56,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     protected NodeSchema m_tableSchema = null;
     private NodeSchema m_preAggOutputSchema;
     // Store the columns we use from this table as an internal schema
-    protected NodeSchema m_tableScanSchema = new NodeSchema();
+    protected NodeSchema m_tableScanSchema;
     protected Map<Integer, Integer> m_differentiatorMap = new HashMap<>();
     protected AbstractExpression m_predicate;
 
@@ -113,13 +113,13 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             m_predicate.validate();
         }
         // All the schema columns better reference this table
-        for (SchemaColumn col : m_tableScanSchema.getColumns())
-        {
-            if (!m_targetTableName.equals(col.getTableName()))
-            {
-                throw new Exception("ERROR: The scan column: " + col.getColumnName() +
-                                    " in table: " + m_targetTableName + " refers to " +
-                                    " table: " + col.getTableName());
+        if (m_tableScanSchema != null) {
+            for (SchemaColumn col : m_tableScanSchema.getColumns()) {
+                if (!m_targetTableName.equals(col.getTableName())) {
+                    throw new Exception("ERROR: The scan column: " + col.getColumnName() +
+                            " in table: " + m_targetTableName + " refers to " +
+                            " table: " + col.getTableName());
+                }
             }
         }
     }
@@ -192,6 +192,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
     protected void setScanColumns(List<SchemaColumn> scanColumns) {
         assert(scanColumns != null);
+        m_tableScanSchema = new NodeSchema(scanColumns.size());
         int i = 0;
         for (SchemaColumn col : scanColumns) {
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
@@ -310,7 +311,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             // It's just a cheap knock-off of the projection's
             m_hasSignificantOutputSchema = false;
         }
-        else if (m_tableScanSchema.size() != 0) {
+        else if (m_tableScanSchema != null && m_tableScanSchema.size() != 0) {
             // Order the scan columns according to the table schema
             // before we stick them in the projection output
             int difftor = 0;
@@ -357,13 +358,13 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             m_tableSchema = m_tableSchema.replaceTableClone(getTargetTableAlias());
         }
         else {
-            m_tableSchema = new NodeSchema();
             CatalogMap<Column> cols =
                     db.getTables().getExact(m_targetTableName).getColumns();
             // you don't strictly need to sort this,
             // but it makes diff-ing easier
             List<Column> sortedCols =
                     CatalogUtil.getSortedCatalogItems(cols, "index");
+            m_tableSchema = new NodeSchema(sortedCols.size());
             for (Column col : sortedCols) {
                 // must produce a tuple value expression for this column.
                 TupleValueExpression tve = new TupleValueExpression(

@@ -129,7 +129,7 @@ public class TestScanPlanNode extends TestCase
         // be the tuple address, the second one a parameter expression, next
         // will be a constant, and the other will be a more complex expression
         // that uses some TVEs.
-        NodeSchema proj_schema = new NodeSchema();
+        NodeSchema proj_schema = new NodeSchema(4);
         String[] cols = new String[4];
 
         TupleAddressExpression col1_exp = new TupleAddressExpression();
@@ -157,18 +157,16 @@ public class TestScanPlanNode extends TestCase
         cols[2] = COLS[3];
 
         // update column 4 with a sum of columns 0 and 2
-        OperatorExpression col4_exp = new OperatorExpression();
-        col4_exp.setValueType(COLTYPES[4]);
-        col4_exp.setValueSize(COLTYPES[4].getLengthInBytesForFixedTypes());
-        col4_exp.setExpressionType(ExpressionType.OPERATOR_PLUS);
         TupleValueExpression left = new TupleValueExpression(TABLE1, TABLE1, COLS[0], COLS[0], 0);
         left.setValueType(COLTYPES[0]);
         left.setValueSize(COLTYPES[0].getLengthInBytesForFixedTypes());
         TupleValueExpression right = new TupleValueExpression(TABLE1, TABLE1, COLS[2], COLS[2], 0);
         right.setValueType(COLTYPES[2]);
         right.setValueSize(COLTYPES[2].getLengthInBytesForFixedTypes());
-        col4_exp.setLeft(left);
-        col4_exp.setRight(right);
+        OperatorExpression col4_exp = new OperatorExpression(
+                ExpressionType.OPERATOR_PLUS, left, right);
+        col4_exp.setValueType(COLTYPES[4]);
+        col4_exp.setValueSize(COLTYPES[4].getLengthInBytesForFixedTypes());
         proj_schema.addColumn(TABLE1, TABLE1, COLS[4], "C1", col4_exp);
         cols[3] = COLS[4];
 
@@ -180,15 +178,12 @@ public class TestScanPlanNode extends TestCase
         dut.generateOutputSchema(m_voltdb.getDatabase());
         NodeSchema dut_schema = dut.getOutputSchema();
         System.out.println(dut_schema.toString());
-        for (int i = 0; i < cols.length; i++)
-        {
+        for (int i = 0; i < cols.length; i++) {
             SchemaColumn col = null;
-            if (i == 0)
-            {
+            if (i == 0) {
                 col = dut_schema.find("", "", cols[i], cols[i]);
             }
-            else
-            {
+            else {
                 col = dut_schema.find(TABLE1, TABLE1, cols[i], cols[i]);
             }
             assertNotNull(col);

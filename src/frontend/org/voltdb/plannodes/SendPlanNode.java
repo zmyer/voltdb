@@ -87,12 +87,11 @@ public class SendPlanNode extends AbstractPlanNode {
 
     @Override
     protected String explainPlanForNode(String indent) {
-        if (m_parents.size() == 0)
+        if (getParent() == null) {
             return "RETURN RESULTS TO STORED PROCEDURE";
-        else
-            return "SEND PARTITION RESULTS TO COORDINATOR";
+        }
 
-
+        return "SEND PARTITION RESULTS TO COORDINATOR";
     }
 
     @Override

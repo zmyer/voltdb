@@ -96,12 +96,9 @@ public class InlineAggregation extends MicroOptimization {
         }
 
         // Inline aggregate node
-        AbstractPlanNode parent = null;
-        if (aggplan.getParentCount() == 1) {
-            parent = aggplan.getParent(0);
-        }
+        AbstractPlanNode parent = aggplan.getParent();
         child.addInlinePlanNode(aggplan);
-        child.clearParents();
+        child.clearParent();
         if (parent != null) {
             parent.replaceChild(aggplan, child);
         }

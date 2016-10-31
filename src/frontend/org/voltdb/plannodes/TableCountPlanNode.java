@@ -45,7 +45,7 @@ public class TableCountPlanNode extends AbstractScanPlanNode {
         if (m_isSubQuery) {
             assert(child.getChildCount() == 1);
             AbstractPlanNode subChild = child.getChild(0);
-            subChild.clearParents();
+            subChild.clearParent();
             addAndLinkChild(subChild);
         }
     }

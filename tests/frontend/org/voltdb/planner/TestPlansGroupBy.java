@@ -1458,8 +1458,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         // Find re-aggregation node.
         assertTrue(p instanceof ReceivePlanNode);
-        assertTrue(p.getParent(0) instanceof HashAggregatePlanNode);
-        HashAggregatePlanNode reAggNode = (HashAggregatePlanNode) p.getParent(0);
+        assertTrue(p.getParent() instanceof HashAggregatePlanNode);
+        HashAggregatePlanNode reAggNode = (HashAggregatePlanNode) p.getParent();
         String reAggNodeStr = reAggNode.toExplainPlanString().toLowerCase();
 
         // Find scan node.
@@ -1896,7 +1896,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         // Indicates that there is no top aggregation node.
         if (numGroupByOfTopAggNode == -1) {
             if (needFix) {
-                p = receiveNode.getParent(0);
+                p = receiveNode.getParent();
                 assertTrue(p instanceof HashAggregatePlanNode);
                 reAggNode = (HashAggregatePlanNode) p;
 
@@ -1936,7 +1936,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertEquals(numAggsOfTopAggNode, topAggNode.getAggregateTypesSize());
 
         if (needFix) {
-            p = receiveNode.getParent(0);
+            p = receiveNode.getParent();
             assertTrue(p instanceof HashAggregatePlanNode);
             reAggNode = (HashAggregatePlanNode) p;
 

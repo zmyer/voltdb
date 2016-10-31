@@ -42,7 +42,7 @@ public class MockPlanNode extends AbstractPlanNode {
 
     @Override
     public void generateOutputSchema(Database db) {
-        m_outputSchema = new NodeSchema();
+        m_outputSchema = new NodeSchema(m_columnNames.length);
         m_hasSignificantOutputSchema = true;
         for (int i = 0; i < m_columnNames.length; ++i) {
             String colName = m_columnNames[i];

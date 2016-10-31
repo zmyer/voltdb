@@ -35,10 +35,10 @@ import org.voltdb.expressions.TupleValueExpression;
  */
 public class NodeSchema {
     // Sometimes there are columns with identical names within a given table
-    // and its schema.  We want to be able to differentiate these columns so that
-    // m_columnsMapHelper can produce the right offset for columns that have the same
-    // name but are physically different.  We use the "differentiator" (an attribute
-    // of a TVE) to do this.
+    // and its schema.  We want to be able to differentiate these columns
+    // so that m_columnsMapHelper can produce the right offset for columns
+    // that have the same name but are physically different.
+    // Use the "differentiator" (an attribute of a TVE) to do this.
     private static final Comparator<SchemaColumn> BY_NAME =
             new Comparator<SchemaColumn>() {
         @Override
@@ -58,8 +58,8 @@ public class NodeSchema {
     // A helpful map that goes from a schema column to the columns index in the list.
     private final TreeMap<SchemaColumn, Integer> m_columnsMapHelper;
 
-    public NodeSchema() {
-        m_columns = new ArrayList<SchemaColumn>();
+    public NodeSchema(int preallocateColumnSlots) {
+        m_columns = new ArrayList<>(preallocateColumnSlots);
         m_columnsMapHelper = new TreeMap<>(BY_NAME);
     }
 
@@ -124,10 +124,11 @@ public class NodeSchema {
         SchemaColumn col = new SchemaColumn(tableName, tableAlias,
                 columnName, columnAlias);
         int index = findIndexOfColumn(col);
-        if (index != -1) {
-            return m_columns.get(index);
+        if (index == -1) {
+            return null;
         }
-        return null;
+
+        return m_columns.get(index);
     }
 
     /**
@@ -139,10 +140,8 @@ public class NodeSchema {
             super(column.getTableName(), column.getTableAlias(),
                     column.getColumnName(), column.getColumnAlias(),
                     column.getExpression());
+            setDifferentiator(-1);
         }
-
-        @Override
-        public int getDifferentiator() { return -1; }
     }
 
     private int findIndexOfColumn(SchemaColumn column) {
@@ -166,14 +165,14 @@ public class NodeSchema {
                 break;
             }
         }
-
         return index;
     }
 
-    /** Convenience method for looking up the column offset for a TVE using
-     *  getIndexOf().  This is a common operation because every TVE in every
-     *  AbstractExpression in a plan node needs to have its column_idx updated
-     *  during the column index resolution phase.
+    /**
+     * Convenience method for looking up the column offset for a TVE using
+     * findIndexOfColumn().  This is a common operation because every TVE in
+     * every AbstractExpression in a plan node needs to have its column_idx
+     * updated during the column index resolution phase.
      */
     public int getIndexOfTve(TupleValueExpression tve) {
         SchemaColumn column = new SchemaColumn(
@@ -218,7 +217,7 @@ public class NodeSchema {
 
     @Override
     public NodeSchema clone() {
-        NodeSchema copy = new NodeSchema();
+        NodeSchema copy = new NodeSchema(m_columns.size());
         for (SchemaColumn column : m_columns) {
             copy.addColumn(column.clone());
         }
@@ -226,7 +225,7 @@ public class NodeSchema {
     }
 
     public NodeSchema replaceTableClone(String tableAlias) {
-        NodeSchema copy = new NodeSchema();
+        NodeSchema copy = new NodeSchema(m_columns.size());
         for (int colIndex = 0; colIndex < m_columns.size(); ++colIndex) {
             SchemaColumn column = m_columns.get(colIndex);
             String colAlias = column.getColumnAlias();
@@ -235,12 +234,11 @@ public class NodeSchema {
             TupleValueExpression tve = new TupleValueExpression(
                     tableAlias, tableAlias, colAlias, colAlias,
                     colIndex, differentiator);
-            tve.setTypeSizeAndInBytes(column);
+            tve.setTypeSizeAndInBytes(column.getExpression());
             copy.addColumn(tableAlias, tableAlias,
                     colAlias, colAlias,
                     tve, differentiator);
         }
-
         return copy;
     }
 
@@ -314,7 +312,7 @@ public class NodeSchema {
      * carry the columns across but leave any non-TVE expressions behind.
      */
     NodeSchema copyAndReplaceWithTVE() {
-        NodeSchema copy = new NodeSchema();
+        NodeSchema copy = new NodeSchema(m_columns.size());
         int colIndex = 0;
         for (SchemaColumn column : m_columns) {
             copy.addColumn(column.copyAndReplaceWithTVE(colIndex));
@@ -329,7 +327,7 @@ public class NodeSchema {
      */
     NodeSchema join(NodeSchema schema) {
         NodeSchema copy = this.clone();
-        for (SchemaColumn column: schema.getColumns()) {
+        for (SchemaColumn column : schema.getColumns()) {
             copy.addColumn(column.clone());
         }
         return copy;

@@ -909,12 +909,12 @@ public class PlanAssembler {
 
             assert(child.getChildCount() == 1);
             child = child.getChild(0);
-            child.clearParents();
+            child.clearParent();
             if (current == root) {
                 return child;
             }
-            assert(current.getParentCount() == 1);
-            AbstractPlanNode parent = current.getParent(0);
+            AbstractPlanNode parent = current.getParent();
+            assert(parent != null);
             parent.unlinkChild(current);
             parent.addAndLinkChild(child);
             return root;
@@ -948,7 +948,7 @@ public class PlanAssembler {
                 CompiledPlan bestCostPlan = ((StmtSubqueryScan)tableScan).getBestCostPlan();
                 assert (bestCostPlan != null);
                 AbstractPlanNode subQueryRoot = bestCostPlan.rootPlanGraph;
-                subQueryRoot.disconnectParents();
+                subQueryRoot.disconnectParent();
                 scanNode.clearChildren();
                 scanNode.addAndLinkChild(subQueryRoot);
             }
@@ -1032,7 +1032,7 @@ public class PlanAssembler {
                 if (m_parsedSelect.m_mvFixInfo.needed()) {
                     mvFixInfoCoordinatorNeeded = false;
                     AbstractPlanNode receiveNode = receivers.get(0);
-                    if (receiveNode.getParent(0) instanceof NestLoopPlanNode) {
+                    if (receiveNode.getParent() instanceof NestLoopPlanNode) {
                         if (subSelectRoot.hasInlinedIndexScanOfTable(m_parsedSelect.m_mvFixInfo.getMVTableName())) {
                             return getNextSelectPlan();
                         }
@@ -1121,9 +1121,9 @@ public class PlanAssembler {
                         grandChild.getPlanNodeType() == PlanNodeType.PROJECTION) {
 
                     AbstractPlanNode grandGrandChild = grandChild.getChild(0);
-                    child.clearParents();
+                    child.clearParent();
                     root.clearChildren();
-                    grandGrandChild.clearParents();
+                    grandGrandChild.clearParent();
                     grandChild.clearChildren();
 
                     grandChild.addAndLinkChild(root);
@@ -1274,9 +1274,13 @@ public class PlanAssembler {
             boolean needsOrderByNode = isOrderByNodeRequired(m_parsedDelete, subSelectRoot);
 
             AbstractExpression addressExpr = new TupleAddressExpression();
-            NodeSchema proj_schema = new NodeSchema();
+
+            NodeSchema projSchema = new NodeSchema(
+                    needsOrderByNode ?
+                    m_parsedDelete.orderByColumns().size() + 1 :
+                    1);
             // This planner-created column is magic.
-            proj_schema.addColumn(
+            projSchema.addColumn(
                     AbstractParsedStmt.TEMP_TABLE_NAME,
                     AbstractParsedStmt.TEMP_TABLE_NAME,
                     "tuple_address", "tuple_address",
@@ -1284,11 +1288,11 @@ public class PlanAssembler {
             if (needsOrderByNode) {
                 // Projection will need to pass the sort keys to the order by node
                 for (ParsedColInfo col : m_parsedDelete.orderByColumns()) {
-                    proj_schema.addColumn(col.asSchemaColumn());
+                    projSchema.addColumn(col.asSchemaColumn());
                 }
             }
             ProjectionPlanNode projectionNode =
-                    new ProjectionPlanNode(proj_schema);
+                    new ProjectionPlanNode(projSchema);
             subSelectRoot.addInlinePlanNode(projectionNode);
 
             AbstractPlanNode root = subSelectRoot;
@@ -1358,9 +1362,9 @@ public class PlanAssembler {
         updateNode.setUpdateIndexes(false);
 
         TupleAddressExpression tae = new TupleAddressExpression();
-        NodeSchema proj_schema = new NodeSchema();
+        NodeSchema projSchema = new NodeSchema(1 + m_parsedUpdate.columns.size());
         // This planner-generated column is magic.
-        proj_schema.addColumn(
+        projSchema.addColumn(
                 AbstractParsedStmt.TEMP_TABLE_NAME,
                 AbstractParsedStmt.TEMP_TABLE_NAME,
                 "tuple_address", "tuple_address",
@@ -1383,7 +1387,7 @@ public class PlanAssembler {
             AbstractExpression expr = colEntry.getValue();
             expr.setInBytes(colEntry.getKey().getInbytes());
 
-            proj_schema.addColumn(
+            projSchema.addColumn(
                     AbstractParsedStmt.TEMP_TABLE_NAME,
                     AbstractParsedStmt.TEMP_TABLE_NAME,
                     colName, colName,
@@ -1395,7 +1399,7 @@ public class PlanAssembler {
             }
         }
         ProjectionPlanNode projectionNode =
-                new ProjectionPlanNode(proj_schema);
+                new ProjectionPlanNode(projSchema);
 
 
         // add the projection inline (TODO: this will break if more than one
@@ -1577,12 +1581,13 @@ public class PlanAssembler {
             }
         }
 
+        int nColumns = m_parsedInsert.m_columns.size();
         NodeSchema matSchema = null;
         if (subquery == null) {
-            matSchema = new NodeSchema();
+            matSchema = new NodeSchema(nColumns);
         }
 
-        int[] fieldMap = new int[m_parsedInsert.m_columns.size()];
+        int[] fieldMap = new int[nColumns];
         int i = 0;
 
         // The insert statement's set of columns are contained in a LinkedHashMap,
@@ -1703,14 +1708,14 @@ public class PlanAssembler {
                     0);
             tve.setValueType(VoltType.BIGINT);
             tve.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
-            NodeSchema count_schema = new NodeSchema();
-            count_schema.addColumn(
+            NodeSchema countSchema = new NodeSchema(1);
+            countSchema.addColumn(
                     AbstractParsedStmt.TEMP_TABLE_NAME,
                     AbstractParsedStmt.TEMP_TABLE_NAME,
                     "modified_tuples",
                     "modified_tuples",
                     tve);
-            countNode.setOutputSchema(count_schema);
+            countNode.setOutputSchema(countSchema);
         }
 
         // connect the nodes to build the graph
@@ -1736,8 +1741,8 @@ public class PlanAssembler {
         assert (m_parsedSelect.m_displayColumns != null);
 
         // Build the output schema for the projection based on the display columns
-        NodeSchema proj_schema = m_parsedSelect.getFinalProjectionSchema();
-        for (SchemaColumn col : proj_schema.getColumns()) {
+        NodeSchema projSchema = m_parsedSelect.getFinalProjectionSchema();
+        for (SchemaColumn col : projSchema.getColumns()) {
             // Adjust the differentiator fields of TVEs, since they need to
             // reflect the inlined projection node in scan nodes.
             AbstractExpression colExpr = col.getExpression();
@@ -1761,7 +1766,7 @@ public class PlanAssembler {
         }
 
         ProjectionPlanNode projectionNode = new ProjectionPlanNode();
-        projectionNode.setOutputSchemaWithoutClone(proj_schema);
+        projectionNode.setOutputSchemaWithoutClone(projSchema);
 
         // If the projection can be done inline. then add the
         // projection node inline.  Even if the rootNode is a
@@ -1906,7 +1911,7 @@ public class PlanAssembler {
 
             // Disconnect the distributed parts of the plan below the SEND node
             AbstractPlanNode distributedPlan = sendNode.getChild(0);
-            distributedPlan.clearParents();
+            distributedPlan.clearParent();
             sendNode.clearChildren();
 
             // If the distributed limit must be performed on ordered input,
@@ -2003,7 +2008,7 @@ public class PlanAssembler {
             assert(recList.size() == 1);
             receiveNode = recList.get(0);
 
-            reAggParent = receiveNode.getParent(0);
+            reAggParent = receiveNode.getParent();
             boolean result = reAggParent.replaceChild(receiveNode, reAggNode);
             assert(result);
         }
@@ -2030,10 +2035,10 @@ public class PlanAssembler {
             assert(joinNode instanceof AbstractJoinPlanNode);
 
             // Fix the node after Re-aggregation node.
-            joinNode.clearParents();
+            joinNode.clearParent();
 
             assert(mvFixInfo.m_scanNode != null);
-            mvFixInfo.m_scanNode.clearParents();
+            mvFixInfo.m_scanNode.clearParent();
 
             // replace joinNode with MV scan node on each partition.
             sendNode.clearChildren();
@@ -2171,10 +2176,6 @@ public class PlanAssembler {
         }
         assert(sourceSeqScan instanceof SeqScanPlanNode);
 
-        AbstractPlanNode parent = null;
-        if (sourceSeqScan.getParentCount() > 0) {
-            parent = sourceSeqScan.getParent(0);
-        }
         AbstractPlanNode indexAccess = indexAccessForGroupByExprs(
                 (SeqScanPlanNode)sourceSeqScan, gbInfo);
 
@@ -2184,10 +2185,11 @@ public class PlanAssembler {
         }
 
         gbInfo.m_indexAccess = indexAccess;
+        AbstractPlanNode parent = sourceSeqScan.getParent();
         if (parent != null) {
             // have a parent and would like to replace
             // the sequential scan with an index scan
-            indexAccess.clearParents();
+            indexAccess.clearParent();
             // For two children join node, index 0 is its outer side
             parent.replaceChild(0, indexAccess);
 
@@ -2311,14 +2313,15 @@ public class PlanAssembler {
             }
 
             int outputColumnIndex = 0;
-            NodeSchema agg_schema = new NodeSchema();
-            NodeSchema top_agg_schema = new NodeSchema();
+            int nAggs = m_parsedSelect.m_aggResultColumns.size();
+            NodeSchema aggSchema = new NodeSchema(nAggs);
+            NodeSchema topAggSchema = new NodeSchema(nAggs);
 
             for (ParsedColInfo col : m_parsedSelect.m_aggResultColumns) {
                 AbstractExpression rootExpr = col.expression;
                 AbstractExpression agg_input_expr = null;
-                SchemaColumn schema_col = null;
-                SchemaColumn top_schema_col = null;
+                SchemaColumn schemaCol = null;
+                SchemaColumn topSchemaCol = null;
                 if (rootExpr instanceof AggregateExpression) {
                     ExpressionType agg_expression_type = rootExpr.getExpressionType();
                     agg_input_expr = rootExpr.getLeft();
@@ -2339,12 +2342,12 @@ public class PlanAssembler {
 
                     boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
                     aggNode.addAggregate(agg_expression_type, is_distinct, outputColumnIndex, agg_input_expr);
-                    schema_col = new SchemaColumn(
+                    schemaCol = new SchemaColumn(
                             AbstractParsedStmt.TEMP_TABLE_NAME,
                             AbstractParsedStmt.TEMP_TABLE_NAME,
                             "", col.alias,
                             tve);
-                    top_schema_col = new SchemaColumn(
+                    topSchemaCol = new SchemaColumn(
                             AbstractParsedStmt.TEMP_TABLE_NAME,
                             AbstractParsedStmt.TEMP_TABLE_NAME,
                             "", col.alias,
@@ -2434,7 +2437,7 @@ public class PlanAssembler {
                      * MUST already exist in the child node's output. Find them and
                      * add them to the aggregate's output.
                      */
-                    schema_col = new SchemaColumn(
+                    schemaCol = new SchemaColumn(
                             col.tableName, col.tableAlias,
                             col.columnName, col.alias,
                             col.expression);
@@ -2445,13 +2448,13 @@ public class PlanAssembler {
                     else {
                         topExpr = col.expression;
                     }
-                    top_schema_col = new SchemaColumn(
+                    topSchemaCol = new SchemaColumn(
                             col.tableName, col.tableAlias,
                             col.columnName, col.alias, topExpr);
                 }
 
-                agg_schema.addColumn(schema_col);
-                top_agg_schema.addColumn(top_schema_col);
+                aggSchema.addColumn(schemaCol);
+                topAggSchema.addColumn(topSchemaCol);
                 outputColumnIndex++;
             }// end for each ParsedColInfo in m_aggResultColumns
 
@@ -2462,13 +2465,13 @@ public class PlanAssembler {
                     topAggNode.addGroupByExpression(m_parsedSelect.m_groupByExpressions.get(col.alias));
                 }
             }
-            aggNode.setOutputSchema(agg_schema);
+            aggNode.setOutputSchema(aggSchema);
             if (topAggNode != null) {
                 if (m_parsedSelect.hasComplexGroupby()) {
-                    topAggNode.setOutputSchema(top_agg_schema);
+                    topAggNode.setOutputSchema(topAggSchema);
                 }
                 else {
-                    topAggNode.setOutputSchema(agg_schema);
+                    topAggNode.setOutputSchema(aggSchema);
                 }
             }
 
@@ -2722,7 +2725,7 @@ public class PlanAssembler {
         if (coordNode != null && root instanceof ReceivePlanNode) {
             AbstractPlanNode accessPlanTemp = root;
             root = accessPlanTemp.getChild(0).getChild(0);
-            root.clearParents();
+            root.clearParent();
             accessPlanTemp.getChild(0).clearChildren();
             distNode.addAndLinkChild(root);
 
@@ -2874,7 +2877,8 @@ public class PlanAssembler {
             return false;
         }
 
-        if (aggregateNode.getParentCount() == 0) {
+        AbstractPlanNode parent = aggregateNode.getParent();
+        if (parent == null) {
             return false;
         }
 
@@ -2883,16 +2887,14 @@ public class PlanAssembler {
             return false;
         }
 
-        AbstractPlanNode parent = aggregateNode.getParent(0);
         AbstractPlanNode orderByNode = null;
         if (parent instanceof OrderByPlanNode) {
             orderByNode = parent;
         }
-        else if ( parent instanceof ProjectionPlanNode &&
-                parent.getParentCount() > 0 &&
-                parent.getParent(0) instanceof OrderByPlanNode) {
+        else if (parent instanceof ProjectionPlanNode &&
+                parent.getParent() instanceof OrderByPlanNode) {
             // Xin really wants inline project with aggregation
-            orderByNode = parent.getParent(0);
+            orderByNode = parent.getParent();
         }
 
         if (orderByNode == null) {

@@ -103,7 +103,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
         m_estimatedOutputTupleCount = 1;
         m_tableSchema = isp.m_tableSchema;
-        m_tableScanSchema = isp.m_tableScanSchema.clone();
+        m_tableScanSchema = isp.m_tableScanSchema;
 
         m_targetIndexName = isp.m_targetIndexName;
 

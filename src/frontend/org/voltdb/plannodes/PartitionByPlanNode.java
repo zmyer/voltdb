@@ -42,24 +42,20 @@ public class PartitionByPlanNode extends AggregatePlanNode {
 
     @Override
     public void generateOutputSchema(Database db) {
-        if (m_outputSchema == null) {
-            m_outputSchema = new NodeSchema();
-        }
-        else {
-            assert(getOutputSchema().size() == 0);
-        }
         assert(m_children.size() == 1);
         m_children.get(0).generateOutputSchema(db);
         NodeSchema inputSchema = m_children.get(0).getOutputSchema();
+        List<SchemaColumn> inputColumns = inputSchema.getColumns();
+        m_outputSchema = new NodeSchema(1 + inputColumns.size());
         // We already created the TVE for this expression.
         TupleValueExpression tve = m_windowedExpression.getDisplayListExpression();
-        getOutputSchema().addColumn(
+        m_outputSchema.addColumn(
                 tve.getTableName(), tve.getTableAlias(),
                 tve.getColumnName(), tve.getColumnAlias(),
                 tve);
         // Just copy the input columns to the output schema.
         for (SchemaColumn col : inputSchema.getColumns()) {
-            getOutputSchema().addColumn(col.clone());
+            m_outputSchema.addColumn(col.clone());
         }
         m_hasSignificantOutputSchema = true;
     }

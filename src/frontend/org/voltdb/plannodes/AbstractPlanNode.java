@@ -94,11 +94,15 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     protected int m_id = -1;
-    protected List<AbstractPlanNode> m_children = new ArrayList<AbstractPlanNode>();
-    protected List<AbstractPlanNode> m_parents = new ArrayList<AbstractPlanNode>();
-    protected Set<AbstractPlanNode> m_dominators = new HashSet<AbstractPlanNode>();
+    // Pre-allocating the child array list to avoid growing it later seems to
+    // make a measurable performance difference. Allocating 2 elements covers
+    // the predominant 0-or-1-child cases and also NestLoopJoin's 2 children.
+    // The child list only needs to grow beyond 2 children when nested SetOps
+    // of the same type (union, intersect, etc.) are flattened into one
+    // parent node and an arbitrary but typically small number of children.
+    protected final List<AbstractPlanNode> m_children = new ArrayList<>(2);
+    private AbstractPlanNode m_parent;
 
-    // TODO: planner accesses this data directly. Should be protected.
     protected List<ScalarValueHints> m_outputColumnHints = new ArrayList<ScalarValueHints>();
     protected long m_estimatedOutputTupleCount = 0;
     protected long m_estimatedProcessedTupleCount = 0;
@@ -110,21 +114,22 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     /**
      * Some PlanNodes can take advantage of inline PlanNodes to perform
-     * certain additional tasks while performing their main operation, rather than
-     * having to re-read tuples from intermediate results
+     * certain additional tasks interlaced with their main operation,
+     * rather than having to fully materialize and re-scan tuples from
+     * an intermediate result set.
+     * There are typically fewer than 5 such tasks for a plan node.
      */
     protected Map<PlanNodeType, AbstractPlanNode> m_inlineNodes =
-        new LinkedHashMap<PlanNodeType, AbstractPlanNode>();
+            new LinkedHashMap<>(5);
     protected boolean m_isInline = false;
 
     /**
-     * The textual explanation of why the plan may fail to have a deterministic result or effect when replayed.
+     * The textual explanation of why the plan may fail to have
+     * a deterministic result or effect when replayed.
      */
-    protected String  m_nondeterminismDetail = "the query result does not guarantee a consistent ordering";
+    protected String m_nondeterminismDetail =
+            "the query result does not guarantee a consistent ordering";
 
-    /**
-     * Instantiates a new plan node.
-     */
     protected AbstractPlanNode() {
         m_id = NEXT_PLAN_NODE_ID++;
     }
@@ -153,26 +158,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             newId = subquery.overrideSubqueryNodeIds(newId);
         }
         return newId;
-    }
-
-    /**
-     * Create a PlanNode that clones the configuration information but
-     * is not inserted in the plan graph and has a unique plan node id.
-     */
-    protected void produceCopyForTransformation(AbstractPlanNode copy) {
-        copy.m_outputSchema = m_outputSchema;
-        copy.m_hasSignificantOutputSchema = m_hasSignificantOutputSchema;
-        copy.m_outputColumnHints = m_outputColumnHints;
-        copy.m_estimatedOutputTupleCount = m_estimatedOutputTupleCount;
-        copy.m_estimatedProcessedTupleCount = m_estimatedProcessedTupleCount;
-
-        // clone is not yet implemented for every node.
-        assert(m_inlineNodes.size() == 0);
-        assert(m_isInline == false);
-
-        // the api requires the copy is not (yet) connected
-        assert (copy.m_parents.size() == 0);
-        assert (copy.m_children.size() == 0);
     }
 
     public abstract PlanNodeType getPlanNodeType();
@@ -250,31 +235,38 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         // Make sure our children have us listed as their parents
         //
         for (AbstractPlanNode child : m_children) {
-            if (!child.m_parents.contains(this)) {
-                throw new Exception("ERROR: The child PlanNode '" + child.toString() + "' does not " +
-                                    "have its parent PlanNode '" + toString() + "' in its parents list");
+            if (child.m_parent != this) {
+                throw new Exception("ERROR: The child PlanNode '" +
+                        child.toString() + "' does not " +
+                        "have its parent PlanNode '" + toString() +
+                        "' in its parents list");
             }
             child.validate();
         }
         //
         // Inline PlanNodes
         //
-        if (!m_inlineNodes.isEmpty()) {
-            for (AbstractPlanNode node : m_inlineNodes.values()) {
-                //
-                // Make sure that we're not attached to some kind of tree somewhere...
-                //
-                if (!node.m_children.isEmpty()) {
-                    throw new Exception("ERROR: The inline PlanNode '" + node + "' has children inside of PlanNode '" + this + "'");
-                } else if (!node.m_parents.isEmpty()) {
-                    throw new Exception("ERROR: The inline PlanNode '" + node + "' has parents inside of PlanNode '" + this + "'");
-                } else if (!node.isInline()) {
-                    throw new Exception("ERROR: The inline PlanNode '" + node + "' was not marked as inline for PlanNode '" + this + "'");
-                } else if (!node.getInlinePlanNodes().isEmpty()) {
-                    throw new Exception("ERROR: The inline PlanNode '" + node + "' has its own inline PlanNodes inside of PlanNode '" + this + "'");
-                }
-                node.validate();
+        for (AbstractPlanNode node : m_inlineNodes.values()) {
+            //
+            // Make sure that we're not attached to some kind of tree somewhere...
+            //
+            if ( ! node.m_children.isEmpty()) {
+                throw new Exception("ERROR: The inline PlanNode '" + node + "' has children inside of PlanNode '" + this + "'");
             }
+
+            if (node.m_parent != null) {
+                throw new Exception("ERROR: The inline PlanNode '" + node + "' has parents inside of PlanNode '" + this + "'");
+            }
+
+            if ( ! node.isInline()) {
+                 throw new Exception("ERROR: The inline PlanNode '" + node + "' was not marked as inline for PlanNode '" + this + "'");
+            }
+
+            if ( ! node.getInlinePlanNodes().isEmpty()) {
+                throw new Exception("ERROR: The inline PlanNode '" + node + "' has its own inline PlanNodes inside of PlanNode '" + this + "'");
+            }
+
+            node.validate();
         }
     }
 
@@ -459,14 +451,14 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     public void addAndLinkChild(AbstractPlanNode child) {
         assert(child != null);
         m_children.add(child);
-        child.m_parents.add(this);
+        child.m_parent = this;
     }
 
     // called by PushDownLimit, re-link the child without changing the order
     public void setAndLinkChild(int index, AbstractPlanNode child) {
         assert(child != null);
         m_children.set(index, child);
-        child.m_parents.add(this);
+        child.m_parent = this;
     }
 
     /** Remove child from this node.
@@ -475,7 +467,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     public void unlinkChild(AbstractPlanNode child) {
         assert(child != null);
         m_children.remove(child);
-        child.m_parents.remove(this);
+        child.m_parent = null;
     }
 
     /**
@@ -484,13 +476,14 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * @param newChild The new node.
      * @return true if the child was replaced
      */
-    public boolean replaceChild(AbstractPlanNode oldChild, AbstractPlanNode newChild) {
+    public boolean replaceChild(AbstractPlanNode oldChild,
+            AbstractPlanNode newChild) {
         assert(oldChild != null);
         assert(newChild != null);
         int idx = 0;
         for (AbstractPlanNode child : m_children) {
             if (child.equals(oldChild)) {
-                oldChild.m_parents.clear();
+                oldChild.m_parent = null;
                 setAndLinkChild(idx, newChild);
                 return true;
             }
@@ -504,7 +497,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         assert(newChild != null);
         AbstractPlanNode oldChild = m_children.get(oldChildIdx);
         assert(oldChild != null);
-        oldChild.m_parents.clear();
+        oldChild.m_parent = null;
         setAndLinkChild(oldChildIdx, newChild);
     }
 
@@ -533,36 +526,40 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         return m_children.contains(receive);
     }
 
-    /**
-     * Gets the parents.
-     * @return the parents
-     */
-    public int getParentCount() {
-        return m_parents.size();
+    public AbstractPlanNode getParent() {
+        return m_parent;
     }
 
-    public AbstractPlanNode getParent(int index) {
-        return m_parents.get(index);
-    }
-
-    public void clearParents() {
-        m_parents.clear();
+    public void clearParent() {
+        m_parent = null;
     }
 
     public void removeFromGraph() {
-        disconnectParents();
+        disconnectParent();
         disconnectChildren();
     }
 
+    @Deprecated
     public void disconnectParents() {
-        for (AbstractPlanNode parent : m_parents)
-            parent.m_children.remove(this);
-        m_parents.clear();
+        if (m_parent == null) {
+            return;
+        }
+        m_parent.m_children.remove(this);
+        m_parent = null;
+     }
+
+    public void disconnectParent() {
+        if (m_parent == null) {
+            return;
+        }
+        m_parent.m_children.remove(this);
+        m_parent = null;
      }
 
     public void disconnectChildren() {
-        for (AbstractPlanNode child : m_children)
-            child.m_parents.remove(this);
+        for (AbstractPlanNode child : m_children) {
+            child.m_parent = null;
+        }
         m_children.clear();
      }
 
@@ -574,8 +571,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         while (it.hasNext()) {
             AbstractPlanNode child = it.next();
             it.remove();                          // remove this.child from m_children
-            assert child.getParentCount() == 1;
-            child.clearParents();                 // and reset child's parents list
+            assert child.getParent() != null;
+            child.clearParent();                 // and reset child's parents list
             node.addAndLinkChild(child);          // set node.child and child.parent
         }
 
@@ -598,7 +595,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         node.m_isInline = true;
         m_inlineNodes.put(node.getPlanNodeType(), node);
         node.m_children.clear();
-        node.m_parents.clear();
+        node.m_parent = null;
     }
 
     /**
@@ -664,55 +661,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
 
         return false;
-    }
-
-
-    /**
-     * @return the dominator list for a node
-     */
-    public Set<AbstractPlanNode> getDominators() {
-        return m_dominators;
-    }
-
-    /**
-    *   Initialize a hashset for each node containing that node's dominators
-    *   (the set of predecessors that *always* precede this node in a traversal
-    *   of the plan-graph in reverse-execution order (from root to leaves)).
-    */
-    public void calculateDominators() {
-        HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
-        calculateDominators_recurse(visited);
-    }
-
-    private void calculateDominators_recurse(HashSet<AbstractPlanNode> visited) {
-        if (visited.contains(this)) {
-            assert(false): "do not expect loops in plangraph.";
-            return;
-        }
-
-        visited.add(this);
-        m_dominators.clear();
-        m_dominators.add(this);
-
-        // find nodes that are in every parent's dominator set.
-
-        HashMap<AbstractPlanNode, Integer> union = new HashMap<AbstractPlanNode, Integer>();
-        for (AbstractPlanNode n : m_parents) {
-            for (AbstractPlanNode d : n.getDominators()) {
-                if (union.containsKey(d))
-                    union.put(d, union.get(d) + 1);
-                else
-                    union.put(d, 1);
-            }
-        }
-
-        for (AbstractPlanNode pd : union.keySet() ) {
-            if (union.get(pd) == m_parents.size())
-                m_dominators.add(pd);
-        }
-
-        for (AbstractPlanNode n : m_children)
-            n.calculateDominators_recurse(visited);
     }
 
     /**
@@ -1016,36 +964,42 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             sb.append("\n");
         }
 
-        // Agg < Proj < Limit < Scan
-        // Order the inline nodes with integer in ascending order
-        TreeMap<Integer, AbstractPlanNode> sort_inlineNodes =
+        // Order the inline nodes by their types in the order:
+        // Agg < Proj < Limit < Order < Scan < Other?
+        TreeMap<Integer, AbstractPlanNode> sortedInlineNodes =
                 new TreeMap<Integer, AbstractPlanNode>();
 
         // every inline plan node is unique
-        int ii = 4;
+        int ii = 5;
         for (AbstractPlanNode inlineNode : m_inlineNodes.values()) {
             if (inlineNode instanceof AggregatePlanNode) {
-                sort_inlineNodes.put(0, inlineNode);
-            } else if (inlineNode instanceof ProjectionPlanNode) {
-                sort_inlineNodes.put(1, inlineNode);
-            } else if (inlineNode instanceof LimitPlanNode) {
-                sort_inlineNodes.put(2, inlineNode);
-            } else if (inlineNode instanceof AbstractScanPlanNode) {
-                sort_inlineNodes.put(3, inlineNode);
-            } else {
-                // any other inline nodes currently ?  --xin
-                sort_inlineNodes.put(ii++, inlineNode);
+                sortedInlineNodes.put(0, inlineNode);
+            }
+            else if (inlineNode instanceof ProjectionPlanNode) {
+                sortedInlineNodes.put(1, inlineNode);
+            }
+            else if (inlineNode instanceof LimitPlanNode) {
+                sortedInlineNodes.put(2, inlineNode);
+            }
+            else if (inlineNode instanceof AbstractScanPlanNode) {
+                sortedInlineNodes.put(3, inlineNode);
+            }
+            else if (inlineNode instanceof OrderByPlanNode) {
+                sortedInlineNodes.put(4, inlineNode);
+            }
+            else {
+                // Any other (future?) inline nodes
+                sortedInlineNodes.put(ii++, inlineNode);
             }
         }
         // inline nodes with ascending order as their integer keys
-        for (AbstractPlanNode inlineNode : sort_inlineNodes.values()) {
+        for (AbstractPlanNode inlineNode : sortedInlineNodes.values()) {
             // don't bother with inlined projections
             if (( ! m_verboseExplainForDebugging) &&
                 (inlineNode.getPlanNodeType() == PlanNodeType.PROJECTION)) {
                 continue;
             }
             inlineNode.setSkipInitalIndentationForExplain(true);
-
             sb.append(indent + extraIndent + "inline ");
             inlineNode.explainPlan_recurse(sb, indent + extraIndent);
         }
@@ -1115,9 +1069,9 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     protected static NodeSchema loadSchemaFromJSONObject(JSONObject jobj,
             String jsonKey) throws JSONException {
-        NodeSchema nodeSchema = new NodeSchema();
         JSONArray jarray = jobj.getJSONArray(jsonKey);
         int size = jarray.length();
+        NodeSchema nodeSchema = new NodeSchema(size);
         for (int i = 0; i < size; ++i) {
             nodeSchema.addColumn(SchemaColumn.fromJSONObject(
                     jarray.getJSONObject(i)) );
