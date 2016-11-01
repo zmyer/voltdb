@@ -315,6 +315,10 @@ public class RejoinProducer extends JoinProducerBase {
                     m_taskQueue.offer(this);
                     return;
                 }
+                if (REJOINLOG.isDebugEnabled()) {
+                    REJOINLOG.debug("Snapshot completion monitor is not done for partition " + m_partitionId);
+                }
+
                 SnapshotCompletionEvent event = null;
                 Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers = null;
                 Map<Integer, Long> drSequenceNumbers = null;

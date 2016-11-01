@@ -1426,19 +1426,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltDB.crashLocalVoltDB("Failed to update topology", true, e);
         }
         //update NodeSettings
-        Properties props = m_nodeSettings.asProperties();
-        Map<String, String> settingsMap = Maps.newHashMap();
         m_config.m_sitesperhost++;
-        for (final String name: props.stringPropertyNames()) {
-            if (NodeSettings.LOCAL_SITES_COUNT_KEY.equals(name)) {
-                settingsMap.put(name, Integer.toString( m_config.m_sitesperhost));
-            } else {
-                settingsMap.put(name, props.getProperty(name));
-            }
-        }
-        m_nodeSettings = NodeSettings.create(settingsMap);
+        m_nodeSettings.setProperty(NodeSettings.LOCAL_SITES_COUNT_KEY, Integer.toString(m_config.m_sitesperhost));
         m_nodeSettings.store();
-
+        hostLog.info("The local site count is now " + m_nodeSettings.getLocalSitesCount());
         //update sites per host
         m_messenger.updateSitesPerHostZK();
 
