@@ -746,6 +746,7 @@ public final class InvocationDispatcher {
      }
 
     private ClientResponseImpl dispatchReplicate(StoredProcedureInvocation task) {
+
         Object params[] = task.getParams().toArray();
         if (params.length != 2) {
             return gracefulFailureResponse("@Replicate must provide partition id and target hostId", task.clientHandle);
@@ -765,7 +766,9 @@ public final class InvocationDispatcher {
             return gracefulFailureResponse(String.format("@Replicate can not be executed on host %d for target host %d.", thisHostId, targetHostId), task.clientHandle);
         }
         try {
-            VoltDB.instance().createSite((Integer) params[0]);
+            if(!VoltDB.instance().addSite((Integer) params[0])){
+                return gracefulFailureResponse("@Replicate adding site or snapshot save is in progress", task.clientHandle);
+            }
         } catch (Throwable e) {
             hostLog.error("@Replicare failed with error:" + e.getMessage(), e);
             return gracefulFailureResponse("@Replicare failed with error:" + e.getMessage(), task.clientHandle);

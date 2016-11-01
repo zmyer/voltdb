@@ -50,6 +50,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
 import java.util.SortedMap;
@@ -168,6 +169,7 @@ import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -318,7 +320,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private volatile boolean m_isRunning = false;
     private boolean m_isRunningWithOldVerb = true;
     private boolean m_isBare = false;
-
+    private boolean m_addingSiteInProgress = false;
     /**
      * Startup snapshot nonce taken on shutdown --save
      */
@@ -1366,7 +1368,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
-    public void createSite(int partitionId) throws Throwable{
+    public boolean addSite(int partitionId) throws Throwable {
+        m_rejoinDataPending = true;
+        m_addingSiteInProgress = true;
         CountDownLatch latch = new CountDownLatch(1);
         CreateSiteTask task = new CreateSiteTask(partitionId, latch);
         m_es.submit(task);
@@ -1374,6 +1378,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (task.error != null) {
             throw task.error;
         }
+        return task.status;
     }
 
     class CreateSiteTask implements Runnable {
@@ -1381,7 +1386,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         final int partitionId;
         final CountDownLatch latch;
         Throwable error;
-
+        boolean status = true;
         public CreateSiteTask(int partitionId, CountDownLatch latch) {
             this.partitionId= partitionId;
             this.latch = latch;
@@ -1390,7 +1395,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         @Override
         public void run() {
             try {
-                runCreateSiteTask(partitionId);
+                status = runCreateSiteTask(partitionId);
             } catch (Exception e) {
                 error = e;
             }
@@ -1398,8 +1403,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    void runCreateSiteTask(int partitionId) throws Exception {
+    boolean runCreateSiteTask(int partitionId) throws Exception {
         try {
+            final int rejoiningHost = CoreZK.createRejoinNodeIndicator(m_messenger.getZK(), m_myHostId);
+            if (rejoiningHost != -1 || SnapshotSiteProcessor.isSnapshotInProgress()) {
+                return false;
+            }
+
             Stat stat = new Stat();
             JSONObject topo = new JSONObject(new String(m_messenger.getZK().getData(VoltZK.topology, false, stat), Charsets.UTF_8));
             if (!ClusterConfig.addPartitionReplica(topo, m_messenger.getHostId(), partitionId)){
@@ -1407,21 +1417,36 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
             m_messenger.getZK().setData(VoltZK.topology, topo.toString().getBytes(Constants.UTF8ENCODING),stat.getVersion());
         } catch (KeeperException e) {
-            throw e;
+            if (e.code() == KeeperException.Code.BADVERSION) {
+                throw e;
+            } else {
+                VoltDB.crashLocalVoltDB("Failed to update topology", true, e);
+            }
         } catch (Exception e) {
-            throw e;
+            VoltDB.crashLocalVoltDB("Failed to update topology", true, e);
         }
+        //update NodeSettings
+        Properties props = m_nodeSettings.asProperties();
+        Map<String, String> settingsMap = Maps.newHashMap();
+        m_config.m_sitesperhost++;
+        for (final String name: props.stringPropertyNames()) {
+            if (NodeSettings.LOCAL_SITES_COUNT_KEY.equals(name)) {
+                settingsMap.put(name, Integer.toString( m_config.m_sitesperhost));
+            } else {
+                settingsMap.put(name, props.getProperty(name));
+            }
+        }
+        m_nodeSettings = NodeSettings.create(settingsMap);
+        m_nodeSettings.store();
 
         //update sites per host
-        m_messenger.incrementSitesPerHost();
+        m_messenger.updateSitesPerHostZK();
 
         //initiate the site
-        Initiator initiator = createIv2Initiator(partitionId, StartAction.REJOIN);
+        Initiator initiator = createIv2Initiator(partitionId, StartAction.LIVE_REJOIN);
         m_iv2Initiators.put(partitionId, initiator);
         m_iv2InitiatorStartingTxnIds.put( partitionId, TxnEgo.makeZero(partitionId).getTxnId());
-
-        //update MpInitiator with new buddy
-        m_MPI.addBuddyHSId(initiator.getInitiatorHSId());
+        m_commandLog.initPartitionForRejoin(partitionId, TxnEgo.makeZero(partitionId).getTxnId());
         final String serializedCatalog = m_catalogContext.catalog.serialize();
         final CatalogSpecificPlanner csp = new CatalogSpecificPlanner(m_asyncCompilerAgent, m_catalogContext);
 
@@ -1433,7 +1458,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_catalogContext.getDeployment().getCluster().getKfactor(),
                     csp,
                     m_configuredNumberOfPartitions,
-                    StartAction.REJOIN,
+                    StartAction.LIVE_REJOIN,
                     getStatsAgent(),
                     m_memoryStats,
                     m_commandLog,
@@ -1443,6 +1468,22 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         } catch (KeeperException | InterruptedException | ExecutionException e) {
             throw e;
         }
+        //update MpInitiator with new buddy
+        m_MPI.addBuddyHSId(initiator.getInitiatorHSId());
+        Map<Integer, Long> partsToHSIdsToRejoin = new HashMap<>();
+        partsToHSIdsToRejoin.put(partitionId, initiator.getInitiatorHSId());
+        SnapshotSaveAPI.recoveringSiteCount.set(1);
+        m_joinCoordinator = new Iv2RejoinCoordinator(m_messenger,
+                partsToHSIdsToRejoin.values(), getVoltDBRootPath(), false);
+        try {
+            m_messenger.registerMailbox(m_joinCoordinator);
+            m_joinCoordinator.initialize(m_catalogContext.getDeployment().getCluster().getKfactor());
+            m_joinCoordinator.startJoin(m_catalogContext.database);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Failed to move data to replica", true, e);
+        }
+
+        return true;
     }
 
     class DailyLogTask implements Runnable {
@@ -3294,6 +3335,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         m_joinCoordinator = null;
         // Mark the data transfer as done so CL can make the right decision when a truncation snapshot completes
         m_rejoinDataPending = false;
+
+        //The site is new and added after the node is up.
+        if (m_addingSiteInProgress) {
+            m_addingSiteInProgress = false;
+            CoreZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), m_myHostId);
+            hostLog.info("Adding site complete.");
+            return;
+        }
 
         try {
             m_testBlockRecoveryCompletion.acquire();

@@ -1090,21 +1090,20 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         return sphMap;
     }
 
-    public void incrementSitesPerHost() {
+    public void updateSitesPerHostZK() {
         try {
-            String ip = m_config.coordinatorIp.toString();
-            List<String> children = m_zk.getChildren(CoreZK.hosts, false);
-            for (String child : children) {
-                Stat stat = new Stat();
-                String path = ZKUtil.joinZKPath(CoreZK.hosts, child);
-                byte[] payload = m_zk.getData( path, false, stat);
-                final HostInfo info = HostInfo.fromBytes(payload);
-                if (ip.equals(info.m_hostIp)) {
-                    HostInfo hostInfo = new HostInfo(info.m_hostIp, info.m_group, (info.m_localSitesCount + 1));
-                    m_zk.setData(path, hostInfo.toBytes(), stat.getVersion());
-                    break;
-                }
+            HostInfo hostInfo;
+            m_config.localSitesCount++;
+            if (m_config.internalInterface.isEmpty()) {
+                hostInfo = new HostInfo(new InetSocketAddress(m_joiner.m_reportedInternalInterface, m_config.internalPort).toString(),
+                        m_config.group, m_config.localSitesCount);
+            } else {
+                hostInfo = new HostInfo(new InetSocketAddress(m_config.internalInterface, m_config.internalPort).toString(),
+                        m_config.group, m_config.localSitesCount);
             }
+            Stat stat = new Stat();
+            m_zk.getData(CoreZK.hosts_host + getHostId(), false, stat);
+            m_zk.setData(CoreZK.hosts_host + getHostId(), hostInfo.toBytes(), stat.getVersion());
         } catch (Exception e) {
             VoltDB.crashGlobalVoltDB("Unable to update sitesperhost from Zookeeper", false, e);
         }
@@ -1227,6 +1226,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     public long generateMailboxId(Long mailboxId) {
         final long hsId = mailboxId == null ? getHSIdForLocalSite(m_nextSiteId.getAndIncrement()) : mailboxId;
+        if (m_hostLog.isDebugEnabled()) {
+            m_hostLog.debug("HostMessenger.generateMailboxId. current site id=" + hsId + " new max site id =" + m_nextSiteId.get());
+        }
         addMailbox(hsId, new Mailbox() {
             @Override
             public void send(long hsId, VoltMessage message) {
@@ -1293,6 +1295,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     public Mailbox createMailbox() {
         final int siteId = m_nextSiteId.getAndIncrement();
+        if (m_hostLog.isDebugEnabled()) {
+            m_hostLog.debug("HostMessenger.createMailbox. current site id = " + siteId + " next site id =" + m_nextSiteId.get());
+        }
+
         long hsId = getHSIdForLocalSite(siteId);
         SiteMailbox sm = new SiteMailbox( this, hsId);
         addMailbox(hsId, sm);
@@ -1417,6 +1423,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             hsId = proposedHSId;
         } else {
             hsId = getHSIdForLocalSite(m_nextSiteId.getAndIncrement());
+            if (m_hostLog.isDebugEnabled()) {
+                m_hostLog.debug("HostMessenger.createMailbox. current hsid = " + CoreUtils.hsIdToString(hsId) + " next site id =" + m_nextSiteId.get());
+            }
+
             mailbox.setHSId(hsId);
         }
 

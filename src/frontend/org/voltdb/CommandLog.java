@@ -55,6 +55,13 @@ public interface CommandLog {
                                           int partitionCount, boolean isRejoin,
                                           String coreBinding, Map<Integer, Long> perPartitionTxnId);
 
+    /**
+     *Call this method to set up for a newly added site after CommandLog has been initialized via initForRejoin
+     * @param partitionId the partition id
+     * @param txnId the transaction id
+     */
+    public abstract void initPartitionForRejoin(Integer partitionId, Long txnId);
+
     public abstract boolean needsInitialization();
 
     /*

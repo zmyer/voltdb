@@ -160,6 +160,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
                                               1, // 1 source per rejoining site
                                               m_snapshotBufPool,
                                               schemaHasNoTables);
+        REJOINLOG.info("sending message for HSID:" + getHSId());
         send(com.google_voltpatches.common.primitives.Longs.toArray(HSIds), msg);
 
         // For testing, exit if only one property is set...

@@ -88,6 +88,7 @@ public class DummyCommandLog implements CommandLog {
         rowValues[columnNameToIndex.get(CommandLogStats.StatName.FSYNC_INTERVAL.name())] = 0;
     }
 
+    @Override
     public boolean isSynchronous() {
         return false;
     }
@@ -100,5 +101,10 @@ public class DummyCommandLog implements CommandLog {
 
     @Override
     public void registerDurabilityListener(DurabilityListener durabilityListener) {
+    }
+
+    @Override
+    public void initPartitionForRejoin(Integer partitionId, Long txnId) {
+
     }
 }
