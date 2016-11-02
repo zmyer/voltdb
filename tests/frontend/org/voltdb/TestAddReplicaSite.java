@@ -108,7 +108,6 @@ public class TestAddReplicaSite {
             assert(resp.getStatus() == ClientResponse.SUCCESS);
             topo = resp.getResults()[0];
             while (topo.advanceRow()) {
-
                 //partition 1 is on all 3 sites now
                 if ((int)topo.getLong("Partition") == 2) {
                     String[] sites = topo.getString("sites").split(",");
@@ -134,6 +133,16 @@ public class TestAddReplicaSite {
                 }
             }
             System.out.println("topo:" + topo.toString());
+
+            //load more data
+            for (int i = 10000; i < 20000; i++) {
+                client.callProcedure("@AdHoc", "insert into V0 values(" + i + ")");
+            }
+            resp = client.callProcedure("@AdHoc", "select count(*) from V0");
+            assert(resp.getStatus() == ClientResponse.SUCCESS);
+            topo = resp.getResults()[0];
+            topo.advanceRow();
+            assert(topo.getLong(0) == 20000);
         } finally {
             cluster.shutDown();
         }
