@@ -320,7 +320,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private volatile boolean m_isRunning = false;
     private boolean m_isRunningWithOldVerb = true;
     private boolean m_isBare = false;
-    private boolean m_addingSiteInProgress = false;
+    private AtomicBoolean m_addingSiteInProgress = new AtomicBoolean(false);
     /**
      * Startup snapshot nonce taken on shutdown --save
      */
@@ -1369,8 +1369,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     @Override
     public boolean addSite(int partitionId) throws Throwable {
+        if (m_addingSiteInProgress.get()) {
+            return false;
+        }
         m_rejoinDataPending = true;
-        m_addingSiteInProgress = true;
+        m_addingSiteInProgress.compareAndSet(false, true);
         CountDownLatch latch = new CountDownLatch(1);
         CreateSiteTask task = new CreateSiteTask(partitionId, latch);
         m_es.submit(task);
@@ -1378,7 +1381,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (task.error != null) {
             throw task.error;
         }
-        return task.status;
+        return task.taskStarted;
     }
 
     class CreateSiteTask implements Runnable {
@@ -1386,7 +1389,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         final int partitionId;
         final CountDownLatch latch;
         Throwable error;
-        boolean status = true;
+        boolean taskStarted = true;
         public CreateSiteTask(int partitionId, CountDownLatch latch) {
             this.partitionId= partitionId;
             this.latch = latch;
@@ -1395,7 +1398,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         @Override
         public void run() {
             try {
-                status = runCreateSiteTask(partitionId);
+                taskStarted = runCreateSiteTask(partitionId);
             } catch (Exception e) {
                 error = e;
             }
@@ -3328,8 +3331,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         m_rejoinDataPending = false;
 
         //The site is new and added after the node is up.
-        if (m_addingSiteInProgress) {
-            m_addingSiteInProgress = false;
+        if (m_addingSiteInProgress.compareAndSet(true, false)) {
             CoreZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), m_myHostId);
             hostLog.info("Adding site complete.");
             return;
