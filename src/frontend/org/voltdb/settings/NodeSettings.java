@@ -31,7 +31,6 @@ import java.util.regex.Pattern;
 
 import org.aeonbits.owner.Config.Sources;
 import org.aeonbits.owner.ConfigFactory;
-import org.aeonbits.owner.Mutable;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
@@ -42,7 +41,7 @@ import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.ImmutableSortedMap;
 
 @Sources({"file:${org.voltdb.config.dir}/path.properties", "file:${org.voltdb.config.dir}/../.paths"})
-public interface NodeSettings extends Settings, Mutable {
+public interface NodeSettings extends Settings {
 
     public final static String CL_SNAPSHOT_PATH_KEY = "org.voltdb.path.command_log_snapshot";
     public final static String CL_PATH_KEY = "org.voltdb.path.command_log";

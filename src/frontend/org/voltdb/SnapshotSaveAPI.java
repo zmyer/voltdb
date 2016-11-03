@@ -193,7 +193,7 @@ public class SnapshotSaveAPI
 
             // Create a barrier to use with the current number of sites to wait for
             // or if the barrier is already set up check if it is broken and reset if necessary
-            final int numLocalSites = context.getLocalSitesCount();
+            final int numLocalSites = VoltDB.instance().getConfig().m_sitesperhost;
             SnapshotSiteProcessor.readySnapshotSetupBarriers(numLocalSites);
             if (SNAP_LOG.isDebugEnabled()) {
                 SNAP_LOG.debug("Number of local sites:" + numLocalSites);

@@ -1408,15 +1408,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     boolean runCreateSiteTask(int partitionId) throws Exception {
         try {
+            //check if the rejoin or snapshot is in progress
             final int rejoiningHost = CoreZK.createRejoinNodeIndicator(m_messenger.getZK(), m_myHostId);
-            if (rejoiningHost != -1 || SnapshotSiteProcessor.isSnapshotInProgress()) {
+            if (rejoiningHost != -1 || SnapshotSiteProcessor.isSnapshotInProgress() || m_joinCoordinator != null) {
+                //remove it if it is registered.
+                CoreZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), m_myHostId);
                 return false;
             }
 
             Stat stat = new Stat();
             JSONObject topo = new JSONObject(new String(m_messenger.getZK().getData(VoltZK.topology, false, stat), Charsets.UTF_8));
             if (!ClusterConfig.addPartitionReplica(topo, m_messenger.getHostId(), partitionId)){
-                throw new IllegalArgumentException(String.format("The host %d alreayd has the partition %d or there is no such a partition in the cluster.", m_messenger.getHostId(), partitionId));
+                throw new IllegalArgumentException(String.format("The host %d already has the partition %d or there is no such a partition in the cluster.", m_messenger.getHostId(), partitionId));
             }
             m_messenger.getZK().setData(VoltZK.topology, topo.toString().getBytes(Constants.UTF8ENCODING),stat.getVersion());
         } catch (KeeperException e) {
@@ -1430,8 +1433,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         //update NodeSettings
         m_config.m_sitesperhost++;
-        m_nodeSettings.setProperty(NodeSettings.LOCAL_SITES_COUNT_KEY, Integer.toString(m_config.m_sitesperhost));
+        Properties props = m_nodeSettings.asProperties();
+        Map<String, String> settingsMap = Maps.newHashMap();
+        for (final String name: props.stringPropertyNames()) {
+            if (NodeSettings.LOCAL_SITES_COUNT_KEY.equals(name)) {
+                settingsMap.put(name, Integer.toString( m_config.m_sitesperhost));
+            } else {
+                settingsMap.put(name, props.getProperty(name));
+            }
+        }
+        m_nodeSettings = NodeSettings.create(settingsMap);
         m_nodeSettings.store();
+
         hostLog.info("The local site count is now " + m_nodeSettings.getLocalSitesCount());
         //update sites per host
         m_messenger.updateSitesPerHostZK();
@@ -1439,8 +1452,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         //initiate the site
         Initiator initiator = createIv2Initiator(partitionId, StartAction.LIVE_REJOIN);
         m_iv2Initiators.put(partitionId, initiator);
-        m_iv2InitiatorStartingTxnIds.put( partitionId, TxnEgo.makeZero(partitionId).getTxnId());
+        m_iv2InitiatorStartingTxnIds.put(partitionId, TxnEgo.makeZero(partitionId).getTxnId());
         m_commandLog.initPartitionForRejoin(partitionId, TxnEgo.makeZero(partitionId).getTxnId());
+
+        //CatalogContext should have correct site count
         final String serializedCatalog = m_catalogContext.catalog.serialize();
         final CatalogSpecificPlanner csp = new CatalogSpecificPlanner(m_asyncCompilerAgent, m_catalogContext);
 
@@ -3318,7 +3333,33 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public synchronized void onExecutionSiteRejoinCompletion(long transferred) {
         m_executionSiteRecoveryFinish = System.currentTimeMillis();
         m_executionSiteRecoveryTransferred = transferred;
-        onRejoinCompletion();
+        if (m_addingSiteInProgress.get()) {
+            onRejoinSiteCompletion();
+        } else {
+            onRejoinCompletion();
+        }
+    }
+
+    private void onRejoinSiteCompletion() {
+        if (m_joinCoordinator != null) {
+            m_joinCoordinator.close();
+        }
+        m_joinCoordinator = null;
+        m_rejoinDataPending = false;
+        try {
+            if (getCommandLog().getClass().getName().equals("org.voltdb.CommandLogImpl")) {
+                String requestNode = m_messenger.getZK().create(VoltZK.request_truncation_snapshot_node, null,
+                        Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
+                if (m_rejoinTruncationReqId == null) {
+                    m_rejoinTruncationReqId = requestNode;
+                }
+            }
+            CoreZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), m_myHostId);
+            hostLog.info("Site rejoin %s completed");
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to log host site rejoin completion to ZK", true, e);
+        }
+        m_addingSiteInProgress.compareAndSet(true, false);
     }
 
     private void onRejoinCompletion() {
@@ -3329,13 +3370,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         m_joinCoordinator = null;
         // Mark the data transfer as done so CL can make the right decision when a truncation snapshot completes
         m_rejoinDataPending = false;
-
-        //The site is new and added after the node is up.
-        if (m_addingSiteInProgress.compareAndSet(true, false)) {
-            CoreZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), m_myHostId);
-            hostLog.info("Adding site complete.");
-            return;
-        }
 
         try {
             m_testBlockRecoveryCompletion.acquire();

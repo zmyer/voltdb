@@ -28,8 +28,6 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.Map;
-
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
@@ -43,48 +41,63 @@ import com.google_voltpatches.common.collect.Maps;
 public class TestAddReplicaSite {
 
     static final int K = 1;
+    static final int SPH_FAKE = 2;
+    static final int HOST_COUNT = 3;
     static final String JAR_NAME = "addsite.jar";
-    static final VoltProjectBuilder m_builder = new VoltProjectBuilder();
+    static final String JAR_NAME_NO_SCHEMA = "addsite-no-schema.jar";
 
-    @BeforeClass
-    public static void compileCatalog() throws IOException {
-        // just use it to fool VoltDB compiler, use overrides CLI option to provide actual sitesperhost
-        final int fakeSph = 2;
-        final int hostCount = 3;
-        m_builder.addLiteralSchema("CREATE TABLE V0 (id BIGINT);");
-        m_builder.configureLogging(null, null, false, false, 200, Integer.MAX_VALUE, null);
-        assertTrue(m_builder.compile(Configuration.getPathToCatalogForTest(JAR_NAME), fakeSph, hostCount, K));
+    @Test
+    public void testAddSiteWithSchema() throws UnknownHostException, InterruptedException, IOException, ProcCallException {
+        // just use it to fool VoltDB compiler, use overrides CLI option to provide actual sites per host
+
+        final VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("CREATE TABLE V0 (id BIGINT);");
+        builder.configureLogging(null, null, false, false, 200, Integer.MAX_VALUE, null);
+        assertTrue(builder.compile(Configuration.getPathToCatalogForTest(JAR_NAME), SPH_FAKE, HOST_COUNT, K));
+        runTest(builder, JAR_NAME, true);
     }
 
     @Test
-    public void testAddReplicateSite() throws InterruptedException, UnknownHostException, IOException, ProcCallException {
+    public void testAddSiteWithNoSchema() throws UnknownHostException, InterruptedException, IOException, ProcCallException {
+        // just use it to fool VoltDB compiler, use overrides CLI option to provide actual sites per host
+        final VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.configureLogging(null, null, false, false, 200, Integer.MAX_VALUE, null);
+        assertTrue(builder.compile(Configuration.getPathToCatalogForTest(JAR_NAME_NO_SCHEMA), SPH_FAKE, HOST_COUNT, K));
+        runTest(builder, JAR_NAME_NO_SCHEMA, false);
+    }
 
-        //use mixed site per host, total of 10 sites in the cluster, k=2
-        Map<Integer, Integer> mixedSphMap = Maps.newHashMap();
-        mixedSphMap.put(0, 4);
-        mixedSphMap.put(1, 3);
-        mixedSphMap.put(2, 3);
-        LocalCluster  cluster = new LocalCluster(
-                JAR_NAME,
+    private void runTest(VoltProjectBuilder builder, String jar, boolean loadData) throws InterruptedException, UnknownHostException, IOException, ProcCallException {
+
+        LocalCluster cluster = new LocalCluster(
+                jar,
                 2,
-                mixedSphMap.size(),
+                3,
                 K,
                 BackendTarget.NATIVE_EE_JNI);
-        cluster.setOverridesForSitesperhost(mixedSphMap);
+
+        //use mixed site per host, total of 10 sites in the cluster, k=1
+        Map<Integer, Integer> sphMap = Maps.newHashMap();
+            sphMap.put(0, 4);
+            sphMap.put(1, 3);
+            sphMap.put(2, 3);
+        cluster.setOverridesForSitesperhost(sphMap);
+
         cluster.setHasLocalServer(false);
         cluster.setDeploymentAndVoltDBRoot(
-                m_builder.getPathToDeployment(),
-                m_builder.getPathToVoltRoot().getAbsolutePath());
+                builder.getPathToDeployment(),
+                builder.getPathToVoltRoot().getAbsolutePath());
         cluster.startUp();
-        try {
-            Client client = ClientFactory.createClient();
+        Client client = ClientFactory.createClient();
 
+        try {
             //connect to host 1
             client.createConnection("localhost", cluster.port(1));
 
             //load some data
-            for (int i = 0; i < 10000; i++) {
-                client.callProcedure("@AdHoc", "insert into V0 values(" + i + ")");
+            if (loadData) {
+                for (int i = 0; i < 10000; i++) {
+                    client.callProcedure("@AdHoc", "insert into V0 values(" + i + ")");
+                }
             }
 
             //check topology, partition 2 and 3 are on 2 sites.
@@ -102,6 +115,7 @@ public class TestAddReplicaSite {
 
             //add one site on host 1 for partition 2
             client.callProcedure("@Replicate", 2, 1);
+
             //give time for the rejoin to complete
             Thread.sleep(80000);
             resp = client.callProcedure("@Statistics", "TOPO", 0);
@@ -119,6 +133,7 @@ public class TestAddReplicaSite {
 
             //add one site on host 1 for partition 3
             client.callProcedure("@Replicate", 3, 1);
+
             //give time for the rejoin to complete
             Thread.sleep(80000);
             resp = client.callProcedure("@Statistics", "TOPO", 0);
@@ -135,15 +150,18 @@ public class TestAddReplicaSite {
             System.out.println("topo:" + topo.toString());
 
             //load more data
-            for (int i = 10000; i < 20000; i++) {
-                client.callProcedure("@AdHoc", "insert into V0 values(" + i + ")");
+            if (loadData) {
+                for (int i = 10000; i < 20000; i++) {
+                    client.callProcedure("@AdHoc", "insert into V0 values(" + i + ")");
+                }
+                resp = client.callProcedure("@AdHoc", "select count(*) from V0");
+                assert(resp.getStatus() == ClientResponse.SUCCESS);
+                topo = resp.getResults()[0];
+                topo.advanceRow();
+                assert(topo.getLong(0) == 20000);
             }
-            resp = client.callProcedure("@AdHoc", "select count(*) from V0");
-            assert(resp.getStatus() == ClientResponse.SUCCESS);
-            topo = resp.getResults()[0];
-            topo.advanceRow();
-            assert(topo.getLong(0) == 20000);
         } finally {
+            try { client.close();} catch (Exception e) {}
             cluster.shutDown();
         }
     }
