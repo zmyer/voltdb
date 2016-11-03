@@ -24,7 +24,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousCloseException;
-import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
@@ -334,28 +333,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         final InputHandler handler = authenticate(m_socket, timeoutRef);
                         if (handler != null) {
                             m_socket.configureBlocking(false);
-                            if (handler instanceof ClientInputHandler) {
-                                m_socket.socket().setTcpNoDelay(true);
-                            }
+                            m_socket.socket().setTcpNoDelay(true);
                             m_socket.socket().setKeepAlive(true);
 
-                            if (handler instanceof ClientInputHandler) {
-                                m_network.registerChannel(
-                                                m_socket,
-                                                handler,
-                                                0,
-                                                ReverseDNSPolicy.ASYNCHRONOUS);
-                                /*
-                                 * If IV2 is enabled the logic initially enabling read is
-                                 * in the started method of the InputHandler
-                                 */
-                            } else {
-                                m_network.registerChannel(
-                                        m_socket,
-                                        handler,
-                                        SelectionKey.OP_READ,
-                                        ReverseDNSPolicy.ASYNCHRONOUS);
-                            }
+                            m_network.registerChannel(
+                                            m_socket,
+                                            handler,
+                                            0,
+                                            ReverseDNSPolicy.ASYNCHRONOUS);
+                            /*
+                             * If IV2 is enabled the logic initially enabling read is
+                             * in the started method of the InputHandler
+                             */
                             success = true;
                         }
                     } catch (Exception e) {

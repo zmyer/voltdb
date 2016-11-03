@@ -168,6 +168,7 @@ import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -922,6 +923,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
              * is trying to rejoin, it should rely on the cartographer's view to pick the partitions to replace.
              */
             JSONObject topo = getTopology(config.m_startAction, hostGroups, m_joinCoordinator);
+
+            /* Create more connection between nodes with a partition group */
+            // TODO: test code
+            if (m_messenger.getHostId() == 0) {
+                Set<Integer> peers = Sets.newHashSet();
+                peers.add(1);
+                m_messenger.addConnections(peers);
+            }
+//            if (m_messenger.getHostId() == 1) {
+//                peers.add(0);
+//            }
+
             m_partitionsToSitesAtStartupForExportInit = new ArrayList<>();
             try {
                 // IV2 mailbox stuff
