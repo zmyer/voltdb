@@ -182,6 +182,10 @@ public class CatalogContext {
         return m_dbSettings.getNodeSetting();
     }
 
+    public DbSettings getDbSettings() {
+        return m_dbSettings;
+    }
+
     public CatalogContext update(
             long txnId,
             long uniqueId,

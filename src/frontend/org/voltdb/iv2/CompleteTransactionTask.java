@@ -51,7 +51,9 @@ public class CompleteTransactionTask extends TransactionTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
-        hostLog.debug("STARTING: " + this);
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("STARTING: " + this);
+        }
         if (!m_txnState.isReadOnly()) {
             // the truncation point token SHOULD be part of m_txn. However, the
             // legacy interaces don't work this way and IV2 hasn't changed this
@@ -67,7 +69,9 @@ public class CompleteTransactionTask extends TransactionTask
 
             // Log invocation to DR
             logToDR();
-            hostLog.debug("COMPLETE: " + this);
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("COMPLETE: " + this);
+            }
         }
         else
         {
@@ -76,7 +80,9 @@ public class CompleteTransactionTask extends TransactionTask
             // flush the queue; we want the TransactionTaskQueue to stay blocked on this TXN ID
             // for the restarted fragments.
             m_txnState.setBeginUndoToken(Site.kInvalidUndoToken);
-            hostLog.debug("RESTART: " + this);
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("RESTART: " + this);
+            }
         }
 
         final CompleteTransactionResponseMessage resp = new CompleteTransactionResponseMessage(m_completeMsg);

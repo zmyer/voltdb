@@ -16,6 +16,8 @@
  */
 package org.voltdb.settings;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.utils.CatalogUtil;
 
@@ -23,10 +25,11 @@ import com.google_voltpatches.common.base.Supplier;
 
 public class DbSettings {
 
-    private final NodeSettings m_nodeSettings;
+    private AtomicReference<NodeSettings> m_nodeSettings;
     private final Supplier<ClusterSettings> m_cluster;
     public DbSettings(Supplier<ClusterSettings> clusterSettings, NodeSettings pathSettings) {
-        m_nodeSettings = pathSettings;
+        m_nodeSettings = new AtomicReference<>();
+        m_nodeSettings.set(pathSettings);
         m_cluster = clusterSettings;
     }
     /**
@@ -34,7 +37,8 @@ public class DbSettings {
      * @param dt deployment JAXB object
      */
     public DbSettings(DeploymentType dt) {
-        m_nodeSettings = NodeSettings.create(CatalogUtil.asNodeSettingsMap(dt));
+        m_nodeSettings = new AtomicReference<>();
+        m_nodeSettings.set(NodeSettings.create(CatalogUtil.asNodeSettingsMap(dt)));
         m_cluster = ClusterSettings.create(CatalogUtil.asClusterSettingsMap(dt)).asSupplier();
     }
 
@@ -43,12 +47,16 @@ public class DbSettings {
     }
 
     public NodeSettings getNodeSetting() {
-        return m_nodeSettings;
+        return m_nodeSettings.get();
+    }
+
+    public void setNodeSettings(NodeSettings nodeSettings) {
+        m_nodeSettings.set(nodeSettings);
     }
 
     @Override
     public String toString() {
-        return "DbSettings [paths=" + m_nodeSettings + ", cluster=" + m_cluster
+        return "DbSettings [paths=" + m_nodeSettings.get() + ", cluster=" + m_cluster
                 + "]";
     }
 }

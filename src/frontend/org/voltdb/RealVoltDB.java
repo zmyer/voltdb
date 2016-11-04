@@ -1411,8 +1411,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             //check if the rejoin or snapshot is in progress
             final int rejoiningHost = CoreZK.createRejoinNodeIndicator(m_messenger.getZK(), m_myHostId);
             if (rejoiningHost != -1 || SnapshotSiteProcessor.isSnapshotInProgress() || m_joinCoordinator != null) {
-                //remove it if it is registered.
-                CoreZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), m_myHostId);
                 return false;
             }
 
@@ -1444,8 +1442,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         m_nodeSettings = NodeSettings.create(settingsMap);
         m_nodeSettings.store();
-
-        hostLog.info("The local site count is now " + m_nodeSettings.getLocalSitesCount());
+        m_catalogContext.getDbSettings().setNodeSettings(m_nodeSettings);
+        hostLog.info("The local site count is now " + m_catalogContext.getNodeSettings().getLocalSitesCount());
         //update sites per host
         m_messenger.updateSitesPerHostZK();
 
@@ -3347,15 +3345,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         m_joinCoordinator = null;
         m_rejoinDataPending = false;
         try {
-            if (getCommandLog().getClass().getName().equals("org.voltdb.CommandLogImpl")) {
-                String requestNode = m_messenger.getZK().create(VoltZK.request_truncation_snapshot_node, null,
-                        Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
-                if (m_rejoinTruncationReqId == null) {
-                    m_rejoinTruncationReqId = requestNode;
-                }
-            }
             CoreZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), m_myHostId);
-            hostLog.info("Site rejoin %s completed");
+            hostLog.info("Site rejoin is completed");
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to log host site rejoin completion to ZK", true, e);
         }
