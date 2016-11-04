@@ -25,6 +25,7 @@ package org.voltdb;
 
 import static org.junit.Assert.assertTrue;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.Map;
@@ -36,6 +37,8 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.utils.VoltFile;
+
 import com.google_voltpatches.common.collect.Maps;
 
 public class TestAddReplicaSite {
@@ -49,7 +52,6 @@ public class TestAddReplicaSite {
     @Test
     public void testAddSiteWithSchema() throws UnknownHostException, InterruptedException, IOException, ProcCallException {
         // just use it to fool VoltDB compiler, use overrides CLI option to provide actual sites per host
-
         final VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("CREATE TABLE V0 (id BIGINT);");
         builder.configureLogging(null, null, false, false, 200, Integer.MAX_VALUE, null);
@@ -67,6 +69,10 @@ public class TestAddReplicaSite {
     }
 
     private void runTest(VoltProjectBuilder builder, String jar, boolean loadData) throws InterruptedException, UnknownHostException, IOException, ProcCallException {
+
+        VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
+        File f = new File("/tmp/" + System.getProperty("user.name"));
+        f.mkdirs();
 
         LocalCluster cluster = new LocalCluster(
                 jar,

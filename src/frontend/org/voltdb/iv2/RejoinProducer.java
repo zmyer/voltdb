@@ -287,7 +287,7 @@ public class RejoinProducer extends JoinProducerBase {
         }
         else {
             if (REJOINLOG.isDebugEnabled()) {
-                REJOINLOG.debug(m_whoami + "Rejoin snapshot transfer is finished with tables in schema");
+                REJOINLOG.debug(m_whoami + "Rejoin snapshot transfer is finished with no tables in schema");
             }
             doFinishingTask(siteConnection);
             // Remove the completion monitor for an empty (zero table) rejoin.

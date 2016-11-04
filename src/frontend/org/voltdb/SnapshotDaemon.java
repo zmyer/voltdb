@@ -934,6 +934,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                             scheduleSnapshotForLater(jsObj.toString(4), requestId, true);
                         } else {
                             ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
+                            if (SNAP_LOG.isDebugEnabled()) {
+                                SNAP_LOG.debug("Save response to ZK and reset: request id=" + requestId);
+                            }
                             saveResponseToZKAndReset(requestId, rimpl);
                             return;
                         }
@@ -1077,8 +1080,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                     SNAP_LOG.info(result);
                                 } else {
                                     try {
-                                        SNAP_LOG.debug("Queued user snapshot was successfully requested, saving to path " +
-                                                VoltZK.user_snapshot_response + requestId);
+                                        if (SNAP_LOG.isDebugEnabled()) {
+                                            SNAP_LOG.debug("Queued user snapshot was successfully requested, saving to path " +
+                                                    VoltZK.user_snapshot_response + requestId);
+                                        }
                                         /*
                                          * Snapshot was started no problem, reset the watch for new requests
                                          */
@@ -1178,6 +1183,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      */
     void userSnapshotRequestExistenceCheck(boolean deleteExistingRequest) throws Exception {
         if (deleteExistingRequest) {
+            if (SNAP_LOG.isDebugEnabled()) {
+                SNAP_LOG.debug("Delete user snapshot request on ZK:" + VoltZK.user_snapshot_request);
+            }
             m_zk.delete(VoltZK.user_snapshot_request, -1, null, null);
         }
         if (m_zk.exists(VoltZK.user_snapshot_request, m_userSnapshotRequestExistenceWatcher) != null) {
@@ -1763,14 +1771,22 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 jsObj.put("requestId", requestId);
                 String zkString = jsObj.toString(4);
                 byte zkBytes[] = zkString.getBytes("UTF-8");
-
+                if (SNAP_LOG.isDebugEnabled()) {
+                    SNAP_LOG.debug("Create user snapshot request node on ZK:" + VoltZK.user_snapshot_request);
+                }
                 m_zk.create(VoltZK.user_snapshot_request, zkBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             }
             else {
+                if (SNAP_LOG.isDebugEnabled()) {
+                    SNAP_LOG.debug("Create truncation snapshot node on ZK:" + VoltZK.request_truncation_snapshot_node);
+                }
                 m_zk.create(VoltZK.request_truncation_snapshot_node, null,
                         Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
             }
         } catch (KeeperException.NodeExistsException e) {
+            if (SNAP_LOG.isDebugEnabled()) {
+                SNAP_LOG.debug("Snapshot node is alredy on ZK:" + e.getMessage());
+            }
             return null;
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Exception while attempting to create user snapshot request in ZK", true, e);
