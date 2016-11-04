@@ -273,7 +273,9 @@ public class RejoinProducer extends JoinProducerBase {
             if (m_rejoinSiteProcessor.isEOF() == false) {
                 returnToTaskQueue(sourcesReady);
             } else {
-                REJOINLOG.debug(m_whoami + "Rejoin snapshot transfer is finished");
+                if (REJOINLOG.isDebugEnabled()) {
+                    REJOINLOG.debug(m_whoami + "Rejoin snapshot transfer is finished. Remove mailbox");
+                }
                 m_rejoinSiteProcessor.close();
 
                 if (m_streamSnapshotMb != null) {
@@ -284,6 +286,9 @@ public class RejoinProducer extends JoinProducerBase {
             }
         }
         else {
+            if (REJOINLOG.isDebugEnabled()) {
+                REJOINLOG.debug(m_whoami + "Rejoin snapshot transfer is finished with tables in schema");
+            }
             doFinishingTask(siteConnection);
             // Remove the completion monitor for an empty (zero table) rejoin.
             m_snapshotCompletionMonitor.set(null);
@@ -316,7 +321,7 @@ public class RejoinProducer extends JoinProducerBase {
                     return;
                 }
                 if (REJOINLOG.isDebugEnabled()) {
-                    REJOINLOG.debug("Snapshot completion monitor is not done for partition " + m_partitionId);
+                    REJOINLOG.debug("Snapshot completion monitor is done for partition " + m_partitionId);
                 }
 
                 SnapshotCompletionEvent event = null;
@@ -327,7 +332,9 @@ public class RejoinProducer extends JoinProducerBase {
                 try {
                     event = m_snapshotCompletionMonitor.get();
                     if (!m_schemaHasNoTables) {
-                        REJOINLOG.debug(m_whoami + "waiting on snapshot completion monitor.");
+                        if (REJOINLOG.isDebugEnabled()) {
+                            REJOINLOG.debug(m_whoami + "waiting on snapshot completion monitor.");
+                        }
                         exportSequenceNumbers = event.exportSequenceNumbers;
                         m_completionAction.setSnapshotTxnId(event.multipartTxnId);
 
@@ -339,10 +346,11 @@ public class RejoinProducer extends JoinProducerBase {
                         siteConnection.setDRProtocolVersion(event.drVersion);
                     }
 
-                    REJOINLOG.debug(m_whoami + " monitor completed. Sending SNAPSHOT_FINISHED "
-                            + "and handing off to site.");
-                    RejoinMessage snap_complete = new RejoinMessage(
-                            m_mailbox.getHSId(), Type.SNAPSHOT_FINISHED);
+                    if (REJOINLOG.isDebugEnabled()) {
+                        REJOINLOG.debug(m_whoami + " monitor completed. Sending SNAPSHOT_FINISHED "
+                                + "and handing off to site.");
+                    }
+                    RejoinMessage snap_complete = new RejoinMessage(m_mailbox.getHSId(), Type.SNAPSHOT_FINISHED);
                     m_mailbox.send(m_coordinatorHsId, snap_complete);
                 } catch (InterruptedException crashme) {
                     VoltDB.crashLocalVoltDB(
