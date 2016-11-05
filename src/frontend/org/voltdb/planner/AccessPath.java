@@ -18,6 +18,7 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
@@ -29,29 +30,40 @@ public class AccessPath {
     IndexUseType use = IndexUseType.COVERING_UNIQUE_EQUALITY;
     boolean nestLoopIndexJoin = false;
     boolean requiresSendReceive = false;
-    boolean keyIterate = false;
     IndexLookupType lookupType = IndexLookupType.EQ;
     SortDirectionType sortDirection = SortDirectionType.INVALID;
     // The initial expression is needed to adjust (forward) the start of the reverse
     // iteration when it had to initially settle for starting at
     // "greater than a prefix key".
-    final ArrayList<AbstractExpression> initialExpr = new ArrayList<AbstractExpression>();
-    final ArrayList<AbstractExpression> indexExprs = new ArrayList<AbstractExpression>();
-    final ArrayList<AbstractExpression> endExprs = new ArrayList<AbstractExpression>();
-    final ArrayList<AbstractExpression> otherExprs = new ArrayList<AbstractExpression>();
-    final ArrayList<AbstractExpression> joinExprs = new ArrayList<AbstractExpression>();
-    final ArrayList<AbstractExpression> bindings = new ArrayList<AbstractExpression>();
-    final ArrayList<AbstractExpression> eliminatedPostExprs = new ArrayList<AbstractExpression>();
+    final ArrayList<AbstractExpression> initialExpr = new ArrayList<>();
+    final ArrayList<AbstractExpression> indexExprs = new ArrayList<>();
+    final ArrayList<AbstractExpression> endExprs = new ArrayList<>();
+    final ArrayList<AbstractExpression> bindings = new ArrayList<>();
+    final ArrayList<AbstractExpression> eliminatedPostExprs = new ArrayList<>();
+    final ArrayList<AbstractExpression> joinExprs;
+    final ArrayList<AbstractExpression> otherExprs;
+
+    AccessPath() {
+        joinExprs = new ArrayList<>();
+        otherExprs = new ArrayList<>();
+    }
+
+    AccessPath(List<AbstractExpression> joiners, List<AbstractExpression> others) {
+        joinExprs = (joiners == null) ? new ArrayList<>() : new ArrayList<>(joiners);
+        otherExprs = (others == null) ? new ArrayList<>() : new ArrayList<>(others);
+    }
 
     @Override
     public String toString() {
         String retval = "";
 
-        retval += "INDEX: " + ((index == null) ? "NULL" : (index.getParent().getTypeName() + "." + index.getTypeName())) + "\n";
+        retval += "INDEX: " + ((index == null) ?
+                "NULL" :
+                index.getParent().getTypeName() + "." + index.getTypeName()) +
+                "\n";
         retval += "USE:   " + use.toString() + "\n";
         retval += "TYPE:  " + lookupType.toString() + "\n";
         retval += "DIR:   " + sortDirection.toString() + "\n";
-        retval += "ITER?: " + String.valueOf(keyIterate) + "\n";
         retval += "NLIJ?: " + String.valueOf(nestLoopIndexJoin) + "\n";
 
         retval += "IDX EXPRS:\n";

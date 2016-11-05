@@ -192,16 +192,10 @@ public abstract class SubPlanAssembler {
      * @param filterExprs filter expressions
      * @return Naive access path
      */
-    protected static AccessPath getRelevantNaivePath(List<AbstractExpression> joinExprs, List<AbstractExpression> filterExprs) {
-        AccessPath naivePath = new AccessPath();
-
-        if (filterExprs != null) {
-            naivePath.otherExprs.addAll(filterExprs);
-        }
-        if (joinExprs != null) {
-            naivePath.joinExprs.addAll(joinExprs);
-        }
-        return naivePath;
+    protected static AccessPath getRelevantNaivePath(
+            List<AbstractExpression> joinExprs,
+            List<AbstractExpression> filterExprs) {
+        return new AccessPath(joinExprs, filterExprs);
     }
 
     /**
