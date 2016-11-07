@@ -22,7 +22,10 @@ import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.HBBPool.SharedBBContainer;
 import org.voltdb.iv2.DummyTransactionTask;
 import org.voltdb.iv2.TxnEgo;
 
@@ -88,9 +91,24 @@ public class DummyTransactionResponseMessage extends VoltMessage {
     @Override
     public void initFromBuffer(ByteBuffer buf) throws IOException
     {
+        assert(false);
+    }
+
+    @Override
+    protected void initFromContainer(SharedBBContainer container)
+            throws IOException {
+        ByteBuffer buf = container.b();
         m_txnId = buf.getLong();
         m_spHandle = buf.getLong();
         m_spiHSId = buf.getLong();
+        assert(buf.limit() == buf.position());
+        container.discard(getClass().getSimpleName());
+    }
+
+    @Override
+    protected void initFromInputHandler(VoltProtocolHandler handler,
+            NIOReadStream inputStream) throws IOException {
+        initFromContainer(handler.getNextHBBMessage(inputStream, getClass().getSimpleName()));
     }
 
     @Override
@@ -104,4 +122,10 @@ public class DummyTransactionResponseMessage extends VoltMessage {
 
         return sb.toString();
     }
+
+    @Override
+    public void implicitReference(String tag) {}
+
+    @Override
+    public void discard(String tag) {}
 }

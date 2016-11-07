@@ -26,6 +26,8 @@ import java.util.concurrent.FutureTask;
 
 import org.voltcore.utils.HBBPool;
 import org.voltcore.utils.HBBPool.SharedBBContainer;
+import org.voltdb.client.ProcedureInvocationType;
+import org.voltdb.utils.SerializationHelper;
 
 public class SPIfromParameterArray extends StoredProcedureInvocation {
 
@@ -78,7 +80,7 @@ public class SPIfromParameterArray extends StoredProcedureInvocation {
     }
 
     @Override
-    public StoredProcedureInvocation getShallowCopy() {
+    public StoredProcedureInvocation getShallowCopy(String tag) {
         SPIfromParameterArray copy = new SPIfromParameterArray();
         commonShallowCopy(copy);
         copy.rawParams = rawParams;
@@ -115,6 +117,35 @@ public class SPIfromParameterArray extends StoredProcedureInvocation {
             throw new RuntimeException(e);
         }
         return null;
+    }
+
+    /**
+     * Serializes this SPI in the original serialization version.
+     * This is currently used by DR.
+     */
+    public void flattenToBufferForOriginalVersion(ByteBuffer buf) throws IOException
+    {
+        assert(rawParams != null);
+
+        // for self-check assertion
+        int startPosition = buf.position();
+
+        buf.put(ProcedureInvocationType.ORIGINAL.getValue());
+
+        SerializationHelper.writeVarbinary(getProcNameBytes(), buf);
+
+        buf.putLong(clientHandle);
+        try {
+            getParams().flattenToBuffer(buf);
+        }
+        catch (BufferOverflowException e) {
+            hostLog.info("SP \"" + procName + "\" has thrown BufferOverflowException");
+            hostLog.info(toString());
+            throw e;
+        }
+
+        int len = buf.position() - startPosition;
+        assert(len == getSerializedSizeForOriginalVersion());
     }
 
     @Override

@@ -159,6 +159,10 @@ public abstract class SPIfromSerialization extends StoredProcedureInvocation {
             case ProcedureInvocationExtensions.BATCH_TIMEOUT:
                 m_batchTimeout = ProcedureInvocationExtensions.readBatchTimeout(buf);
                 break;
+            case ProcedureInvocationExtensions.ALL_PARTITION:
+                // note this always returns true as it's just a flag
+                m_allPartition = ProcedureInvocationExtensions.readAllPartition(buf);
+                break;
             default:
                 ProcedureInvocationExtensions.skipUnknownExtension(buf);
                 break;

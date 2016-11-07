@@ -205,6 +205,7 @@ public class RepairLog
                     + ", " + who + ": lastSpHandle: " + m_lastSpHandle + ", lastMpHandle: " + m_lastMpHandle);
             for (Iv2RepairLogResponseMessage il : contents(0l, false)) {
                tmLog.warn("[Repair log contents]" + who + ": msg: " + il);
+               il.discard("RepairCopy");
             }
         }
         else if (msg instanceof RepairLogTruncationMessage) {
@@ -304,6 +305,16 @@ public class RepairLog
         Iterator<Item> itemator = items.iterator();
         while (itemator.hasNext()) {
             Item item = itemator.next();
+            VoltMessage msg = item.getMessage();
+            if (msg instanceof FragmentTaskMessage) {
+                // We need to have a different container so the tags don't collide
+                // from different repair logs (Don't bother if we disable tags).
+                FragmentTaskMessage fragTask = (FragmentTaskMessage)msg;
+                msg = new FragmentTaskMessage(fragTask.getInitiatorHSId(), fragTask.getCoordinatorHSId(), fragTask, "RepairCopy");
+            }
+            else {
+                msg.implicitReference("RepairCopy");
+            }
             Iv2RepairLogResponseMessage response =
                 new Iv2RepairLogResponseMessage(
                         requestId,
@@ -311,7 +322,7 @@ public class RepairLog
                         ofTotal,
                         item.getHandle(),
                         item.getTxnId(),
-                        item.getMessage());
+                        msg);
             responses.add(response);
         }
         return responses;

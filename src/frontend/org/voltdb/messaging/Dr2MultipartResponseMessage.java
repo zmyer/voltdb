@@ -17,11 +17,14 @@
 
 package org.voltdb.messaging;
 
-import org.voltcore.messaging.VoltMessage;
-import org.voltdb.ClientResponseImpl;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
+
+import org.voltcore.messaging.VoltMessage;
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.VoltProtocolHandler;
+import org.voltcore.utils.HBBPool.SharedBBContainer;
+import org.voltdb.ClientResponseImpl;
 
 public class Dr2MultipartResponseMessage extends VoltMessage {
 
@@ -61,12 +64,21 @@ public class Dr2MultipartResponseMessage extends VoltMessage {
 
     @Override
     protected void initFromBuffer(ByteBuffer buf) throws IOException {
+        assert(false);
+    }
+
+    @Override
+    protected void initFromContainer(SharedBBContainer container)
+            throws IOException {
+        ByteBuffer buf = container.b();
         m_drain = buf.get() == 1;
         m_producerPID = buf.getInt();
         if (buf.remaining() > 0) {
             m_response = new ClientResponseImpl();
             m_response.initFromBuffer(buf);
         }
+        assert(buf.limit() == buf.position());
+        container.discard(getClass().getSimpleName());
     }
 
     @Override
@@ -93,4 +105,16 @@ public class Dr2MultipartResponseMessage extends VoltMessage {
         }
         return size;
     }
+
+    @Override
+    protected void initFromInputHandler(VoltProtocolHandler handler,
+            NIOReadStream inputStream) throws IOException {
+        initFromContainer(handler.getNextHBBMessage(inputStream, getClass().getSimpleName()));
+    }
+
+    @Override
+    public void implicitReference(String tag) {}
+
+    @Override
+    public void discard(String tag) {}
 }

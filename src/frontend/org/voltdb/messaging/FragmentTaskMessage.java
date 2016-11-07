@@ -195,7 +195,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     // when we serialize the copy.
     public FragmentTaskMessage(long initiatorHSId,
             long coordinatorHSId,
-            FragmentTaskMessage ftask)
+            FragmentTaskMessage ftask,
+            String dupContainerTag)
     {
         super(initiatorHSId, coordinatorHSId, ftask);
 
@@ -205,16 +206,26 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_subject = ftask.m_subject;
         m_inputDepCount = ftask.m_inputDepCount;
         m_items = ftask.m_items;
-        m_initiateTask = ftask.m_initiateTask;
+        if (dupContainerTag == null) {
+            m_initiateTask = ftask.m_initiateTask;
+            if (ftask.m_initiateTaskContainer != null) {
+                m_initiateTaskContainer = ftask.m_initiateTaskContainer;
+            }
+        }
+        else {
+            Iv2InitiateTaskMessage taskMsg = ftask.m_initiateTask;
+            m_initiateTask = new Iv2InitiateTaskMessage(taskMsg.getInitiatorHSId(),
+                    taskMsg.getCoordinatorHSId(), taskMsg, dupContainerTag);
+            if (ftask.m_initiateTaskContainer != null) {
+                m_initiateTaskContainer = ftask.m_initiateTaskContainer.duplicate(dupContainerTag+"_Raw");
+            }
+        }
         m_emptyForRestart = ftask.m_emptyForRestart;
         m_procedureName = ftask.m_procedureName;
         m_currentBatchIndex = ftask.m_currentBatchIndex;
         m_involvedPartitions = ftask.m_involvedPartitions;
         m_procNameToLoad = ftask.m_procNameToLoad;
         m_batchTimeout = ftask.m_batchTimeout;
-        if (ftask.m_initiateTaskContainer != null) {
-            m_initiateTaskContainer = ftask.m_initiateTaskContainer;
-        }
         assert(selfCheck());
     }
 
@@ -964,7 +975,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             m_initiateTask.discard(tag);
         }
         if (m_initiateTaskContainer != null) {
-            m_initiateTaskContainer.discard(tag + "_Raw");
+            if (m_initiateTaskContainer.discardIsLast(tag + "_Raw")) {
+                m_initiateTaskContainer = null;
+            }
         }
     }
 

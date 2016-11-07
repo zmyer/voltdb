@@ -23,9 +23,11 @@ import java.util.Map.Entry;
 import java.util.TreeMap;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.HBBPool;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
@@ -163,6 +165,12 @@ public class ReplaySequencer
     // sequencer must be removed using drain()
     boolean m_mustDrain = false;
 
+    Mailbox m_mailbox;
+
+    public void setMailbox(Mailbox mailbox) {
+        m_mailbox = mailbox;
+    }
+
     /**
      * Dedupe initiate task messages. Check if the initiate task message is seen before.
      *
@@ -189,6 +197,7 @@ public class ReplaySequencer
                 resp.setResults(new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                         new VoltTable[0],
                         ClientResponseImpl.IGNORED_TRANSACTION));
+                init.discard(HBBPool.debugUniqueTag("SendOrDone", m_mailbox.getHSId()));
                 return resp;
             }
         }

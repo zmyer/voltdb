@@ -44,9 +44,9 @@ public final class HBBPool {
         TRACE.setLevel(Level.TRACE);
     }
 
-    private static final boolean JUSTALLOC_LOGGING = false;
-    private static final boolean FULL_LOGGING = true;
-    private static final boolean LOG_STACKTRACE = true;
+    private static final boolean JUSTALLOC_LOGGING = true;
+    private static final boolean FULL_LOGGING = false;
+    private static final boolean LOG_STACKTRACE = false;
 
     /**
      * Number of bytes allocated globally by DBBPools
@@ -165,8 +165,8 @@ public final class HBBPool {
                 m_outstandingContainers.add(container);
                 message.append("Allocated ").append(tag).append(" (1/1[]) ");
                 if (!FULL_LOGGING && JUSTALLOC_LOGGING) {
-                    message.append(" BufferWrapper ").append(Integer.toHexString(System.identityHashCode(bufWrapper)));
-                    message.append(" Container ").append(Integer.toHexString(System.identityHashCode(container)));
+                    message.append(" BufferWrapper ").append(Integer.toHexString(bufWrapper.hashCode()));
+                    message.append(" Container ").append(Integer.toHexString(container.hashCode()));
                     message.append(" with HBB capacity ").append(bufWrapper.m_buffer.length).append(" total allocated ").append(bytesAllocatedGlobally.get());
                     TRACE.trace(message);
                 }
@@ -207,8 +207,8 @@ public final class HBBPool {
                 m_outstandingContainers.remove(container);
                 message.append("Deallocated ").append(tag);
                 if (!FULL_LOGGING && JUSTALLOC_LOGGING) {
-                    message.append(" BufferWrapper ").append(Integer.toHexString(System.identityHashCode(bufWrapper)));
-                    message.append(" Container ").append(Integer.toHexString(System.identityHashCode(container)));
+                    message.append(" BufferWrapper ").append(Integer.toHexString(bufWrapper.hashCode()));
+                    message.append(" Container ").append(Integer.toHexString(container.hashCode()));
                     message.append(" with HBB capacity ").append(bufWrapper.m_buffer.length).append(" total allocated ").append(bytesAllocatedGlobally.get());
                     TRACE.trace(message);
                 }
@@ -337,7 +337,7 @@ public final class HBBPool {
             trackAllocation();
         }
 
-        private synchronized void internalDiscard(final boolean logging, final String tag) {
+        private synchronized boolean internalDiscard(final boolean logging, final String tag) {
             assert(tag != null);
             final int containerRefCount = --m_containerRefCount;
             if (containerRefCount == 0) {
@@ -371,6 +371,7 @@ public final class HBBPool {
                     assert(m_tags.remove(tag));
                 }
                 assert(m_tags.isEmpty());
+                return true;
             }
             else {
                 checkUseAfterFree();
@@ -378,6 +379,7 @@ public final class HBBPool {
                     logDeallocation(this, m_bufWrapper.m_wrapperRefCount, containerRefCount, tag);
                 }
                 assert(m_tags.remove(tag));
+                return false;
             }
         }
 
@@ -389,7 +391,15 @@ public final class HBBPool {
             internalDiscard(false, tag);
         }
 
+        public boolean discardIsLast(String tag) {
+            return internalDiscard(true, tag);
+        }
+
         public ByteBuffer b() {
+            if (b.array()[5] == 73 && b.array()[6] == 110 && b.array()[7] == 115 && b.array()[8] == 101) {
+                Throwable t = new Throwable("\"" + Thread.currentThread().getName() + "\" at " + System.currentTimeMillis());
+                HOST.warn("Wrapper " + Integer.toHexString(System.identityHashCode(m_bufWrapper)) + " contains match: ", t);
+            }
             checkUseAfterFree();
             return b;
         }

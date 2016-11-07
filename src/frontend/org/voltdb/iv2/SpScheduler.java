@@ -643,14 +643,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // make a copy because handleIv2 non-repair case does?
             Iv2InitiateTaskMessage localWork =
                 new Iv2InitiateTaskMessage(message.getInitiatorHSId(),
-                    message.getCoordinatorHSId(), message);
+                    message.getCoordinatorHSId(), message, null);
             doLocalInitiateOffer(localWork);
         }
 
         // is remote repair necessary?
         if (!needsRepair.isEmpty()) {
             Iv2InitiateTaskMessage replmsg =
-                new Iv2InitiateTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
+                new Iv2InitiateTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message, null);
             m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(needsRepair), replmsg);
         }
     }
@@ -681,14 +681,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // make a copy because handleIv2 non-repair case does?
             FragmentTaskMessage localWork =
                 new FragmentTaskMessage(message.getInitiatorHSId(),
-                    message.getCoordinatorHSId(), message);
+                    message.getCoordinatorHSId(), message, null);
             doLocalFragmentOffer(localWork);
         }
 
         // is remote repair necessary?
         if (!needsRepair.isEmpty()) {
             FragmentTaskMessage replmsg =
-                new FragmentTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
+                new FragmentTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message, null);
             m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(needsRepair), replmsg);
         }
     }
@@ -803,7 +803,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // before we start mucking with its state (SPHANDLE).  We need to revisit
             // all the messaging mess at some point.
             msg = new FragmentTaskMessage(message.getInitiatorHSId(),
-                    message.getCoordinatorHSId(), message);
+                    message.getCoordinatorHSId(), message, null);
             //Not going to use the timestamp from the new Ego because the multi-part timestamp is what should be used
 
             if (!message.isReadOnly()) {
@@ -833,9 +833,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (m_sendToHSIds.length > 0 && (!message.isReadOnly() || msg.isSysProcTask())) {
                 FragmentTaskMessage replmsg =
                     new FragmentTaskMessage(m_mailbox.getHSId(),
-                            m_mailbox.getHSId(), msg);
+                            m_mailbox.getHSId(), msg, null);
                 for (long hsid : m_sendToHSIds) {
-                    msg.implicitReference(HBBPool.debugUniqueTag("SendOrDone", hsid));
+                    replmsg.implicitReference(HBBPool.debugUniqueTag("SendOrDone", hsid));
                 }
                 m_mailbox.send(m_sendToHSIds,
                         replmsg);
@@ -1205,7 +1205,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         Iv2Trace.logDummyTransactionTaskMessage(msg, m_mailbox.getHSId());
 
         DummyTransactionTask task = new DummyTransactionTask(m_mailbox,
-                new SpTransactionState(msg), m_pendingTasks);
+                new SpTransactionState(m_mailbox, msg), m_pendingTasks);
         // This read only DummyTransactionTask is to help flushing the task queue,
         // including tasks in command log queue as well.
         ListenableFuture<Object> durabilityBackpressureFuture =

@@ -45,7 +45,7 @@ public class SPIfromSerializedBuffer extends SPIfromSerialization {
     }
 
     @Override
-    public StoredProcedureInvocation getShallowCopy() {
+    public StoredProcedureInvocation getShallowCopy(String tag) {
         SPIfromSerializedBuffer copy = new SPIfromSerializedBuffer();
         commonShallowCopy(copy);
         copy.serializedParams = serializedParams.duplicate();

@@ -983,7 +983,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                 try {
                     ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
-                    StoredProcedureInvocation invocation = response.getInvocation().getShallowCopy();
+                    StoredProcedureInvocation invocation = response.getInvocation().getShallowCopy("RestartTxn");
                     int partition = InvocationDispatcher.getPartitionForProcedure(ppi.index,
                             ppi.type, invocation);
                     createTransaction(cihm.connection.connectionId(),
@@ -994,7 +994,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             partition,
                             messageSize,
                             nowNanos);
-                    invocation.discard("Params");
+                    invocation.discard("RestartTxn");
                     return true;
                 } catch (Exception e) {
                     // unable to hash to a site, return an error
@@ -1367,7 +1367,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return err;
         }
 
-        ClientResponseImpl response = m_dispatcher.dispatch(task, handler, ccxn, user);
+        ClientResponseImpl response = m_dispatcher.dispatch(task, handler, ccxn, user, null);
         task.discard("ClientInterface");
         return response;
     }

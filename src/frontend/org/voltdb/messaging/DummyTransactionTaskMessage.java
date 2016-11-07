@@ -21,7 +21,10 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.HBBPool.SharedBBContainer;
 import org.voltdb.iv2.TxnEgo;
 
 /**
@@ -58,6 +61,30 @@ public class DummyTransactionTaskMessage extends TransactionInfoBaseMessage
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
+
+    @Override
+    protected void initFromBuffer(ByteBuffer buf) throws IOException {
+        assert(false);
+    }
+
+    @Override
+    public void initFromContainer(SharedBBContainer container) throws IOException {
+        super.initFromContainer(container);
+        ByteBuffer buf = container.b();
+        assert(buf.limit() == buf.position());
+        container.discard(getClass().getSimpleName());
+    }
+
+    @Override
+    public void initFromInputHandler(VoltProtocolHandler handler, NIOReadStream inputStream) throws IOException {
+        initFromContainer(handler.getNextHBBMessage(inputStream, getClass().getSimpleName()));
+    }
+
+    @Override
+    public void implicitReference(String tag) {}
+
+    @Override
+    public void discard(String tag) {}
 
     @Override
     public String toString() {

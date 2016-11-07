@@ -89,7 +89,7 @@ public class TestStoredProcedureInvocation extends TestCase {
     };
 
 
-    void roundTripBuffer(boolean expectSuccess, ByteBuffer buf, String procName, long handle, int timeout) throws IOException {
+    void roundTripBuffer(boolean expectSuccess, ByteBuffer buf, String procName, long handle, int timeout, boolean allPartition) throws IOException {
         SPIfromSerializedBuffer spi = new SPIfromSerializedBuffer();
         spi.initFromByteBuffer(buf);
 
@@ -207,7 +207,7 @@ public class TestStoredProcedureInvocation extends TestCase {
         // try original if no timeout
         if (timeout == BatchTimeoutOverrideType.NO_TIMEOUT) {
             try {
-                StoredProcedureInvocation spi = new StoredProcedureInvocation();
+                SPIfromParameterArray spi = new SPIfromParameterArray();
                 spi.setProcName(procName);
                 spi.setClientHandle(handle);
                 spi.setParams(params);

@@ -281,7 +281,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
         assert(lockingVows());
         if (repairWork instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)repairWork;
-            Iv2InitiateTaskMessage work = new Iv2InitiateTaskMessage(m.getInitiatorHSId(), getHSId(), m);
+            Iv2InitiateTaskMessage work = new Iv2InitiateTaskMessage(m.getInitiatorHSId(), getHSId(), m, null);
             m_scheduler.updateLastSeenUniqueIds(work);
             m_scheduler.handleMessageRepair(needsRepair, work);
         }

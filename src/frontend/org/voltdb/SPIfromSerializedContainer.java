@@ -19,6 +19,7 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Iterator;
 
 import org.voltcore.utils.HBBPool;
 import org.voltcore.utils.HBBPool.SharedBBContainer;
@@ -54,29 +55,34 @@ public class SPIfromSerializedContainer extends SPIfromSerialization {
     }
 
     protected void initFromParameterSet(ParameterSet params) throws IOException {
-        String initTag;
+        SharedBBContainer newSerialization;
         if (serializedParams != null) {
             // deallocate existing params and swap with new params
-            assert(serializedParams.m_tags.size() == 1);
-            initTag = serializedParams.m_tags.iterator().next();
+            Iterator<String> it = serializedParams.m_tags.iterator();
+            String initTag = it.next();
+            newSerialization = HBBPool.allocateHeapAndPool(m_serializedParamSize, initTag);
             serializedParams.discard(initTag);
+            while (it.hasNext()) {
+                initTag = it.next();
+                newSerialization.implicitReference(initTag);
+                serializedParams.discard(initTag);
+            }
             serializedParams = null;
         }
         else {
-            initTag = "Params";
+            newSerialization = HBBPool.allocateHeapAndPool(m_serializedParamSize, "Params");
         }
-        SharedBBContainer newSerialization = HBBPool.allocateHeapAndPool(m_serializedParamSize, initTag);
         params.flattenToBuffer(newSerialization.b());
         newSerialization.b().flip();
         setSerializedParams(newSerialization);
     }
 
     @Override
-    public StoredProcedureInvocation getShallowCopy()
+    public StoredProcedureInvocation getShallowCopy(String tag)
     {
         SPIfromSerializedContainer copy = new SPIfromSerializedContainer();
         commonShallowCopy(copy);
-        copy.serializedParams = serializedParams.duplicate("Params");
+        copy.serializedParams = serializedParams.duplicate(tag);
         copy.m_serializedParamSize = m_serializedParamSize;
 
         return copy;
@@ -113,7 +119,9 @@ public class SPIfromSerializedContainer extends SPIfromSerialization {
     @Override
     public void discard(String tag) {
         assert(serializedParams != null);
-        serializedParams.discard(tag);
+        if (serializedParams.discardIsLast(tag)) {
+            serializedParams = null;
+        }
     }
 
     public boolean parametersSerialized() {

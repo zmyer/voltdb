@@ -17,11 +17,15 @@
 
 package org.voltdb.messaging;
 
-import org.voltcore.messaging.VoltMessage;
-import org.voltdb.StoredProcedureInvocation;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
+
+import org.voltcore.messaging.VoltMessage;
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.VoltProtocolHandler;
+import org.voltcore.utils.HBBPool.SharedBBContainer;
+import org.voltdb.SPIfromSerializedBuffer;
+import org.voltdb.StoredProcedureInvocation;
 
 public class Dr2MultipartTaskMessage extends VoltMessage {
 
@@ -74,12 +78,30 @@ public class Dr2MultipartTaskMessage extends VoltMessage {
         m_drain = buf.get() == 1;
         m_lastExecutedMPUniqueID = buf.getLong();
         if (buf.remaining() > 0) {
-            m_invocation = new StoredProcedureInvocation();
-            m_invocation.initFromBuffer(buf);
+            SPIfromSerializedBuffer spi  = new SPIfromSerializedBuffer();
+            spi.initFromByteBuffer(buf);
+            m_invocation = spi;
         } else {
             m_invocation = null;
         }
     }
+
+    @Override
+    protected void initFromContainer(SharedBBContainer container)
+            throws IOException {
+    }
+
+    @Override
+    protected void initFromInputHandler(VoltProtocolHandler handler,
+            NIOReadStream inputStream) throws IOException {
+        initFromBuffer(handler.getNextBBMessage(inputStream));
+    }
+
+    @Override
+    public void implicitReference(String tag) {}
+
+    @Override
+    public void discard(String tag) {}
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException {

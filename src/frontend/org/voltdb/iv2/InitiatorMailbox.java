@@ -29,6 +29,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.HBBPool;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -39,9 +40,9 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 import org.voltdb.messaging.RejoinMessage;
+import org.voltdb.messaging.RepairLogTruncationMessage;
 
 import com.google_voltpatches.common.base.Supplier;
-import org.voltdb.messaging.RepairLogTruncationMessage;
 
 /**
  * InitiatorMailbox accepts initiator work and proxies it to the
@@ -380,7 +381,9 @@ public class InitiatorMailbox implements Mailbox
             + " for " + CoreUtils.hsIdToString(message.m_sourceHSId) + ". ");
 
         for (Iv2RepairLogResponseMessage log : logs) {
+            log.implicitReference(HBBPool.debugUniqueTag("SendOrDone", message.m_sourceHSId));
             send(message.m_sourceHSId, log);
+            log.discard("RepairCopy");
         }
     }
 
@@ -403,7 +406,7 @@ public class InitiatorMailbox implements Mailbox
         assert(lockingVows());
         if (repairWork instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)repairWork;
-            Iv2InitiateTaskMessage work = new Iv2InitiateTaskMessage(m.getInitiatorHSId(), getHSId(), m);
+            Iv2InitiateTaskMessage work = new Iv2InitiateTaskMessage(m.getInitiatorHSId(), getHSId(), m, null);
             m_scheduler.handleMessageRepair(needsRepair, work);
         }
         else if (repairWork instanceof FragmentTaskMessage) {

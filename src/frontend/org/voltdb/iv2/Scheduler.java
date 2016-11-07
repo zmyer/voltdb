@@ -137,6 +137,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
     public void setMailbox(Mailbox mailbox)
     {
         m_mailbox = mailbox;
+        m_replaySequencer.setMailbox(mailbox);
     }
 
     public void setLeaderState(boolean isLeader)

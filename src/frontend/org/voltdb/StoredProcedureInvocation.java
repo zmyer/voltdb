@@ -61,7 +61,7 @@ public abstract class StoredProcedureInvocation {
     long clientHandle = -1;
 
     protected int m_batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
-    private boolean m_allPartition = false;
+    protected boolean m_allPartition = false;
 
     /**
      * Serialize and then deserialize an invocation so that it has serializedParams set for command logging if the
@@ -71,7 +71,7 @@ public abstract class StoredProcedureInvocation {
      */
     public abstract SPIfromSerialization roundTripForCL() throws IOException;
 
-    public abstract StoredProcedureInvocation getShallowCopy();
+    public abstract StoredProcedureInvocation getShallowCopy(String tag);
 
     public void setProcName(String name) {
         if (name == null) {
@@ -171,9 +171,9 @@ public abstract class StoredProcedureInvocation {
                 getSerializedParamSize());
     }
 
-    private int getSerializedParamSize()
+    public int getSerializedParamSize()
     {
-        if (m_serializedParamSize != null) {
+        if (m_serializedParamSize == null) {
             getParams();
         }
         return m_serializedParamSize;
@@ -221,6 +221,7 @@ public abstract class StoredProcedureInvocation {
         copy.m_procNameBytes = m_procNameBytes;
         copy.m_extensionCount = m_extensionCount;
         copy.m_batchTimeout = m_batchTimeout;
+        copy.m_allPartition = m_allPartition;
     }
 
     protected void commonFlattenToBuffer(ByteBuffer buf) throws IOException {
