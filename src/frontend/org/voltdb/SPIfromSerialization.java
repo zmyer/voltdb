@@ -193,4 +193,6 @@ public abstract class SPIfromSerialization extends StoredProcedureInvocation {
             throw new RuntimeException(e);
         }
     }
+
+    abstract public SPIfromSerializedBuffer deepCopyIfContainer();
 }

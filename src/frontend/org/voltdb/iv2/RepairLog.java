@@ -310,7 +310,7 @@ public class RepairLog
                 // We need to have a different container so the tags don't collide
                 // from different repair logs (Don't bother if we disable tags).
                 FragmentTaskMessage fragTask = (FragmentTaskMessage)msg;
-                msg = new FragmentTaskMessage(fragTask.getInitiatorHSId(), fragTask.getCoordinatorHSId(), fragTask, "RepairCopy");
+                msg = fragTask.copyFragFromRepairLog("RepairCopy");
             }
             else {
                 msg.implicitReference("RepairCopy");

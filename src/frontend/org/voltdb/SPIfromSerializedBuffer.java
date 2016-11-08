@@ -26,44 +26,50 @@ public class SPIfromSerializedBuffer extends SPIfromSerialization {
      * This ByteBuffer is accessed from multiple threads concurrently.
      * Always duplicate it before reading
      */
-    private ByteBuffer serializedParams = null;
+    private ByteBuffer m_serializedParams = null;
 
     @Override
     public ByteBuffer GetUnsafeSerializedBBParams() {
-        return serializedParams.duplicate();
+        return m_serializedParams.duplicate();
     }
 
     @Override
     public ByteBuffer GetSafeSerializedBBParams() {
-        return serializedParams.duplicate();
+        return m_serializedParams.duplicate();
     }
 
     public void setSerializedParams(ByteBuffer serializedParams) {
         assert(serializedParams.position() == 0);
         this.m_serializedParamSize = serializedParams.limit();
-        this.serializedParams = serializedParams;
+        this.m_serializedParams = serializedParams;
     }
 
     @Override
     public StoredProcedureInvocation getShallowCopy(String tag) {
         SPIfromSerializedBuffer copy = new SPIfromSerializedBuffer();
         commonShallowCopy(copy);
-        copy.serializedParams = serializedParams.duplicate();
+        copy.m_serializedParams = m_serializedParams.duplicate();
         copy.m_serializedParamSize = m_serializedParamSize;
 
         return copy;
     }
 
+    @Override
+    public SPIfromSerializedBuffer deepCopyIfContainer() {
+        return this;
+    }
+
     public void initFromByteBuffer(ByteBuffer buf) throws IOException {
         genericInit(buf);
         // do not deserialize parameters in ClientInterface context
-        serializedParams = buf.slice();
+        m_serializedParams = buf.slice();
+        m_serializedParamSize = m_serializedParams.limit();
     }
 
     protected void initFromParameterSet(ParameterSet params) throws IOException {
         ByteBuffer buf = ByteBuffer.allocate(m_serializedParamSize);
         params.flattenToBuffer(buf);
-        serializedParams = buf;
+        m_serializedParams = buf;
     }
     /*
      * Store a copy of the parameters to the procedure in serialized form.
@@ -76,8 +82,8 @@ public class SPIfromSerializedBuffer extends SPIfromSerialization {
      * is invoked by the command log.
      */
     public ByteBuffer getSerializedParams() {
-        if (serializedParams != null) {
-            return serializedParams.duplicate();
+        if (m_serializedParams != null) {
+            return m_serializedParams.duplicate();
         }
         return null;
     }

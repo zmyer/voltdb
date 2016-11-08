@@ -44,7 +44,7 @@ public final class HBBPool {
         TRACE.setLevel(Level.TRACE);
     }
 
-    private static final boolean JUSTALLOC_LOGGING = true;
+    private static final boolean JUSTALLOC_LOGGING = false;
     private static final boolean FULL_LOGGING = false;
     private static final boolean LOG_STACKTRACE = false;
 

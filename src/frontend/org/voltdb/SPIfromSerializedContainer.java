@@ -30,44 +30,44 @@ public class SPIfromSerializedContainer extends SPIfromSerialization {
      * This ByteBuffer is accessed from multiple threads concurrently.
      * Always duplicate it before reading
      */
-    private SharedBBContainer serializedParams = null;
+    private SharedBBContainer m_serializedParams = null;
 
     @Override
     public ByteBuffer GetUnsafeSerializedBBParams() {
         // This will not bump the refcount of the container so the container could be reused
         // while holding this copy of the bytebuffer if we are not careful
-        return serializedParams.b().duplicate();
+        return m_serializedParams.b().duplicate();
     }
 
     @Override
     public ByteBuffer GetSafeSerializedBBParams() {
         ByteBuffer copy = ByteBuffer.allocate(m_serializedParamSize);
-        copy.put(serializedParams.b().array(), serializedParams.b().arrayOffset(), m_serializedParamSize);
+        copy.put(m_serializedParams.b().array(), m_serializedParams.b().arrayOffset(), m_serializedParamSize);
         copy.flip();
         return copy;
     }
 
     public void setSerializedParams(SharedBBContainer serializedParams) {
-        assert(this.serializedParams == null);
+        assert(this.m_serializedParams == null);
         assert(serializedParams.b().position() == 0);
         this.m_serializedParamSize = serializedParams.b().limit();
-        this.serializedParams = serializedParams;
+        this.m_serializedParams = serializedParams;
     }
 
     protected void initFromParameterSet(ParameterSet params) throws IOException {
         SharedBBContainer newSerialization;
-        if (serializedParams != null) {
+        if (m_serializedParams != null) {
             // deallocate existing params and swap with new params
-            Iterator<String> it = serializedParams.m_tags.iterator();
+            Iterator<String> it = m_serializedParams.m_tags.iterator();
             String initTag = it.next();
             newSerialization = HBBPool.allocateHeapAndPool(m_serializedParamSize, initTag);
-            serializedParams.discard(initTag);
+            m_serializedParams.discard(initTag);
             while (it.hasNext()) {
                 initTag = it.next();
                 newSerialization.implicitReference(initTag);
-                serializedParams.discard(initTag);
+                m_serializedParams.discard(initTag);
             }
-            serializedParams = null;
+            m_serializedParams = null;
         }
         else {
             newSerialization = HBBPool.allocateHeapAndPool(m_serializedParamSize, "Params");
@@ -82,9 +82,18 @@ public class SPIfromSerializedContainer extends SPIfromSerialization {
     {
         SPIfromSerializedContainer copy = new SPIfromSerializedContainer();
         commonShallowCopy(copy);
-        copy.serializedParams = serializedParams.duplicate(tag);
+        copy.m_serializedParams = m_serializedParams.duplicate(tag);
         copy.m_serializedParamSize = m_serializedParamSize;
 
+        return copy;
+    }
+
+    @Override
+    public SPIfromSerializedBuffer deepCopyIfContainer() {
+        SPIfromSerializedBuffer copy = new SPIfromSerializedBuffer();
+        commonShallowCopy(copy);
+        copy.setSerializedParams(GetSafeSerializedBBParams());
+        copy.m_serializedParamSize = m_serializedParamSize;
         return copy;
     }
 
@@ -107,24 +116,24 @@ public class SPIfromSerializedContainer extends SPIfromSerialization {
      * is invoked by the command log.
      */
     public SharedBBContainer getSerializedParams() {
-        assert(serializedParams != null);
-        return serializedParams.duplicate("Params");
+        assert(m_serializedParams != null);
+        return m_serializedParams.duplicate("Params");
     }
 
     @Override
     public void implicitReference(String tag) {
-        serializedParams.implicitReference(tag);
+        m_serializedParams.implicitReference(tag);
     }
 
     @Override
     public void discard(String tag) {
-        assert(serializedParams != null);
-        if (serializedParams.discardIsLast(tag)) {
-            serializedParams = null;
+        assert(m_serializedParams != null);
+        if (m_serializedParams.discardIsLast(tag)) {
+            m_serializedParams = null;
         }
     }
 
     public boolean parametersSerialized() {
-        return serializedParams != null;
+        return m_serializedParams != null;
     }
 }

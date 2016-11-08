@@ -161,10 +161,9 @@ public class TestVoltMessageSerialization extends TestCase {
                 new VoltTable[] { table, table }, "knockknockbananna"));
         iresponse.setClientHandle(99);
 
-        InitiateResponseMessage iresponse2 = (InitiateResponseMessage) checkVoltContainerMessage(iresponse);
+        InitiateResponseMessage iresponse2 = (InitiateResponseMessage) checkVoltBufferMessage(iresponse);
 
         assertEquals(iresponse.getTxnId(), iresponse2.getTxnId());
-        iresponse2.discard("Params");
     }
 
     public void testInitiateResponseForIv2() throws IOException {
@@ -185,7 +184,7 @@ public class TestVoltMessageSerialization extends TestCase {
                 new VoltTable[] { table, table }, "knockknockbananna"));
         iresponse.setClientHandle(99);
 
-        InitiateResponseMessage iresponse2 = (InitiateResponseMessage) checkVoltContainerMessage(iresponse);
+        InitiateResponseMessage iresponse2 = (InitiateResponseMessage) checkVoltBufferMessage(iresponse);
 
         assertEquals(iresponse.getTxnId(), iresponse2.getTxnId());
         assertTrue(iresponse2.isReadOnly());
@@ -204,7 +203,7 @@ public class TestVoltMessageSerialization extends TestCase {
         iresponse.setMispartitioned(true, serializedSPI, Pair.of(3l, new byte[] {1, 2, 3}));
         iresponse.setClientHandle(99);
 
-        InitiateResponseMessage iresponse2 = (InitiateResponseMessage) checkVoltContainerMessage(iresponse);
+        InitiateResponseMessage iresponse2 = (InitiateResponseMessage) checkVoltBufferMessage(iresponse);
 
         assertEquals(iresponse.getTxnId(), iresponse2.getTxnId());
         assertTrue(iresponse2.isReadOnly());
@@ -214,8 +213,6 @@ public class TestVoltMessageSerialization extends TestCase {
         assertNotNull(iresponse2.getCurrentHashinatorConfig());
         assertEquals(ClientResponse.TXN_RESTART, iresponse2.getClientResponseData().getStatus());
         serializedSPI.discard("Params");
-        iresponse.discard("Params");
-        iresponse2.discard("Params");
     }
 
     public void testFragmentTask() throws IOException {

@@ -31,17 +31,17 @@ import org.voltdb.utils.SerializationHelper;
 
 public class SPIfromParameterArray extends StoredProcedureInvocation {
 
-    FutureTask<ParameterSet> paramSet;
-    Object[] rawParams;
+    FutureTask<ParameterSet> m_paramSet;
+    Object[] m_rawParams;
 
 
     public void setSafeParams(final Object... parameters) {
         // convert the params to the expected types
-        rawParams = parameters;
-        paramSet = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
+        m_rawParams = parameters;
+        m_paramSet = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
             @Override
             public ParameterSet call() {
-                ParameterSet params = ParameterSet.fromArrayWithCopy(rawParams);
+                ParameterSet params = ParameterSet.fromArrayWithCopy(m_rawParams);
                 m_serializedParamSize = params.getSerializedSize();
                 return params;
             }
@@ -50,11 +50,11 @@ public class SPIfromParameterArray extends StoredProcedureInvocation {
 
     public void setParams(final Object... parameters) {
         // convert the params to the expected types
-        rawParams = parameters;
-        paramSet = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
+        m_rawParams = parameters;
+        m_paramSet = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
             @Override
             public ParameterSet call() {
-                ParameterSet params = ParameterSet.fromArrayNoCopy(rawParams);
+                ParameterSet params = ParameterSet.fromArrayNoCopy(m_rawParams);
                 m_serializedParamSize = params.getSerializedSize();
                 return params;
             }
@@ -83,8 +83,8 @@ public class SPIfromParameterArray extends StoredProcedureInvocation {
     public StoredProcedureInvocation getShallowCopy(String tag) {
         SPIfromParameterArray copy = new SPIfromParameterArray();
         commonShallowCopy(copy);
-        copy.rawParams = rawParams;
-        copy.paramSet = paramSet;
+        copy.m_rawParams = m_rawParams;
+        copy.m_paramSet = m_paramSet;
         copy.m_serializedParamSize = m_serializedParamSize;
 
         return copy;
@@ -94,7 +94,7 @@ public class SPIfromParameterArray extends StoredProcedureInvocation {
     @Override
     Object getParameterAtIndex(int partitionIndex) {
         try {
-            return rawParams[partitionIndex];
+            return m_rawParams[partitionIndex];
         }
         catch (Exception ex) {
             throw new RuntimeException("Invalid partitionIndex: " + partitionIndex, ex);
@@ -103,9 +103,9 @@ public class SPIfromParameterArray extends StoredProcedureInvocation {
 
     @Override
     public ParameterSet getParams() {
-        paramSet.run();
+        m_paramSet.run();
         try {
-            return paramSet.get();
+            return m_paramSet.get();
         } catch (InterruptedException e) {
             VoltDB.crashLocalVoltDB("Interrupted while deserializing a parameter set", false, e);
         } catch (ExecutionException e) {
@@ -125,7 +125,7 @@ public class SPIfromParameterArray extends StoredProcedureInvocation {
      */
     public void flattenToBufferForOriginalVersion(ByteBuffer buf) throws IOException
     {
-        assert(rawParams != null);
+        assert(m_rawParams != null);
 
         // for self-check assertion
         int startPosition = buf.position();
@@ -154,7 +154,7 @@ public class SPIfromParameterArray extends StoredProcedureInvocation {
         int startPosition = buf.position();
 
         commonFlattenToBuffer(buf);
-        assert(rawParams != null);
+        assert(m_rawParams != null);
         try {
             getParams().flattenToBuffer(buf);
         }

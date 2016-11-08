@@ -54,7 +54,7 @@ public class InitiateResponseMessage extends VoltMessage {
 
     // Mis-partitioned invocation needs to send the invocation back to ClientInterface for restart
     private boolean m_mispartitioned;
-    private SPIfromSerialization m_invocation;
+    private SPIfromSerializedBuffer m_invocation;
     private Pair<Long, byte[]> m_currentHashinatorConfig;
 
     /** Empty constructor for de-serialization */
@@ -165,7 +165,7 @@ public class InitiateResponseMessage extends VoltMessage {
                                   Pair<Long, byte[]> currentHashinatorConfig) {
         assert(invocation != null);
         m_mispartitioned = mispartitioned;
-        m_invocation = (SPIfromSerialization)invocation.getShallowCopy("Params");
+        m_invocation = invocation.deepCopyIfContainer();
         m_currentHashinatorConfig = currentHashinatorConfig;
         m_commit = false;
         m_response = new ClientResponseImpl(ClientResponse.TXN_RESTART, new VoltTable[]{}, "Mispartitioned");
@@ -272,11 +272,7 @@ public class InitiateResponseMessage extends VoltMessage {
     public void implicitReference(String tag) {}
 
     @Override
-    public void discard(String tag) {
-        if (m_mispartitioned) {
-            m_invocation.discard(tag);
-        }
-    }
+    public void discard(String tag) {}
 
     @Override
     public String toString() {

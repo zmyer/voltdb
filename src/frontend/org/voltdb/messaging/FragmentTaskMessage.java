@@ -195,8 +195,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     // when we serialize the copy.
     public FragmentTaskMessage(long initiatorHSId,
             long coordinatorHSId,
-            FragmentTaskMessage ftask,
-            String dupContainerTag)
+            FragmentTaskMessage ftask)
     {
         super(initiatorHSId, coordinatorHSId, ftask);
 
@@ -206,19 +205,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_subject = ftask.m_subject;
         m_inputDepCount = ftask.m_inputDepCount;
         m_items = ftask.m_items;
-        if (dupContainerTag == null) {
-            m_initiateTask = ftask.m_initiateTask;
-            if (ftask.m_initiateTaskContainer != null) {
-                m_initiateTaskContainer = ftask.m_initiateTaskContainer;
-            }
-        }
-        else {
-            Iv2InitiateTaskMessage taskMsg = ftask.m_initiateTask;
-            m_initiateTask = new Iv2InitiateTaskMessage(taskMsg.getInitiatorHSId(),
-                    taskMsg.getCoordinatorHSId(), taskMsg, dupContainerTag);
-            if (ftask.m_initiateTaskContainer != null) {
-                m_initiateTaskContainer = ftask.m_initiateTaskContainer.duplicate(dupContainerTag+"_Raw");
-            }
+        m_initiateTask = ftask.m_initiateTask;
+        if (ftask.m_initiateTaskContainer != null) {
+            m_initiateTaskContainer = ftask.m_initiateTaskContainer;
         }
         m_emptyForRestart = ftask.m_emptyForRestart;
         m_procedureName = ftask.m_procedureName;
@@ -227,6 +216,15 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_procNameToLoad = ftask.m_procNameToLoad;
         m_batchTimeout = ftask.m_batchTimeout;
         assert(selfCheck());
+    }
+
+    public FragmentTaskMessage copyFragFromRepairLog(String dupContainerTag) {
+        FragmentTaskMessage copy = new FragmentTaskMessage(getInitiatorHSId(), getCoordinatorHSId(), this);
+        copy.m_initiateTask = m_initiateTask.copyInitTaskFromRepairLog(dupContainerTag);
+        if (m_initiateTaskContainer != null) {
+            copy.m_initiateTaskContainer = m_initiateTaskContainer.duplicate(dupContainerTag+"_Raw");
+        }
+        return copy;
     }
 
     public void setProcedureName(String procedureName) {

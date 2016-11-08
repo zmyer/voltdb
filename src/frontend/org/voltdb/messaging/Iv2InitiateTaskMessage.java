@@ -85,19 +85,19 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     }
 
     /** Copy constructor for repair. */
-    public Iv2InitiateTaskMessage(long initiatorHSId,
-            long coordinatorHSId, Iv2InitiateTaskMessage rhs, String dupContainerTag)
+    public Iv2InitiateTaskMessage(long initiatorHSId, long coordinatorHSId, Iv2InitiateTaskMessage rhs)
     {
         super(initiatorHSId, coordinatorHSId, rhs);
         m_isSinglePartition = rhs.m_isSinglePartition;
-        if (dupContainerTag == null) {
-            m_invocation = rhs.m_invocation;
-        }
-        else {
-            m_invocation = rhs.m_invocation.getShallowCopy(dupContainerTag);
-        }
+        m_invocation = rhs.m_invocation;
         m_clientInterfaceHandle = rhs.m_clientInterfaceHandle;
         m_connectionId = rhs.m_connectionId;
+    }
+
+    public Iv2InitiateTaskMessage copyInitTaskFromRepairLog(String dupContainerTag) {
+        Iv2InitiateTaskMessage copy = new Iv2InitiateTaskMessage(getInitiatorHSId(), getCoordinatorHSId(), this);
+        copy.m_invocation = m_invocation.getShallowCopy(dupContainerTag);
+        return copy;
     }
 
     @Override
