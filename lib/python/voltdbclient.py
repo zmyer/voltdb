@@ -19,10 +19,11 @@ import sys
 if sys.hexversion < 0x02050000:
     raise Exception("Python version 2.5 or greater is required.")
 import array
-import socket
+import socket, ssl
 import struct
 import datetime
 import decimal
+import pprint
 try:
     from hashlib import sha1 as sha
 except ImportError:
@@ -129,7 +130,7 @@ class FastSerializer:
     # if these assumptions are not true. it is further assumed
     # that host order is little endian. See isNaN().
 
-    def __init__(self, host = None, port = 21212, username = "",
+    def __init__(self, host = None, port = 21212, usessl = True, username = "",
                  password = "", dump_file_path = None,
                  connect_timeout = 8,
                  procedure_timeout = None,
@@ -148,6 +149,7 @@ class FastSerializer:
         self.wbuf = array.array('c')
         self.host = host
         self.port = port
+        self.usessl = usessl;
         if not dump_file_path is None:
             self.dump_file = open(dump_file_path, "wb")
         else:
@@ -157,10 +159,18 @@ class FastSerializer:
 
         self.socket = None
         if self.host != None and self.port != None:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            ss = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            if (self.usessl):
+                self.socket = ssl.wrap_socket(ss, None, None, False, ca_certs=ssl.CERT_NONE, ssl_version=ssl.PROTOCOL_TLSv1)
+            else:
+                self.socket = ss
             self.socket.setblocking(1)
             self.socket.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
             self.socket.connect((self.host, self.port))
+            if self.usessl:
+                print repr(self.socket.getpeername())
+                print self.socket.cipher()
+                print pprint.pformat(self.socket.getpeercert())
 
         # input can be big or little endian
         self.inputBOM = self.BIG_ENDIAN  # byte order if input stream
