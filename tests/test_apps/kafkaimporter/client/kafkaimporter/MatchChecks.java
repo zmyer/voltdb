@@ -135,14 +135,28 @@ public class MatchChecks {
     }
 
     public static long getImportTableRowCount(boolean alltypes, Client client) {
-        // check row count in import table
-        String table = alltypes ? "KafkaImportTable2" : "KafkaImportTable1";
-        ClientResponse response = doAdHoc(client, "select count(*) from " + table);
-        VoltTable[] countQueryResult = response.getResults();
-        VoltTable data = countQueryResult[0];
-        if (data.asScalarLong() == VoltType.NULL_BIGINT)
-            return 0;
-        return data.asScalarLong();
+        // check row count in import table or tables for the streamtest case
+        String table_base = "KafkaImportTable";
+        long total_rowcount = 0;
+        if (KafkaImportBenchmark.config.streamtest) {
+            for (int i = 0; i < KafkaImportBenchmark.config.streams; i++) {
+                String table = table_base + i;
+                ClientResponse response = doAdHoc(client, "select count(*) from " + table);
+                VoltTable[] countQueryResult = response.getResults();
+                VoltTable data = countQueryResult[0];
+                if (data.asScalarLong() != VoltType.NULL_BIGINT)
+                    total_rowcount += data.asScalarLong();
+            }
+            return total_rowcount;
+        } else {
+            String table = alltypes ? "KafkaImportTable2" : "KafkaImportTable1";
+            ClientResponse response = doAdHoc(client, "select count(*) from " + table);
+            VoltTable[] countQueryResult = response.getResults();
+            VoltTable data = countQueryResult[0];
+            if (data.asScalarLong() == VoltType.NULL_BIGINT)
+                return 0;
+            return data.asScalarLong();
+        }
     }
 
     public static boolean checkPounderResults(long expected_rows, Client client) {
@@ -222,12 +236,19 @@ public class MatchChecks {
         while (importStats.advanceRow()) {
             int statnum = 0;
             log.info("getImportValues: " + importStats.getString("PROCEDURE_NAME"));
-            stats[statnum] = importStats.getLong("SUCCESSES"); log.info("\tSUCCESSES: " + stats[statnum++]);
-            stats[statnum] = importStats.getLong("FAILURES"); log.info("\tFAILURES: " + stats[statnum++]);
-            stats[statnum] = importStats.getLong("OUTSTANDING_REQUESTS"); log.info("\tOUTSTANDING_REQUESTS: " + stats[statnum++]);
-            stats[statnum] = importStats.getLong("RETRIES"); log.info("\tRETRIES: " + stats[statnum++]);
-        }
 
+            stats[statnum++] += importStats.getLong("SUCCESSES");
+            log.info("\tSUCCESSES: " + importStats.getLong("SUCCESSES"));
+
+            stats[statnum++] += importStats.getLong("FAILURES");
+            log.info("\tFAILURES: " + importStats.getLong("FAILURES"));
+
+            stats[statnum++] += importStats.getLong("OUTSTANDING_REQUESTS");
+            log.info("\tOUTSTANDING_REQUESTS: " + importStats.getLong("OUTSTANDING_REQUESTS"));
+
+            stats[statnum++] += importStats.getLong("RETRIES");
+            log.info("\tRETRIES: " + importStats.getLong("RETRIES"));
+        }
         return stats;
     }
 

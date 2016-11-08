@@ -436,11 +436,12 @@ public class KafkaImportBenchmark {
         if (!config.streamtest) importRowCount = MatchChecks.getImportRowCount(client);
 
         // in case of pause / resume tweak, let it drain longer
-        int trial = 3;
+        int trial = 1000;
         while (!RUNNING_STATE.equalsIgnoreCase(MatchChecks.getClusterState(client)) ||
                 ((--trial > 0) && ((importStatValues[OUTSTANDING_REQUESTS] > 0) || (importRows < config.expected_rows)))) {
             Thread.sleep(PAUSE_WAIT * 1000);
             importStatValues = MatchChecks.getImportValues(client);
+            log.info(" importStatValue: " + importStatValues.toString());
             if (!config.streamtest) mirrorRows = MatchChecks.getMirrorTableRowCount(config.alltypes, client);
             importRows = MatchChecks.getImportTableRowCount(config.alltypes, client);
             // importRowCount = MatchChecks.getImportRowCount(client);
@@ -455,9 +456,6 @@ public class KafkaImportBenchmark {
         }
         if (config.useexport) {
             log.info("exportRowCount: " + exportRowCount);
-        }
-
-        if (config.useexport) {
             log.info("Total rows exported: " + finalInsertCount);
             log.info("Unmatched Rows remaining in the export Mirror Table: " + mirrorRows);
             log.info("Unmatched Rows received from Kafka to Import Table (duplicate rows): " + importRows);
