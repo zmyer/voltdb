@@ -306,5 +306,5 @@ public interface VoltDBInterface
      * @param partitionId  The id of the partition to be replicated on the host
      * @throws Throwable failure to create the site for replica
      */
-    public boolean addSite(int partitionId) throws Throwable;
+    public boolean createReplicaSite(int partitionId) throws Throwable;
 }

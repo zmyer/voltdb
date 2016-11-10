@@ -80,7 +80,9 @@ public class SnapshotCompletionMonitor {
             new HashMap<Long, Map<Integer, Long>>();
 
     public void registerPartitionTxnIdsForSnapshot(long snapshotTxnId, Map<Integer, Long> partitionTxnIds) {
-        SNAP_LOG.debug("Registering per partition txnids " + partitionTxnIds);
+        if (SNAP_LOG.isDebugEnabled()) {
+            SNAP_LOG.debug("Registering per partition txnids " + partitionTxnIds);
+        }
         synchronized (m_snapshotTxnIdsToPartitionTxnIds) {
             assert(!m_snapshotTxnIdsToPartitionTxnIds.containsKey(snapshotTxnId));
             m_snapshotTxnIdsToPartitionTxnIds.put(snapshotTxnId, partitionTxnIds);
@@ -158,6 +160,9 @@ public class SnapshotCompletionMonitor {
             return;
         }
         JSONObject jsonObj = new JSONObject(new String(data, "UTF-8"));
+        if (SNAP_LOG.isDebugEnabled()) {
+            SNAP_LOG.debug("Process snapshot data:" + jsonObj.toString());
+        }
         long txnId = jsonObj.getLong("txnId");
         int hostCount = jsonObj.getInt("hostCount");
         String path = jsonObj.getString(SnapshotUtil.JSON_PATH);

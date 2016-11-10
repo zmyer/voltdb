@@ -766,7 +766,7 @@ public final class InvocationDispatcher {
             return gracefulFailureResponse(String.format("@Replicate can not be executed on host %d for target host %d.", thisHostId, targetHostId), task.clientHandle);
         }
         try {
-            if(!VoltDB.instance().addSite((Integer) params[0])){
+            if(!VoltDB.instance().createReplicaSite((Integer) params[0])){
                 return gracefulFailureResponse("@Replicate adding site or snapshot save is in progress", task.clientHandle);
             }
         } catch (Throwable e) {

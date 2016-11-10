@@ -766,7 +766,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public boolean addSite(int partitionId) {
+    public boolean createReplicaSite(int partitionId) {
         return true;
     }
 }

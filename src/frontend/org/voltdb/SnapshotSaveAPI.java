@@ -113,7 +113,9 @@ public class SnapshotSaveAPI
             final HashinatorSnapshotData hashinatorData,
             final long timestamp)
     {
-        TRACE_LOG.trace("Creating snapshot target and handing to EEs");
+        if (TRACE_LOG.isTraceEnabled()) {
+            TRACE_LOG.trace("Creating snapshot target and handing to EEs");
+        }
         final VoltTable result = SnapshotUtil.constructNodeResultsTable();
         JSONObject jsData = null;
         if (data != null && !data.isEmpty()) {
@@ -146,8 +148,9 @@ public class SnapshotSaveAPI
                 @Override
                 public void run() {
                     Map<Integer, Long> partitionTransactionIds = m_partitionLastSeenTransactionIds;
-
-                    SNAP_LOG.debug("Last seen partition transaction ids " + partitionTransactionIds);
+                    if (SNAP_LOG.isDebugEnabled()) {
+                        SNAP_LOG.debug("Last seen partition transaction ids " + partitionTransactionIds);
+                    }
                     m_partitionLastSeenTransactionIds = new HashMap<Integer, Long>();
                     partitionTransactionIds.put(TxnEgo.getPartitionId(multiPartTxnId), multiPartTxnId);
 
@@ -193,17 +196,16 @@ public class SnapshotSaveAPI
 
             // Create a barrier to use with the current number of sites to wait for
             // or if the barrier is already set up check if it is broken and reset if necessary
-            final int numLocalSites = VoltDB.instance().getConfig().m_sitesperhost;
+            final int numLocalSites = context.getLocalSitesCount();
             SnapshotSiteProcessor.readySnapshotSetupBarriers(numLocalSites);
-            if (SNAP_LOG.isDebugEnabled()) {
-                SNAP_LOG.debug("Number of local sites:" + numLocalSites);
-            }
+
             //From within this EE, record the sequence numbers as of the start of the snapshot (now)
             //so that the info can be put in the digest.
             SnapshotSiteProcessor.populateSequenceNumbersForExecutionSite(context);
             Integer partitionId = TxnEgo.getPartitionId(partitionTxnId);
             if (SNAP_LOG.isDebugEnabled()) {
-                SNAP_LOG.debug("Registering transaction id " + partitionTxnId + " for " + TxnEgo.getPartitionId(partitionTxnId));
+                SNAP_LOG.debug("Registering transaction id " + partitionTxnId + " for " + TxnEgo.getPartitionId(partitionTxnId) +
+                        ". local sites count:" + numLocalSites);
             }
             m_partitionLastSeenTransactionIds.put(partitionId, partitionTxnId);
             m_remoteDataCenterLastIds.put(partitionId, perSiteRemoteDataCenterDrIds);
@@ -240,7 +242,9 @@ public class SnapshotSaveAPI
                         }
                     }
                     else if (taskList == null) {
-                        SNAP_LOG.debug("No task for this site, block " + block);
+                        if (SNAP_LOG.isDebugEnabled()) {
+                            SNAP_LOG.debug("No task for this site, block " + block);
+                        }
                         // This node is participating in the snapshot but this site has nothing to do.
                         // Send back an appropriate empty table based on the block flag
                         if (block != 0) {
@@ -534,10 +538,12 @@ public class SnapshotSaveAPI
                 SNAP_LOG.debug("Node had no snapshot work to do.  Creating a null task to drive completion.");
                 m_taskListsForHSIds.put(context.getSiteId(), new ArrayDeque<SnapshotTableTask>());
             }
-            SNAP_LOG.debug("Planned tasks: " +
-                           CoreUtils.hsIdCollectionToString(plan.getTaskListsForHSIds().keySet()));
-            SNAP_LOG.debug("Created tasks for HSIds: " +
-                           CoreUtils.hsIdCollectionToString(m_taskListsForHSIds.keySet()));
+            if (SNAP_LOG.isDebugEnabled()) {
+                SNAP_LOG.debug("Planned tasks: " +
+                        CoreUtils.hsIdCollectionToString(plan.getTaskListsForHSIds().keySet()));
+                SNAP_LOG.debug("Created tasks for HSIds: " +
+                        CoreUtils.hsIdCollectionToString(m_taskListsForHSIds.keySet()));
+            }
         }
     }
 }
