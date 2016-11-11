@@ -146,11 +146,10 @@ function async-benchmark() {
         client.kafkaimporter.KafkaImportBenchmark \
         --displayinterval=5 \
         --duration=180 \
-        --kafkaserverlist=localhost:9092 \
+        --servers=localhost \
         --alltypes=false \
-        --useexport=false \
-        --expected_rows=6000000 \
-        --servers=localhost
+        --useexport=true \
+        --expected_rows=6000000
 }
 
 # The following two demo functions are used by the Docker package. Don't remove.

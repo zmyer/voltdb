@@ -4,16 +4,16 @@
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
-    <commandlog enabled="false" />
+    <!-- <commandlog enabled="false" /> -->
     <import>
-        <configuration module="kafkastream.jar" type="custom" enabled="true">
+        <configuration type="kafka" enabled="true">
             <property name="brokers">kafka2:9092</property>
             <property name="topics">T8_KAFKAEXPORTTABLE1</property>
-            <property name="groupid">A8</property>
-            <property name="procedure">InsertImport</property>
+            <property name="groupid">A9</property>
+            <property name="procedure">InsertEx</property>
         </configuration>
     
-        <configuration module="kafkastream.jar" type="custom" enabled="true">
+        <configuration type="kafka" enabled="true">
             <property name="brokers">kafka2:9092</property>
             <property name="topics">T8_KAFKAEXPORTTABLE2</property>
             <property name="groupid">T8</property>
@@ -21,13 +21,14 @@
         </configuration>
     </import>
 
-    <export enabled="true" target="kafka">
-        <configuration>
+    <export>
+        <configuration enabled="true" type="kafka" target="ABC">
             <property name="metadata.broker.list">kafka2:9092</property>
             <property name="producer.type">async</property>
             <property name="acks">1</property>
             <property name="skipinternals">true</property>
             <property name="topic.prefix">T8_</property>
+            <property name="compression.type">gzip</property>
         </configuration>
     </export>
 </deployment>

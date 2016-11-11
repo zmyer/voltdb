@@ -15,6 +15,19 @@ CREATE TABLE kafkaimporttable1
 
 PARTITION TABLE kafkaimporttable1 ON COLUMN KEY;
 
+create view action
+(
+    key, value, insert_time
+)
+as
+    select key,
+        count(*),
+        min(key),
+        max(key)
+    from kafkaexporttable1
+    group by key
+;
+
 CREATE TABLE kafkaimporttable2
     (
           key                       BIGINT        NOT NULL
@@ -84,14 +97,16 @@ CREATE TABLE kafkamirrortable2
 PARTITION TABLE kafkamirrortable2 ON COLUMN key;
 
 -- Export table
-CREATE TABLE kafkaexporttable1
+CREATE STREAM kafkaexporttable1
+    PARTITION ON COLUMN KEY
+    EXPORT TO TARGET ABC
      (
                   KEY   BIGINT NOT NULL ,
                   value BIGINT NOT NULL
      );
 
-PARTITION TABLE kafkaexporttable1 ON COLUMN KEY;
-EXPORT TABLE kafkaexporttable1;
+-- PARTITION TABLE kafkaexporttable1 ON COLUMN KEY;
+-- EXPORT TABLE kafkaexporttable1;
 
 CREATE TABLE kafkaexporttable2
     (
@@ -155,7 +170,9 @@ CREATE PROCEDURE CountImport1 as select count(*) from kafkaimporttable1;
 CREATE PROCEDURE CountMirror2 as select count(*) from kafkamirrortable2;
 CREATE PROCEDURE CountImport2 as select count(*) from kafkaimporttable2;
 CREATE PROCEDURE ImportCountMinMax as select count(key), min(key), max(key) from kafkaimporttable1;
-CREATE PROCEDURE InsertOnly as upsert into KAFKAIMPORTTABLE1(key, value) VALUES(?, ?);
+CREATE PROCEDURE InsertOnly as insert into KAFKAIMPORTTABLE1(key, value) VALUES(?, ?);
 PARTITION PROCEDURE InsertOnly ON TABLE Kafkaimporttable1 COLUMN key;
 
+CREATE PROCEDURE InsertEx as insert into KAFKAexportTABLE1(key, value) VALUES(?, ?);
+PARTITION PROCEDURE InsertEx ON TABLE Kafkaexporttable1 COLUMN key;
 END_OF_BATCH
