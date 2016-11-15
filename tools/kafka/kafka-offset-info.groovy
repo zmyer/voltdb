@@ -36,6 +36,9 @@
 import com.google.common.net.HostAndPort
 import static com.google.common.base.Throwables.getStackTraceAsString as stackTraceFor
 
+import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
+
 import kafka.api.ConsumerMetadataRequest
 import kafka.api.FetchRequest
 import kafka.api.FetchRequestBuilder

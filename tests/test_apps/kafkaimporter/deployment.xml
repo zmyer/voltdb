@@ -9,8 +9,8 @@
         <configuration type="kafka" enabled="true">
             <property name="brokers">kafka2:9092</property>
             <property name="topics">T8_KAFKAEXPORTTABLE1</property>
-            <property name="groupid">A9</property>
-            <property name="procedure">InsertEx</property>
+            <property name="groupid">B9</property>
+            <property name="procedure">InsertImport1</property>
         </configuration>
     
         <configuration type="kafka" enabled="true">

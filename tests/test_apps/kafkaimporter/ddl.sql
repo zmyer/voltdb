@@ -15,18 +15,18 @@ CREATE TABLE kafkaimporttable1
 
 PARTITION TABLE kafkaimporttable1 ON COLUMN KEY;
 
-create view action
-(
-    key, value, insert_time
-)
-as
-    select key,
-        count(*),
-        min(key),
-        max(key)
-    from kafkaexporttable1
-    group by key
-;
+-- create view action
+-- (
+--     key, value, insert_time
+-- )
+-- as
+--     select key,
+--         count(*),
+--         min(key),
+--         max(key)
+--     from kafkaexporttable1
+--     group by key
+-- ;
 
 CREATE TABLE kafkaimporttable2
     (
