@@ -81,6 +81,31 @@ public class ClusterConfig
         return partitions;
     }
 
+    public static List<Integer> hostIdsForBuddyGroup(JSONObject topo, int hostId) throws JSONException
+    {
+        List<Integer> buddyHostIds = new ArrayList<>();
+        JSONArray buddies = topo.getJSONArray("buddyGroups");
+        boolean found = false;
+        for (int ii = 0; ii < buddies.length(); ii++) {
+            JSONObject buddy = buddies.getJSONObject(ii);
+            JSONArray hostIds = buddy.getJSONArray("buddyHostIds");
+            buddyHostIds.clear();
+            for (int h = 0; h < hostIds.length(); h++) {
+                int hId = hostIds.getInt(h);
+                if (hostId == hId) {
+                    found = true;
+                }
+                buddyHostIds.add(hId);
+            }
+            if (found) {
+                break;
+            } else {
+                buddyHostIds.clear();
+            }
+        }
+        return buddyHostIds;
+    }
+
     /**
      * Add a list of hosts to the current topology.
      *
@@ -693,6 +718,7 @@ public class ClusterConfig
             if (n.partitionCount() != sitesPerHostMap.get(n.m_hostId)) {
                 throw new RuntimeException("Unable to assign partitions using the new placement algorithm");
             }
+            System.out.println(n.toString());
         }
         for (Partition p : partitions) {
             if (p.m_neededReplicas != 0) {
@@ -723,6 +749,19 @@ public class ClusterConfig
                 stringer.value(n.m_hostId);
             }
             stringer.value(partitions.get(part).m_master.m_hostId);
+            stringer.endArray();
+            stringer.endObject();
+        }
+        stringer.endArray();
+        stringer.key("buddyGroups").array();
+        // TODO: add buddy group info into this list!
+        List<Set<Integer>> buddyHostIds = Lists.newArrayList();
+        for (Set<Integer> hosts : buddyHostIds) {
+            stringer.object();
+            stringer.key("buddyHostIds").array();
+            for (Integer hostId : hosts) {
+                stringer.value(hostId);
+            }
             stringer.endArray();
             stringer.endObject();
         }
