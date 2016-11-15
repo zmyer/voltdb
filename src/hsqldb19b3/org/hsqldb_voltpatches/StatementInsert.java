@@ -55,17 +55,9 @@ public class StatementInsert extends StatementDML {
                     Expression insertExpression, boolean[] checkColumns,
                     CompileContext compileContext) {
 
-        super(StatementTypes.INSERT, StatementTypes.X_SQL_DATA_CHANGE,
-              session.currentSchema);
-
-        this.targetTable            = targetTable;
-        this.baseTable              = targetTable.getBaseTable();
-        this.insertColumnMap        = columnMap;
-        this.insertCheckColumns     = checkColumns;
+        super(session, targetTable, columnMap, checkColumns, compileContext);
         this.insertExpression       = insertExpression;
-        this.isTransactionStatement = true;
-
-        setDatabseObjects(compileContext);
+        setDatabaseObjects(compileContext);
         checkAccessRights(session);
     }
 
@@ -75,18 +67,9 @@ public class StatementInsert extends StatementDML {
     StatementInsert(Session session, Table targetTable, int[] columnMap,
                     boolean[] checkColumns, QueryExpression queryExpression,
                     CompileContext compileContext) {
-
-        super(StatementTypes.INSERT, StatementTypes.X_SQL_DATA_CHANGE,
-              session.currentSchema);
-
-        this.targetTable            = targetTable;
-        this.baseTable              = targetTable.getBaseTable();
-        this.insertColumnMap        = columnMap;
-        this.insertCheckColumns     = checkColumns;
+        super(session, targetTable, columnMap, checkColumns, compileContext);
         this.queryExpression        = queryExpression;
-        this.isTransactionStatement = true;
-
-        setDatabseObjects(compileContext);
+        setDatabaseObjects(compileContext);
         checkAccessRights(session);
     }
 
@@ -96,6 +79,7 @@ public class StatementInsert extends StatementDML {
      *
      * @return the result of executing the statement
      */
+    @Override
     Result getResult(Session session) {
 
         Table           table              = baseTable;
@@ -163,12 +147,10 @@ public class StatementInsert extends StatementDML {
         return resultOut;
     }
 
-    RowSetNavigator getInsertSelectNavigator(Session session) {
-
+    private RowSetNavigator getInsertSelectNavigator(Session session) {
         Type[] colTypes  = baseTable.getColumnTypes();
         int[]  columnMap = insertColumnMap;
 
-        //
         Result                result = queryExpression.getResult(session, 0);
         RowSetNavigator       nav         = result.initialiseNavigator();
         Type[]                sourceTypes = result.metaData.columnTypes;
@@ -176,7 +158,7 @@ public class StatementInsert extends StatementDML {
 
         while (nav.hasNext()) {
             Object[] data       = baseTable.getNewRowData(session);
-            Object[] sourceData = (Object[]) nav.getNext();
+            Object[] sourceData = nav.getNext();
 
             for (int i = 0; i < columnMap.length; i++) {
                 int  j          = columnMap[i];
@@ -192,12 +174,10 @@ public class StatementInsert extends StatementDML {
         return newData;
     }
 
-    RowSetNavigator getInsertValuesNavigator(Session session) {
-
+    private RowSetNavigator getInsertValuesNavigator(Session session) {
         Type[] colTypes  = baseTable.getColumnTypes();
         int[]  columnMap = insertColumnMap;
 
-        //
         Expression[]          list    = insertExpression.nodes;
         RowSetNavigatorClient newData = new RowSetNavigatorClient(list.length);
 

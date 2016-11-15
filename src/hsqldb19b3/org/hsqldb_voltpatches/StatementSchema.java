@@ -255,6 +255,7 @@ public class StatementSchema extends Statement {
         }
     }
 
+    @Override
     public Result execute(Session session) {
 
         Result result = getResult(session);
@@ -975,7 +976,7 @@ public class StatementSchema extends Statement {
                         tableWorks.addExprIndex(indexColumns, indexExprs.toArray(new Expression[indexExprs.size()]), name, unique, predicate).setAssumeUnique(assumeUnique);
                         break;
                     }
-                    org.hsqldb_voltpatches.index.Index addedIndex = 
+                    org.hsqldb_voltpatches.index.Index addedIndex =
                     tableWorks.addIndex(indexColumns, name, unique, predicate);
                     // End of VoltDB extension
                     // tableWorks.addIndex(indexColumns, name, unique);
@@ -1187,10 +1188,12 @@ public class StatementSchema extends Statement {
         }
     }
 
+    @Override
     public boolean isAutoCommitStatement() {
         return true;
     }
 
+    @Override
     public String describe(Session session) {
         return sql;
     }

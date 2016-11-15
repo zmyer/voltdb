@@ -881,6 +881,11 @@ public class ParserDML extends ParserDQL {
             insertExpression.resolveTypes(session, null);
         }
 
+        //XXX: VoltDB does not support MERGE but probably neither does this
+        // version of HSQL. In particular, failure to provide a value for
+        // the updateCheckColumns member, analogous to insertCheckColumns
+        // initialized here to insertColumnCheckList,
+        // seems like it would lead to NPEs in various statement checks.
         StatementDMQL cs = new StatementDML(session, fullRangeVars,
                                             insertColumnMap, updateColumnMap,
                                             insertColumnCheckList,

@@ -65,9 +65,61 @@ import org.hsqldb_voltpatches.types.Type;
 // support for ON UPDATE CASCADE etc. | ON DELETE SET NULL etc. by Sebastian Kloska (kloska@users dot ...)
 // support for MERGE statement by Justin Spadea (jzs9783@users dot sourceforge.net)
 public class StatementDML extends StatementDMQL {
+    //XXX: This garbage heap of attributes for SOME but not ALL
+    // StatementTypes has a bad code smell. The code would probably
+    // be much easier to follow if most statement types had their own
+    // derived class (like StatementInsert currently has) and if they
+    // (unlike StatementInsert currently) defined their own attributes 
+    // and methods rather than over-sharing them here with statement
+    // types that may be the same or similar or so different that the
+    // member or method has no applicability.
+    // Even going to the extreme of pushing ALL attributes to the leaf
+    // classes, forcing duplication of attributes and code even among
+    // similar StatementTypes may be an improvement, eliminating lots of
+    // tricky switch-case code paths here with their partial redundancy.
 
-    StatementDML(int type, int group, HsqlName schemaName) {
-        super(type, group, schemaName);
+    RangeVariable[] targetRangeVariables;
+
+    /** for TRUNCATE variation of DELETE */
+    boolean restartIdentity;
+
+    /** condition expression for UPDATE, MERGE and DELETE */
+    Expression condition;
+
+    /** column map for INSERT operation direct or via MERGE */
+    int[] insertColumnMap;
+
+    /** column map for UPDATE operation direct or via MERGE */
+    int[] updateColumnMap;
+
+    /** Column value Expressions for UPDATE and MERGE. */
+    Expression[] updateExpressions;
+
+    /** Column value Expressions for MERGE */
+    Expression[][] multiColumnValues;
+
+    /** INSERT_VALUES */
+    Expression insertExpression;
+
+    /**
+     * Flags indicating which columns' values will/will not be
+     * explicitly set.
+     */
+    boolean[] insertCheckColumns;
+    boolean[] updateCheckColumns;
+
+    /**
+     * Instantiate this as an INSERT statement
+     */
+    protected StatementDML(Session session,
+            Table targetTable,
+            int[] columnMap,
+            boolean[] checkColumns,
+            CompileContext compileContext) {
+        super(StatementTypes.INSERT, StatementTypes.X_SQL_DATA_CHANGE,
+                targetTable, session.currentSchema);
+        this.insertColumnMap        = columnMap;
+        this.insertCheckColumns     = checkColumns;
     }
 
     /**
@@ -76,17 +128,12 @@ public class StatementDML extends StatementDMQL {
     StatementDML(Session session, Table targetTable,
                  RangeVariable[] rangeVars, CompileContext compileContext,
                  boolean restartIdentity) {
-
         super(StatementTypes.DELETE_WHERE, StatementTypes.X_SQL_DATA_CHANGE,
-              session.currentSchema);
-
-        this.targetTable            = targetTable;
-        this.baseTable              = targetTable.getBaseTable();
+                targetTable, session.currentSchema);
         this.targetRangeVariables   = rangeVars;
         this.restartIdentity        = restartIdentity;
-        this.isTransactionStatement = true;
 
-        setDatabseObjects(compileContext);
+        setDatabaseObjects(compileContext);
         checkAccessRights(session);
     }
 
@@ -97,19 +144,14 @@ public class StatementDML extends StatementDMQL {
                  RangeVariable rangeVars[], int[] updateColumnMap,
                  Expression[] colExpressions, boolean[] checkColumns,
                  CompileContext compileContext) {
-
         super(StatementTypes.UPDATE_WHERE, StatementTypes.X_SQL_DATA_CHANGE,
-              session.currentSchema);
-
-        this.targetTable            = targetTable;
-        this.baseTable              = targetTable.getBaseTable();
+                targetTable, session.currentSchema);
         this.updateColumnMap        = updateColumnMap;
         this.updateExpressions      = colExpressions;
         this.updateCheckColumns     = checkColumns;
         this.targetRangeVariables   = rangeVars;
-        this.isTransactionStatement = true;
 
-        setDatabseObjects(compileContext);
+        setDatabaseObjects(compileContext);
         checkAccessRights(session);
     }
 
@@ -121,13 +163,13 @@ public class StatementDML extends StatementDMQL {
                  boolean[] checkColumns, Expression mergeCondition,
                  Expression insertExpr, Expression[] updateExpr,
                  CompileContext compileContext) {
-
         super(StatementTypes.MERGE, StatementTypes.X_SQL_DATA_CHANGE,
-              session.currentSchema);
-
-        this.sourceTable          = targetRangeVars[0].rangeTable;
-        this.targetTable          = targetRangeVars[1].rangeTable;
-        this.baseTable            = targetTable.getBaseTable();
+                targetRangeVars[1].rangeTable, session.currentSchema);
+        //XXX: It seems quite suspicious that there is no provision here
+        // for initializing the updateCheckColumns member, yet it is
+        // assumed to be valid and not null in several code blocks
+        // below qualified by 'case StatementTypes.MERGE :'.
+        // Does MERGE even work in this version of HSQL?
         this.insertCheckColumns   = checkColumns;
         this.insertColumnMap      = insertColMap;
         this.updateColumnMap      = updateColMap;
@@ -135,9 +177,8 @@ public class StatementDML extends StatementDMQL {
         this.updateExpressions    = updateExpr;
         this.targetRangeVariables = targetRangeVars;
         this.condition            = mergeCondition;
-        isTransactionStatement    = true;
 
-        setDatabseObjects(compileContext);
+        setDatabaseObjects(compileContext);
         checkAccessRights(session);
     }
 
@@ -147,29 +188,84 @@ public class StatementDML extends StatementDMQL {
     StatementDML(Session session, Table table, RangeVariable rangeVars[],
                  int[] updateColumnMap, Expression[] colExpressions,
                  CompileContext compileContext) {
-
         super(StatementTypes.ASSIGNMENT, StatementTypes.X_SQL_DATA_CHANGE,
-              session.currentSchema);
-
-        this.targetTable       = table;
-        this.baseTable         = targetTable.getBaseTable();
+              table, session.currentSchema);
         this.updateColumnMap   = updateColumnMap;
         this.updateExpressions = colExpressions;
         this.updateCheckColumns =
-            targetTable.getColumnCheckList(updateColumnMap);
+            table.getColumnCheckList(updateColumnMap);
         this.targetRangeVariables = rangeVars;
         isTransactionStatement    = false;
 
-        setDatabseObjects(compileContext);
+        setDatabaseObjects(compileContext);
         checkAccessRights(session);
     }
 
     /**
      * Instantiate this as a CURSOR operation statement.
      */
-    StatementDML() {
+    protected StatementDML() {
         super(StatementTypes.UPDATE_CURSOR, StatementTypes.X_SQL_DATA_CHANGE,
               null);
+    }
+
+    @Override
+    public void clearVariables() {
+        super.clearVariables();
+        condition = null;
+        insertColumnMap    = null;
+        updateColumnMap    = null;
+        updateExpressions  = null;
+        insertExpression   = null;
+        insertCheckColumns = null;
+    }
+
+    @Override
+    boolean[] getInsertOrUpdateColumnCheckList() {
+
+        switch (type) {
+
+            case StatementTypes.INSERT :
+                return insertCheckColumns;
+
+            case StatementTypes.UPDATE_WHERE :
+                return updateCheckColumns;
+
+            case StatementTypes.MERGE :
+                boolean[] check =
+                    (boolean[]) ArrayUtil.duplicateArray(insertCheckColumns);
+
+                ArrayUtil.orBooleanArray(updateCheckColumns, check);
+
+                return check;
+        }
+
+        return null;
+    }
+
+    @Override
+    void checkAccessRights(Session session) {
+        super.checkAccessRights(session);
+        switch (type) {
+        case StatementTypes.INSERT :
+            session.getGrantee().checkInsert(targetTable,
+                    insertCheckColumns);
+            break;
+        case StatementTypes.DELETE_WHERE :
+            session.getGrantee().checkDelete(targetTable);
+            break;
+
+        case StatementTypes.UPDATE_WHERE :
+            session.getGrantee().checkUpdate(targetTable,
+                    updateCheckColumns);
+            break;
+        case StatementTypes.MERGE :
+            session.getGrantee().checkInsert(targetTable,
+                    insertCheckColumns);
+            session.getGrantee().checkUpdate(targetTable,
+                    updateCheckColumns);
+            break;
+        }
     }
 
     @Override
@@ -472,7 +568,7 @@ public class StatementDML extends StatementDMQL {
      *
      * @return Result object
      */
-    Result executeMergeStatement(Session session) {
+    private Result executeMergeStatement(Session session) {
 
         Result          resultOut          = null;
         RowSetNavigator generatedNavigator = null;
@@ -974,7 +1070,7 @@ public class StatementDML extends StatementDMQL {
         }
     }
 
-    Object[] getMergeInsertData(Session session) {
+    private Object[] getMergeInsertData(Session session) {
 
         if (insertExpression == null) {
             return null;
@@ -1133,10 +1229,6 @@ public class StatementDML extends StatementDMQL {
             }
 
             Table reftable = c.getRef();
-
-            // -- unused shortcut when update table has no imported constraint
-            boolean hasref =
-                reftable.getNextConstraintIndex(0, Constraint.MAIN) != -1;
             Index refindex = c.getRefIndex();
 
             // -- walk the index for all the nodes that reference update node
@@ -1255,6 +1347,128 @@ public class StatementDML extends StatementDMQL {
         }
 
         return true;
+    }
+
+    /**
+     * Provides the toString() implementation.
+     */
+    @Override
+    protected StringBuffer describeImpl(Session session) throws Exception {
+        StringBuffer sb = new StringBuffer();
+        switch (type) {
+        case StatementTypes.INSERT : {
+            if (queryExpression == null) {
+                sb.append("INSERT VALUES");
+                sb.append('[').append('\n');
+                appendInsertMultiColumns(sb);
+                sb.append('\n');
+                appendTable(sb).append('\n');
+            }
+            else {
+                sb.append("INSERT SELECT");
+                sb.append('[').append('\n');
+                appendColumns(sb, insertColumnMap);
+                sb.append('\n');
+                appendTable(sb).append('\n');
+                sb.append(queryExpression.describe(session)).append('\n');
+            }
+            break;
+        }
+        case StatementTypes.UPDATE_WHERE : {
+            sb.append("UPDATE");
+            sb.append('[').append('\n');
+            appendColumns(sb, updateColumnMap).append('\n');
+            appendTable(sb).append('\n');
+            appendCondition(session, sb);
+            for (RangeVariable trv : targetRangeVariables) {
+                sb.append(trv.describe(session)).append('\n');
+            }
+            break;
+        }
+        case StatementTypes.DELETE_WHERE : {
+            sb.append("DELETE");
+            sb.append('[').append('\n');
+            appendTable(sb).append('\n');
+            appendCondition(session, sb);
+            for (RangeVariable trv : targetRangeVariables) {
+                sb.append(trv.describe(session)).append('\n');
+            }
+            break;
+        }
+        case StatementTypes.MERGE : {
+            sb.append("MERGE");
+            sb.append('[').append('\n');
+            appendInsertMultiColumns(sb).append('\n');
+            appendColumns(sb, updateColumnMap).append('\n');
+            appendTable(sb).append('\n');
+            appendCondition(session, sb);
+            for (RangeVariable trv : targetRangeVariables) {
+                sb.append(trv.describe(session)).append('\n');
+            }
+            break;
+        }
+        default : {
+            return sb.append("UNKNOWN");
+        }
+        }
+        appendParameters(sb).append('\n');
+        appendSubqueries(session, sb).append(']');
+        return sb;
+    }
+
+    private StringBuffer appendTable(StringBuffer sb) {
+        sb.append("TABLE[").append(targetTable.getName().name).append(']');
+        return sb;
+    }
+
+    private StringBuffer appendCondition(Session session, StringBuffer sb) {
+        if (condition == null) {
+            sb.append("CONDITION[]\n");
+        }
+        else {
+            sb.append("CONDITION[").append(
+                                     condition.describe(session)).append(
+                                     "]\n");
+        }
+        return sb;
+    }
+
+    private StringBuffer appendColumns(StringBuffer sb, int[] columnMap) {
+        if (columnMap == null || updateExpressions == null) {
+            return sb;
+        }
+
+        sb.append("COLUMNS=[");
+
+        for (int i = 0; i < columnMap.length; i++) {
+            sb.append('\n').append(columnMap[i]).append(':').append(
+                ' ').append(
+                targetTable.getColumn(columnMap[i]).getNameString()).append(
+                '[').append(updateExpressions[i]).append(']');
+        }
+
+        sb.append(']');
+        return sb;
+    }
+
+    private StringBuffer appendInsertMultiColumns(StringBuffer sb) {
+        if (insertColumnMap == null || multiColumnValues == null) {
+            return sb;
+        }
+
+        sb.append("COLUMNS=[");
+
+        for (int j = 0; j < multiColumnValues.length; j++) {
+            for (int i = 0; i < insertColumnMap.length; i++) {
+                sb.append('\n').append(insertColumnMap[i]).append(':').append(
+                    ' ').append(
+                    targetTable.getColumn(insertColumnMap[i]).getName().name).append(
+                    '[').append(multiColumnValues[j][i]).append(']');
+            }
+        }
+
+        sb.append(']');
+        return sb;
     }
 
     /************************* Volt DB Extensions *************************/
@@ -1378,12 +1592,13 @@ public class StatementDML extends StatementDMQL {
             assert(insertExpression != null || queryExpression != null);
 
             if (queryExpression == null) {
-            if (insertExpression.nodes.length > 1) {
-                throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
-                    "VoltDB does not support multiple rows in the INSERT statement VALUES clause. Use separate INSERT statements.");
-            }
+                if (insertExpression.nodes.length > 1) {
+                    throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
+                            "VoltDB does not support multiple rows in the INSERT statement VALUES clause. Use separate INSERT statements.");
+                }
                 voltAppendTargetColumns(session, insertColumnMap, insertExpression.nodes[0].nodes, xml);
-            } else {
+            }
+            else {
                 voltAppendTargetColumns(session, insertColumnMap, null, xml);
                 VoltXMLElement child = voltGetXMLExpression(queryExpression, parameters, session);
                 xml.children.add(child);

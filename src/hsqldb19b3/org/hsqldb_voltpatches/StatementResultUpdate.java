@@ -31,32 +31,32 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.result.Result;
-import org.hsqldb_voltpatches.types.Type;
-import org.hsqldb_voltpatches.result.ResultConstants;
-import org.hsqldb_voltpatches.persist.PersistentStore;
-import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
+import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.navigator.RowSetNavigator;
-import org.hsqldb_voltpatches.navigator.RowSetNavigatorClient;
 import org.hsqldb_voltpatches.navigator.RowSetNavigatorLinkedList;
+import org.hsqldb_voltpatches.persist.PersistentStore;
+import org.hsqldb_voltpatches.result.Result;
+import org.hsqldb_voltpatches.result.ResultConstants;
+import org.hsqldb_voltpatches.types.Type;
 
 public class StatementResultUpdate extends StatementDML {
+    /** column map of query expression */
+    private int[] baseColumnMap;
 
     int    actionType;
     Type[] types;
 
     StatementResultUpdate() {
-
         super();
-
-        isTransactionStatement = true;
     }
 
+    @Override
     public String describe(Session session) {
         return "";
     }
 
+    @Override
     public Result execute(Session session) {
 
         try {
@@ -66,6 +66,7 @@ public class StatementResultUpdate extends StatementDML {
         }
     }
 
+    @Override
     Result getResult(Session session) {
 
         checkAccessRights(session);
@@ -134,65 +135,7 @@ public class StatementResultUpdate extends StatementDML {
         this.baseColumnMap = columnMap;
     }
 
-/*
-    Result result = getAccessRightsResult(session);
-
-    if (result != null) {
-        return result;
-    }
-
-    if (this.isExplain) {
-        return Result.newSingleColumnStringResult("OPERATION",
-                describe(session));
-    }
-
-    try {
-        materializeSubQueries(session, args);
-
-        result = getResult(session);
-    } catch (Throwable t) {
-        String commandString = sql;
-
-        if (session.database.getProperties().getErrorLevel()
-                == HsqlDatabaseProperties.NO_MESSAGE) {
-            commandString = null;
-        }
-
-        result = Result.newErrorResult(t, commandString);
-
-        if (result.isError()) {
-            result.getException().setStatementType(group, type);
-        }
-    }
-
-    session.sessionContext.clearStructures(this);
-
-    return result;
-*/
-/*
-    long     id         = cmd.getResultId();
-    int      actionType = cmd.getActionType();
-    Result   result     = sessionData.getDataResult(id);
-    Object[] pvals      = cmd.getParameterData();
-    Type[]   types      = cmd.metaData.columnTypes;
-
-    StatementQuery statement = (StatementQuery) result.getValueObject() ;
-    QueryExpression qe = statement.queryExpression;
-
-    Table baseTable = qe.getBaseTable();
-
-    int[] columnMap = qe.getBaseTableColumnMap();
-
-
-    switch (actionType) {
-
-        case ResultConstants.UPDATE_CURSOR :
-        case ResultConstants.DELETE_CURSOR :
-        case ResultConstants.INSERT_CURSOR :
-    }
-
-    return Result.updateZeroResult;
-*/
+    @Override
     void checkAccessRights(Session session) {
 
         switch (type) {
