@@ -926,14 +926,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             /* Create more connection between nodes with a partition group */
             // TODO: test code
-            if (m_messenger.getHostId() == 0) {
+            try {
+                List<Integer> buddyHostIds = ClusterConfig.hostIdsForBuddyGroup(topo, m_messenger.getHostId());
                 Set<Integer> peers = Sets.newHashSet();
-                peers.add(1);
+                for (Integer hostId : buddyHostIds) {
+                    if (hostId > m_messenger.getHostId()) {
+                        peers.add(hostId);
+                    }
+                }
                 m_messenger.addConnections(peers);
+            } catch (JSONException e1) {
+                // TODO Auto-generated catch block
+                e1.printStackTrace();
             }
-//            if (m_messenger.getHostId() == 1) {
-//                peers.add(0);
-//            }
 
             m_partitionsToSitesAtStartupForExportInit = new ArrayList<>();
             try {
