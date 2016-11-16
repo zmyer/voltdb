@@ -925,7 +925,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             JSONObject topo = getTopology(config.m_startAction, hostGroups, m_joinCoordinator);
 
             /* Create more connection between nodes with a partition group */
-            // TODO: test code
             try {
                 List<Integer> buddyHostIds = ClusterConfig.hostIdsForBuddyGroup(topo, m_messenger.getHostId());
                 Set<Integer> peers = Sets.newHashSet();
@@ -934,7 +933,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         peers.add(hostId);
                     }
                 }
-                m_messenger.addConnections(peers);
+                m_messenger.createAuxiliaryConnections(peers);
             } catch (JSONException e1) {
                 // TODO Auto-generated catch block
                 e1.printStackTrace();

@@ -268,7 +268,8 @@ public class ForeignHost {
          * Try and give some warning when a connection is timing out.
          * Allows you to observe the liveness of the host receiving the heartbeats
          */
-        if (current_delta > m_logRate) {
+        if ((m_deadHostTimeout != Integer.MAX_VALUE) &&
+                (current_delta > m_logRate)) {
             rateLimitedLogger.log(
                     "Have not received a message from host "
                         + hostnameAndIPAndPort() + " for " + (current_delta / 1000.0) + " seconds",
@@ -278,6 +279,7 @@ public class ForeignHost {
         // set m_isUp to false, so use both that and m_closing to
         // avoid repeat reports of a single node failure
         if ((!m_closing && m_isUp) &&
+            (m_deadHostTimeout != Integer.MAX_VALUE) &&
             (current_delta > m_deadHostTimeout))
         {
             if (m_deadReportsCount.getAndIncrement() == 0) {
@@ -441,5 +443,10 @@ public class ForeignHost {
      */
     void cutLink() {
         m_linkCutForTest.set(true);
+    }
+
+    public boolean isPrimary() {
+        // Secondary foreign host never time out
+        return m_deadHostTimeout != Integer.MAX_VALUE;
     }
 }

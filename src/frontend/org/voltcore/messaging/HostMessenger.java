@@ -330,10 +330,18 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private final Object m_mapLock = new Object();
 
     /*
-     * References to other hosts in the mesh.
+     * References to other hosts in the mesh. To any foreign host, there
+     * will be one primary connection and, if possible, multiple auxiliary
+     * connections.
      * Updates via COW
      */
     volatile ImmutableMultimap<Integer, ForeignHost> m_foreignHosts = ImmutableMultimap.of();
+
+    /*
+     * Reference to the target HSId to FH mapping
+     * Updates via COW
+     */
+    volatile ImmutableMap<Long, ForeignHost> m_fhMapping = ImmutableMap.of();
 
     /*
      * References to all the local mailboxes
@@ -350,6 +358,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private AgreementSite m_agreementSite;
     private ZooKeeper m_zk;
     private final AtomicInteger m_nextSiteId = new AtomicInteger(0);
+    private final AtomicInteger m_nextForeignHost = new AtomicInteger();
     private final AtomicBoolean m_paused = new AtomicBoolean(false);
 
     /*
@@ -785,11 +794,20 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     /*
      * Convenience method for doing the verbose COW remove from the map
      */
-    private void removeForeignHost(int hostId) {
+    private void removeForeignHost(final int hostId) {
         ImmutableCollection<ForeignHost> fhs = m_foreignHosts.get(hostId);
         synchronized (m_mapLock) {
             m_foreignHosts = ImmutableMultimap.<Integer, ForeignHost>builder()
                     .putAll(Multimaps.filterKeys(m_foreignHosts, not(equalTo(hostId))))
+                    .build();
+            Predicate<Long> predicates = new Predicate<Long>() {
+                @Override
+                public boolean apply(Long intput) {
+                    return CoreUtils.getHostIdFromHSId(intput) != hostId;
+                }
+            };
+            m_fhMapping = ImmutableMap.<Long, ForeignHost>builder()
+                    .putAll(Maps.filterKeys(m_fhMapping, predicates))
                     .build();
         }
         for (ForeignHost fh : fhs) {
@@ -1015,7 +1033,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
          * Now that the agreement site mailbox has been created it is safe
          * to enable read
          */
-        //TODO: defer it until we figure out topology
         for (ForeignHost fh : m_foreignHosts.values()) {
             fh.enableRead(VERBOTEN_THREADS);
         }
@@ -1062,7 +1079,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     {
         m_networkLog.info("Host " + getHostId() + " receives a new connection from host " + hostId);
         prepSocketChannel(socket);
-        ForeignHost fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout,
+        // Auxiliary connection never time out
+        ForeignHost fhost = new ForeignHost(this, hostId, socket, Integer.MAX_VALUE,
                 listeningAddress, new PicoNetwork(socket));
         putForeignHost(hostId, fhost);
         fhost.enableRead(VERBOTEN_THREADS);
@@ -1223,12 +1241,30 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             }
             return null;
         }
-        // Round-robining the foreign host based on the target site id
-        int targetSiteId = CoreUtils.getSiteIdFromHSId(hsId);
-        ForeignHost fhost = (ForeignHost) fhosts.toArray()[Math.abs(targetSiteId) % fhosts.size()];
-
-        if (!fhost.isUp())
-        {
+        ForeignHost fhost = null;
+        if (CoreUtils.getSiteIdFromHSId(hsId) < 0 ) {
+            // special mailbox, always use primary connection
+            for (ForeignHost f : fhosts) {
+                if (f.isPrimary()) {
+                    fhost = f;
+                    break;
+                }
+            }
+            if (fhost == null) { // unlikely
+                m_networkLog.warn("Attempted to deliver a message to foreign host with id" +
+                            hostId + " but there is no primary connection to the host.");
+                return null;
+            }
+        } else {
+            // assign a foreign host for regular mailbox
+            fhost = m_fhMapping.get(hsId);
+            if (fhost == null) {
+                int index = Math.abs(m_nextForeignHost.getAndIncrement() % fhosts.size());
+                fhost = (ForeignHost) fhosts.toArray()[index];
+                bindForeignHost(hsId, fhost);
+            }
+        }
+        if (!fhost.isUp()) {
             if (!m_shuttingDown) {
                 m_networkLog.info("Attempted delivery of message to failed site: " + CoreUtils.hsIdToString(hsId));
             }
@@ -1252,6 +1288,18 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 }
             }
             m_siteMailboxes = b.build();
+        }
+    }
+
+    private void bindForeignHost(Long hsId, ForeignHost fh) {
+        synchronized (m_mapLock) {
+            if (m_fhMapping.containsKey(hsId)) {
+                return;
+            }
+            ImmutableMap.Builder<Long, ForeignHost> b = ImmutableMap.builder();
+            m_fhMapping = b.putAll(m_fhMapping)
+                           .put(hsId, fh)
+                           .build();
         }
     }
 
@@ -1586,14 +1634,15 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
     }
 
-    public void addConnections(Set<Integer> hostIds) {
+    public void createAuxiliaryConnections(Set<Integer> hostIds) {
         for (Integer hostId : hostIds) {
             Iterator<ForeignHost> it = m_foreignHosts.get(hostId).iterator();
             if (it.hasNext()) {
                 ForeignHost fh = it.next();
                 try {
                     SocketChannel socket = m_joiner.requestForConnection(fh.m_listeningAddress);
-                    ForeignHost fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout,
+                    // Auxiliary connection never time out
+                    ForeignHost fhost = new ForeignHost(this, hostId, socket, Integer.MAX_VALUE,
                             fh.m_listeningAddress, new PicoNetwork(socket));
                     putForeignHost(hostId, fhost);
                     fhost.enableRead(VERBOTEN_THREADS);
