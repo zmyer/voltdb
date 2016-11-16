@@ -340,7 +340,7 @@ public class ForeignHost {
     }
 
     /**
-     * Read data from the network. Runs in the context of Port when
+     * Read data from the network. Runs in the context of PicoNetwork thread when
      * data is available.
      * @throws IOException
      */

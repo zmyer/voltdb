@@ -264,14 +264,15 @@ public class SocketJoiner {
                     !m_internalInterface.equals(m_coordIp.getAddress().getCanonicalHostName()) &&
                     !m_internalInterface.equals(m_coordIp.getAddress().getHostAddress()))
                 {
-                    String msg = "The provided internal interface (" + m_internalInterface +
-                    ") does not match the specified leader address (" +
-                     ReverseDNSCache.hostnameOrAddress(m_coordIp.getAddress()) +
-                    ", " + m_coordIp.getAddress().getHostAddress() +
-                    "). This will result in either a cluster which fails to start" +
-                    " or an unintended network topology. The leader will now exit;" +
-                    " correct your specified leader and interface and try restarting.";
-                    org.voltdb.VoltDB.crashLocalVoltDB(msg, false, null);
+                    org.voltdb.VoltDB.crashLocalVoltDB(
+                            String.format("The provided internal interface (%s) does not match the "
+                                    + "specified leader address (%s, %s). "
+                                    + "This will result in either a cluster which fails to start or an unintended network topology. "
+                                    + "The leader will now exit; correct your specified leader and interface and try restarting.",
+                                    m_internalInterface,
+                                    ReverseDNSCache.hostnameOrAddress(m_coordIp.getAddress()),
+                                    m_coordIp.getAddress().getHostAddress()),
+                            false, null);
                 }
             }
             retval = true;
