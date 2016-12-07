@@ -43,6 +43,7 @@ public interface InputHandler {
      *
      * @param inputStream
      * @return ByteBuffer containing the message data
+     * @throws java.io.IOException
      */
     ByteBuffer retrieveNextMessage(NIOReadStream inputStream) throws IOException;
 
