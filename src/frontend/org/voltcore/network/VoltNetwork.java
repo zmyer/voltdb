@@ -191,7 +191,6 @@ class VoltNetwork implements Runnable, IOStatsIntf
 
                 try {
                     SelectionKey key = channel.register (m_selector, interestOps, null);
-
                     port.setKey (key);
                     port.registered();
 
@@ -220,6 +219,18 @@ class VoltNetwork implements Runnable, IOStatsIntf
         } catch (Exception e) {
             throw new IOException(e);
         }
+    }
+
+    public Runnable nudgeChannel(final Connection c) {
+        Runnable nudge = new Runnable() {
+            @Override
+            public void run() {
+                VoltPort port = (VoltPort)c;
+                callPort(port);
+            }
+        };
+        m_tasks.offer(nudge);
+        return nudge;
     }
 
     private VoltPort getVoltPort(final SocketChannel channel,
