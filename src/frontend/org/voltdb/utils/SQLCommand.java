@@ -53,7 +53,6 @@ import jline.console.KeyMap;
 import jline.console.history.FileHistory;
 
 import org.voltdb.CLIConfig;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.BatchTimeoutOverrideType;
@@ -1255,6 +1254,16 @@ public class SQLCommand
         return splitStrings[1];
     }
 
+    private static String extractOptionalArgInput(String arg, String defaultValue) {
+        // the input arguments has "=" character when this function is called
+        String[] splitStrings = arg.split("=", 2);
+        if (splitStrings.length == 1) return defaultValue;
+        if (splitStrings[1].isEmpty()) {
+            return defaultValue;
+        }
+        return splitStrings[1];
+    }
+
     // Application entry point
     public static void main(String args[])
     {
@@ -1268,6 +1277,7 @@ public class SQLCommand
         List<String> queries = null;
         String ddlFile = "";
         String sslConfigFile = null;
+        boolean enableSSL = false;
 
         // Parse out parameters
         for (int i = 0; i < args.length; i++) {
@@ -1348,7 +1358,8 @@ public class SQLCommand
 
             // arg to enable ssl from a properties file
             else if (arg.startsWith("--ssl")) {
-                sslConfigFile = extractArgInput(arg);
+                enableSSL = true;
+                sslConfigFile = extractOptionalArgInput(arg, null);
             }
             else if (arg.equals("--debug")) {
                 m_debug = true;
@@ -1388,16 +1399,8 @@ public class SQLCommand
         }
 
         // Create connection
-        ClientConfig config = new ClientConfig(user, password, sslConfigFile);
+        ClientConfig config = new ClientConfig(user, password, null, enableSSL, sslConfigFile);
         config.setProcedureCallTimeout(0);  // Set procedure all to infinite timeout, see ENG-2670
-        if (sslConfigFile != null) {
-            try {
-                config.enableSSL();
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Failed to enable SSL on Client: " + e.getMessage(), false, null);
-                return;
-            }
-        }
         try {
             // if specified enable kerberos
             if (!kerberos.isEmpty()) {

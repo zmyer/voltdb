@@ -165,7 +165,7 @@ public class SyncBenchmark {
 
         if (config.ssl != null && !config.ssl.isEmpty()) {
             try {
-                clientConfig.enableSSL();
+                clientConfig.enableSSL(config.ssl);
             } catch (Exception e) {
                 System.err.println("Failed to configure ssl, exiting");
                 System.exit(-1);

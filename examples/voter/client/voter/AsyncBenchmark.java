@@ -137,8 +137,8 @@ public class AsyncBenchmark {
         @Option(desc = "Password for connection.")
         String password = "";
 
-        @Option(desc = "SSL configuration file.")
-        String ssl = "";
+        @Option(desc = "Enable SSL")
+        boolean ssl = false;
 
         @Option(desc = "Enable topology awareness")
         boolean topologyaware = false;
@@ -183,10 +183,9 @@ public class AsyncBenchmark {
         // when that's fixed, we can go back.
         ClientConfig clientConfig = null;
 
-        if (config.ssl != null && !config.ssl.isEmpty()) {
+        if (config.ssl) {
             try {
                 clientConfig = new ClientConfig(config.user, config.password, new StatusListener(), config.ssl);
-                clientConfig.enableSSL();
             } catch (Exception e) {
                 System.err.println("Failed to configure ssl, exiting");
                 System.exit(-1);
