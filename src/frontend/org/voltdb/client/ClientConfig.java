@@ -90,7 +90,6 @@ public class ClientConfig {
         }
         return username;
     }
-    private String sslPropsFile;
 
     /**
      * <p>Configuration for a client with no authentication credentials that will
@@ -122,7 +121,7 @@ public class ClientConfig {
      *
      * @param username Cleartext username.
      * @param password Cleartext password.
-     * @param enableSSL Enable SSL
+     * @param enableSSL enable SSL connection to server
      */
     public ClientConfig(String username, String password, boolean enableSSL) {
         this(username, password, true, (ClientStatusListenerExt) null, ClientAuthScheme.HASH_SHA256, enableSSL, null);
@@ -163,7 +162,7 @@ public class ClientConfig {
      * @param username Cleartext username.
      * @param password Cleartext password.
      * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
-     * @param enableSSL Enable SSL
+     * @param enableSSL enable SSL connection to server
      */
     public ClientConfig(String username, String password, ClientStatusListenerExt listener, boolean enableSSL) {
         this(username,password,true,listener, ClientAuthScheme.HASH_SHA256, enableSSL, null);
@@ -176,12 +175,11 @@ public class ClientConfig {
      * @param username Cleartext username.
      * @param password Cleartext password.
      * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
-     * @param enableSSL Enable SSL
+     * @param enableSSL enable SSL connection to server
      * @param sslPropsFile SSL Properties file
      */
     public ClientConfig(String username, String password, ClientStatusListenerExt listener, boolean enableSSL, String sslPropsFile) {
         this(username,password,true,listener, ClientAuthScheme.HASH_SHA256, enableSSL, sslPropsFile);
-        this.sslPropsFile = sslPropsFile;
     }
 
     /**
@@ -279,6 +277,7 @@ public class ClientConfig {
         m_hashScheme = scheme;
         m_sslPropsFile = sslPropsFile;
         m_enableSSL = enableSSL;
+        if (m_sslPropsFile != null && m_sslPropsFile.trim().length() > 0) m_enableSSL = true;
         if (m_enableSSL) {
             enableSSL();
         }
@@ -529,13 +528,13 @@ public class ClientConfig {
         try {
             SSLConfiguration.SslConfig sslConfig;
             if (ENABLE_SSL_FOR_TEST ||
-                    (m_enableSSL && (sslPropsFile == null || sslPropsFile.trim().length() == 0)) ) {
+                    (m_enableSSL && (m_sslPropsFile == null || m_sslPropsFile.trim().length() == 0)) ) {
                 sslConfig = new SSLConfiguration.SslConfig(null, null, null, null);
                 SSLConfiguration.applySystemProperties(sslConfig);
                 m_sslContext = SSLConfiguration.initializeSslContext(sslConfig);
                 return;
             }
-            File configFile = new File(sslPropsFile);
+            File configFile = new File(m_sslPropsFile);
             Properties sslProperties = new Properties();
             try ( FileInputStream configFis = new FileInputStream(configFile) ) {
                 sslProperties.load(configFis);
@@ -549,7 +548,7 @@ public class ClientConfig {
 
             m_sslContext = SSLConfiguration.initializeSslContext(sslConfig);
         } catch (IOException | NoSuchAlgorithmException | KeyStoreException | CertificateException | UnrecoverableKeyException | KeyManagementException ex) {
-            throw new IllegalArgumentException("Failed to initialize SSL from config file: " + sslPropsFile, ex);
+            throw new IllegalArgumentException("Failed to initialize SSL from config file: " + m_sslPropsFile, ex);
         }
 
     }

@@ -1028,6 +1028,7 @@ public class SQLCommand
         + "              [--user=user]\n"
         + "              [--password=password]\n"
         + "              [--kerberos=jaas_login_configuration_entry_key]\n"
+        + "              [--ssl or --ssl=ssl-configuration-file]\n"
         + "              [--query=query]\n"
         + "              [--output-format=(fixed|csv|tab)]\n"
         + "              [--output-skip-metadata]\n"
@@ -1254,16 +1255,6 @@ public class SQLCommand
         return splitStrings[1];
     }
 
-    private static String extractOptionalArgInput(String arg, String defaultValue) {
-        // the input arguments has "=" character when this function is called
-        String[] splitStrings = arg.split("=", 2);
-        if (splitStrings.length == 1) return defaultValue;
-        if (splitStrings[1].isEmpty()) {
-            return defaultValue;
-        }
-        return splitStrings[1];
-    }
-
     // Application entry point
     public static void main(String args[])
     {
@@ -1355,11 +1346,13 @@ public class SQLCommand
             else if (arg.equals("--output-skip-metadata")) {
                 m_outputShowMetadata = false;
             }
-
-            // arg to enable ssl from a properties file
+            else if (arg.startsWith("--ssl=")) {
+                enableSSL = true;
+                sslConfigFile = extractArgInput(arg);
+            }
             else if (arg.startsWith("--ssl")) {
                 enableSSL = true;
-                sslConfigFile = extractOptionalArgInput(arg, null);
+                sslConfigFile = null;
             }
             else if (arg.equals("--debug")) {
                 m_debug = true;
