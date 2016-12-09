@@ -30,6 +30,7 @@ import java.security.cert.CertificateException;
 import java.util.Iterator;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.net.ssl.SSLContext;
 import javax.security.auth.Subject;
@@ -37,6 +38,7 @@ import javax.security.auth.login.LoginContext;
 import javax.security.auth.login.LoginException;
 
 import org.voltcore.utils.ssl.SSLConfiguration;
+import org.voltcore.utils.ssl.SSLConfiguration.SslConfig;
 import org.voltdb.types.VoltDecimalHelper;
 
 /**
@@ -67,7 +69,8 @@ public class ClientConfig {
     long m_initialConnectionRetryIntervalMS = DEFAULT_INITIAL_CONNECTION_RETRY_INTERVAL_MS;
     long m_maxConnectionRetryIntervalMS = DEFAULT_MAX_CONNECTION_RETRY_INTERVAL_MS;
     boolean m_sendReadsToReplicasBytDefaultIfCAEnabled = false;
-    SSLContext m_sslContext;
+    final AtomicReference<SSLContext> m_sslContextRef = new AtomicReference<>();
+    final SslConfig m_sslConfig;
     boolean m_topologyChangeAware = false;
     boolean m_enableSSL = false;
     String m_sslPropsFile = null;
@@ -103,6 +106,7 @@ public class ClientConfig {
         m_listener = null;
         m_cleartext = true;
         m_hashScheme = ClientAuthScheme.HASH_SHA256;
+        m_sslConfig = null;
     }
 
 
@@ -286,7 +290,26 @@ public class ClientConfig {
             m_sslPropsFile = this.getClass().getResource(DEFAULT_SSL_PROPS_FILE).getFile();
         }
         if (m_enableSSL) {
-            enableSSL();
+            if (m_enableSSL && (m_sslPropsFile == null || m_sslPropsFile.trim().length() == 0) ) {
+                m_sslConfig = new SSLConfiguration.SslConfig(null, null, null, null);
+                SSLConfiguration.applySystemProperties(m_sslConfig);
+            } else {
+                File configFile = new File(m_sslPropsFile);
+                Properties sslProperties = new Properties();
+                try ( FileInputStream configFis = new FileInputStream(configFile) ) {
+                    sslProperties.load(configFis);
+                    m_sslConfig = new SSLConfiguration.SslConfig(
+                            sslProperties.getProperty(SSLConfiguration.KEYSTORE_CONFIG_PROP),
+                            sslProperties.getProperty(SSLConfiguration.KEYSTORE_PASSWORD_CONFIG_PROP),
+                            sslProperties.getProperty(SSLConfiguration.TRUSTSTORE_CONFIG_PROP),
+                            sslProperties.getProperty(SSLConfiguration.TRUSTSTORE_PASSWORD_CONFIG_PROP));
+                    SSLConfiguration.applySystemProperties(m_sslConfig);
+                } catch (IOException ioe) {
+                    throw new IllegalArgumentException("Unable to access SSL configuration.", ioe);
+                }
+            }
+        } else {
+           m_sslConfig = null;
         }
     }
 
@@ -532,35 +555,17 @@ public class ClientConfig {
      * Configure ssl from the provided properties file. if file is not provided we configure without keystore and truststore manager.
      */
     public void enableSSL() {
-        try {
-            SSLConfiguration.SslConfig sslConfig;
-            if (ENABLE_SSL_FOR_TEST ||
-                    (m_enableSSL && (m_sslPropsFile == null || m_sslPropsFile.trim().length() == 0)) ) {
-                sslConfig = new SSLConfiguration.SslConfig(null, null, null, null);
-                SSLConfiguration.applySystemProperties(sslConfig);
-                m_sslContext = SSLConfiguration.initializeSslContext(sslConfig);
-                return;
+        if (!m_enableSSL || m_sslContextRef.get() != null) return;
+        synchronized (m_sslContextRef) {
+            try {
+                m_sslContextRef.set(SSLConfiguration.initializeSslContext(m_sslConfig));
+            } catch (IOException | NoSuchAlgorithmException | KeyStoreException | CertificateException | UnrecoverableKeyException | KeyManagementException ex) {
+                throw new IllegalArgumentException("Failed to initialize SSL from config file: " + m_sslPropsFile, ex);
             }
-            File configFile = new File(m_sslPropsFile);
-            Properties sslProperties = new Properties();
-            try ( FileInputStream configFis = new FileInputStream(configFile) ) {
-                sslProperties.load(configFis);
-                sslConfig = new SSLConfiguration.SslConfig(
-                        sslProperties.getProperty(SSLConfiguration.KEYSTORE_CONFIG_PROP),
-                        sslProperties.getProperty(SSLConfiguration.KEYSTORE_PASSWORD_CONFIG_PROP),
-                        sslProperties.getProperty(SSLConfiguration.TRUSTSTORE_CONFIG_PROP),
-                        sslProperties.getProperty(SSLConfiguration.TRUSTSTORE_PASSWORD_CONFIG_PROP));
-                SSLConfiguration.applySystemProperties(sslConfig);
-            }
-
-            m_sslContext = SSLConfiguration.initializeSslContext(sslConfig);
-        } catch (IOException | NoSuchAlgorithmException | KeyStoreException | CertificateException | UnrecoverableKeyException | KeyManagementException ex) {
-            throw new IllegalArgumentException("Failed to initialize SSL from config file: " + m_sslPropsFile, ex);
         }
-
     }
 
     public SSLContext getSslContext() {
-        return m_sslContext;
+        return m_sslContextRef.get();
     }
 }

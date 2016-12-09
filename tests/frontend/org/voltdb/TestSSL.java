@@ -136,7 +136,7 @@ public class TestSSL extends TestCase {
     }
 
     private void checkAdminAndClient(int adminPort, int clientPort, boolean enableSSL, String sslPropsFile) throws Exception {
-        ClientConfig clientConfig = new ClientConfig("", "", null, enableSSL, null);
+        ClientConfig clientConfig = new ClientConfig("", "", null, enableSSL, sslPropsFile);
 
         m_admin = ClientFactory.createClient(clientConfig);
         m_admin.createConnection("localhost", adminPort);
@@ -182,12 +182,6 @@ public class TestSSL extends TestCase {
     public void testLocalClusterDefaultPortDeployment() throws Exception {
         startLocalCluster(KEYSTORE_RESOURCE, KEYSTORE_PASSWD, KEYSTORE_RESOURCE, KEYSTORE_PASSWD);
         checkAdminAndClient(m_cluster.adminPort(0), m_cluster.port(0), true, getResourcePath(SSL_PROPS_FILE));
-    }
-
-    @Test
-    public void testLocalClusterDefaultPortDeploymentWithNoSSLConfig() throws Exception {
-        startLocalCluster(KEYSTORE_RESOURCE, KEYSTORE_PASSWD, KEYSTORE_RESOURCE, KEYSTORE_PASSWD);
-        checkAdminAndClient(m_cluster.adminPort(0), m_cluster.port(0), false, null);
     }
 
     @Test
