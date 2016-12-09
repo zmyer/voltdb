@@ -135,8 +135,9 @@ public class TestSSL extends TestCase {
         m_server.waitForInitialization();
     }
 
-    private void checkAdminAndClient(int adminPort, int clientPort, boolean enableSSL, String sslPropsFile) throws Exception {
-        ClientConfig clientConfig = new ClientConfig("", "", null, enableSSL, sslPropsFile);
+    private void checkAdminAndClient(int adminPort, int clientPort, String sslPropsFile) throws Exception {
+        ClientConfig clientConfig = new ClientConfig("", "", null, true, getResourcePath(sslPropsFile));
+        clientConfig.enableSSL();
 
         m_admin = ClientFactory.createClient(clientConfig);
         m_admin.createConnection("localhost", adminPort);
@@ -159,13 +160,13 @@ public class TestSSL extends TestCase {
     @Test
     public void ntestServerThreadDefaultPortDeployment() throws Exception {
         startServerThread(KEYSTORE_RESOURCE, KEYSTORE_PASSWD, KEYSTORE_RESOURCE, KEYSTORE_PASSWD);
-        checkAdminAndClient(m_server.m_config.m_adminPort, m_server.m_config.m_port, true, getResourcePath(SSL_PROPS_FILE));
+        checkAdminAndClient(m_server.m_config.m_adminPort, m_server.m_config.m_port, SSL_PROPS_FILE);
     }
 
     @Test
     public void ntestServerThreadObfuscatedPassword() throws Exception {
         startServerThread(KEYSTORE_RESOURCE, KEYSTORE_PASSWD_OBFUSCATED, KEYSTORE_RESOURCE, KEYSTORE_PASSWD_OBFUSCATED);
-        checkAdminAndClient(m_server.m_config.m_adminPort, m_server.m_config.m_port, true, getResourcePath(SSL_PROPS_FILE));
+        checkAdminAndClient(m_server.m_config.m_adminPort, m_server.m_config.m_port, SSL_PROPS_FILE);
     }
 
     @Test
@@ -175,19 +176,19 @@ public class TestSSL extends TestCase {
         System.setProperty(TRUSTSTORE_SYSPROP, getResourcePath(KEYSTORE_RESOURCE));
         System.setProperty(TRUSTSTORE_PASSWD_SYSPROP, KEYSTORE_PASSWD);
         startServerThread("invalid", "invalid", null, null);
-        checkAdminAndClient(m_server.m_config.m_adminPort, m_server.m_config.m_port, true, getResourcePath(SSL_PROPS_FILE_INVALID));
+        checkAdminAndClient(m_server.m_config.m_adminPort, m_server.m_config.m_port, SSL_PROPS_FILE_INVALID);
     }
 
     @Test
     public void testLocalClusterDefaultPortDeployment() throws Exception {
         startLocalCluster(KEYSTORE_RESOURCE, KEYSTORE_PASSWD, KEYSTORE_RESOURCE, KEYSTORE_PASSWD);
-        checkAdminAndClient(m_cluster.adminPort(0), m_cluster.port(0), true, getResourcePath(SSL_PROPS_FILE));
+        checkAdminAndClient(m_cluster.adminPort(0), m_cluster.port(0), SSL_PROPS_FILE);
     }
 
     @Test
     public void ntestLocalCLusterObfuscatedPassword() throws Exception {
         startLocalCluster(KEYSTORE_RESOURCE, KEYSTORE_PASSWD_OBFUSCATED, KEYSTORE_RESOURCE, KEYSTORE_PASSWD_OBFUSCATED);
-        checkAdminAndClient(m_cluster.adminPort(0), m_cluster.port(0), true, getResourcePath(SSL_PROPS_FILE));
+        checkAdminAndClient(m_cluster.adminPort(0), m_cluster.port(0), SSL_PROPS_FILE);
     }
 
     @Test
@@ -212,6 +213,7 @@ public class TestSSL extends TestCase {
         m_cluster.startUp();
 
         ClientConfig clientConfig = new ClientConfig("", "", null, true, getResourcePath(SSL_PROPS_FILE));
+        clientConfig.enableSSL();
 
         ClientResponse response;
         Client client;
