@@ -159,13 +159,13 @@ public class TestSSL extends TestCase {
     @Test
     public void ntestServerThreadDefaultPortDeployment() throws Exception {
         startServerThread(KEYSTORE_RESOURCE, KEYSTORE_PASSWD, KEYSTORE_RESOURCE, KEYSTORE_PASSWD);
-        checkAdminAndClient(m_server.m_config.m_adminPort, m_server.m_config.m_port, true, SSL_PROPS_FILE);
+        checkAdminAndClient(m_server.m_config.m_adminPort, m_server.m_config.m_port, true, getResourcePath(SSL_PROPS_FILE));
     }
 
     @Test
     public void ntestServerThreadObfuscatedPassword() throws Exception {
         startServerThread(KEYSTORE_RESOURCE, KEYSTORE_PASSWD_OBFUSCATED, KEYSTORE_RESOURCE, KEYSTORE_PASSWD_OBFUSCATED);
-        checkAdminAndClient(m_server.m_config.m_adminPort, m_server.m_config.m_port, true, SSL_PROPS_FILE);
+        checkAdminAndClient(m_server.m_config.m_adminPort, m_server.m_config.m_port, true, getResourcePath(SSL_PROPS_FILE));
     }
 
     @Test
@@ -175,13 +175,13 @@ public class TestSSL extends TestCase {
         System.setProperty(TRUSTSTORE_SYSPROP, getResourcePath(KEYSTORE_RESOURCE));
         System.setProperty(TRUSTSTORE_PASSWD_SYSPROP, KEYSTORE_PASSWD);
         startServerThread("invalid", "invalid", null, null);
-        checkAdminAndClient(m_server.m_config.m_adminPort, m_server.m_config.m_port, true, SSL_PROPS_FILE_INVALID);
+        checkAdminAndClient(m_server.m_config.m_adminPort, m_server.m_config.m_port, true, getResourcePath(SSL_PROPS_FILE_INVALID));
     }
 
     @Test
     public void testLocalClusterDefaultPortDeployment() throws Exception {
         startLocalCluster(KEYSTORE_RESOURCE, KEYSTORE_PASSWD, KEYSTORE_RESOURCE, KEYSTORE_PASSWD);
-        checkAdminAndClient(m_cluster.adminPort(0), m_cluster.port(0), true, SSL_PROPS_FILE);
+        checkAdminAndClient(m_cluster.adminPort(0), m_cluster.port(0), true, getResourcePath(SSL_PROPS_FILE));
     }
 
     @Test
@@ -193,7 +193,7 @@ public class TestSSL extends TestCase {
     @Test
     public void ntestLocalCLusterObfuscatedPassword() throws Exception {
         startLocalCluster(KEYSTORE_RESOURCE, KEYSTORE_PASSWD_OBFUSCATED, KEYSTORE_RESOURCE, KEYSTORE_PASSWD_OBFUSCATED);
-        checkAdminAndClient(m_cluster.adminPort(0), m_cluster.port(0), true, SSL_PROPS_FILE);
+        checkAdminAndClient(m_cluster.adminPort(0), m_cluster.port(0), true, getResourcePath(SSL_PROPS_FILE));
     }
 
     @Test

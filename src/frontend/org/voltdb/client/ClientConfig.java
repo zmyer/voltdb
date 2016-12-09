@@ -74,6 +74,8 @@ public class ClientConfig {
 
     //For unit testing.
     private static final boolean ENABLE_SSL_FOR_TEST = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? "false" : System.getenv("ENABLE_SSL"));
+    private static final String DEFAULT_SSL_PROPS_FILE = "ssl-config";
+
     final static String getUserNameFromSubject(Subject subject) {
         if (subject == null || subject.getPrincipals() == null || subject.getPrincipals().isEmpty()) {
             throw new IllegalArgumentException("Subject is null or does not contain principals");
@@ -278,6 +280,11 @@ public class ClientConfig {
         m_sslPropsFile = sslPropsFile;
         m_enableSSL = enableSSL;
         if (m_sslPropsFile != null && m_sslPropsFile.trim().length() > 0) m_enableSSL = true;
+        //For testing
+        if (ENABLE_SSL_FOR_TEST) {
+            m_enableSSL = true;
+            m_sslPropsFile = this.getClass().getResource(DEFAULT_SSL_PROPS_FILE).getFile();
+        }
         if (m_enableSSL) {
             enableSSL();
         }
