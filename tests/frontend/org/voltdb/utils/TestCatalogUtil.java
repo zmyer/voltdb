@@ -27,9 +27,13 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Calendar;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.SortedSet;
+
+import junit.framework.TestCase;
 
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
@@ -58,8 +62,6 @@ import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.licensetool.LicenseException;
 import org.voltdb.types.ConstraintType;
-
-import junit.framework.TestCase;
 
 public class TestCatalogUtil extends TestCase {
 
@@ -620,6 +622,47 @@ public class TestCatalogUtil extends TestCase {
             public boolean isCommandLoggingAllowed() {
                 return false;
             }
+
+            @Override
+            public boolean isAWSMarketplace() {
+                return false;
+            }
+
+            @Override
+            public boolean isEnterprise() {
+                return false;
+            }
+
+            @Override
+            public boolean isPro() {
+                return false;
+            }
+
+            @Override
+            public String licensee() {
+                return null;
+            }
+
+            @Override
+            public Calendar issued() {
+                // TODO Auto-generated method stub
+                return null;
+            }
+
+            @Override
+            public String note() {
+                return null;
+            }
+
+            @Override
+            public boolean hardExpiration() {
+                return false;
+            }
+
+            @Override
+            public boolean secondaryInitialization() {
+                return true;
+            }
         };
         assertNull("Setting DR Active-Active should succeed with qualified license",
                    CatalogUtil.checkLicenseConstraint(catalog, lapi));
@@ -663,6 +706,46 @@ public class TestCatalogUtil extends TestCase {
             @Override
             public boolean isCommandLoggingAllowed() {
                 return false;
+            }
+
+            @Override
+            public boolean isAWSMarketplace() {
+                return false;
+            }
+
+            @Override
+            public boolean isEnterprise() {
+                return false;
+            }
+
+            @Override
+            public boolean isPro() {
+                return false;
+            }
+
+            @Override
+            public String licensee() {
+                return null;
+            }
+
+            @Override
+            public Calendar issued() {
+                return null;
+            }
+
+            @Override
+            public String note() {
+                return null;
+            }
+
+            @Override
+            public boolean hardExpiration() {
+                return false;
+            }
+
+            @Override
+            public boolean secondaryInitialization() {
+                return true;
             }
         };
         assertNotNull("Setting DR Active-Active should fail with unqualified license",
@@ -1894,7 +1977,7 @@ public class TestCatalogUtil extends TestCase {
         assertTrue(db.getConnectors().get(CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP) != null);
         // check default setting of DR conflict exporter
         assertEquals("LOG", db.getConnectors().get(CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP).getConfig().get("nonce").getValue());
-        assertEquals(cat.getClusters().get("cluster").getVoltroot() + "/" + CatalogUtil.DEFAULT_DR_CONFLICTS_DIR,
+        assertEquals(CatalogUtil.DEFAULT_DR_CONFLICTS_DIR,
                 db.getConnectors().get(CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP).getConfig().get("outdir").getValue());
         assertEquals("true", db.getConnectors().get(CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP).getConfig().get("replicated").getValue());
         assertEquals(CatalogUtil.DEFAULT_DR_CONFLICTS_EXPORT_TYPE, db.getConnectors().get(CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP).getConfig().get("type").getValue());
@@ -1967,6 +2050,7 @@ public class TestCatalogUtil extends TestCase {
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
                 + "        <configuration target='" + CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP + "' enabled='true' type='file'>"
+                + "            <property name=\"outdir\">/tmp/" + System.getProperty("user.name") + "</property>"
                 + "            <property name=\"type\">csv</property>"
                 + "            <property name=\"nonce\">newNonce</property>"
                 + "        </configuration>"
@@ -2035,5 +2119,29 @@ public class TestCatalogUtil extends TestCase {
         assertEquals(1, mapping.size());
         assertEquals(true, mapping.containsKey("B"));
         assertEquals(0, mapping.get("B").getIndex());
+    }
+
+    public void testGetNormalTableNamesFromInMemoryJar() throws Exception {
+        String schema = "CREATE TABLE NORMAL_A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL);\n" +
+                "CREATE TABLE NORMAL_B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL);\n" +
+                "CREATE TABLE NORMAL_C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL);\n" +
+                "CREATE VIEW VIEW_A (TOTAL_ROWS) AS SELECT COUNT(*) FROM NORMAL_A;\n" +
+                "CREATE STREAM EXPORT_A (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL);\n";
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        final File file = VoltFile.createTempFile("testGetNormalTableNamesFromInMemoryJar", ".jar", new File(testDir));
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(schema);
+        builder.compile(file.getPath());
+        byte[] bytes = MiscUtils.fileToBytes(file);
+        InMemoryJarfile jarfile = CatalogUtil.loadInMemoryJarFile(bytes);
+        file.delete();
+
+        Set<String> definedNormalTableNames = new HashSet<>();
+        definedNormalTableNames.add("NORMAL_A");
+        definedNormalTableNames.add("NORMAL_B");
+        definedNormalTableNames.add("NORMAL_C");
+        Set<String> returnedNormalTableNames = CatalogUtil.getNormalTableNamesFromInMemoryJar(jarfile);
+        assertEquals(definedNormalTableNames, returnedNormalTableNames);
     }
 }

@@ -20,8 +20,9 @@ import io
 import requests
 import socket
 from cStringIO import StringIO
-import xmlrunner
 from flask import json
+import xmlrunner
+
 
 __host_name__ = socket.gethostname()
 __host_or_ip__ = socket.gethostbyname(__host_name__)
@@ -79,25 +80,25 @@ class UploadConfiguration(Database):
             res = requests.put(__db_url__ + str(last_db_id) + '/deployment/', files={'file': open('test-files/images.png', 'rb')})
             assert res.status_code == 200
             result = json.loads(res.content)
-            self.assertEqual(result['status'],'failure')
-            self.assertEqual(result['error'],'Invalid file type.')
+            self.assertEqual(result['status'], 401)
+            self.assertEqual(result['statusString'], 'Invalid file type.')
 
             res = requests.put(__db_url__ + str(last_db_id) + '/deployment/', files={'file': open('test-files/Invalid.xml', 'rb')})
             assert res.status_code == 200
             result = json.loads(res.content)
-            self.assertEqual(result['status'],'failure')
-            self.assertEqual(result['error'],'Invalid file content.')
+            self.assertEqual(result['status'], 401)
+            self.assertEqual(result['statusString'], 'Invalid file content.')
 
             res = requests.put(__db_url__ + str(last_db_id) + '/deployment/', files={'file': open('test-files/Sample.xml', 'rb')})
             assert res.status_code == 200
             result = json.loads(res.content)
-            self.assertEqual(result['status'],'failure')
-            self.assertEqual(result['error'],'Invalid file content.')
+            self.assertEqual(result['status'], 401)
+            self.assertEqual(result['statusString'], 'Invalid file content.')
 
             res = requests.put(__db_url__ + str(last_db_id) + '/deployment/', files={'file': open('test-files/deployment.xml', 'rb')})
             assert res.status_code == 200
             result = json.loads(res.content)
-            self.assertEqual(result['status'],'success')
+            self.assertEqual(result['status'], 201)
         else:
             print "The database list is empty"
 
@@ -114,7 +115,7 @@ class UploadConfiguration(Database):
             res = requests.put(__db_url__ + str(last_db_id) + '/deployment/', files={'file': open('test-files/deployment.xml', 'rb')})
             assert res.status_code == 200
             result = json.loads(res.content)
-            self.assertEqual(result['status'],'success')
+            self.assertEqual(result['status'], 201)
             response = requests.get(__db_url__ + str(last_db_id) + '/deployment/', headers=headers )
             value = response.json()
 
@@ -176,4 +177,3 @@ class UploadConfiguration(Database):
 
 if __name__ == '__main__':
     unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))
-    unittest.main()

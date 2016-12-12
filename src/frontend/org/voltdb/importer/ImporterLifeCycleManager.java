@@ -86,6 +86,10 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
         m_configs = builder.build();
     }
 
+    public final int getConfigsCount() {
+        return m_configs.size();
+    }
+
     /**
      * This method is used by the framework to indicate that the importers must be started now.
      * This implementation starts the required number of threads based on the number of resources
@@ -216,16 +220,17 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
 
     private void submitAccept(final AbstractImporter importer)
     {
-        m_executorService.submit(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    importer.accept();
-                } catch(Exception e) {
-                    s_logger.error(
+        m_executorService.submit(() -> {
+            try {
+                final String thName = importer.getTaskThreadName();
+                if (thName != null) {
+                    Thread.currentThread().setName(thName);
+                }
+                importer.accept();
+            } catch(Throwable e) {
+                s_logger.error(
                         String.format("Error calling accept for importer %s", m_factory.getTypeName()),
                         e);
-                }
             }
         });
     }

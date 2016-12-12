@@ -111,6 +111,15 @@ public class VoltProjectBuilder {
             assert(this.name != null);
         }
 
+        public ProcedureInfo(final Class<?> cls, final String partitionInfo) {
+            this.roles = new String[0];
+            this.cls = cls;
+            this.name = cls.getSimpleName();
+            this.sql = null;
+            this.partitionInfo = partitionInfo;
+            assert(this.name != null);
+        }
+
         public ProcedureInfo(
                 final String roles[],
                 final String name,
@@ -539,7 +548,7 @@ public class VoltProjectBuilder {
                 String[] parameter = procedure.partitionInfo.split(":");
                 String[] token = parameter[0].split("\\.");
                 String position = "";
-                if(Integer.parseInt(parameter[1].trim()) > 0) {
+                if(parameter.length >= 2 && Integer.parseInt(parameter[1].trim()) > 0) {
                     position = " PARAMETER " + parameter[1];
                 }
                 transformer.append("PARTITION PROCEDURE " + procedure.name + " ON TABLE " + token[0] + " COLUMN " + token[1] + position + ";");
@@ -672,8 +681,10 @@ public class VoltProjectBuilder {
 
         if (config == null) {
             config = new Properties();
+            //If No config provided use file with outdir to user-specific tmp.
+            config.put("outdir", "/tmp/" + System.getProperty("user.name"));
             config.putAll(ImmutableMap.<String, String>of(
-                    "type","tsv", "batched","true", "with-schema","true", "nonce","zorag", "outdir","exportdata"
+                    "type","tsv", "batched","true", "with-schema","true", "nonce","zorag"
                     ));
         }
         exportConnector.put("elConfig", config);

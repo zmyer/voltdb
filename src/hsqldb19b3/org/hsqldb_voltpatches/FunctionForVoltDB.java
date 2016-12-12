@@ -55,6 +55,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         final private int m_typeParameter;
         final private Type[] m_paramTypes;
         final private short[] m_paramParseList;
+        final private short[] m_paramParseListAlt;
 
         public String getName() {
             return m_name;
@@ -76,13 +77,22 @@ public class FunctionForVoltDB extends FunctionSQL {
             return m_paramParseList;
         }
 
+        public short[] getParamParseListAlt() {
+            return m_paramParseListAlt;
+        }
+
         private FunctionId(String name, Type type, int id, int typeParameter, Type[] paramTypes, short[] paramParseList) {
+            this(name, type, id, typeParameter, paramTypes, paramParseList, null);
+        }
+
+        private FunctionId(String name, Type type, int id, int typeParameter, Type[] paramTypes, short[] paramParseList, short[] paramParseListAlt) {
             m_name = name;
             m_type = type;
             m_id = id;
             m_typeParameter = typeParameter;
             m_paramTypes = paramTypes;
             m_paramParseList = paramParseList;
+            m_paramParseListAlt = paramParseListAlt;
         }
 
         // These ID numbers need to be unique values for FunctionSQL.functType.
@@ -253,17 +263,15 @@ public class FunctionForVoltDB extends FunctionSQL {
 
             new FunctionId("from_unixtime", Type.SQL_TIMESTAMP, FUNC_VOLT_FROM_UNIXTIME, -1,
                     new Type[] { Type.SQL_BIGINT },
-                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+                    singleParamList),
 
             new FunctionId("format_currency", Type.SQL_VARCHAR, FUNC_VOLT_FORMAT_CURRENCY, -1,
                     new Type[] { Type.SQL_DECIMAL, Type.SQL_INTEGER},
-                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
-                    Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+                    doubleParamList),
 
             new FunctionId("round", Type.SQL_DECIMAL, FUNC_VOLT_ROUND, -1,
                     new Type[] { Type.SQL_DECIMAL, Type.SQL_INTEGER},
-                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
-                    Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+                    doubleParamList),
 
             new FunctionId("str", Type.SQL_VARCHAR, FUNC_VOLT_STR, -1,
                     new Type[] { Type.SQL_DECIMAL, Type.SQL_INTEGER, Type.SQL_INTEGER},
@@ -272,7 +280,7 @@ public class FunctionForVoltDB extends FunctionSQL {
 
             new FunctionId("bitnot", Type.SQL_BIGINT, FUNC_VOLT_BITNOT, -1,
                     new Type[] { Type.SQL_BIGINT },
-                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+                    singleParamList),
 
             new FunctionId("concat", Type.SQL_VARCHAR, FUNC_CONCAT, -1,
                     new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR },
@@ -282,11 +290,11 @@ public class FunctionForVoltDB extends FunctionSQL {
 
             new FunctionId("hex", Type.SQL_VARCHAR, FUNC_VOLT_HEX, -1,
                     new Type[] { Type.SQL_BIGINT },
-                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+                    singleParamList),
 
             new FunctionId("bin", Type.SQL_VARCHAR, FUNC_VOLT_BIN, -1,
                     new Type[] { Type.SQL_BIGINT },
-                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+                    singleParamList),
 
             new FunctionId("dateadd", Type.SQL_TIMESTAMP, FUNC_VOLT_DATEADD, -1,
                     new Type[] { Type.SQL_VARCHAR, Type.SQL_BIGINT, Type.SQL_TIMESTAMP },
@@ -302,61 +310,59 @@ public class FunctionForVoltDB extends FunctionSQL {
 
             new FunctionId("pointfromtext", Type.VOLT_GEOGRAPHY_POINT, FUNC_VOLT_POINTFROMTEXT, -1,
                     new Type[] { Type.SQL_VARCHAR },
-                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+                    singleParamList),
 
             new FunctionId("polygonfromtext", Type.VOLT_GEOGRAPHY, FUNC_VOLT_POLYGONFROMTEXT, -1,
                     new Type[] { Type.SQL_VARCHAR },
-                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+                    singleParamList),
             new FunctionId("contains", Type.SQL_BOOLEAN, FUNC_VOLT_CONTAINS, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY, Type.VOLT_GEOGRAPHY_POINT },
-                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
-                    Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+                    doubleParamList),
 
             new FunctionId("numinteriorring", Type.SQL_INTEGER, FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY },
-                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+                    singleParamList),
 
              // numinteriorrings is alias of numinteriorring
             new FunctionId("numinteriorrings", Type.SQL_INTEGER, FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY },
-                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+                    singleParamList),
 
             new FunctionId("numpoints", Type.SQL_INTEGER, FUNC_VOLT_POLYGON_NUM_POINTS, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY },
-                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+                    singleParamList),
 
             new FunctionId("latitude", Type.SQL_DOUBLE, FUNC_VOLT_POINT_LATITUDE, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY_POINT },
-                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+                    singleParamList),
 
             new FunctionId("longitude", Type.SQL_DOUBLE, FUNC_VOLT_POINT_LONGITUDE, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY_POINT },
-                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+                    singleParamList),
 
             new FunctionId("centroid", Type.VOLT_GEOGRAPHY_POINT, FUNC_VOLT_POLYGON_CENTROID, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY },
-                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+                    singleParamList),
 
             new FunctionId("area", Type.SQL_DOUBLE, FUNC_VOLT_POLYGON_AREA, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY },
-                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+                    singleParamList),
 
             new FunctionId("distance", Type.SQL_DOUBLE, FUNC_VOLT_DISTANCE, -1,
                     new Type[] { Type.SQL_ALL_TYPES, Type.SQL_ALL_TYPES },
-                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
-                                   Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+                    doubleParamList),
 
             new FunctionId("astext", Type.SQL_VARCHAR, FUNC_VOLT_ASTEXT, -1,
                     new Type[] { Type.SQL_ALL_TYPES },
-                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+                    singleParamList),
 
             new FunctionId("isvalid", Type.SQL_BOOLEAN, FUNC_VOLT_VALIDATE_POLYGON, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY },
-                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+                    singleParamList),
 
             new FunctionId("isinvalidreason", Type.SQL_VARCHAR, FUNC_VOLT_POLYGON_INVALID_REASON, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY },
-                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+                    singleParamList),
 
             new FunctionId("dwithin", Type.SQL_BOOLEAN, FUNC_VOLT_DWITHIN, -1,
                     new Type[] { Type.SQL_ALL_TYPES, Type.SQL_ALL_TYPES, Type.SQL_DOUBLE },
@@ -367,17 +373,19 @@ public class FunctionForVoltDB extends FunctionSQL {
                                    Tokens.CLOSEBRACKET }),
             new FunctionId("validpolygonfromtext", Type.VOLT_GEOGRAPHY, FUNC_VOLT_VALIDPOLYGONFROMTEXT, -1,
                     new Type[] { Type.SQL_VARCHAR },
-                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+                    singleParamList),
 
             new FunctionId("min_valid_timestamp", Type.SQL_TIMESTAMP, FUNC_VOLT_MIN_VALID_TIMESTAMP, -1,
-            		new Type[] {},
-            		new short[] { Tokens.OPENBRACKET, Tokens.CLOSEBRACKET }),
+                    new Type[] {},
+                    emptyParamList,
+                    noParamList),
             new FunctionId("max_valid_timestamp", Type.SQL_TIMESTAMP, FUNC_VOLT_MAX_VALID_TIMESTAMP, -1,
-            		new Type[] {},
-            		new short[] { Tokens.OPENBRACKET, Tokens.CLOSEBRACKET }),
+                    new Type[] {},
+                    emptyParamList,
+                    noParamList),
             new FunctionId("is_valid_timestamp", Type.SQL_BOOLEAN, FUNC_VOLT_IS_VALID_TIMESTAMP, -1,
-            		new Type[] { Type.SQL_TIMESTAMP },
-            		new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+                    new Type[] { Type.SQL_TIMESTAMP },
+                    singleParamList),
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();
@@ -430,6 +438,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         funcType  = m_def.getId();
         name      = m_def.getName();
         parseList = m_def.getParamParseList();
+        parseListAlt = m_def.getParamParseListAlt();
         parameterArg = m_def.getTypeParameter();
     }
 
@@ -703,6 +712,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                             catch (Exception e) {
                                 throw Error.error(ErrorCode.X_42561);
                             }
+                            nodes[i].valueData = paramTypes[i].castToType(session, nodes[i].valueData, nodes[i].dataType);
                             nodes[i].dataType = paramTypes[i];
                         }
                     } else if (paramTypes[i].isNumberType() && !nodes[i].dataType.isNumberType()) {
@@ -741,11 +751,11 @@ public class FunctionForVoltDB extends FunctionSQL {
             break;
         }
         default:
-        	// If this is a nullary function, we don't want to
-        	// crash here.
-        	if (0 < nodes.length) {
-        		sb.append(nodes[0].getSQL());
-        	}
+            // If this is a nullary function, we don't want to
+            // crash here.
+            if (0 < nodes.length) {
+                sb.append(nodes[0].getSQL());
+            }
             break;
         }
         for (int ii = 1; ii < nodes.length; ii++) {

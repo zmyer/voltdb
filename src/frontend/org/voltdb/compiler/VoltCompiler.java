@@ -49,29 +49,24 @@ import javax.xml.bind.Unmarshaller;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
-import com.google_voltpatches.common.collect.ImmutableSet;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.VoltXMLElement;
-import org.json_voltpatches.JSONException;
+import org.voltcore.TransactionIdManager;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CatalogContext;
 import org.voltdb.ProcInfoData;
 import org.voltdb.RealVoltDB;
-import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
-import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
-import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.FilteredCatalogDiffEngine;
-import org.voltdb.catalog.Index;
-import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
@@ -88,20 +83,21 @@ import org.voltdb.compiler.projectfile.ProjectType;
 import org.voltdb.compiler.projectfile.RolesType;
 import org.voltdb.compiler.projectfile.SchemasType;
 import org.voltdb.compilereport.ReportMaker;
-import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.StatementPartitioning;
+import org.voltdb.settings.ClusterSettings;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.InMemoryJarfile.JarLoader;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.MiscUtils;
 import org.xml.sax.ErrorHandler;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
 import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 /**
  * Compiles a project XML file and some metadata into a Jarfile
@@ -116,7 +112,8 @@ public class VoltCompiler {
 
     // Causes the "debugoutput" folder to be generated and populated.
     // Also causes explain plans on disk to include cost.
-    public final static boolean DEBUG_MODE = System.getProperties().contains("compilerdebug");
+    public final static boolean DEBUG_MODE
+      = Boolean.valueOf(System.getProperty("org.voltdb.compilerdebug", "false"));
 
     // was this voltcompiler instantiated in a main(), or as part of VoltDB
     public final boolean standaloneCompiler;
@@ -129,9 +126,9 @@ public class VoltCompiler {
     private final Map<String, Statement> m_previousCatalogStmts = new HashMap<>();
 
     // feedback by filename
-    ArrayList<Feedback> m_infos = new ArrayList<Feedback>();
-    ArrayList<Feedback> m_warnings = new ArrayList<Feedback>();
-    ArrayList<Feedback> m_errors = new ArrayList<Feedback>();
+    ArrayList<Feedback> m_infos = new ArrayList<>();
+    ArrayList<Feedback> m_warnings = new ArrayList<>();
+    ArrayList<Feedback> m_errors = new ArrayList<>();
 
     // set of annotations by procedure name
     private Map<String, ProcInfoData> m_procInfoOverrides = null;
@@ -149,7 +146,7 @@ public class VoltCompiler {
 
     String m_projectFileURL = null;
     private String m_currentFilename = NO_FILENAME;
-    Map<String, String> m_ddlFilePaths = new HashMap<String, String>();
+    Map<String, String> m_ddlFilePaths = new HashMap<>();
     String[] m_addedClasses = null;
     Set<String> m_importLines = null;
 
@@ -476,7 +473,7 @@ public class VoltCompiler {
      */
     public boolean compileEmptyCatalog(final String jarOutputPath) {
         // Use a special DDL reader to provide the contents.
-        List<VoltCompilerReader> ddlReaderList = new ArrayList<VoltCompilerReader>(1);
+        List<VoltCompilerReader> ddlReaderList = new ArrayList<>(1);
         ddlReaderList.add(new VoltCompilerStringReader("ddl.sql", m_emptyDDLComment));
         // Seed it with the DDL so that a version upgrade hack in compileInternalToFile()
         // doesn't try to get the DDL file from the path.
@@ -515,7 +512,7 @@ public class VoltCompiler {
         // Make the new compiler use the original jarfile's classloader so it can
         // pull in the class files for procedures and imports
         autoGenCompiler.m_classLoader = origJarFile.getLoader();
-        List<VoltCompilerReader> autogenReaderList = new ArrayList<VoltCompilerReader>(1);
+        List<VoltCompilerReader> autogenReaderList = new ArrayList<>(1);
         autogenReaderList.add(new VoltCompilerJarFileReader(origJarFile, AUTOGEN_DDL_FILE_NAME));
         DatabaseType autoGenDatabase = getProjectDatabase(null);
         InMemoryJarfile autoGenJarOutput = new InMemoryJarfile();
@@ -672,7 +669,23 @@ public class VoltCompiler {
 
         // generate the catalog report and write it to disk
         try {
-            m_report = ReportMaker.report(m_catalog, m_warnings, ddlWithBatchSupport);
+            VoltDBInterface voltdb = VoltDB.instance();
+            // try to get a catalog context
+            CatalogContext catalogContext = voltdb != null ? voltdb.getCatalogContext() : null;
+            ClusterSettings clusterSettings = catalogContext != null ? catalogContext.getClusterSettings() : null;
+            int tableCount = catalogContext != null ? catalogContext.tables.size() : 0;
+            Deployment deployment = catalogContext != null ? catalogContext.cluster.getDeployment().get("deployment") : null;
+            int hostcount = clusterSettings != null ? clusterSettings.hostcount() : 1;
+            int kfactor = deployment != null ? deployment.getKfactor() : 0;
+            int sitesPerHost = 8;
+            if  (voltdb != null && voltdb.getCatalogContext() != null) {
+                sitesPerHost =  voltdb.getCatalogContext().getNodeSettings().getLocalSitesCount();
+            }
+            boolean isPro = MiscUtils.isPro();
+
+            long minHeapRqt = RealVoltDB.computeMinimumHeapRqt(isPro, tableCount, sitesPerHost, kfactor);
+            m_report = ReportMaker.report(m_catalog, minHeapRqt, isPro, hostcount,
+                    sitesPerHost, kfactor, m_warnings, ddlWithBatchSupport);
             m_reportPath = null;
             File file = null;
 
@@ -681,16 +694,12 @@ public class VoltCompiler {
                 file = new File("catalog-report.html");
             }
             else {
-                // try to get a catalog context
-                VoltDBInterface voltdb = VoltDB.instance();
-                CatalogContext catalogContext = voltdb != null ? voltdb.getCatalogContext() : null;
-
                 // it's possible that standaloneCompiler will be false and catalogContext will be null
                 //   in test code.
 
                 // if we have a context, write report to voltroot
                 if (catalogContext != null) {
-                    file = new File(catalogContext.cluster.getVoltroot(), "catalog-report.html");
+                    file = new File(VoltDB.instance().getVoltDBRootPath(), "catalog-report.html");
                 }
             }
 
@@ -746,7 +755,7 @@ public class VoltCompiler {
      * catalog to be shoved into the catalog jarfile.
      */
     HashMap<String, byte[]> getExplainPlans(Catalog catalog) {
-        HashMap<String, byte[]> retval = new HashMap<String, byte[]>();
+        HashMap<String, byte[]> retval = new HashMap<>();
         Database db = getCatalogDatabase();
         assert(db != null);
         for (Procedure proc : db.getProcedures()) {
@@ -777,7 +786,7 @@ public class VoltCompiler {
     private List<VoltCompilerReader> DDLPathsToReaderList(final String... ddlFilePaths)
             throws VoltCompilerException
     {
-        List<VoltCompilerReader> ddlReaderList = new ArrayList<VoltCompilerReader>(ddlFilePaths.length);
+        List<VoltCompilerReader> ddlReaderList = new ArrayList<>(ddlFilePaths.length);
         for (int i = 0; i < ddlFilePaths.length; ++i) {
             ddlReaderList.add(createDDLFileReader(ddlFilePaths[i]));
         }
@@ -1031,7 +1040,7 @@ public class VoltCompiler {
             final InMemoryJarfile jarOutput)
                     throws VoltCompilerException
     {
-        final ArrayList<Class<?>> classDependencies = new ArrayList<Class<?>>();
+        final ArrayList<Class<?>> classDependencies = new ArrayList<>();
         final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
 
         Database db = initCatalogDatabase();
@@ -1179,75 +1188,6 @@ public class VoltCompiler {
 
         ddlcompiler.compileToCatalog(db);
 
-        // Actually parse and handle all the partitions
-        // this needs to happen before procedures are compiled
-        String msg = "In database, ";
-        final CatalogMap<Table> tables = db.getTables();
-        for (Table table: tables) {
-            String tableName = table.getTypeName();
-
-            if (voltDdlTracker.m_partitionMap.containsKey(tableName.toLowerCase())) {
-                String colName = voltDdlTracker.m_partitionMap.get(tableName.toLowerCase());
-                // A null column name indicates a replicated table. Ignore it here
-                // because it defaults to replicated in the catalog.
-                if (colName != null) {
-                    assert(tables.getIgnoreCase(tableName) != null);
-                    if (table.getMaterializer() != null) {
-                        msg += "the materialized view is automatically partitioned based on its source table. "
-                                + "Invalid PARTITION statement on view table " + tableName + ".";
-                        throw new VoltCompilerException(msg);
-                    }
-
-                    final Column partitionCol = table.getColumns().getIgnoreCase(colName);
-                    // make sure the column exists
-                    if (partitionCol == null) {
-                        msg += "PARTITION has unknown COLUMN '" + colName + "'";
-                        throw new VoltCompilerException(msg);
-                    }
-                    // make sure the column is marked not-nullable
-                    if (partitionCol.getNullable() == true) {
-                        msg += "Partition column '" + tableName + "." + colName + "' is nullable. " +
-                            "Partition columns must be constrained \"NOT NULL\".";
-                        throw new VoltCompilerException(msg);
-                    }
-                    // verify that the partition column is a supported type
-                    VoltType pcolType = VoltType.get((byte) partitionCol.getType());
-                    switch (pcolType) {
-                        case TINYINT:
-                        case SMALLINT:
-                        case INTEGER:
-                        case BIGINT:
-                        case STRING:
-                        case VARBINARY:
-                            break;
-                        default:
-                            msg += "Partition column '" + tableName + "." + colName + "' is not a valid type. " +
-                            "Partition columns must be an integer, varchar or varbinary type.";
-                            throw new VoltCompilerException(msg);
-                    }
-
-                    table.setPartitioncolumn(partitionCol);
-                    table.setIsreplicated(false);
-
-                    // Check valid indexes, whether they contain the partition column or not.
-                    for (Index index: table.getIndexes()) {
-                        checkValidPartitionTableIndex(index, partitionCol, tableName);
-                    }
-                    // Set the partitioning of destination tables of associated views.
-                    // If a view's source table is replicated, then a full scan of the
-                    // associated view is single-sited. If the source is partitioned,
-                    // a full scan of the view must be distributed, unless it is filtered
-                    // by the original table's partitioning key, which, to be filtered,
-                    // must also be a GROUP BY key.
-                    final CatalogMap<MaterializedViewInfo> views = table.getViews();
-                    for (final MaterializedViewInfo mvi : views) {
-                        mvi.getDest().setIsreplicated(false);
-                        setGroupedTablePartitionColumn(mvi, partitionCol);
-                    }
-                }
-            }
-        }
-
         // add database estimates info
         addDatabaseEstimatesInfo(m_estimates, db);
 
@@ -1318,78 +1258,12 @@ public class VoltCompiler {
         }
     }
 
-    private void checkValidPartitionTableIndex(Index index, Column partitionCol, String tableName)
-            throws VoltCompilerException {
-        // skip checking for non-unique indexes.
-        if (!index.getUnique()) {
-            return;
-        }
-
-        boolean containsPartitionColumn = false;
-        String jsonExpr = index.getExpressionsjson();
-        // if this is a pure-column index...
-        if (jsonExpr.isEmpty()) {
-            for (ColumnRef cref : index.getColumns()) {
-                Column col = cref.getColumn();
-                // unique index contains partitioned column
-                if (col.equals(partitionCol)) {
-                    containsPartitionColumn = true;
-                    break;
-                }
-            }
-        }
-        // if this is a fancy expression-based index...
-        else {
-            try {
-                int partitionColIndex = partitionCol.getIndex();
-                List<AbstractExpression> indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, null);
-                for (AbstractExpression expr: indexExpressions) {
-                    if (expr instanceof TupleValueExpression &&
-                            ((TupleValueExpression) expr).getColumnIndex() == partitionColIndex ) {
-                        containsPartitionColumn = true;
-                        break;
-                    }
-                }
-            } catch (JSONException e) {
-                e.printStackTrace(); // danger will robinson
-                assert(false);
-            }
-        }
-
-        if (containsPartitionColumn) {
-            if (index.getAssumeunique()) {
-                String exceptionMsg = String.format("ASSUMEUNIQUE is not valid " +
-                "for an index that includes the partitioning column. Please use UNIQUE instead.");
-                throw new VoltCompilerException(exceptionMsg);
-            }
-        }
-        else if ( ! index.getAssumeunique()) {
-            // Throw compiler exception.
-            String indexName = index.getTypeName();
-            String keyword = "";
-            if (indexName.startsWith(HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX)) {
-                indexName = "PRIMARY KEY";
-                keyword = "PRIMARY KEY";
-            } else {
-                indexName = "UNIQUE INDEX " + indexName;
-                keyword = "UNIQUE";
-            }
-
-            String exceptionMsg = "Invalid use of " + keyword +
-                    ". The " + indexName + " on the partitioned table " + tableName +
-                    " does not include the partitioning column " + partitionCol.getName() +
-                    ". See the documentation for the 'CREATE TABLE' and 'CREATE INDEX' commands and the 'ASSUMEUNIQUE' keyword.";
-            throw new VoltCompilerException(exceptionMsg);
-        }
-
-    }
-
     /**
      * Once the DDL file is over, take all of the extra classes found and add them to the jar.
      */
     private void addExtraClasses(final InMemoryJarfile jarOutput) throws VoltCompilerException {
 
-        List<String> addedClasses = new ArrayList<String>();
+        List<String> addedClasses = new ArrayList<>();
 
         for (String className : m_addedClasses) {
             /*
@@ -1487,62 +1361,9 @@ public class VoltCompiler {
         m_previousCatalogStmts.clear();
     }
 
-    private void setGroupedTablePartitionColumn(MaterializedViewInfo mvi, Column partitionColumn)
-            throws VoltCompilerException {
-        // A view of a replicated table is replicated.
-        // A view of a partitioned table is partitioned -- regardless of whether it has a partition key
-        // -- it certainly isn't replicated!
-        // If the partitioning column is grouped, its counterpart is the partitioning column of the view table.
-        // Otherwise, the view table just doesn't have a partitioning column
-        // -- it is seemingly randomly distributed,
-        // and its grouped columns are only locally unique but not globally unique.
-        Table destTable = mvi.getDest();
-        // Get the grouped columns in "index" order.
-        // This order corresponds to the iteration order of the MaterializedViewInfo's group by columns.
-        List<Column> destColumnArray = CatalogUtil.getSortedCatalogItems(destTable.getColumns(), "index");
-        String partitionColName = partitionColumn.getTypeName(); // Note getTypeName gets the column name -- go figure.
-
-        if (mvi.getGroupbycols().size() > 0) {
-            int index = 0;
-            for (ColumnRef cref : CatalogUtil.getSortedCatalogItems(mvi.getGroupbycols(), "index")) {
-                Column srcCol = cref.getColumn();
-                if (srcCol.getName().equals(partitionColName)) {
-                    Column destCol = destColumnArray.get(index);
-                    destTable.setPartitioncolumn(destCol);
-                    return;
-                }
-                ++index;
-            }
-        } else {
-            String complexGroupbyJson = mvi.getGroupbyexpressionsjson();
-            if (complexGroupbyJson.length() > 0) {
-                int partitionColIndex =  partitionColumn.getIndex();
-
-                  List<AbstractExpression> mvComplexGroupbyCols = null;
-                  try {
-                      mvComplexGroupbyCols = AbstractExpression.fromJSONArrayString(complexGroupbyJson, null);
-                  } catch (JSONException e) {
-                      e.printStackTrace();
-                  }
-                  int index = 0;
-                  for (AbstractExpression expr: mvComplexGroupbyCols) {
-                      if (expr instanceof TupleValueExpression) {
-                          TupleValueExpression tve = (TupleValueExpression) expr;
-                          if (tve.getColumnIndex() == partitionColIndex) {
-                              Column destCol = destColumnArray.get(index);
-                              destTable.setPartitioncolumn(destCol);
-                              return;
-                          }
-                      }
-                      ++index;
-                  }
-            }
-        }
-    }
-
     /** Provide a feedback path to monitor plan output via harvestCapturedDetail */
     public void enableDetailedCapture() {
-        m_capturedDiagnosticDetail = new ArrayList<String>();
+        m_capturedDiagnosticDetail = new ArrayList<>();
     }
 
     /** Access recent plan output, for diagnostic purposes */
@@ -1583,7 +1404,7 @@ public class VoltCompiler {
         org.voltdb.compiler.projectfile.ProceduresType.Procedure xmlproc)
         throws VoltCompilerException
     {
-        final ArrayList<String> groups = new ArrayList<String>();
+        final ArrayList<String> groups = new ArrayList<>();
 
         // @groups
         if (xmlproc.getGroups() != null) {
@@ -1860,8 +1681,8 @@ public class VoltCompiler {
             outputStream.println();
 
             // Accumulate a summary of the summary for a briefer report
-            ArrayList<Procedure> nonDetProcs = new ArrayList<Procedure>();
-            ArrayList<Procedure> tableScans = new ArrayList<Procedure>();
+            ArrayList<Procedure> nonDetProcs = new ArrayList<>();
+            ArrayList<Procedure> tableScans = new ArrayList<>();
             int countSinglePartition = 0;
             int countMultiPartition = 0;
             int countDefaultProcs = 0;
@@ -2043,7 +1864,7 @@ public class VoltCompiler {
     }
 
     // this needs to be reset in the main compile func
-    private static final HashSet<Class<?>> cachedAddedClasses = new HashSet<Class<?>>();
+    private static final HashSet<Class<?>> cachedAddedClasses = new HashSet<>();
 
 
     public List<Class<?>> getInnerClasses(Class <?> c)
@@ -2306,7 +2127,7 @@ public class VoltCompiler {
     public void compileInMemoryJarfile(InMemoryJarfile jarfile) throws IOException
     {
         // Gather DDL files for recompilation
-        List<VoltCompilerReader> ddlReaderList = new ArrayList<VoltCompilerReader>();
+        List<VoltCompilerReader> ddlReaderList = new ArrayList<>();
         Entry<String, byte[]> entry = jarfile.firstEntry();
         while (entry != null) {
             String path = entry.getKey();
@@ -2386,7 +2207,7 @@ public class VoltCompiler {
             outputJar.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, buildInfoBytes);
 
             // Gather DDL files for recompilation if not using a project file.
-            List<VoltCompilerReader> ddlReaderList = new ArrayList<VoltCompilerReader>();
+            List<VoltCompilerReader> ddlReaderList = new ArrayList<>();
             if (projectReader == null) {
                 Entry<String, byte[]> entry = outputJar.firstEntry();
                 while (entry != null) {
@@ -2410,11 +2231,11 @@ public class VoltCompiler {
             String textName = String.format("catalog-%s.out", versionFromVoltDB);
             CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
             final String outputJarPath = (catalogContext != null
-                    ? new File(catalogContext.cluster.getVoltroot(), jarName).getPath()
+                    ? new File(VoltDB.instance().getVoltDBRootPath(), jarName).getPath()
                     : VoltDB.Configuration.getPathToCatalogForTest(jarName));
             // Place the compiler output in a text file in the same folder.
             final String outputTextPath = (catalogContext != null
-                    ? new File(catalogContext.cluster.getVoltroot(), textName).getPath()
+                    ? new File(VoltDB.instance().getVoltDBRootPath(), textName).getPath()
                     : VoltDB.Configuration.getPathToCatalogForTest(textName));
             try {
                 m_classLoader = outputJar.getLoader();

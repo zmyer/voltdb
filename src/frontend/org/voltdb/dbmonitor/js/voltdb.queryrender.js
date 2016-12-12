@@ -1,8 +1,47 @@
-function QueryUI(queryTab) {
+
+    function QueryUI(queryTab) {
     "use strict";
     var CommandParser,
         queryToRun = '';
     this.QueryTab = queryTab;
+
+
+    function getSelectedTextWithin(el) {
+    var selectedText = "";
+    if (typeof window.getSelection != "undefined") {
+        var sel = window.getSelection(), rangeCount;
+        if ( (rangeCount = sel.rangeCount) > 0 ) {
+            var range = document.createRange();
+            for (var i = 0, selRange; i < rangeCount; ++i) {
+                range.selectNodeContents(el);
+                selRange = sel.getRangeAt(i);
+                if (selRange.compareBoundaryPoints(range.START_TO_END, range) == 1 && selRange.compareBoundaryPoints(range.END_TO_START, range) == -1) {
+                    if (selRange.compareBoundaryPoints(range.START_TO_START, range) == 1) {
+                        range.setStart(selRange.startContainer, selRange.startOffset);
+                    }
+                    if (selRange.compareBoundaryPoints(range.END_TO_END, range) == -1) {
+                        range.setEnd(selRange.endContainer, selRange.endOffset);
+                    }
+                    selectedText += range.toString();
+                }
+            }
+        }
+    } else if (typeof document.selection != "undefined" && document.selection.type == "Text") {
+        var selTextRange = document.selection.createRange();
+        var textRange = selTextRange.duplicate();
+        textRange.moveToElementText(el);
+        if (selTextRange.compareEndPoints("EndToStart", textRange) == 1 && selTextRange.compareEndPoints("StartToEnd", textRange) == -1) {
+            if (selTextRange.compareEndPoints("StartToStart", textRange) == 1) {
+                textRange.setEndPoint("StartToStart", selTextRange);
+            }
+            if (selTextRange.compareEndPoints("EndToEnd", textRange) == -1) {
+                textRange.setEndPoint("EndToEnd", selTextRange);
+            }
+            selectedText = textRange.text;
+        }
+    }
+    return selectedText;
+}
 
     function ICommandParser() {
         var MatchEndOfLineComments = /^\s*(?:\/\/|--).*$/gm,
@@ -50,10 +89,11 @@ function QueryUI(queryTab) {
                 }
                 nonceNum = parseInt(nextNonce[1], 10);
                 src = src.replace(QuotedStringNonceLiteral + nonceNum,
-                                  stringBank[nonceNum - QuotedStringNonceBase]);
+                            stringBank[nonceNum - QuotedStringNonceBase]);
             }
             return src;
         }
+
 
         // break down a multi-statement string into a statement array.
         function parseUserInputMethod(src) {
@@ -61,7 +101,12 @@ function QueryUI(queryTab) {
                 stringBank = [],
                 statementBank = [];
             // Eliminate line comments permanently.
+
+            //escape $ sign
+            src = src.replace(new RegExp('\\$', 'g'), '$$$$');
+
             src = src.replace(MatchEndOfLineComments, '');
+
 
             // Extract quoted strings to keep their content from getting confused with
             // interesting statement syntax. This is required for statement splitting at 
@@ -185,14 +230,15 @@ function QueryUI(queryTab) {
         }
 
         var connection = VoltDBCore.connections[dataSource];
-        var source = $('#querybox-' + query_id).getSelectedText();
+        var source = getSelectedTextWithin(document.getElementById('querybox-' + query_id))
+//        $('#querybox-' + query_id).getSelectedText();
         if (source != null){
             source = source.replace(/^\s+|\s+$/g,'');
             if (source == '')
-                source = $('#querybox-' + query_id).val();
+                source = $('#querybox-' + query_id).text();
         }
         else
-            source = $('#querybox-' + query_id).val();
+            source = $('#querybox-' + query_id).text();
 
         source = source.replace(/^\s+|\s+$/g,'');
         if (source == '')
@@ -337,7 +383,9 @@ function QueryUI(queryTab) {
                     typ = 9;  //code for varchar
                 }
                 else if(typ == 22){
-                    val = parseFloat(val).toFixed(12)
+                    if(val!= null){
+                        val = parseFloat(val).toFixed(12)
+                    }
                 }
                 if (isExplainQuery == true) {
                     val = applyFormat(val);

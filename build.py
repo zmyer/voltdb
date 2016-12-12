@@ -54,20 +54,31 @@ if CTX.compilerName() == 'gcc':
     CTX.LDFLAGS += " -rdynamic"
     if (CTX.compilerMajorVersion() >= 4):
         CTX.CPPFLAGS += " -Wno-deprecated-declarations  -Wno-unknown-pragmas"
-	if (CTX.compilerMinorVersion() == 6):
-	    CTX.CPPFLAGS += " -Wno-unused-but-set-variable"
-	if (CTX.compilerMinorVersion() == 9):
-            CTX.CPPFLAGS += " -Wno-float-conversion -Wno-unused-but-set-variable -Wno-unused-local-typedefs"
-        elif (CTX.compilerMinorVersion() == 8):
-	    CTX.CPPFLAGS += " -Wno-conversion -Wno-unused-but-set-variable -Wno-unused-local-typedefs"
-
+    # GCC 4 warning disablement options
+    if (CTX.compilerMajorVersion() == 4):
+        # Do we want -Wno-unused-but-set-variable?
+        if (CTX.compilerMinorVersion() == 6) \
+          or (CTX.compilerMinorVersion() == 8) \
+          or (CTX.compilerMinorVersion() == 9):
+            CTX.CPPFLAGS += " -Wno-unused-but-set-variable"
+        # Do we want -Wno-unused-local-typedefs?
+        if (CTX.compilerMinorVersion() == 8) \
+          or (CTX.compilerMinorVersion() == 9):
+            CTX.CPPFLAGS += " -Wno-unused-local-typedefs"
+        # Do we want -Wno-float-conversion?
+        if (CTX.compilerMinorVersion() == 8):
+            CTX.CPPFLAGS += " -Wno-float-conversion"
+        # Do we want -Wno-conversion?
+        if (CTX.compilerMinorVersion() == 8):
+            CTX.CPPFLAGS += " -Wno-conversion"
+    # GCC 5 warning disablement options
     if (CTX.compilerMajorVersion() == 5):
         CTX.CPPFLAGS += " -Wno-unused-local-typedefs"
 
 if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 3 and CTX.compilerMinorVersion() >= 4):
     CTX.CPPFLAGS += " -Wno-varargs"
 
-if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 7):
+if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() >= 7):
     CTX.CPPFLAGS += " -Wno-unused-local-typedefs -Wno-absolute-value"
 
 if (CTX.compilerName() != 'gcc') or (CTX.compilerMajorVersion() == 4 and CTX.compilerMinorVersion() >= 3) or (CTX.compilerMajorVersion() == 5):
@@ -84,19 +95,30 @@ if CTX.PROFILE:
 # Clang uses -std=c++11
 # This should match the calculation in CMakeLists.txt
 if CTX.compilerName() == 'gcc':
-    if (CTX.compilerMajorVersion() < 4) or (CTX.compilerMajorVersion() == 4) and (CTX.compilerMinorVersion() < 4):
-	print("GCC Version %d.%d.%d is too old\n"
-	       % (CTX.compilerMajorVersion(), CTX.compilerMinorVersion(), CTX.compilerPatchLevel()));
-	sys.exit(-1);
-    if 4 <= CTX.compilerMinorVersion() <= 6:
-	CTX.CXX_VERSION_FLAG = "--std=c++0x"
-	print("Building with C++ 0x\n")
+    if (CTX.compilerMajorVersion() < 4) \
+        or ((CTX.compilerMajorVersion() == 4) \
+             and (CTX.compilerMinorVersion() < 4)):
+        print("GCC Version %d.%d.%d is too old\n"
+              % (CTX.compilerMajorVersion(), CTX.compilerMinorVersion(), CTX.compilerPatchLevel()));
+        sys.exit(-1)
+    if (CTX.compilerMajorVersion() == 4):
+        if 4 <= CTX.compilerMinorVersion() <= 6:
+            CTX.CXX_VERSION_FLAG = "c++0x"
+        else:
+            CTX.CXX_VERSION_FLAG ="c++11"
+    elif (CTX.compilerMajorVersion() == 5):
+        CTX.CXX_VERSION_FLAG = "c++11"
     else:
-	CTX.CXX_VERSION_FLAG ="--std=c++11"
-	print("Building with C++11")
+        print("WARNING: GCC Version %d.%d.%d is newer than the VoltDB Validated compilers.\n"
+               % (CTX.compilerMajorVersion(),
+                  CTX.compilerMinorVersion(),
+                  CTX.compilerPatchLevel()))
 elif CTX.compilerName() == 'clang':
-    CTX.CXX_VERSION_FLAG="--std=c++11"
-CTX.CPPFLAGS += " " + CTX.CXX_VERSION_FLAG
+    CTX.CXX_VERSION_FLAG="c++11"
+else:
+    print("WARNING: Unknown compiler %s" % CTX.compilerName())
+print("Building with %s" % CTX.CXX_VERSION_FLAG)
+CTX.CPPFLAGS += " -std=" + CTX.CXX_VERSION_FLAG
 
 if CTX.COVERAGE:
     CTX.LDFLAGS += " -ftest-coverage -fprofile-arcs"
@@ -212,12 +234,12 @@ CTX.INPUT['catalog'] = """
  database.cpp
  index.cpp
  indexref.cpp
- materializedviewhandler.cpp
+ materializedviewhandlerinfo.cpp
  materializedviewinfo.cpp
  planfragment.cpp
  statement.cpp
  table.cpp
- viewtrigger.cpp
+ tableref.cpp
  udf.cpp
  udflibrary.cpp
  udfargument.cpp
@@ -242,8 +264,6 @@ CTX.INPUT['common'] = """
  NValue.cpp
  RecoveryProtoMessage.cpp
  RecoveryProtoMessageBuilder.cpp
- DefaultTupleSerializer.cpp
- FullTupleSerializer.cpp
  executorcontext.cpp
  serializeio.cpp
  StreamPredicateList.cpp
@@ -279,6 +299,7 @@ CTX.INPUT['executors'] = """
  nestloopexecutor.cpp
  nestloopindexexecutor.cpp
  orderbyexecutor.cpp
+ windowfunctionexecutor.cpp
  projectionexecutor.cpp
  receiveexecutor.cpp
  sendexecutor.cpp
@@ -323,7 +344,7 @@ CTX.INPUT['plannodes'] = """
  orderbynode.cpp
  plannodefragment.cpp
  plannodeutil.cpp
- partitionbynode.cpp
+ windowfunctionnode.cpp
  projectionnode.cpp
  receivenode.cpp
  SchemaColumn.cpp
@@ -357,6 +378,7 @@ CTX.INPUT['storage'] = """
  ElasticIndexReadContext.cpp
  ElasticScanner.cpp
  ExportTupleStream.cpp
+ MaterializedViewHandler.cpp
  MaterializedViewTriggerForInsert.cpp
  MaterializedViewTriggerForWrite.cpp
  persistenttable.cpp
@@ -446,6 +468,15 @@ if whichtests in ("${eetestsuite}", "logging"):
     logging_test
     """
 
+if whichtests in ("${eetestsuite}", "memleaktests"):
+   CTX.TESTS['memleaktests'] = """
+     definite_losses
+     indirect_losses
+     no_losses
+     still_reachable_losses
+     possible_losses
+     rw_deleted
+   """
 if whichtests in ("${eetestsuite}", "common"):
     CTX.TESTS['common'] = """
      debuglog_test
@@ -471,8 +502,10 @@ if whichtests in ("${eetestsuite}", "executors"):
     CTX.TESTS['executors'] = """
     OptimizedProjectorTest
     MergeReceiveExecutorTest
+    TestGeneratedPlans
+    TestWindowedRank
+    TestWindowedCount
     """
-
 
 if whichtests in ("${eetestsuite}", "expressions"):
     CTX.TESTS['expressions'] = """
@@ -508,6 +541,7 @@ if whichtests in ("${eetestsuite}", "storage"):
      table_and_indexes_test
      table_test
      tabletuple_export_test
+     tabletuplefilter_test
     """
 
 if whichtests in ("${eetestsuite}", "structures"):
@@ -521,7 +555,7 @@ if whichtests in ("${eetestsuite}", "structures"):
 
 if whichtests in ("${eetestsuite}", "plannodes"):
     CTX.TESTS['plannodes'] = """
-     PartitionByPlanNodeTest
+     WindowFunctionPlanNodeTest
      PlanNodeFragmentTest
     """
 
@@ -564,6 +598,8 @@ elif CTX.PLATFORM == "Linux":
         if name == "processor":
             numHardwareThreads = numHardwareThreads + 1
 
+print("Making in directory \"%s\" with %d threads"
+        % (CTX.OUTPUT_PREFIX, numHardwareThreads))
 retval = os.system("make --directory=%s -j%d" % (CTX.OUTPUT_PREFIX, numHardwareThreads))
 if retval != 0:
     sys.exit(-1)

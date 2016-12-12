@@ -5,7 +5,14 @@ var sqlPortForPausedDB = {
 var $tabs = null;
 var tab_counter = 1;
 var INT_MAX_VALUE = 2147483647;
+
+var isMobile = false; //initiate as false
+// device detection
+if(/(android|bb\d+|meego).+mobile|avantgo|bada\/|blackberry|blazer|compal|elaine|fennec|hiptop|iemobile|ip(hone|od)|iris|kindle|Android|Silk|lge |maemo|midp|mmp|netfront|opera m(ob|in)i|palm( os)?|phone|p(ixi|re)\/|plucker|pocket|psp|series(4|6)0|symbian|treo|up\.(browser|link)|vodafone|wap|windows (ce|phone)|xda|xiino/i.test(navigator.userAgent)
+    || /1207|6310|6590|3gso|4thp|50[1-6]i|770s|802s|a wa|abac|ac(er|oo|s\-)|ai(ko|rn)|al(av|ca|co)|amoi|an(ex|ny|yw)|aptu|ar(ch|go)|as(te|us)|attw|au(di|\-m|r |s )|avan|be(ck|ll|nq)|bi(lb|rd)|bl(ac|az)|br(e|v)w|bumb|bw\-(n|u)|c55\/|capi|ccwa|cdm\-|cell|chtm|cldc|cmd\-|co(mp|nd)|craw|da(it|ll|ng)|dbte|dc\-s|devi|dica|dmob|do(c|p)o|ds(12|\-d)|el(49|ai)|em(l2|ul)|er(ic|k0)|esl8|ez([4-7]0|os|wa|ze)|fetc|fly(\-|_)|g1 u|g560|gene|gf\-5|g\-mo|go(\.w|od)|gr(ad|un)|haie|hcit|hd\-(m|p|t)|hei\-|hi(pt|ta)|hp( i|ip)|hs\-c|ht(c(\-| |_|a|g|p|s|t)|tp)|hu(aw|tc)|i\-(20|go|ma)|i230|iac( |\-|\/)|ibro|idea|ig01|ikom|im1k|inno|ipaq|iris|ja(t|v)a|jbro|jemu|jigs|kddi|keji|kgt( |\/)|klon|kpt |kwc\-|kyo(c|k)|le(no|xi)|lg( g|\/(k|l|u)|50|54|\-[a-w])|libw|lynx|m1\-w|m3ga|m50\/|ma(te|ui|xo)|mc(01|21|ca)|m\-cr|me(rc|ri)|mi(o8|oa|ts)|mmef|mo(01|02|bi|de|do|t(\-| |o|v)|zz)|mt(50|p1|v )|mwbp|mywa|n10[0-2]|n20[2-3]|n30(0|2)|n50(0|2|5)|n7(0(0|1)|10)|ne((c|m)\-|on|tf|wf|wg|wt)|nok(6|i)|nzph|o2im|op(ti|wv)|oran|owg1|p800|pan(a|d|t)|pdxg|pg(13|\-([1-8]|c))|phil|pire|pl(ay|uc)|pn\-2|po(ck|rt|se)|prox|psio|pt\-g|qa\-a|qc(07|12|21|32|60|\-[2-7]|i\-)|qtek|r380|r600|raks|rim9|ro(ve|zo)|s55\/|sa(ge|ma|mm|ms|ny|va)|sc(01|h\-|oo|p\-)|sdk\/|se(c(\-|0|1)|47|mc|nd|ri)|sgh\-|shar|sie(\-|m)|sk\-0|sl(45|id)|sm(al|ar|b3|it|t5)|so(ft|ny)|sp(01|h\-|v\-|v )|sy(01|mb)|t2(18|50)|t6(00|10|18)|ta(gt|lk)|tcl\-|tdg\-|tel(i|m)|tim\-|t\-mo|to(pl|sh)|ts(70|m\-|m3|m5)|tx\-9|up(\.b|g1|si)|utst|v400|v750|veri|vi(rg|te)|vk(40|5[0-3]|\-v)|vm40|voda|vulc|vx(52|53|60|61|70|80|81|83|85|98)|w3c(\-| )|webc|whit|wi(g |nc|nw)|wmlb|wonu|x700|yas\-|your|zeto|zte\-/i.test(navigator.userAgent.substr(0,4))) isMobile = true;
+    var is_iPad = navigator.userAgent.match(/iPad/i) != null;
 $(document).ready(function () {
+
     function CheckBrowser() {
         if ('localStorage' in window && window['localStorage'] !== null) {
             return true;
@@ -27,8 +34,6 @@ $(document).ready(function () {
             digits: "Please enter a positive number without any decimal."
         }
     }
-
-
 
     var fixWidth= function(){
         var totalWidth = $(window).width()
@@ -53,11 +58,27 @@ $(document).ready(function () {
         }
     };
 
+    var lock;
     addEvent(window, "resize", function() {
         fixWidth()
+         clearTimeout(lock);
+      lock = setTimeout(refreshSplit, 100);
     });
 
     fixWidth()
+
+     var refreshSplit = function() {
+      var mousedown = new CustomEvent('mousedown');
+      var mousemove = new CustomEvent('mousemove', {bubbles: true});
+      var mouseup = new CustomEvent('mouseup', {bubbles: true});
+      var gutter = document.querySelector('.gutter-horizontal');
+
+      mousemove.clientX = gutter.getBoundingClientRect().left;
+
+      gutter.dispatchEvent(mousedown);
+      gutter.dispatchEvent(mousemove);
+      gutter.dispatchEvent(mouseup);
+    };
     
     $("#bntTimeoutSetting").popup({
         open: function (event, ui, ele) {
@@ -75,10 +96,11 @@ $(document).ready(function () {
             });
             var popup = $(this)[0];
             $("#btnQueryTimeoutConfigSave").unbind("click");
-            $("#btnQueryTimeoutConfigSave").on("click", function(){
+            $("#btnQueryTimeoutConfigSave").on("click", function(e){
                 if (!$("#formQueryTimeoutConfiguration").valid()) {
                     e.preventDefault();
                     e.stopPropagation();
+                    return;
                 }
                 var timeoutTime = $("#txtQueryTimeoutConfig").val();
                 if(timeoutTime == ""){
@@ -114,6 +136,18 @@ $(document).ready(function () {
         }
     });
 
+    $('#btnSaveQueryConfirmation').on('click', function(e){
+        var element = $("#worktabs .ui-tabs-panel:visible").attr("id");
+        var element_id = element.split('-')[1]
+        if($('#qTab-' + element_id).data('isold')){
+            saveQueryTab(false)
+            e.preventDefault()
+            e.stopPropagation()
+            return;
+        }
+    });
+
+
     $('#btnSaveQueryConfirmation').popup({
         open: function (event, ui, ele) {
             var element = $("#worktabs .ui-tabs-panel:visible").attr("id");
@@ -121,13 +155,20 @@ $(document).ready(function () {
 
             $('#txtQueryName').val(SQLQueryRender.orgQueryName)
             $('#errorQueryName').hide()
-            var queryText = $('#querybox-' + element_id).val()
+            var item = document.getElementById('querybox-' + element_id);
+            var queryText = item.innerText || item.textContent;
             if(queryText == ''){
                 $('#btnSaveQueryOk').hide()
                 $('#queryError').show()
+                $('#Tr1').hide()
+                $('#saveQueryHeader').html('Error')
+                $('#divSaveQueryConfirmation').addClass('errorIcon')
             } else {
                 $('#btnSaveQueryOk').show()
                 $('#queryError').hide()
+                $('#Tr1').show()
+                $('#saveQueryHeader').html('Save Query')
+                $('#divSaveQueryConfirmation').removeClass('errorIcon')
             }
 
             $.validator.addMethod(
@@ -172,63 +213,10 @@ $(document).ready(function () {
                         e.stopPropagation();
                         return;
                     }
-
-                    var newTabName = $('#txtQueryName').val()
-                    var element = $("#worktabs .ui-tabs-panel:visible").attr("id");
-                    var element_id = element.split('-')[1]
-                    var oldTabName = $('#qTab-' + element_id).find('a').text()
-                    var oldQuery = '';
-
-                    queryData = {}
-                    orgQueryData = ""
-                    query_localStorage = localStorage.queries
-                    if (query_localStorage != undefined){
-                        queryData = $.parseJSON(query_localStorage)
-                        orgQueryData = query_localStorage
-                    }
-
-                    if($('#qTab-' + element_id).data('isold')){
-                        var key_index = getKeyIndex(queryData, oldTabName)
-                        if(newTabName != oldTabName){
-                            oldQuery = queryData[key_index + '_' + oldTabName]
-                            delete queryData[key_index + '_' + oldTabName]
-                            queryData[key_index + '_' + newTabName] =  $('#querybox-' + element_id).val()
-                        } else{
-                            queryData[key_index + '_' + newTabName] =  $('#querybox-' + element_id).val()
-                        }
-                    } else {
-                        key_name = generateKeyIndex(queryData) + '_' + newTabName
-                        queryData[key_name] = $('#querybox-' + element_id).val()
-                    }
-                    var orderedData = SQLQueryRender.getOrderedData(queryData)
-                    try{
-                        localStorage.queries = JSON.stringify(orderedData)
-                        $('#qTab-' + element_id).find('a').html(newTabName)
-                        $('#qTab-' + element_id).data('isold', true)
-                        deleteQueryFromGlobal(oldTabName)
-                    } catch(e){
-                        errorMsg = "Cannot save the current tab."
-                        if(navigator.userAgent.indexOf('Mozilla') != -1 && navigator.userAgent.indexOf('Firefox') != -1){
-                            if(e.code != undefined && e.code == '1014'){
-                                errorMsg = 'Maximum storage limit reached. Cannot save the current tab. '+
-                                '<br/>Please remove the existing tabs or decrease the length of query.';
-                            }
-                        } else {
-                            if(e.code != undefined && e.code == '22'){
-                                errorMsg = 'Maximum storage limit reached. Cannot save the current tab. '+
-                                '<br/>Please remove the existing tabs or decrease the length of query.';
-                            }
-                        }
-                        $('#memErrorMsg').html(errorMsg);
-                        if(orgQueryData != "" && orgQueryData != "{}" )
-                            localStorage.queries = orgQueryData;
-                        $("#btnMemoryError").trigger("click")
-                    }
-
+                    saveQueryTab(true)
                 } else {
                     $("#btnHtmlSupport").trigger("click");
                 }
-
                 popup.close();
             });
 
@@ -238,6 +226,62 @@ $(document).ready(function () {
             });
         }
     });
+
+    var saveQueryTab = function(isNewTab){
+        var newTabName = $('#txtQueryName').val()
+        var element = $("#worktabs .ui-tabs-panel:visible").attr("id");
+        var element_id = element.split('-')[1]
+        var oldTabName = $('#qTab-' + element_id).find('a').text()
+        queryData = {}
+        orgQueryData = "{}"
+        query_localStorage = localStorage.queries
+        if (query_localStorage != undefined){
+            queryData = $.parseJSON(query_localStorage)
+            orgQueryData = query_localStorage
+        }
+
+        if(isNewTab){
+            var key_name = generateKeyIndex(queryData) + '_' + newTabName
+            var item = document.getElementById('querybox-' + element_id);
+            var queryText = item.innerText || item.textContent;
+            queryData[key_name] = queryText;
+        } else {
+            var key_index = getKeyIndex(queryData, oldTabName)
+            var item = document.getElementById('querybox-' + element_id);
+            var queryText = item.innerText || item.textContent;
+            queryData[key_index + '_' + oldTabName] =  queryText;
+            newTabName =  oldTabName
+        }
+
+        var orderedData = SQLQueryRender.getOrderedData(queryData)
+        saveQueryTabToLocalStorage(orderedData, orgQueryData, newTabName, oldTabName, element_id)
+    }
+
+    var saveQueryTabToLocalStorage = function(orderedData, orgQueryData, newTabName, oldTabName, element_id){
+        try{
+            localStorage.queries = JSON.stringify(orderedData)
+            $('#qTab-' + element_id).find('a').html(newTabName)
+            $('#qTab-' + element_id).data('isold', true)
+            deleteQueryFromGlobal(oldTabName)
+        } catch(e){
+            errorMsg = "Cannot save the current tab." + (e.message != undefined ? ' \nError: "' + e.message + '".' : '')
+            if(navigator.userAgent.indexOf('Mozilla') != -1 && navigator.userAgent.indexOf('Firefox') != -1){
+                if(e.code != undefined && e.code == '1014'){
+                    errorMsg = 'Maximum storage limit reached. Cannot save the current tab. '+
+                    '<br/>Please remove the existing tabs or decrease the length of query.';
+                }
+            } else {
+                if(e.code != undefined && e.code == '22'){
+                    errorMsg = 'Maximum storage limit reached. Cannot save the current tab. '+
+                    '<br/>Please remove the existing tabs or decrease the length of query.';
+                }
+            }
+            $('#memErrorMsg').html(errorMsg);
+            if(orgQueryData != "" && orgQueryData != "{}" )
+                localStorage.queries = orgQueryData;
+            $("#btnMemoryError").trigger("click")
+        }
+    };
 
     var generateKeyIndex = function(queryData){
         var key_index = 1;
@@ -297,6 +341,18 @@ $(document).ready(function () {
         }
     });
 
+    $("#btnCloseTabConfirmation").on("click", function(e){
+        var tablist = []
+        $('#worktabs ul li').not($('#liNewQuery')).each(function(){
+            tablist.push($(this).attr('id').split('-')[1])
+        })
+        if(tablist.length <= 1){
+            e.stopPropagation()
+            e.preventDefault()
+            return;
+        }
+    })
+
     $('#btnCloseTabConfirmation').popup({
         afterOpen: function () {
             var popup = $(this)[0];
@@ -308,6 +364,7 @@ $(document).ready(function () {
                 $('#worktabs ul li').each(function(){
                     tablist.push($(this).attr('id').split('-')[1])
                 })
+
                 $tabs.tabs( "refresh");
                 var active_id = $tabs.tabs( "option", "active")
                 var current_position = $.inArray(id, tablist)
@@ -324,6 +381,7 @@ $(document).ready(function () {
                 $('#'+ element_id).remove();
                 $('#q-' + id).remove()
                 $('#queryBtnList-' + id).remove()
+                SQLQueryRender.enableDisableCrossTab()
                 SQLQueryRender.showHideNewTab()
                 popup.close()
             });
@@ -375,8 +433,6 @@ $(document).ready(function () {
         }
     }
 
-
-
     displayQueryTimeout();
     //Default Action
     $(".tab_content").hide(); //Hide all content
@@ -392,6 +448,8 @@ $(document).ready(function () {
         $(activeTab).fadeIn(); //Fade in the active content
         return false;
     });
+
+
 
     // Table Accordion	
     $('#accordionTable').accordion({
@@ -518,19 +576,32 @@ $(document).ready(function () {
         }
     });
 
-    // Implements Scroll in Server List div
-    //$('#tabScroller').slimscroll({
-    //    disableFadeOut: true,
-    //    alwaysVisible: true,
-    //    railVisible: true,
-    //    height: '225px'
-    //});
     $tabs = $("#worktabs").tabs();
 
-    if(localStorage.queries == undefined)
+    if(localStorage.queries == undefined || localStorage.queries == '{}')
         SQLQueryRender.createQueryTab();
     else
         SQLQueryRender.loadSavedQueries();
+
+
+    $('#worktabs').tabs({ activate: function(event ,ui){
+        var counter = ui.newTab.attr('id').split('-')[1];
+
+        if($("#querybox-"+ counter).parent().find(".gutter").length == 0){
+            if(isMobile == false){
+                Split(['#querybox-' + counter, '#blockContainer'+ counter], {
+                      direction: 'vertical',
+                      sizes: [30, 70],
+                      gutterSize: 15,
+                      minSize: [120, 150]
+                })
+            }
+        }
+
+
+    }
+
+    });
 });
 
 (function (window) {
@@ -563,6 +634,19 @@ $(document).ready(function () {
             return orderData
         }
 
+        this.enableDisableCrossTab = function(){
+            var tablist = []
+            $('#worktabs ul li').not($('#liNewQuery')).each(function(){
+                var id = $(this).attr('id').split('-')[1]
+                tablist.push(id)
+                $('#close-tab-' + id).removeClass('disableCloserTab');
+            })
+
+            if(tablist.length == 1){
+                $('#close-tab-' + tablist[0]).addClass('disableCloserTab');
+            }
+        }
+
         this.loadSavedQueries= function(){
             var sql_localStorage = localStorage.queries
             var queryData = {}
@@ -571,6 +655,7 @@ $(document).ready(function () {
                 unOrderedData = $.parseJSON(sql_localStorage)
                 queryData = SQLQueryRender.getOrderedData(unOrderedData)
             }
+
 
             $.each( queryData, function( key, value ) {
                 SQLQueryRender.createQueryTab(key.split('_')[1], value)
@@ -582,8 +667,8 @@ $(document).ready(function () {
                 $(html).appendTo( ul );
                 $("#new-query").unbind('click')
                 $("#new-query").on('click', function() {
-                SQLQueryRender.createQueryTab()
-            });
+                    SQLQueryRender.createQueryTab()
+                });
             }
         }
 
@@ -591,10 +676,9 @@ $(document).ready(function () {
             localArray = []
             if(localStorage.queries != undefined){
                 $.each($.parseJSON(localStorage.queries), function(key){
-                    localArray.push(key)
+                    localArray.push(key.split('_').splice(1).join())
                 })
             }
-
             if($.inArray('Query' + tab_counter, localArray) != -1 ||
             $.inArray('Query' + tab_counter, SQLQueryRender.queryNameList) != -1){
                 tab_counter++
@@ -624,8 +708,10 @@ $(document).ready(function () {
                     tab_counter : tabName) +'</a> <div class="ui-icon ui-icon-close close-tab" id="close-tab-' + tab_counter +
                     '" href="#closeTabConfirmation" title="Close Tab">Close</div></li>'
             }
-            var html_body = '<div class="querybar"><div class="wrapper"><textarea id="querybox-'+tab_counter+'" class="querybox-'+tab_counter+'" wrap="off"></textarea></div></div><div class="workspacestatusbar noborder"></div>'
-            var html_query = '<div class="blockWrapper" id="blockContainer02">' +
+
+
+           var html_body = '<div class="verticalWrapper"><div id="querybox-'+tab_counter+'" class="querybox-'+tab_counter+' querybox split split-vertical" contenteditable></div>'
+            var html_query = '<div class="blockWrapper split split-vertical" id="blockContainer'+tab_counter+'">' +
                              '   <div class="exportType">' +
                              '<form name="" id="queryResult-'+tab_counter+'">' +
                              '<select id="exportType-'+tab_counter+'">' +
@@ -634,22 +720,39 @@ $(document).ready(function () {
                              '   <option>Monospace</option>' +
                              '</select>' +
                              '</form>' +
-                             '</div>' +
-                             '<h1 class="theHeading icon-queryResult">Query Result</h1>' +
-                             '<div class="queryResult-'+tab_counter+'">' +
-                             '<div id="resultHtml-'+tab_counter+'" style="display: none;" class="resultHtml"></div>' +
-                             '<div id="resultCsv-'+tab_counter+'" style="display: none;" class="resultCsv"></div>' +
-                             '<div id="resultMonospace-'+tab_counter+'" style="display: block;" class="resultMonospace">' +
-                             '<pre>                    </pre>' +
-                             '</div>' +
-                             '</div>' +
-                             '<div id="queryResults-'+tab_counter+'" class="queryStatus"></div>' +
-                            '</div>' ;
+                             '</div>';
+
+            if(!isMobile){
+            html_query = html_query + '<h1 class="theHeading"><span class="icon-queryResult"></span><span class="queryResultStyle">Query Result</span><div id="queryResults-'+tab_counter+'" class="queryStatus"></div><div class="clear"></div></h1>';
+            }
+            else{
+            html_query = html_query + '<h1 class="theHeading"><span class="icon-queryResult"></span><span class="queryResultStyle">Query Result</span></h1>';
+            }
+
+            html_query = html_query + '<div id="queryWrapper-'+tab_counter+'" class="queryWrapper">' +
+                 '<div class="queryResult-'+tab_counter+'">' +
+                 '<div id="resultHtml-'+tab_counter+'" style="display: none;" class="resultHtml"></div>' +
+                 '<div id="resultCsv-'+tab_counter+'" style="display: none;" class="resultCsv"></div>' +
+                 '<div id="resultMonospace-'+tab_counter+'" style="display: block;" class="resultMonospace">' +
+                 '<pre>                    </pre>' +
+                 '</div>' +
+                 '</div>';
+
+
+            if(isMobile){
+            html_query = html_query + '<div id="queryResults-'+tab_counter+'" class="queryStatus"></div><div class="clear"></div>';
+            }
+
+            html_query = html_query + '</div></div>';
+
             $(html).appendTo( ul );
             $('#ulTabList').append($('#liNewQuery'))
             $('#worktabs').append('<div id="q-'+tab_counter+'" >' + html_body + html_query + '</div>')
-            $('#querybox-'+tab_counter).val(tabQuery == undefined ? '' : tabQuery)
+            $('#querybox-'+tab_counter).text(tabQuery == undefined ? '' : tabQuery)
             SQLQueryRender.addQueryBtn(tab_counter)
+
+
+
             $('#exportType-' + tab_counter).change(function () {
                 var tab_id = $(this).attr('id').split('-')[1]
                 if ($('#exportType-'+ tab_id).val() == 'HTML') {
@@ -675,7 +778,22 @@ $(document).ready(function () {
             $("#new-query").unbind('click')
             $("#new-query").on('click', function() {
                 SQLQueryRender.createQueryTab()
+
+                tab_counter = tab_counter - 1
+                 if($("#querybox-" + tab_counter).parent().find(".gutter").length == 0){
+                     if(isMobile == false){
+                         Split(['#querybox-' + tab_counter, '#blockContainer'+ tab_counter], {
+                                direction: 'vertical',
+                                sizes: [30, 70],
+                                gutterSize: 15,
+                                minSize: [120, 150]
+                            })
+                        }
+                    }
+
             });
+
+
             $('#close-tab-' + tab_counter).unbind('click')
             $('#close-tab-' + tab_counter).click(function() {
                 var element_id = $(this.parentElement).attr('id')
@@ -695,8 +813,12 @@ $(document).ready(function () {
                 SQLQueryRender.queryNameList.push(tabName == undefined ? 'Query' + tab_counter : tabName)
             }
 
+
+
             tab_counter++
             this.showHideNewTab()
+            SQLQueryRender.enableDisableCrossTab()
+
         }
 
         this.addQueryBtn = function(tab_id){
@@ -727,7 +849,7 @@ $(document).ready(function () {
             $('#clearQuery-' + tab_id).unbind('click')
             $('#clearQuery-' + tab_id).click(function () {
                 query_id = $(this).attr('id').split('-')[1]
-                $('#querybox-' + query_id).val('')
+                $('#querybox-' + query_id).text('')
             });
 
             $('#querySaveBtn-' + tab_id).unbind('click');
@@ -761,6 +883,7 @@ $(document).ready(function () {
             else
                 $('#liNewQuery').show()
         }
+
 
         this.saveConnectionKey = function (useAdminPort) {
             var server = SQLQueryRender.server == null ? VoltDBConfig.GetDefaultServerNameForKey() : $.trim(SQLQueryRender.server);
@@ -1045,7 +1168,9 @@ $(document).ready(function () {
         var toggleSpinner = function (show) {
             if (!show) {
                 $("#sqlQueryOverlay").hide();
-                $("#tabScroller").css("height", 556);
+//                $("#tabScroller").css("height", "calc(100% - 96px)");
+//                $("#tabScroller").css("height", "-moz-calc(100% - 96px)");
+                //$("#tabScroller").css("height", "-webkit-calc(100% - 96px)");
                 $(".slimScrollBar").css('z-index', '99');
             }
             else if (show) {
@@ -1058,15 +1183,19 @@ $(document).ready(function () {
         };
 
         this.SaveQueryTimeout = function(timeoutTime){
-            saveCookie("timeoutTime", timeoutTime);
+            saveInLocalStorage("timeoutTime", timeoutTime);
         }
 
         this.getCookie = function (name) {
-            return $.cookie(name + "_" + VoltDBConfig.GetPortId());
+            var value =  undefined
+            var data = localStorage.getItem(name + "_" + VoltDBConfig.GetPortId())
+            if(data != undefined)
+                value =  $.parseJSON(data)
+            return value == undefined ? value : value['value']
         }
 
         this.removeCookie = function (name) {
-            return $.removeCookie(name + "_" + VoltDBConfig.GetPortId());
+            return localStorage.removeItem(name + "_" + VoltDBConfig.GetPortId());
         }
     });
     window.SQLQueryRender = SQLQueryRender = new iSqlQueryRender();
