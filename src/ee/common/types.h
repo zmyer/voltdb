@@ -632,7 +632,7 @@ std::string indexLookupToString(IndexLookupType type);
 IndexLookupType stringToIndexLookup(std::string str );
 
 std::string UDFToString(UDFType type);
-UDFType stringToUDF(std::string str );
+UDFType stringToUDF(std::string str);
 
 int64_t getMaxTypeValue (ValueType type);
 

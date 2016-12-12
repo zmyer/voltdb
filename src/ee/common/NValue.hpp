@@ -36,7 +36,6 @@
 
 #include "catalog/catalog.h"
 #include "common/ExportSerializeIo.h"
-#include "common/FatalException.hpp"
 #include "common/MiscUtil.h"
 #include "common/Pool.hpp"
 #include "common/SQLException.h"
