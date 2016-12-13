@@ -19,8 +19,6 @@
 #define UDFLIBRARY_H
 
 #include <dlfcn.h>
-#include <map>
-#include <cstdio>
 
 #include "common/FatalException.hpp"
 #include "udf/UDF.h"
@@ -31,7 +29,7 @@ typedef UserDefinedFunction *(*CreateFunction)();
 
 class UDFLibrary {
 public:
-    UDFLibrary(const string &libraryPath) {
+    UDFLibrary(const std::string &libraryPath) {
         m_libHandle = dlopen(libraryPath.c_str(), RTLD_NOW);
         if (! m_libHandle) {
             throwFatalException("Failed to load shared library file %s", libraryPath.c_str());
@@ -41,7 +39,7 @@ public:
         dlclose(m_libHandle);
     }
 
-    ScalarFunction *loadScalarFunction(const string &functionName, const string &entryName) {
+    ScalarFunction *loadScalarFunction(const std::string &functionName, const std::string &entryName) {
         char *error;
         char createFunctionName[50];
         sprintf(createFunctionName, "createFunction%s", entryName.c_str());

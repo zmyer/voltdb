@@ -15,11 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "udf/UDF.h"
-#include "udf/UDFRegistrar.h"
-
 #include <cmath>
-
+#include "udf/UDF.h"
 #define PI 3.14159
 
 namespace voltdb {

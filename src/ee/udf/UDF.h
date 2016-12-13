@@ -92,4 +92,9 @@ private:
 
 } // namespace voltdb
 
+#define REGISTER_VOLTDB_SCALAR_UDF(FunctionClass)                    \
+extern "C" UserDefinedFunction *createFunction##FunctionClass() {    \
+    return new FunctionClass();                                      \
+}
+
 #endif // UDF_H
