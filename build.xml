@@ -20,8 +20,8 @@
     <attribute name="includes" default=""/>
     <sequential>
         <javac
-            target="1.7"
-            source="1.7"
+            target="1.8"
+            source="1.8"
             srcdir="@{srcdir}"
             destdir="@{destdir}"
             excludes="@{excludes}"
@@ -1008,11 +1008,11 @@ Antlr4 Compilation Macro
     <uptodate property="sqlGrammarIsUpToDate"
 	      targetfile="${antlr4.touch}"
 	      srcfile="${pkg.sqlparser.syntax.dir}/grammar/SQLParser.g4" />
-</target>    
+</target>
 <target name="compile_sql_grammar"
 	depends="check_for_sql_grammar"
 	description="Compile the VoltDB SQL Parser using ANTLR4."
-	unless="sqlGrammarIsUpToDate" > 
+	unless="sqlGrammarIsUpToDate" >
     <path id="antlr.class.path">
 	<pathelement location="${antlr.complete.name}" />
     </path>
@@ -1042,7 +1042,7 @@ Create the sqlparser's SQL to VoltXMLElement Tests.
     <uptodate property="sqlparserVoltXMLTestsUpToDate"
 		      targetfile="${sqlparserVoltXMLTests.touch}"
 		      srcfile="${src.sqlparser.tests.dir}/tests/SimpleTestSuite.xml" />
-</target> 
+</target>
 
 <target name="create_sqlparser_tools"
 		description="Compile the sqlparser VoltXMLElement test generator.">
