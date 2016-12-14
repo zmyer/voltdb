@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2015 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -89,10 +89,9 @@ def print_elapsed_seconds(message_end="", prev_time=-1,
     current system time and a previous time, which is either the specified
     'prev_time' or, if that is negative (or unspecified), the previous time
     at which this function was called. The printed message is preceded by
-    'message_begin' and followed by "seconds, " and 'message_end'; if the
-    elapsed time is greater than or equal to 60 seconds, it also includes the
-    minutes and seconds in parentheses, e.g., 61.9 seconds would be printed
-    as "61.9 seconds (01:02), ".
+    'message_begin' and followed by 'message_end'; the elapsed time is printed
+    in a minutes:seconds format, with the exact number of seconds in parentheses,
+    e.g., 61.9 seconds would be printed as "01:02 (61.9 seconds), ".
     """
 
     now = time.time()
@@ -105,7 +104,8 @@ def print_elapsed_seconds(message_end="", prev_time=-1,
     print_seconds(diff_time, message_end, message_begin)
     return diff_time
 
-def run_once(name, command, statements_path, results_path, submit_verbosely, testConfigKit):
+def run_once(name, command, statements_path, results_path,
+             submit_verbosely, testConfigKit, precision):
 
     print "Running \"run_once\":"
     print "  name: %s" % (name)
@@ -183,7 +183,10 @@ def run_once(name, command, statements_path, results_path, submit_verbosely, tes
             break
         if client.response.tables:
             ### print "DEBUG: got table(s) from ", statement["SQL"] ,"."
-            table = normalize(client.response.tables[0], statement["SQL"])
+            if precision:
+                table = normalize(client.response.tables[0], statement["SQL"], precision)
+            else:
+                table = normalize(client.response.tables[0], statement["SQL"])
             if len(client.response.tables) > 1:
                 print "WARNING: ignoring extra table(s) from result of query ?", statement["SQL"] , "?"
         # else:
@@ -210,22 +213,65 @@ def run_once(name, command, statements_path, results_path, submit_verbosely, tes
     else:
         return 0
 
-def run_config(suite_name, config, basedir, output_dir, random_seed, report_all, generate_only,
-    subversion_generation, submit_verbosely, args, testConfigKit):
+def get_max_mismatches(comparison_database, suite_name):
+    """Returns the maximum number of acceptable mismatches, i.e., the number of
+    'known' failures for VoltDB to match the results of the comparison database
+    (HSQL or PostgreSQL), which is normally zero; however, there are sometimes
+    a few exceptions, e.g., for queries that are not supported by PostgreSQL.
+    """
+    max_mismatches = 0
+
+    # Kludge to not fail for known issues, when running against PostgreSQL
+    # (or the PostGIS extension of PostgreSQL)
+    if comparison_database.startswith('Post'):
+        # Known failures in the basic-joins test suite, and in the basic-index-joins,
+        # and basic-compoundex-joins "extended" test suites (see ENG-10775)
+        if (config_name == 'basic-joins' or config_name == 'basic-index-joins' or
+              config_name == 'basic-compoundex-joins'):
+            max_mismatches = 5280
+        # Known failures, related to the ones above, in the basic-int-joins test
+        # suite (see ENG-10775, ENG-11401)
+        elif config_name == 'basic-int-joins':
+            max_mismatches = 600
+        # Known failures in the joined-matview-* test suites ...
+        # Failures in joined-matview-default-full due to ENG-11086
+        elif config_name == 'joined-matview-default-full':
+            max_mismatches = 3387
+        # Failures in joined-matview-int due to ENG-11086
+        elif config_name == 'joined-matview-int':
+            max_mismatches = 46440
+
+    return max_mismatches
+
+def run_config(suite_name, config, basedir, output_dir, random_seed,
+               report_invalid, report_all, generate_only, subversion_generation,
+               submit_verbosely, ascii_only, args, testConfigKit):
 
     # Store the current, initial system time (in seconds since January 1, 1970)
     time0 = time.time()
 
+    precision = 0
     for key in config.iterkeys():
         print "in run_config key = '%s', config[key] = '%s'" % (key, config[key])
-        if not os.path.isabs(config[key]):
+        if key == "precision":
+            precision = int(config["precision"])
+        elif not os.path.isabs(config[key]):
             config[key] = os.path.abspath(os.path.join(basedir, config[key]))
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    global comparison_database
+    comparison_database_lower = comparison_database.lower()
     statements_path = os.path.abspath(os.path.join(output_dir, "statements.data"))
-    hsql_path = os.path.abspath(os.path.join(output_dir, "hsql.data"))
+    cmpdb_path = os.path.abspath(os.path.join(output_dir, comparison_database_lower + ".data"))
     jni_path = os.path.abspath(os.path.join(output_dir, "jni.data"))
+    modified_sql_path = None
+    debug_transform_sql_arg = ''
+    global debug_transform_sql
+    if debug_transform_sql:
+        if comparison_database == 'PostgreSQL' or comparison_database == 'PostGIS':
+            modified_sql_path = os.path.abspath(os.path.join(output_dir, 'postgresql_transform.out'))
+            debug_transform_sql_arg = ' -Dsqlcoverage.transform.sql.file='+modified_sql_path
     template = config["template"]
 
     global normalize
@@ -254,11 +300,13 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
 
     command = " ".join(args[2:])
     command += " schema=" + os.path.basename(config['ddl'])
+    if debug_transform_sql:
+        command = command.replace(" -server ", debug_transform_sql_arg+" -server ")
 
     random_state = random.getstate()
     if "template-jni" in config:
         template = config["template-jni"]
-    generator = SQLGenerator(config["schema"], template, subversion_generation)
+    generator = SQLGenerator(config["schema"], template, subversion_generation, ascii_only)
     counter = 0
 
     statements_file = open(statements_path, "wb")
@@ -269,8 +317,9 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
 
     min_statements_per_pattern = generator.min_statements_per_pattern()
     max_statements_per_pattern = generator.max_statements_per_pattern()
-    num_inserts  = generator.num_insert_statements()
-    num_patterns = generator.num_patterns()
+    num_inserts    = generator.num_insert_statements()
+    num_patterns   = generator.num_patterns()
+    num_unresolved = generator.num_unresolved_statements()
 
     if generate_only or submit_verbosely:
         print "Generated %d statements." % counter
@@ -286,8 +335,9 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
     num_crashes = 0
     failed = False
     try:
-        if run_once("jni", command, statements_path, jni_path, submit_verbosely, testConfigKit) != 0:
-            print >> sys.stderr, "Test with the JNI (VoltDB) backend had errors."
+        if run_once("jni", command, statements_path, jni_path,
+                    submit_verbosely, testConfigKit, precision) != 0:
+            print >> sys.stderr, "Test with the JNI (VoltDB) backend had errors (crash?)."
             failed = True
     except:
         print >> sys.stderr, "JNI (VoltDB) backend crashed!!!"
@@ -309,43 +359,47 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
 
     failed = False
     try:
-        if run_once("hsqldb", command, statements_path, hsql_path, submit_verbosely, testConfigKit) != 0:
-            print >> sys.stderr, "Test with the HSqlDB backend had errors."
+        if run_once(comparison_database_lower, command, statements_path, cmpdb_path,
+                    submit_verbosely, testConfigKit, precision) != 0:
+            print >> sys.stderr, "Test with the " + comparison_database + " backend had errors (crash?)."
             failed = True
     except:
-        print >> sys.stderr, "HSqlDB backend crashed!!"
+        print >> sys.stderr, comparison_database + " backend crashed!!"
         traceback.print_exc()
         failed = True
     if (failed):
-        print >> sys.stderr, "  hsql_path: %s" % (hsql_path)
+        print >> sys.stderr, "  cmpdb_path: %s" % (cmpdb_path)
         sys.stderr.flush()
         num_crashes += 1
         #exit(1)
 
     # Print the elapsed time, with a message
-    global total_hsqldb_time
-    hsqldb_time = print_elapsed_seconds("for running HSqlDB statements (" + suite_name + ")")
-    total_hsqldb_time += hsqldb_time
+    global total_cmpdb_time
+    cmpdb_time = print_elapsed_seconds("for running " + comparison_database + " statements (" + suite_name + ")")
+    total_cmpdb_time += cmpdb_time
 
     someStats = (get_numerical_html_table_element(min_statements_per_pattern, strong_warn_below=1) +
                  get_numerical_html_table_element(max_statements_per_pattern, strong_warn_below=1, warn_above=100000) +
                  get_numerical_html_table_element(num_inserts,  warn_below=4, strong_warn_below=1, warn_above=1000) +
                  get_numerical_html_table_element(num_patterns, warn_below=4, strong_warn_below=1, warn_above=10000) +
+                 get_numerical_html_table_element(num_unresolved, error_above=0) +
                  get_time_html_table_element(gensql_time) +
                  get_time_html_table_element(voltdb_time) +
-                 get_time_html_table_element(hsqldb_time) )
+                 get_time_html_table_element(cmpdb_time) )
     extraStats = get_numerical_html_table_element(num_crashes, error_above=0) + someStats
+    max_mismatches = get_max_mismatches(comparison_database, suite_name)
 
     global compare_results
     try:
         compare_results = imp.load_source("normalizer", config["normalizer"]).compare_results
-        success = compare_results(suite_name, random_seed, statements_path, hsql_path,
-                                  jni_path, output_dir, report_all, extraStats)
+        success = compare_results(suite_name, random_seed, statements_path, cmpdb_path,
+                                  jni_path, output_dir, report_invalid, report_all, extraStats,
+                                  comparison_database, modified_sql_path, max_mismatches)
     except:
-        print >> sys.stderr, "Compare (VoltDB & HSqlDB) results crashed!"
+        print >> sys.stderr, "Compare (VoltDB & " + comparison_database + ") results crashed!"
         traceback.print_exc()
         print >> sys.stderr, "  jni_path: %s" % (jni_path)
-        print >> sys.stderr, "  hsql_path: %s" % (hsql_path)
+        print >> sys.stderr, "  cmpdb_path: %s" % (cmpdb_path)
         sys.stderr.flush()
         num_crashes += 1
         gray_zero_html_table_element = get_numerical_html_table_element(0, use_gray=True)
@@ -353,6 +407,7 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
                       gray_zero_html_table_element + gray_zero_html_table_element +
                       gray_zero_html_table_element + gray_zero_html_table_element +
                       gray_zero_html_table_element + gray_zero_html_table_element +
+                      gray_zero_html_table_element +
                       get_numerical_html_table_element(num_crashes, error_above=0) + someStats + '</tr>' )
         success = {"keyStats": errorStats, "mis": -1}
 
@@ -390,10 +445,12 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
     global invalid_statements
     global mismatched_statements
     global keyStats_start_index
-    global total_num_npes
+    global total_volt_npes
+    global total_cmp_npes
     global total_num_crashes
     global total_num_inserts
     global total_num_patterns
+    global total_num_unresolved
     global min_all_statements_per_pattern
     global max_all_statements_per_pattern
     keyStats_start_index = 0
@@ -404,10 +461,12 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
     total_statements      += int(next_keyStats_column_value())
     mismatched_statements += int(next_keyStats_column_value())
     next_keyStats_column_value()  # ignore Mismatched %
-    total_num_npes        += int(next_keyStats_column_value())
+    total_volt_npes       += int(next_keyStats_column_value())
+    total_cmp_npes        += int(next_keyStats_column_value())
     total_num_crashes     += num_crashes
     total_num_inserts     += num_inserts
     total_num_patterns    += num_patterns
+    total_num_unresolved  += num_unresolved
     min_all_statements_per_pattern = min(min_all_statements_per_pattern, min_statements_per_pattern)
     max_all_statements_per_pattern = max(max_all_statements_per_pattern, max_statements_per_pattern)
 
@@ -605,17 +664,19 @@ if __name__ == "__main__":
     save_prev_time = time0
     total_gensql_time = 0.0
     total_voltdb_time = 0.0
-    total_hsqldb_time = 0.0
+    total_cmpdb_time = 0.0
     total_compar_time = 0.0
     keyStats_start_index = 0
     valid_statements = 0
     invalid_statements = 0
     mismatched_statements = 0
     total_statements = 0
-    total_num_npes = 0
+    total_volt_npes = 0
+    total_cmp_npes = 0
     total_num_crashes  = 0
     total_num_inserts  = 0
     total_num_patterns = 0
+    total_num_unresolved = 0
     max_all_statements_per_pattern = 0
     min_all_statements_per_pattern = sys.maxint
 
@@ -637,12 +698,26 @@ if __name__ == "__main__":
     parser.add_option("-S", "--subversion_generation", dest="subversion_generation",
                       action="store_true", default=None,
                       help="enable generation of additional subquery forms for select statements")
+    parser.add_option("-a", "--ascii-only", action="store_true",
+                      dest="ascii_only", default=False,
+                      help="include only ASCII values in randomly generated string constants")
+    parser.add_option("-i", "--report-invalid", action="store_true",
+                      dest="report_invalid", default=False,
+                      help="report invalid SQL statements, not just mismatches")
     parser.add_option("-r", "--report-all", action="store_true",
                       dest="report_all", default=False,
-                      help="report all attempted SQL statements rather than mismatches")
+                      help="report all attempted SQL statements, not just mismatches")
     parser.add_option("-g", "--generate-only", action="store_true",
                       dest="generate_only", default=False,
                       help="only generate and report SQL statements, do not start any database servers")
+    parser.add_option("-P", "--postgresql", action="store_true",
+                      dest="postgresql", default=False,
+                      help="compare VoltDB results to PostgreSQL, rather than HSqlDB")
+    parser.add_option("-G", "--postgis", action="store_true",
+                      dest="postgis", default=False,
+                      help="compare VoltDB results to PostgreSQL, with the PostGIS extension")
+    parser.add_option("-d", "--debug", dest="debug", default=None,
+                      help="pass a debug option to the Non-VoltDB backend, e.g., to the PostgreSQL backend")
     (options, args) = parser.parse_args()
 
     if options.seed == None:
@@ -675,6 +750,15 @@ if __name__ == "__main__":
     else:
         configs_to_run = config_list.get_configs()
 
+    comparison_database = "HSqlDB"  # default value
+    if options.postgresql:
+        comparison_database = 'PostgreSQL'
+    if options.postgis:
+        comparison_database = 'PostGIS'
+    debug_transform_sql = False
+    if options.debug == 'transform_sql':
+        debug_transform_sql = True
+
     testConfigKits = {}
     defaultHost = "localhost"
     defaultPort = 21212
@@ -698,12 +782,16 @@ if __name__ == "__main__":
             testCatalog = create_catalogFile(testConfigKits['voltcompiler'], testProjectFile, 'test')
             # To add one more key
             testConfigKits["testCatalog"] = testCatalog
-        result = run_config(config_name, config, basedir, report_dir, seed, options.report_all,
+        result = run_config(config_name, config, basedir, report_dir, seed,
+                            options.report_invalid, options.report_all,
                             options.generate_only, options.subversion_generation,
-                            options.report_all, args, testConfigKits)
+                            options.report_all, options.ascii_only, args, testConfigKits)
         statistics[config_name] = result["keyStats"]
         statistics["seed"] = seed
-        if result["mis"] != 0:
+
+        # The maximum number of acceptable mismatches is normally zero, except
+        # for certain rare cases involving known errors in PostgreSQL
+        if result["mis"] > get_max_mismatches(comparison_database, config_name):
             success = False
 
     # Write the summary
@@ -723,32 +811,44 @@ if __name__ == "__main__":
                            "\n<td align=right>" + str(total_statements) + "</td>" + \
                            "\n<td align=right>" + str(mismatched_statements) + "</td>" + \
                            "\n<td align=right>" + mismatched_percent + "%</td>" + \
-                           "\n<td align=right>" + str(total_num_npes) + "</td>" + \
+                           "\n<td align=right>" + str(total_volt_npes) + "</td>" + \
+                           "\n<td align=right>" + str(total_cmp_npes) + "</td>" + \
                            "\n<td align=right>" + str(total_num_crashes) + "</td>" + \
                            "\n<td align=right>" + str(min_all_statements_per_pattern) + "</td>" + \
                            "\n<td align=right>" + str(max_all_statements_per_pattern) + "</td>" + \
                            "\n<td align=right>" + str(total_num_inserts) + "</td>" + \
                            "\n<td align=right>" + str(total_num_patterns) + "</td>" + \
+                           "\n<td align=right>" + str(total_num_unresolved) + "</td>" + \
                            "\n<td align=right>" + minutes_colon_seconds(total_gensql_time) + "</td>" + \
                            "\n<td align=right>" + minutes_colon_seconds(total_voltdb_time) + "</td>" + \
-                           "\n<td align=right>" + minutes_colon_seconds(total_hsqldb_time) + "</td>" + \
+                           "\n<td align=right>" + minutes_colon_seconds(total_cmpdb_time) + "</td>" + \
                            "\n<td align=right>" + minutes_colon_seconds(total_compar_time) + "</td>" + \
                            "\n<td align=right>" + minutes_colon_seconds(time1-time0) + "</td></tr>\n"
-    generate_summary(output_dir, statistics)
+    generate_summary(output_dir, statistics, comparison_database)
 
     # Print the total time, for each type of activity
     print_seconds(total_gensql_time, "for generating ALL SQL statements")
     print_seconds(total_voltdb_time, "for running ALL VoltDB (JNI) statements")
-    print_seconds(total_hsqldb_time, "for running ALL HSqlDB statements")
+    print_seconds(total_cmpdb_time,  "for running ALL " + comparison_database + " statements")
     print_seconds(total_compar_time, "for comparing ALL DB results")
     print_elapsed_seconds("for generating the output report", time1, "Total   time: ")
     print_elapsed_seconds("for the entire run", time0, "Total   time: ")
-    if total_num_npes > 0:
-        print "Total number of (VoltDB or HSqlDB) NullPointerExceptions (NPEs): %d" % total_num_npes
+    if total_num_unresolved > 0:
+        success = False
+        print "Total number of invalid statements with unresolved symbols: %d" % total_num_unresolved
+    if total_cmp_npes > 0:
+        print "Total number of " + comparison_database + " NullPointerExceptions (NPEs): %d" % total_cmp_npes
+    if total_volt_npes > 0:
+        success = False
+        print "Total number of VoltDB NullPointerExceptions (NPEs): %d" % total_volt_npes
+    if mismatched_statements > 0:
+        print "Total number of mismatched statements (i.e., test failures): %d" % mismatched_statements
     if total_num_crashes > 0:
-        print "Total number of (VoltDB, HSqlDB, or compare results) crashes: %d" % total_num_crashes
+        print "Total number of (VoltDB, " + comparison_database + ", or compare results) crashes: %d" % total_num_crashes
+        success = False
 
     if not success:
+        sys.stdout.flush()
+        sys.stderr.flush()
         print >> sys.stderr, "SQL coverage has errors."
         exit(1)
-

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -33,7 +33,9 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
+import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.common.Constants;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
@@ -149,6 +151,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     byte[] m_procedureName = null;
     int m_currentBatchIndex = 0;
 
+    int m_batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
+
     public int getCurrentBatchIndex() {
         return m_currentBatchIndex;
     }
@@ -203,6 +207,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_currentBatchIndex = ftask.m_currentBatchIndex;
         m_involvedPartitions = ftask.m_involvedPartitions;
         m_procNameToLoad = ftask.m_procNameToLoad;
+        m_batchTimeout = ftask.m_batchTimeout;
         if (ftask.m_initiateTaskBuffer != null) {
             m_initiateTaskBuffer = ftask.m_initiateTaskBuffer.duplicate();
         }
@@ -378,6 +383,14 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         }
     }
 
+    public int getBatchTimeout() {
+        return m_batchTimeout;
+    }
+
+    public void setBatchTimeout(int batchTimeout) {
+        m_batchTimeout = batchTimeout;
+    }
+
     public boolean isFinalTask() {
         return m_isFinal;
     }
@@ -440,7 +453,22 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                                       Collection<Integer> involvedPartitions) {
         m_initiateTask = initiateTask;
         m_involvedPartitions = ImmutableSet.copyOf(involvedPartitions);
-        m_initiateTaskBuffer = ByteBuffer.allocate(initiateTask.getSerializedSize());
+        // this function may be called for the same instance twice, with slightly different
+        // but same size initiateTask. The second call is intended to update the spHandle in
+        // the initiateTask to a new value and update the corresponding buffer, therefore it
+        // only change the spHandle which takes a fixed amount of bytes, the only component
+        // that can change size, which is the StoredProcedureInvocation, isn't changed at all.
+        // Because of these, the serialized size will be the same for the two calls and the
+        // buffer only needs to be allocated once. When this function is called the second
+        // time, just reset the position and limit and reserialize the updated content to the
+        // existing ByteBuffer so we can save an allocation.
+        if (m_initiateTaskBuffer == null) {
+            m_initiateTaskBuffer = ByteBuffer.allocate(initiateTask.getSerializedSize());
+        }
+        else {
+            m_initiateTaskBuffer.position(0);
+            m_initiateTaskBuffer.limit(initiateTask.getSerializedSize());
+        }
         try {
             initiateTask.flattenToBuffer(m_initiateTaskBuffer);
             m_initiateTaskBuffer.flip();
@@ -576,6 +604,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         // int for which batch (4)
         msgsize += 4;
+
+        // 1 byte for the timeout flag
+        msgsize += 1;
+
+        msgsize += m_batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT ? 0 : 4;
 
         // Involved partitions
         msgsize += 2 + m_involvedPartitions.size() * 4;
@@ -728,6 +761,14 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // ints for batch context
         buf.putInt(m_currentBatchIndex);
 
+        // put byte flag for timeout value and 4 bytes integer value if specified
+        if (m_batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT) {
+            buf.put(BatchTimeoutOverrideType.NO_OVERRIDE_FOR_BATCH_TIMEOUT.getValue());
+        } else {
+            buf.put(BatchTimeoutOverrideType.HAS_OVERRIDE_FOR_BATCH_TIMEOUT.getValue());
+            buf.putInt(m_batchTimeout);
+        }
+
         buf.putShort((short) m_involvedPartitions.size());
         for (int pid : m_involvedPartitions) {
             buf.putInt(pid);
@@ -849,6 +890,13 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // ints for batch context
         m_currentBatchIndex = buf.getInt();
 
+        BatchTimeoutOverrideType batchTimeoutType = BatchTimeoutOverrideType.typeFromByte(buf.get());
+        if (batchTimeoutType == BatchTimeoutOverrideType.NO_OVERRIDE_FOR_BATCH_TIMEOUT) {
+            m_batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
+        } else {
+            m_batchTimeout = buf.getInt();
+        }
+
         // Involved partition
         short involvedPartitionCount = buf.getShort();
         ImmutableSet.Builder<Integer> involvedPartitionsBuilder = ImmutableSet.builder();
@@ -911,10 +959,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         sb.append("FRAGMENT_TASK (FROM ");
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
-        sb.append(") FOR TXN ");
-        sb.append(m_txnId);
+        sb.append(") FOR TXN ").append(TxnEgo.txnIdToString(m_txnId));
         sb.append(" FOR REPLAY ").append(isForReplay());
-        sb.append(", SP HANDLE: ").append(getSpHandle());
+        sb.append(", SP HANDLE: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("\n");
         if (m_isReadOnly)
             sb.append("  READ, COORD ");

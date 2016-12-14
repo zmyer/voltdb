@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,10 +18,9 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -92,7 +91,7 @@ public class OrderByPlanNode extends AbstractPlanNode {
         // PlanNodes all need private deep copies of expressions
         // so that the resolveColumnIndexes results
         // don't get bashed by other nodes or subsequent planner runs
-        m_sortExpressions.add((AbstractExpression) sortExpr.clone());
+        m_sortExpressions.add(sortExpr.clone());
         m_sortDirections.add(sortDir);
     }
 
@@ -104,36 +103,39 @@ public class OrderByPlanNode extends AbstractPlanNode {
         return m_sortExpressions;
     }
 
+    public List<SortDirectionType> getSortDirections() {
+        return m_sortDirections;
+    }
+
     @Override
-    public void resolveColumnIndexes()
-    {
+    public void resolveColumnIndexes() {
         // Need to order and resolve indexes of output columns AND
         // the sort columns
         assert(m_children.size() == 1);
-        m_children.get(0).resolveColumnIndexes();
-        NodeSchema input_schema = m_children.get(0).getOutputSchema();
-        for (SchemaColumn col : m_outputSchema.getColumns())
-        {
+        AbstractPlanNode childNode = m_children.get(0);
+        childNode.resolveColumnIndexes();
+        NodeSchema inputSchema = childNode.getOutputSchema();
+        for (SchemaColumn col : m_outputSchema.getColumns()) {
+            AbstractExpression colExpr = col.getExpression();
             // At this point, they'd better all be TVEs.
-            assert(col.getExpression() instanceof TupleValueExpression);
-            TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
-            tve.setColumnIndex(index);
+            assert(colExpr instanceof TupleValueExpression);
+            TupleValueExpression tve = (TupleValueExpression) colExpr;
+            tve.setColumnIndexUsingSchema(inputSchema);
         }
         m_outputSchema.sortByTveIndex();
 
+        resolveSortIndexesUsingSchema(inputSchema);
+    }
+
+    public void resolveSortIndexesUsingSchema(NodeSchema inputSchema) {
         // Find the proper index for the sort columns.  Not quite
         // sure these should be TVEs in the long term.
-        List<TupleValueExpression> sort_tves =
-            new ArrayList<TupleValueExpression>();
-        for (AbstractExpression sort_exps : m_sortExpressions)
-        {
-            sort_tves.addAll(ExpressionUtil.getTupleValueExpressions(sort_exps));
-        }
-        for (TupleValueExpression tve : sort_tves)
-        {
-            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
-            tve.setColumnIndex(index);
+        for (AbstractExpression sort_exps : m_sortExpressions) {
+            List<TupleValueExpression> sort_tves =
+                    ExpressionUtil.getTupleValueExpressions(sort_exps);
+            for (TupleValueExpression tve : sort_tves) {
+                tve.setColumnIndexUsingSchema(inputSchema);
+            }
         }
     }
 
@@ -142,8 +144,7 @@ public class OrderByPlanNode extends AbstractPlanNode {
                                      Cluster cluster,
                                      Database db,
                                      DatabaseEstimates estimates,
-                                     ScalarValueHints[] paramHints)
-    {
+                                     ScalarValueHints[] paramHints) {
         // This method doesn't do anything besides what the parent method does,
         // but it is a nice place to put a comment. Really, sorts should be pretty
         // expensive and they're not costed as such yet because sometimes that
@@ -163,32 +164,13 @@ public class OrderByPlanNode extends AbstractPlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         assert (m_sortExpressions.size() == m_sortDirections.size());
-        stringer.key(Members.SORT_COLUMNS.name()).array();
-        for (int ii = 0; ii < m_sortExpressions.size(); ii++) {
-            stringer.object();
-            stringer.key(Members.SORT_EXPRESSION.name());
-            stringer.object();
-            m_sortExpressions.get(ii).toJSONString(stringer);
-            stringer.endObject();
-            stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirections.get(ii).toString());
-            stringer.endObject();
-        }
-        stringer.endArray();
+        AbstractExpression.toJSONArrayFromSortList(stringer, m_sortExpressions, m_sortDirections);
     }
 
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
-        JSONArray jarray = null;
-        if( !jobj.isNull(Members.SORT_COLUMNS.name()) ){
-            jarray = jobj.getJSONArray( Members.SORT_COLUMNS.name() );
-        }
-        int size = jarray.length();
-        for( int i = 0; i < size; i++ ) {
-            JSONObject tempObj = jarray.getJSONObject(i);
-            m_sortDirections.add( SortDirectionType.get(tempObj.getString( Members.SORT_DIRECTION.name())) );
-            m_sortExpressions.add( AbstractExpression.fromJSONChild(tempObj, Members.SORT_EXPRESSION.name()) );
-        }
+        AbstractExpression.loadSortListFromJSONArray(m_sortExpressions, m_sortDirections, jobj);
     }
 
     @Override
@@ -197,11 +179,17 @@ public class OrderByPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
+    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+        super.findAllExpressionsOfClass(aeClass, collected);
         for (AbstractExpression ae : m_sortExpressions) {
-            collected.addAll(ExpressionUtil.findAllExpressionsOfClass(ae, aeClass));
+            collected.addAll(ae.findAllSubexpressionsOfClass(aeClass));
         }
-        return collected;
+    }
+
+    @Override
+    public boolean isOutputOrdered (List<AbstractExpression> sortExpressions, List<SortDirectionType> sortDirections) {
+        assert(sortExpressions.equals(m_sortExpressions));
+        assert(sortDirections.equals(m_sortDirections));
+        return true;
     }
 }

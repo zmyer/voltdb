@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,7 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -28,6 +29,7 @@ import org.voltdb.planner.ParsedUnionStmt;
 import org.voltdb.planner.ParsedUnionStmt.UnionType;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SortDirectionType;
 
 public class UnionPlanNode extends AbstractPlanNode {
 
@@ -118,7 +120,7 @@ public class UnionPlanNode extends AbstractPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.UNION_TYPE.name()).value(m_unionType.name());
+        stringer.keySymbolValuePair(Members.UNION_TYPE.name(), m_unionType.name());
     }
 
     @Override
@@ -130,5 +132,15 @@ public class UnionPlanNode extends AbstractPlanNode {
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
         m_unionType = UnionType.valueOf(jobj.getString(Members.UNION_TYPE.name()));
+    }
+
+    @Override
+    public boolean isOutputOrdered (List<AbstractExpression> sortExpressions, List<SortDirectionType> sortDirections) {
+        return false;
+    }
+
+    @Override
+    public boolean isOrderDeterministic() {
+        return false;
     }
 }

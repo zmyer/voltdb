@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -64,7 +64,7 @@ public:
     void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream);
 
     /** write a tuple to the stream */
-    size_t appendTuple(int64_t lastCommittedSpHandle,
+    virtual size_t appendTuple(int64_t lastCommittedSpHandle,
                        int64_t spHandle,
                        int64_t seqNo,
                        int64_t uniqueId,

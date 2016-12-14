@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -48,8 +48,6 @@ public class MpPromoteAlgo implements RepairAlgo
     private final long m_requestId = System.nanoTime();
     private final List<Long> m_survivors;
     private long m_maxSeenTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
-    private long m_maxBinaryLogUniqueId = Long.MIN_VALUE;
-    private long m_maxBinaryLogSequenceNumber = Long.MIN_VALUE;
     private final List<Iv2InitiateTaskMessage> m_interruptedTxns = new ArrayList<Iv2InitiateTaskMessage>();
     private Pair<Long, byte[]> m_newestHashinatorConfig = Pair.of(Long.MIN_VALUE,new byte[0]);
     // Each Term can process at most one promotion; if promotion fails, make
@@ -171,9 +169,6 @@ public class MpPromoteAlgo implements RepairAlgo
                 m_maxSeenTxnId = Math.max(m_maxSeenTxnId, response.getTxnId());
             }
 
-            m_maxBinaryLogSequenceNumber = Math.max(m_maxBinaryLogSequenceNumber, response.getBinaryLogSequenceNumber());
-            m_maxBinaryLogUniqueId = Math.max(m_maxBinaryLogUniqueId, response.getBinaryLogUniqueId());
-
             // Step 2: track hashinator versions
 
             if (response.hasHashinatorConfig()) {
@@ -257,9 +252,7 @@ public class MpPromoteAlgo implements RepairAlgo
             m_mailbox.repairReplicasWith(m_survivors, repairMsg);
         }
 
-        m_promotionResult.set(new RepairResult(m_maxSeenTxnId,
-                                               m_maxBinaryLogSequenceNumber,
-                                               m_maxBinaryLogUniqueId));
+        m_promotionResult.set(new RepairResult(m_maxSeenTxnId));
     }
 
     //
@@ -327,7 +320,6 @@ public class MpPromoteAlgo implements RepairAlgo
                         false,  // no acks in iv2.
                         restart,   // Indicate rollback for repair as appropriate
                         ftm.isForReplay());
-            rollback.setOriginalTxnId(ftm.getOriginalTxnId());
             return rollback;
         }
     }

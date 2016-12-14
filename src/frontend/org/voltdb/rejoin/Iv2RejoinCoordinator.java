@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -45,8 +45,10 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.StreamSnapshotRequestConfig;
 import org.voltdb.utils.FixedDBBPool;
 
+import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ArrayListMultimap;
 import com.google_voltpatches.common.collect.Multimap;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 
 /**
  * Thread Safety: this is a reentrant class. All mutable datastructures
@@ -86,6 +88,8 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     // Node-wise stream snapshot receiver buffer pool
     private final FixedDBBPool m_snapshotBufPool;
 
+    private String m_hostId;
+
     public Iv2RejoinCoordinator(HostMessenger messenger,
                                 Collection<Long> sites,
                                 String voltroot,
@@ -117,6 +121,12 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             m_snapshotBufPool.allocate(SnapshotSiteProcessor.m_snapshotBufferLength, poolSize);
             // Create a buffer pool for compressed stream snapshot data
             m_snapshotBufPool.allocate(SnapshotSiteProcessor.m_snapshotBufferCompressedLen, poolSize);
+
+            m_hostId = String.valueOf(m_messenger.getHostId());
+            Preconditions.checkArgument(
+                    m_hostId != null && !m_hostId.trim().isEmpty(),
+                    "m_hostId is null or empty"
+                    );
         }
     }
 
@@ -281,7 +291,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         }
         if (data != null && !schemaHasNoTables) {
             REJOINLOG.debug("Snapshot request: " + data);
-            SnapshotUtil.requestSnapshot(0l, "", nonce, !m_liveRejoin, SnapshotFormat.STREAM, data,
+            SnapshotUtil.requestSnapshot(0l, "", nonce, !m_liveRejoin, SnapshotFormat.STREAM, SnapshotPathType.SNAP_NO_PATH, data,
                     SnapshotUtil.fatalSnapshotResponseHandler, true);
         }
     }

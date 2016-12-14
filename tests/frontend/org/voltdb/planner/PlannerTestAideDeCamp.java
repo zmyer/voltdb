@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -31,8 +31,6 @@ import java.util.List;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.voltcore.utils.Pair;
-import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
@@ -70,6 +68,8 @@ public class PlannerTestAideDeCamp {
      * @throws Exception
      */
     public PlannerTestAideDeCamp(URL ddlurl, String basename) throws Exception {
+        assert(ddlurl != null);
+        String pth = ddlurl.getPath();
         String schemaPath = URLDecoder.decode(ddlurl.getPath(), "UTF-8");
         VoltCompiler compiler = new VoltCompiler();
         hsql = HSQLInterface.loadHsqldb();
@@ -91,9 +91,13 @@ public class PlannerTestAideDeCamp {
      * @param sql
      * @param detMode
      */
-    CompiledPlan compileAdHocPlan(String sql, DeterminismMode detMode)
-    {
+    CompiledPlan compileAdHocPlan(String sql, DeterminismMode detMode) {
         compile(sql, 0, null, true, false, detMode);
+        return m_currentPlan;
+    }
+
+    CompiledPlan compileAdHocPlan(String sql, boolean inferPartitioning, boolean singlePartition, DeterminismMode detMode) {
+        compile(sql, 0, null, inferPartitioning, singlePartition, detMode);
         return m_currentPlan;
     }
 
@@ -167,18 +171,10 @@ public class PlannerTestAideDeCamp {
             catalogParam.setIndex(i);
         }
 
-        List<PlanNodeList> nodeLists = new ArrayList<PlanNodeList>();
+        List<PlanNodeList> nodeLists = new ArrayList<>();
         nodeLists.add(new PlanNodeList(plan.rootPlanGraph));
         if (plan.subPlanGraph != null) {
             nodeLists.add(new PlanNodeList(plan.subPlanGraph));
-        }
-
-        //Store the list of parameters types and indexes in the plan node list.
-        List<Pair<Integer, VoltType>> parameters = nodeLists.get(0).getParameters();
-        for (int i = 0; i < plan.parameters.length; ++i) {
-            ParameterValueExpression pve = plan.parameters[i];
-            Pair<Integer, VoltType> parameter = new Pair<Integer, VoltType>(i, pve.getValueType());
-            parameters.add(parameter);
         }
 
         // Now update our catalog information
@@ -193,6 +189,7 @@ public class PlannerTestAideDeCamp {
             // TODO Auto-generated catch block
             e2.printStackTrace();
             System.exit(-1);
+            return null;
         }
 
         //
@@ -205,7 +202,7 @@ public class PlannerTestAideDeCamp {
             e.printStackTrace();
         }
 
-        List<AbstractPlanNode> plannodes = new ArrayList<AbstractPlanNode>();
+        List<AbstractPlanNode> plannodes = new ArrayList<>();
         for (PlanNodeList nodeList : nodeLists) {
             plannodes.add(nodeList.getRootPlanNode());
         }
@@ -214,4 +211,7 @@ public class PlannerTestAideDeCamp {
         return plannodes;
     }
 
+    public String getCatalogString() {
+        return db.getCatalog().serialize();
+    }
 }

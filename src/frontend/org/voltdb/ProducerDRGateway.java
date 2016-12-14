@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,30 +17,26 @@
 
 package org.voltdb;
 
+import java.io.IOException;
 import java.util.Map;
 
 public interface ProducerDRGateway {
 
-    /*
-     * Ensure that all enabled DR Producer Hosts have agreed on the PBD file name
+    /**
+     * Start the main thread and the state machine, wait until all nodes converge on the initial state.
+     * @throws IOException
      */
-    public abstract void blockOnDRStateConvergence();
+    public void startAndWaitForGlobalAgreement() throws IOException;
 
     /**
      * Start listening on the ports
      */
-    public abstract void initialize(boolean drProducerEnabled, int listenPort, String portInterface);
+    public abstract void startListening(boolean drProducerEnabled, int listenPort, String portInterface) throws IOException;
 
     /**
      * @return true if bindPorts has been called.
      */
     public abstract boolean isStarted();
-
-    /**
-     * @param ib This is really the invocation buffer
-     * @return
-     */
-    public abstract boolean offer(final Object ib);
 
     /**
      * Queues up a task to move all the InvocationBuffers to the PersistentBinaryDeque
@@ -64,5 +60,8 @@ public interface ProducerDRGateway {
     /**
      * Clear all queued DR buffers for a master, useful when the replica goes away
      */
-    public void resetDRProducer();
+    public void deactivateDRProducer();
+    public void activateDRProducer();
+
+    public void blockOnSyncSnapshotGeneration();
 }

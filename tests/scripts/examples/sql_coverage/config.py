@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2015 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -56,6 +56,7 @@
 #                      "ddl": "int-DDL.sql",
 #                      "template": "basic-matview.sql",
 #                      "normalizer": "normalizer.py"},
+
      "basic-joins": {"schema": "schema.py",
                      "ddl": "DDL.sql",
                       "template": "basic-joins.sql",
@@ -76,11 +77,13 @@
     "numeric-decimals": {"schema": "decimal-schema.py",
                          "ddl": "DDL.sql",
                          "template": "numeric-decimals.sql",
-                        "normalizer": "fuzzynormalizer.py"},
+                         "normalizer": "normalizer.py",
+                         "precision": "9"},
     "numeric-ints": {"schema": "int-schema.py",
                      "ddl": "int-DDL.sql",
                      "template": "numeric-ints.sql",
-                     "normalizer": "normalizer.py"},
+                     "normalizer": "normalizer.py",
+                     "precision": "9"},
 # HSQL SEEMS TO HAVE A BAD DEFAULT PRECISION, DISABLING
 #    "advanced-decimal": {"schema": "decimal-schema.py",
 #                         "ddl": "DDL.sql",

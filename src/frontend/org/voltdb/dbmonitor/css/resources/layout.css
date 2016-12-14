@@ -69,6 +69,7 @@ h1, h2, h3, h4, h5, h6 {
 .errorValue {
     color: #c70000;
 }
+.notActive {-moz-opacity:0.5; -khtml-opacity: 0.5; filter: alpha(opacity=50); opacity: 0.5; }
 
 /*****Global Ends******/
 /******sprite*************/
@@ -80,25 +81,21 @@ li.joiningIcon,
 li.missingIcon,
 li.alertIcon,
 a.alertIcon,
+.iconDRDatabase,
 input.icon-search,
 a.save-search,
 a.icon-search,
-ul.servers-list li.active,
-ul.servers-list li.joining,
-ul.clusterStat, li.activeServerName,
-ul.servers-list li.active,
-ul.servers-list li.pauseMonitoring,
-ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, .iconDeleteAddConfig, .drArrow, .icon-master, .icon-replica, .icon-command {
+ul.clusterStat, li.activeServerName,.timeOutCross,
+a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, .iconDeleteAddConfig, .drArrow, .icon-master, .icon-replica, .icon-command {
     background-image: url(images/voltdb-icon-sprite.png) !important;
     background-repeat: no-repeat;
 }
 
-ul.servers-list li.pauseActiveMonitoring {
-    background-image: url(images/voltdb-icon-sprite.png) !important;
-    background-repeat: no-repeat;
-    background-color: #f0f3f4;
+.iconDRDatabase {
+    background-position: left top;
+    height: 25px;
+    line-height: 25px;
 }
-
 .user {
     background-position: left -209px;
     width: 25px;
@@ -148,7 +145,6 @@ a.alertIcon {
 .showhideIcon {
     height: 25px;
 }
-
 
 
 
@@ -322,6 +318,7 @@ html, body {
         float: left;
         width: 140px;
         padding: 8px 0 0 0;
+		margin-right:90px;
     }
 
     .headLeft .menu {
@@ -417,7 +414,8 @@ ul.topRightList {
             display: block;
             text-decoration: none;
             color: #000000;
-            padding: 3px 2px 5px 15px;
+		  /*padding: 3px 2px 5px 15px;*/
+            padding: 3px 2px 5px 72px;
             white-space: nowrap;
         }
 
@@ -426,7 +424,7 @@ ul.topRightList {
 
         .menuHome ul li:hover ul {
             display: block;
-            position: absolute;
+            /*position: absolute;*/
         }
 
         .menuHome ul li:hover li {
@@ -439,7 +437,7 @@ ul.topRightList {
             border-left: 1px solid #CCCCCC;
             border-right: 1px solid #CCCCCC;
             position: relative;
-            right: 50px;
+            right:0 /*50px*/;
             z-index: 1;
             width: 115px;
         }
@@ -522,7 +520,7 @@ ul.topRightList {
 
 .clusterDetailsContLeft {
     float: left;
-    width: 50%;
+    width: 60%;
 }
 
 .clusterDetailsContRight {
@@ -615,7 +613,7 @@ ul.rightShowhideList {
         }
 
 .preBtn {
-    float: right;
+    float: left;
     padding: 6px 0 0 10px;
 }
 
@@ -624,21 +622,23 @@ ul.rightShowhideList {
 }
 
     .viewSelect label {
-        font-weight: bold;
         font-size: 14px;
+        position:relative;
+        top:2px;
     }
 
     .viewSelect select {
         border: 1px solid #aaaaaa;
         height: 28px;
         line-height: 28px;
-        width: 150px;
+        width: 140px;
     }
 
 
 .graphChart {
     width: 100%;
 }
+
 
 
 .chart {
@@ -651,6 +651,7 @@ ul.rightShowhideList {
     -moz-box-shadow: 0px 6px 7px -5px #ccc; /* Firefox 3.5 - 3.6 */
     box-shadow: 0px 6px 7px -5px #ccc; /* Opera 10.5, IE 9, Firefox 4+, Chrome 6+, iOS 5 */
 }
+.chartDR {margin-bottom:10px;}
 
 .left {
     float: left;
@@ -668,22 +669,22 @@ ul.rightShowhideList {
 }
 
     .chartHeader h1 {
-        padding: 15px 0 0 20px;
+        padding: 18px 0 0 20px;
     }
 
     .chartHeader span {
         position: absolute;
         max-width: 150px;
         display: block;
-        right: 20px;
+        right: 40px;
         text-align: right;
-        top: 15px;
+        top: 18px;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
 
-
+.chartLeft { float:left;}
 
 /*accordion*/
 .menu_list {
@@ -708,9 +709,15 @@ ul.rightShowhideList {
 .collapsed {
     background: #fbfbfb url(images/voltdb-icon-sprite.png) 20px -535px no-repeat;
 }
+.collapsedDR {
+    background:url(images/voltdb-icon-sprite.png) 20px -537px no-repeat;
+}
 
 .expanded {
     background: #fbfbfb url(images/voltdb-icon-sprite.png) 20px -490px no-repeat;
+}
+.expandedDR {
+    background:url(images/voltdb-icon-sprite.png) 20px -491px no-repeat;
 }
 
 .leftShowhide .expanded {
@@ -723,6 +730,11 @@ ul.rightShowhideList {
 
 .arrowAdjust {
     padding: 0px 0 0 26px;
+    position: relative;
+    top: 4px;
+}
+.arrowAdjustDR {
+    padding: 0px 0 0 7px;
     position: relative;
     top: 4px;
 }
@@ -740,6 +752,8 @@ ul.tabs {
     border-left: 1px solid #ccc;
     width: 100%;
 }
+
+ul.refreshList { margin-top:10px;}
 
     ul.tabs li {
         float: left;
@@ -759,7 +773,7 @@ ul.tabs {
             text-decoration: none;
             color: #000;
             display: block;
-            font-size: 1.2em;
+            font-size: 14px;
             padding: 0 3px;
             border: 1px solid #fff;
             outline: none;
@@ -817,7 +831,7 @@ html ul.tabs li.active, html ul.tabs li.active a:hover {
     }
 
     .storeTbl th, td, .dbTbl th, td {
-        padding: 10px 25px 10px 10px;
+        padding: 10px 19px 10px 10px;
         border-right: 1px solid #CCCCCC;
         border-bottom: 1px solid #CCCCCC;
     }
@@ -1012,7 +1026,7 @@ a.hideServers {
 }
 
 #serverListWrapper {
-    padding: 15px 0 15px 15px;
+    padding: 15px 15px 15px 15px;
 }
 
 ul.servers-list {
@@ -1027,6 +1041,36 @@ ul.servers-list {
 ul.servers-list li {
     border-bottom: 1px solid #dbdbdb;
     padding: 15px 10px 15px 30px;
+}
+
+
+.serversTbl { width: 100%;}
+.serversTbl tr th,.serversTbl tr td { border-right: none;border-bottom: 1px solid #CCCCCC;vertical-align: top;}
+.serversTbl tr th {  padding: 20px 19px 20px 0;font-weight: bold;background: #dee0e0;}
+.serversTbl tr td {padding: 20px 19px 20px 0;}
+.serversTbl tr td:nth-child(1){ text-align: left;padding-left: 30px;}
+.serversTbl tr th:nth-child(2),.serversTbl tr td:nth-child(2){ text-align: center;}
+.serversTbl tr th:nth-child(3), .serversTbl tr td:nth-child(3){ text-align: right;}
+.serversTbl tr th:first-child { text-align: left;padding-left: 10px;}
+.serversTbl tr:hover { background: #f0f3f4;}
+.serversTbl tr td span.alert {
+    color: #ea151d;
+}
+
+
+.alertWrap { height:220px;overflow: auto;width: 100%;}
+.serversListTbl { width: 100%;}
+.serversListTbl tr th,.serversListTbl tr td { border-right: none;border-bottom: 1px solid #CCCCCC;}
+.serversListTbl tr th {  padding: 20px 19px 20px 0;font-weight: bold;}
+.serversListTbl tr td {padding: 20px 19px 20px 0;}
+.serversListTbl tr td:nth-child(1){ text-align: left;padding-left: 30px;}
+.serversListTbl tr th:nth-child(2),.serversListTbl tr td:nth-child(2){ text-align: center;}
+.serversListTbl tr th:nth-child(3), .serversListTbl tr td:nth-child(3){ text-align: right;}
+.serversListTbl tr th:first-child { text-align: left;padding-left: 10px;}
+.serversListTbl tr:hover { background: #f0f3f4;}
+.alertAlign {width: 200px; word-break: break-all;}
+.serversListTbl tr td span.alert {
+    color: #ea151d;
 }
 
 .searchLeft {
@@ -1082,22 +1126,47 @@ a.setVal {
         color: #fff;
     }
 
-ul.servers-list li.active {
-    background-position: 4px -298px;
+
+table.serversTbl tr td.active, table.serversListTbl tr td.active {background-image: url(images/servIcons.png) !important;
+    background-repeat: no-repeat;}
+
+table.serversTbl tr td.joining{background-image: url(images/servIcons.png) !important;
+    background-repeat: no-repeat;}
+
+table.serversTbl tr td.pauseMonitoring {background-image: url(images/pauseMonitoring.png) !important;
+    background-repeat: no-repeat;}
+
+.alertIconServ{background-image: url(images/alertServ.png) !important;
+    background-repeat: no-repeat;}
+
+
+table.serversTbl tr td.pauseActiveMonitoring {
+    background-image: url(images/pauseMonitoring.png) !important;
+    background-repeat: no-repeat;
+    background-color: #f0f3f4;
 }
 
-ul.servers-list li.pauseMonitoring {
-    background-position: 4px -1458px;
+table.serversTbl tr td.active{
+    background-position: 5px 17px;
 }
 
-ul.servers-list li.pauseActiveMonitoring {
-    background-position: 4px -1458px;
+table.serversListTbl tr td.active {
+    background-position: 5px 20px;
 }
 
-ul.servers-list li.joining {
-    background-position: 2px -350px;
+table.serversTbl tr td.pauseMonitoring {
+    background-position:5px 17px;
+}
+
+table.serversTbl tr td.pauseActiveMonitoring {
+    background-position: 5px 17px ;
+}
+
+table.serversTbl tr td.joining {
+    background-position:5px 17px ;
     color: #a3a3a3;
 }
+.alertIconServ {background-position:0 1px;text-indent: 20px;line-height: 17px;}
 
 ul.servers-list li:hover {
     background-color: #f0f3f4;
@@ -1106,16 +1175,25 @@ ul.servers-list li:hover {
 ul.servers-list li.monitoring {
     background-color: #f0f3f4;
 }
+table.serversTbl tr.serverActive {
+     background-color: #f0f3f4;
 
+}
     ul.servers-list li.monitoring a {
         font-weight: bold;
         color: #76bd1d;
+
     }
+
+    .serverNameAlign {float: left; word-break: break-all;}
+
 
 ul.servers-list li span.memory-status {
     float: right;
     color: #111;
+    margin-top: 4px;
 }
+
 
 ul.servers-list li span.alert {
     color: #ea151d;
@@ -1133,7 +1211,7 @@ ul.servers-list li a {
 
 .server-info-heading {
     margin-bottom: 15px;
-    background: #f0f3f4;
+    background: #dee0e0;
     font-weight: bold;
     min-height: 50px;
     line-height: 50px;
@@ -1144,6 +1222,8 @@ ul.servers-list li a {
         display: block;
         padding-left: 10px;
     }
+    .server-info-heading .servIp{ float: left;margin-left: 34%;}
+    ul.servers-list li span.servIpNum { float: left;margin-left: 15%;margin-top: 4px;}
 
     .server-info-heading .memory-use {
         float: right;
@@ -1301,8 +1381,8 @@ ul.catalogNav {
     border-top: none;
 }
 
-tr.trLicenseInfo td {
-    border: none !important;
+td.trLicenseInfo{
+    padding-top: 20px!important;
 }
 
 
@@ -1374,7 +1454,7 @@ a.icon-document {
         color: #76bd1d;
     }
 
-#schema, #sqlQuery, #admin {
+#schema, #sqlQuery, #admin, #dr {
     display: none;
 }
 
@@ -1457,6 +1537,12 @@ table.size-summary-table {
     width: 100%;
 }
 
+table.cluster-config-table {
+    border-left: 1px solid #cccccc;
+    border-right: 1px solid #cccccc;
+    width: 80%;
+}
+
 input.count-input {
     width: 100px;
     text-align: right;
@@ -1515,6 +1601,18 @@ input.count-input {
         background-position: 3px -834px;
     }
 
+.timeOutCross {color: #888;
+    cursor: pointer;
+    padding: 5px;
+    background-position: 0 -795px;
+    height: 15px;
+    width: 15px;
+   }
+
+.timeOutCross:hover {
+    background-position:0 -833px;
+}
+
 .popup_back {
     cursor: pointer;
     background-color: #222;
@@ -1549,6 +1647,12 @@ div.popup {
     overflow: auto;
     line-height: 18px;
 }
+@media screen and (-webkit-min-device-pixel-ratio:0) {
+     ::i-block-chrome,.overlay-content  {
+     width: 450px;
+    }
+
+}
 
 .graphPop {
     height: 110px;
@@ -1558,6 +1662,11 @@ div.popup {
 .overlay-btns {
     text-align: right;
     padding: 5px 20px 20px 20px;
+
+}
+.overlayShutdownBtn {
+    text-align: center;
+    padding: 5px 0 24px 0;
 }
 
 
@@ -1567,6 +1676,7 @@ div.popup {
     margin-bottom: 5px;
     height: 30px;
     line-height: 35px;
+
 }
 
     .user-preferences li.last {
@@ -1578,7 +1688,7 @@ div.popup {
     .user-preferences li input[type='checkbox'] {
         float: right;
         position: relative;
-        top: 8px;
+        top: 10px;
     }
 
 .msg-pop-info {
@@ -1667,7 +1777,7 @@ div.popup {
 /*navigation responsive*/
 
 #nav {
-    position: absolute;
+    /*position: absolute;*/
     left: 250px;
     z-index: 999;
     display: block;
@@ -1738,10 +1848,11 @@ ul.topRightList li a {
 
 .btnStudio {
     background: #AA1F2F;
-    padding: 5px 10px;
+    padding: 5px 10px 4px 10px;
     border: 1px solid #AA1F2F;
     color: #FFFFFF;
     cursor: pointer;
+
 }
 
     .btnStudio:hover {
@@ -1749,6 +1860,19 @@ ul.topRightList li a {
         border: 1px solid #76BD1D;
         color: #FFFFFF;
     }
+
+ .plusBtn {
+          font-size: 20px;
+          background:#ccc;
+          border:none;
+          color:#222;
+          font-weight:normal;
+          padding: 1px 10px;
+          margin: 6px 3px 5px 3px;
+          border-radius: 12px 2px 0 0;
+            }
+.plusBtn:hover {background:none; border:none;}
+
 
 .contentQuery {
     background: #CCCCCC;
@@ -1759,22 +1883,26 @@ ul.topRightList li a {
     background: #FFFFFF;
     padding: 15px;
 }
+.queryResultStyle {margin-top:3px;position: relative;top:4px;}
 
 .blockWrapper {
     margin-bottom: 20px;
+    margin-top:3px;
+
 }
 
 .objectExplorer {
     float: left;
-    width: 28%;
-    padding: 15px 1%;
+    /*width: 28%;*/
+    width:300px;
+    padding: 13px 1%;
     background: #fff;
     position: relative;
 }
 
 .queryInput {
     float: right;
-    width: 68%;
+    width: 68.5%;
 }
 
 #queryForm {
@@ -1782,12 +1910,13 @@ ul.topRightList li a {
 }
 
 .queryInput .query textarea {
-    width: 98%;
+    width: 100%;
     padding: 1%;
-    resize: none !important;
+    /*resize: none !important;*/
     height: 215px;
     border: 1px solid #CCCCCC;
-    line-height: 25px;
+    /*line-height: 25px;*/
+    resize:vertical;
     font-size: 18px;
 }
 
@@ -1800,20 +1929,26 @@ ul.topRightList li a {
 }
 
 .btnList {
-    margin: 10px 0 0 0;
+    margin-top:10px;
     padding: 0;
-    float: right;
+    /*float: right;*/
 }
 
     .btnList li {
         margin: 0;
-        padding: 0 10px 0 0;
+        padding: 0 10px 1px 0;
         float: left;
     }
 
 .blockWrapper h1.theHeading {
+    margin: 0 0 10px 0 !important;
+    padding: 17px 20px 9px 0;
+    background-color: #FFFFFF;
+    border-bottom:1px solid #ccc;
+    }
+.blockWrapper h1.theHeadingQuery {
     margin: 0 0 1.5px 0 !important;
-    padding: 17px 20px 17px 45px;
+    padding: 0px 0px 8px 2px;
     background-color: #FFFFFF;
     -webkit-box-shadow: 0px 6px 7px -5px #ccc;
     -moz-box-shadow: 0px 6px 7px -5px #ccc;
@@ -1821,10 +1956,9 @@ ul.topRightList li a {
 }
 
 .queryStatus {
-    padding: 10px;
-    background: #f2f2f2;
-    border-bottom: 1px solid #ccc;
-    color: #333;
+    padding:12px 0 0 10px;
+    color: #aaa;
+
 }
 
 .ui-accordion {
@@ -1838,11 +1972,11 @@ ul.topRightList li a {
     }
 
 h3.ui-accordion-header {
-    padding: 8px 5px 8px 23px;
+    padding: 8px 5px 8px 23px!important;
     margin-bottom: 5px !important;
-    font-weight: bold;
-    font-size: 12px;
-    border-bottom: 1px solid #f2f2f2;
+    font-weight: bold!important;
+    font-size: 12px!important;
+    border-bottom: 1px solid #f2f2f2!important;
     width: auto;
     white-space: nowrap;
     overflow: hidden;
@@ -1864,13 +1998,13 @@ h3.ui-accordion-header {
     height: auto !important;
 }
 
-h3.ui-accordion-header, h3.ui-accordion-header-active, h1.icon-query, h1.icon-queryResult {
-    background-image: url(images/voltdb-icon-sprite.png);
-    background-repeat: no-repeat;
+h3.ui-accordion-header, h3.ui-accordion-header-active, .icon-query/* h1.icon-queryResult*/ {
+    background-image: url(images/voltdb-icon-sprite.png)!important;
+    background-repeat: no-repeat!important;
 }
 
 h3.ui-accordion-header {
-    background-position: 8px -1185px;
+    background-position: 8px -1185px!important;
     background-color: #f2f2f2;
 }
 
@@ -1879,9 +2013,9 @@ h3.ui-state-hover {
 }
 
 h3.ui-state-active {
-    background-position: 8px -1214px;
+    background-position: 8px -1214px!important;
     margin-bottom: 0;
-    background-color: #76bd1d;
+    background-color: #76bd1d!important;
     color: #fff;
 }
 
@@ -1889,13 +2023,68 @@ h3.ui-state-active {
         background-color: #76bd1d;
     }
 
-h1.icon-query {
-    background-position: 15px -1252px;
+.icon-query {
+    background-position: 15px -1254px;
 }
 
-h1.icon-queryResult {
-    background-position: 15px -1039px;
+/*h1.icon-queryResult {
+    background-position: 0px -1034px;
+    padding-left:30px!important;
+}*/
+.icon-queryResult { float:left;
+    background-image: url(images/icon_query_result.jpg);
+    background-repeat: no-repeat; width:25px; height:25px; margin:0 5px 0 0;}
+/***********************************DR page*******************************/
+#containerMain1 { background:#fff; padding:10px;}
+.DRContantWrap {background:#ccc; padding:10px; display:block;}
+.contentDR {
+    margin: 0 0 20px 0;
+    padding:0 20px;
+
+
 }
+.drHead { background-color:#fff; padding:5px 20px 20px 37px; border:none;  }
+.drBody { padding:0;}
+.DRHeaderName { position:relative;top:5px;}
+.iconDRDatabase {float: left; width: 20px; margin: 0 0 0 12px; position: relative;top: 5px;}
+.DRHeaderWrap {float:left;}
+
+/*********************jquery ui class override*********************/
+#accordionProcedures .ui-state-default, #accordionTable .ui-state-default,#accordionStreamedTable .ui-state-default,
+#accordionViews .ui-state-default,.ui-widget-content .ui-state-default, .ui-widget-header .ui-state-default {
+
+border:none!important;
+border-radius:0;
+background:#e0e0e0;
+border:1px solid #FFF;
+
+}
+#accordionProcedures .ui-state-default .ui-icon, #accordionTable .ui-state-default .ui-icon,
+#accordionStreamedTable .ui-state-default .ui-icon, #accordionViews .ui-state-default .ui-icon { background-image:none!important;}
+.ui-accordion .ui-accordion-content { padding:10px!important; border-radius:none!important;}
+
+.close-tab{
+    float:left;
+    color:#222;
+}
+
+
+#worktabs .ui-state-active a, .ui-state-active a:link, .ui-state-active a:visited { color:#FFF; background:#76BD1D; padding:.5em .2em; border-radius:12px 2px 0 0;}
+#worktabs .ui-state-active, .ui-widget-content .ui-state-active, .ui-widget-header .ui-state-active {background:#76BD1D;}
+#worktabs .ui-tabs-nav { padding:1px 0 0px 3px !important; border-radius:0;}
+#worktabs .ui-tabs-nav li { border:1px solid #CCC!important; margin-top:2px; border-radius:12px 2px 0 0;}
+#worktabs .ui-tabs-panel {padding:0 3px; position:relative; top:-1px; }
+#worktabs .ui-tabs-nav .ui-tabs-anchor {font-size: 12px; font-weight: bold;}
+#worktabs ul li#liNewQuery {background: #ccc; border:none!important; padding-top:1px;border-radius: 12px 2px 0 0;}
+#worktabs ul li a.ui-tabs-anchor { padding:.5em .2em;}
+.workspace {height:100%}
+.workspace .ui-tabs .ui-tabs-nav li { margin:1px 2px 0 0;}
+.workspace .ui-tabs .ui-tabs-nav li.ui-tabs-active { padding-bottom:0;}
+
+.disableCloserTab { opacity:0.5;}
+#queryError span.error{ color: #c70000; font-size:13px; }
+
+/*********************jquery ui class override ends*********************/
 
 .exportType {
     float: right;
@@ -1910,8 +2099,9 @@ h1.icon-queryResult {
 
 .resultHtml, .resultCsv, .resultMonospace {
     width: 100%;
+    height:85%;
     overflow: auto;
-    height: 400px;
+
 }
 
 .queryResult pre {
@@ -2033,7 +2223,7 @@ right: -31px!important;
 h2.help {
     font: bold 15px Arial, Helvetica, sans-serif;
     padding-bottom: 10px;
-    border-bottom: 1px dashed #ddd;
+    /*border-bottom: 1px dashed #ddd;*/
 }
 
 .VDBMonitorHelp p {
@@ -2075,6 +2265,10 @@ ul.helpSchemaList {
         font: 15px Arial, Helvetica, sans-serif;
     }
 
+.tableL2 {margin-bottom: 10px !important;}
+.primaryrow2 td:nth-child(2){
+     word-break: break-all;}
+
 .VDBQueryHelp {
 }
 
@@ -2093,6 +2287,7 @@ ul.helpSchemaList {
 
 /**admin**/
 .adminIcons,
+.sqlSetting,
 .pause,
 .resume,
 .save,
@@ -2110,9 +2305,9 @@ ul.helpSchemaList {
 .edit,
 .editDisabled,
 .arrow,
-.labelCollapsed,
-.labelExpanded,
-a.restoreConfirmationDisable, .securityDelete, .exportDelete, .plusAdd {
+/*.labelCollapsed,*/
+/*.labelExpanded,*/
+a.restoreConfirmationDisable, .securityDelete, .exportDelete, .plusAdd,.deleteSmall {
     background-image: url(images/admin-icons.png);
 }
 
@@ -2120,12 +2315,14 @@ label.error {
     color: #c70000;
     width: auto;
     display: block;
-    line-height: 0px;
+    line-height: 15px;
     font-size: 11px;
-    padding: 10px 5px 0 7px;
+    /*padding: 10px 5px 0 7px;*/
+    padding: 10px 5px 0 0;
     margin: 0 0 6px 0;
-    height: 10px;
+    height:auto;
 }
+/*.tdSnapshotFrequency label.error{line-height:15px; height:auto;}*/
 
 .adminWrapper {
     margin: 0;
@@ -2235,7 +2432,7 @@ ul.adminClusterList li a.stop {
 
 ul.adminClusterList li a.shutdown {
     display: inline-block;
-    background-position: -965px -56px;
+    background-position: -165px -56px;
     width: 40px;
     height: 36px;
 }
@@ -2306,6 +2503,7 @@ ul.adminClusterList li a.shutdown {
     float: left;
 }
 
+
 .serverName { /*cursor:pointer; float:left; background:#D0D2D2; padding:8px; font-weight:bold;*/
     background: none repeat scroll 0 0 #d0d2d2;
     cursor: pointer;
@@ -2316,11 +2514,18 @@ ul.adminClusterList li a.shutdown {
     padding: 0 0 0 8px;
 }
 
+
+
 .setServer { /*float:left;*/
     float: right;
 }
 
 .adminIcons { /*background-position:-225px -13px; width:30px; height:28px;*/
+    background-position: -225px -14px;
+    height: 28px;
+    width: 30px;
+}
+.sqlSetting {
     background-position: -225px -14px;
     height: 28px;
     width: 30px;
@@ -2425,6 +2630,16 @@ ul.adminClusterList li a.shutdown {
     height: 17px;
     position: relative;
     top: 5px;
+
+}
+
+.deleteSmall {
+    background-position: -388px -103px;
+    width: 31px;
+    height: 17px;
+    position: relative;
+    top: 8px;
+    display: inline-block;
 }
 
 .edit {
@@ -2481,6 +2696,11 @@ ul.adminClusterList li a.shutdown {
     font-weight: normal;
 }
 
+.serNameTruncate{
+
+    word-break: break-all;
+}
+
 .propertiesTbl {
     margin: 0 !important;
     padding: 0 !important;
@@ -2512,13 +2732,15 @@ ul.adminClusterList li a.shutdown {
 }
 
 .labelCollapsed {
-    background-position: -468px -11px;
+    /*background-position: -468px -11px;*/
     padding-left: 22px;
+    background: url("images/up.png")0 1px no-repeat;
 }
 
 .labelExpanded {
-    background-position: -468px -55px;
+    /*background-position: -468px -55px;*/
     padding-left: 22px;
+    background: url("images/down.png")0 1px no-repeat;
 }
 
 .adminTbl2 tr td:nth-child(1) {
@@ -2577,6 +2799,11 @@ input.exitableTxtBx {
 
 input.exitableFilePrefix {
     width: 155px; /*position:relative; top:6px;*/
+    padding: 2px 3px;
+}
+
+input.exitableMemoryLimit {
+    width: 90px; /*position:relative; top:6px;*/
     padding: 2px 3px;
 }
 
@@ -2660,6 +2887,12 @@ input.exitableFilePrefix {
     border: 1px solid #CCCCCC;
 }
 
+.serverHeader { background: #dee0e0; }
+.serverHeader:hover  {
+    background: #dee0e0 !important;
+}
+tr.serverHeader:hover {background: #dee0e0;}
+
     .tblshutdown tr:hover, .tblshutdown tr.activeHostMonitoring {
         background: #F0F3F4;
     }
@@ -2667,7 +2900,8 @@ input.exitableFilePrefix {
         .tblshutdown tr.activeHostMonitoring td a {
             color: #76bd1d;
         }
-
+        .tblshutdown tr th {  padding: 20px 19px 20px 0;font-weight: bold;}
+        .tblshutdown tr th:first-child { text-align: left;padding-left: 10px;}
 
     .tblshutdown tr td {
         border: none;
@@ -2733,7 +2967,7 @@ td.pauseCursorDefault a {
 }
 
 #serverListWrapperAdmin {
-    padding: 15px 16px 0 15px;
+    /*padding: 15px 16px 0 15px;*/
 }
 
     #serverListWrapperAdmin table.tblshutdown {
@@ -2744,7 +2978,7 @@ td.pauseCursorDefault a {
     font-weight: bold;
 }
 
-td.heartbeattd, td.securitytd, td.queryTimeOut, td.tdSnapshotPrefix, td.tdSnapshotFrequency, td.tdSnapshotRetained, td.snapshottd, td.tdDrConfig {
+td.heartbeattd, td.securitytd, td.queryTimeOut, td.tdSnapshotPrefix, td.tdSnapshotFrequency, td.tdSnapshotRetained, td.snapshottd, td.tdDrConfig, td.memorySize , td.diskSize{
     position: relative;
 }
 
@@ -2822,12 +3056,12 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit {
 }
 
 .overviewTbl {
-    overflow: auto;
+    /*overflow: auto;*/
     width: auto;
 }
 
     .overviewTbl table td {
-        white-space: nowrap !important;
+       /*white-space: nowrap !important;*/
     }
 
 .confirmationHeight {
@@ -2965,7 +3199,7 @@ a.restoreBtn {
 }
 
 .securityDelete {
-    background-position: -1221px -12px;
+    background-position: -421px -12px;
     width: 25px;
     height: 20px;
     position: relative;
@@ -3092,10 +3326,18 @@ a.restoreBtn {
         .configurTbl tr td input[type="text"] {
         }
 
+
+.configureImportTbl tr td{
+    border: none;
+    padding: 5px 2px;
+}
 .propertiesAlign {
     margin: 10px 0 0 0;
     border-top: 1px solid #CCCCCC;
     padding: 20px 0 10px 0;
+}
+.featuresAlign {
+   padding: 0 0 10px 0;
 }
 
 .addConfigProperWrapper {
@@ -3184,6 +3426,12 @@ a.drTblBtn {
     top: 5px;
 }
 
+.loadImport {
+    position: relative;
+    left: 3px;
+    top: 5px;
+}
+
 .loadExportConfig {
     margin: 0 0 0 29%;
 }
@@ -3210,7 +3458,7 @@ table.tblPopup {
 /****DR *******/
 
 .drWrapper {
-    margin: 20px 0 0 0;
+    margin: 0 0 0 0;
 }
 
     .drWrapper .content {
@@ -3376,7 +3624,7 @@ tr.drSubSection td {
 
     .tabs-filter-wrapperDR .filter {
         float: left;
-        width: 40%;
+        width: 45%;
     }
 
 .drTitle {
@@ -3527,6 +3775,247 @@ a:hover.changePsd {
     height: 364px;
 }
 
+/*add idsk limit*/
+table.diskLimitTbl tr td { border: none;}
+
+/*********overlapping nv.d3.css*********/
+.nvtooltip{border: 1px solid #CCCCCC !important;}
+
+
+svg.nvd3-svg { width:95% !important; }
+.nvtooltip table thead tr:first-child{ border-bottom: 1px solid #CCCCCC;text-align: center;}
+.nvtooltip table tr td { border: none !important;}
+
+
+/**************************QueryTimeOut*************************/
+.queryHeadName { float:left; width:100px; height:22px; text-indent:40px; padding-top:17px;}
+.queryTimeoutName {
+    background: #d0d2d2 none repeat scroll 0 0;
+    cursor: pointer;
+    float: left;
+    font-weight: bold;
+    height: 27px;
+    line-height: 28px;
+    padding: 2px 0 0 8px;
+}
+.queryTimeoutName span { font-weight:normal; font-size:13px;}
+
+#queryTimeoutConfigControls { width:345px;}
+.queryTimeout { border:1px solid #ccc; margin:20px;}
+.queryTimeout p { padding:10px 5px;border-top:1px solid #ccc;}
+.QueryTbl {}
+.QueryTbl tr td {
+    border:none;
+    padding: 8px 5px 10px 5px;
+    text-align: left;
+}
+.QueryTbl tr td input[type="text"] { width:125px;}
+
+.queryTimeOutLabel span.qtmText { font-size: 12px; font-weight: normal; margin-right: 5px; }
+.queryTimeOutLabel {
+    background: none repeat scroll 0 0 #d0d2d2;
+    cursor: default;
+    float: left;
+    font-weight: bold;
+    height: 28px;
+    line-height: 28px;
+    padding: 0 0 0 8px;
+}
+.setqueryTimeOut {
+    float: right;
+}
+
+label.errorTimeOut {
+    color: #c70000;
+    width: 115px;
+    display: block;
+    line-height: 12px;
+    font-size: 11px;
+    /* padding: 10px 5px 0 7px; */
+    padding: 10px 5px 0 0;
+    margin: 0 0 22px 0;
+    height: 10px;
+}
+.clsQueryWrapper {float:right;}
+.queryTimeClass {float:left;}
+.clsQueryBtns { float:right;}
+.sliderGraph { float:left; margin:8px 30px 0 0;}
+.labelSlider { float:left; position:relative;right:208px;}
+@-moz-document url-prefix() {.labelSlider {right:214px; top:-2px;}}
+.labelSlider label {font-size: 14px;}
+.sliderGraph .ui-slider .ui-widget-header { background:#ccc}
+.sliderGraph .ui-slider .ui-slider-handle {outline:none; border-radius:1px; top:-3px; border:1px solid #ccc!important; }
+.sliderMain { position:relative; top:3px;}
+.downloadBtnChart { float: right;margin-right: 10px;position: relative; top: -4px;}
+#timeInterval {border:0; color:#222; font-weight:bold; width:24px;}
+@-moz-document url-prefix() {#timeInterval {width:28px;}}
+.errorMsgLocalStorageFull { background:#fff; padding:10px 20px; margin-bottom:10px; position:relative;}
+.errorMsgLocalWrapper{ float:left; padding-right:5px; width:20px;}
+.textMsgLocalWrapper { float:left; width:95%;}
+.textMsgLocalWrapper p {color:#ff0000; font-weight:bold; position:relative; top:2px; font-size:13px;}
+.crossIconMsg { }
+/*.sliderPop {margin-bottom: 10px;}
+.sliderControl { margin:0; padding:0;}
+.sliderControl .ui-slider .ui-slider-handle {outline:none; border-radius:1px; border:1px solid #ccc!important; }
+.slideContent { float:left;}
+.slideContent input[type="text"] { width:22px;}
+.sliderMain { float:left; width:58%; margin:0 0 0 10px;}
+fieldset { border:1px solid #ccc; padding:20px;}
+.chartContent {float: left; width: 34px; margin: 68px 0 0 27px;}
+.chartDataContent { float: right;padding: 0 45px 0 0;width: 240px;}
+.chartDataContent ul li { line-height:20px;}
+.chartDataContent input[ type="checkbox"] { position:relative;top:2px;}
+.chartDownloadBtn{text-align: right;padding: 5px 0px 0px 20px;}*/
+ .wordBreak{word-break: break-all; line-height:22px!important;}
+
+/********************jquery us css override*****************/
+#worktabs .ui-widget-header { border:none;}
+/********************jquery us css override end*****************/
+.errorHeightFix { line-height:12px!important; position:relative; top:-6px;}
+
+.formatImport {
+    position: relative;
+    width: 175px;
+    margin-bottom: 0;
+}
+
+.drop-down-list {
+    background: #fff;
+    border: 1px solid #ccc;
+    border-top: none;
+    position: absolute;
+    left: 0;
+    top: 30px;
+    width: 173px;
+    display: none;
+}
+.input-group {
+    position: relative;
+    display: table;
+    border-collapse: separate;
+}
+.formatImport > .input-group > .formatHeight {
+    height: 30px;
+    border: 1px solid #ccc;
+    width: 140px;
+    padding: 0 0 0 5px;
+}
+.input-group-addon:last-child {
+    border-left: 0;
+}
+.input-group-addon {
+    padding: 6px 9px;
+    font-size: 14px;
+    font-weight: normal;
+    line-height: 1;
+    color: #555;
+    text-align: center;
+    background-color: #eee;
+    border: 1px solid #ccc;
+    }
+.input-group-addon, .input-group-btn {
+    width: 1%;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+.input-group-addon, .input-group-btn, .input-group .form-control {
+    display: table-cell;
+}
+.downImg { background: url(images/drop_down_arrow.png) no-repeat; width:16px; height:16px; display:block;}
+
+.drop-down-list li {
+    padding: 6px 10px;
+}
+.drop-down-list li:hover {
+    background-color: #3A89FF;
+    color: #fff;
+}
+
+/****split css****/
+
+.split {
+   -webkit-box-sizing: border-box;
+      -moz-box-sizing: border-box;
+           box-sizing: border-box;
+
+   overflow-y: hidden;
+   overflow-x: auto;
+ }
+ @-moz-document url-prefix() {
+ split { overflow-y:auto;}
+ }
+ .tabScroller{height:88%; margin-bottom:0;}
+
+ .content {
+   border: 1px solid #C0C0C0;
+   box-shadow: inset 0 1px 2px #e4e4e4;
+   background-color: #fff;
+ }
+
+ .gutter {
+   background-color: transparent;
+
+   background-repeat: no-repeat;
+   background-position: 50%;
+ }
+
+ .gutter.gutter-horizontal {
+   cursor: col-resize;
+   background-image: url(images/vertical.png);
+   background-color:#eee;
+ }
+
+ .gutter.gutter-vertical {
+   cursor: row-resize;
+   background-image: url(images/horizontal.png);
+   background-color:#eee;
+   margin-top:15px;
+ }
+
+ .split.split-horizontal, .gutter.gutter-horizontal {
+   height:96.5%;
+   float: left;
+ }
+
+
+ .querybox {
+    -moz-appearance: textfield-multiline;
+    -webkit-appearance: textarea;
+    border: 1px solid #ccc;
+    font: medium -moz-fixed;
+    font: -webkit-small-control;
+    height: 170px;
+    overflow: auto;
+    padding: 2px;
+    resize: vertical;
+    outline:none;
+    white-space: pre;
+    font-size: 18px;
+    font-family: Arial,Helvetica,sans-serif;
+
+}
+.workspace .ui-widget-content {border:none;}
+/*.queryWrapper {border:1px solid #ccc;}*/
+.queryWrapper { height:calc(100% - 85px)}
+
+.verticalWrapper{
+height: 90%;
+ /*height:calc(95% - 92px);*/
+}
+
+
+
+/**********************Shutdown ******************************/
+ul#shutdownMsg{ margin:0; padding:0;}
+ul#shutdownMsg li{ font-size:13px; line-height:20px; }
+.shutdownNormal{ position:relative; padding-right:23px; top:2px;}
+.shutdownSuccess{ position:relative; padding-right:5px; top:2px;}
+.shutdownLoader{ position:relative; padding-right:5px; top:4px;}
+.shutdownFailure{ position:relative; padding-right:5px; top:4px;}
+.shutdownErrorMsg {  padding:0 20px 15px 20px;color:#c70000; line-height:15px; width:400px;}
+.shutdownErrorMsg h2 { font-weight:bold; font-size:13px;}
+.shutdownRetryMsg { padding: 0 0 11px 0; text-align: center;}
+
 
 
 /*********************************************media Qu********************/
@@ -3550,6 +4039,41 @@ a:hover.changePsd {
     ul.topRightList li {
         padding:12px 0 0 2px;
     }
+	.downloadConfig { margin-bottom:5px;}
+
+
+}
+
+@media (min-width: 320px) and (max-width:360px) {
+
+
+      .server-info-heading .server {
+  float: left;
+  display: block;
+  padding: 7px 0 0 10px;
+  width: 30px;
+  line-height: 18px;
+}
+
+    .server-info-heading .memory-use {
+  float: right;
+  display: block;
+  padding: 6px 28px 0 0;
+  width: 30px;
+  line-height: 18px;
+}
+
+    .server-info-heading .servIp{  margin-left: 25%;
+  width: 30px;
+  line-height: 18px;
+  margin-top: 5px;}
+    ul.servers-list li span.servIpNum {margin-left: 10%;}
+    /*.serverNameAlign { width: 22%;}*/
+	.headLeft .logo{ margin-right:0;}
+
+
+
+
 }
 @media (max-width: 360px) {
     .headerAdminContent {
@@ -3563,6 +4087,7 @@ a:hover.changePsd {
     ul.drList li {
         margin-left: 0;
     }
+    .chartLeft {float:left; width: 146px; position: relative;top: -10px;}
 }
 
 @media (max-width: 479px) {
@@ -3576,7 +4101,7 @@ a:hover.changePsd {
     }
 
     .displayPre {
-        height: 115px;
+        height: 120px;
     }
 
     ul.rightShowhideList {
@@ -3604,7 +4129,7 @@ a:hover.changePsd {
     }
 
     .tabs-filter-wrapperDR {
-        width: 250px;
+        width: 250px!important;
     }
 
 
@@ -3620,19 +4145,55 @@ a:hover.changePsd {
         position: relative;
         right: 10px;
     }
+	#queryTimeoutConfigControls { width:305px;}
+	.QueryTbl tr td input[type="text"] { width:125px;}
+	label.errorTimeOut { padding-bottom:20px;}
+	.btnList { float:none; margin-left:10px}
+	.btnList li { float:none;}
+	.btnStudio { width:100%;margin-top:2px;}
+	.queryHeadName { float:none;}
+	.queryTimeOutLabel { width:86%; margin-right:2px;}
+
+
 }
+@media (max-width: 480px) {
+        .split {
+        -webkit-box-sizing:content-box;
+        -moz-box-sizing: content-box;
+        box-sizing: content-box;
+        overflow-x: hidden;
+        overflow-y: auto;}
+        .resultHtml { height:65%;}
+        .queryWrapper {border:1px solid #ccc;margin: 10px 0 0 0; height:calc(60% - 85px)}
+        .blockWrapper h1.theHeading { border:none;padding:17px 20px 30px 0;}
+        .queryStatus{ background:#f2f2f2;float:none;padding: 10px;border-bottom: 1px solid#ccc;color: #333;margin-top: 18px;}
+        .exportType select {margin-top: 5px;}
+
+    }
+
+
 
 @media (min-width: 639px) and (max-width:640px) {
     #serverConfigAdmin {
         top: 100px;
+    }
+}
+
+    @media (min-width: 541px) and (max-width:700px) {
+        .mainContentAlert {
+            width:77%
+        }
     }
 
     .tabs-filter-wrapperDR {
         width: 560px;
     }
     /*admin*/
+    .server-info-heading .servIp {margin-left: 10%;margin-top: 0;}
+    ul.servers-list li span.servIpNum {margin-left: 8%;}
+    /*.serverNameAlign { width: 26%;}*/
 
-}
+
 
 @media (max-width: 699px) {
     .logHeight {height: 364px;}
@@ -3672,6 +4233,7 @@ a:hover.changePsd {
     }
 
     #nav {
+		position:absolute;
         width: 100%;
         top: 65px;
         left: 0;
@@ -3901,6 +4463,13 @@ a:hover.changePsd {
     .drHeightIndividual {
         min-height: 150px;
     }
+
+}
+@media (max-width: 1024px) {
+        .sliderGraph,.labelSlider { float:none;}
+        .labelSlider { right:0;}
+        .sliderMain { margin-bottom:10px;}
+
 }
 
 @media (min-width: 480px) and (max-width:540px) {
@@ -3955,12 +4524,18 @@ a:hover.changePsd {
     }
 
     .partitionHeight {
-        height: 350px;
+        height: 350px!important;
         margin-top: 30px;
     }
     .logHeight {
         height: 364px;
     }
+    .server-info-heading .servIp {margin-left: 18%;}
+    ul.servers-list li span.servIpNum {margin-left: 6%;}
+    .tblshutdown tr th {
+        padding: 20px 19px 20px 8px;
+    }
+
 }
 
 @media (min-width: 320px) and (max-width: 479px) {
@@ -3968,19 +4543,18 @@ a:hover.changePsd {
         width: 100%;
         position: absolute;
         right: -1px;
-        top: 205px;
+       /* top: 205px;*/
+	   top:151px;
     }
 
     .partitionHeight {
-        height: 300px;
+        height: 300px!important;
         margin-top: 30px;
     }
     .logHeight {
         height: 330px;
 
     }
-
-
 
     .rightShowhideList li a {
         margin: 0 0 0 46px;
@@ -4027,8 +4601,8 @@ a:hover.changePsd {
     }
 
     .overviewTbl {
-        overflow: auto;
-        width: auto;
+         overflow: auto;
+       width: auto;
     }
 
     .adminLeft {
@@ -4090,6 +4664,12 @@ a:hover.changePsd {
     .refreshBtn {
         margin-bottom: 10px;
     }
+	.menuHome ul li:hover ul{ position:absolute;}
+	.menuHome ul li a{padding: 3px 2px 5px 15px;}
+	.clsQueryWrapper { float:none;}
+	.queryTimeClass { float:none;}
+	.clsQueryBtns { float:none;}
+
 }
 
 @media (min-width: 480px) and (max-width: 700px) {
@@ -4109,17 +4689,19 @@ a:hover.changePsd {
         width: 80%;
     }
 
-    /* .configWrapper {
-        width: 380px;
-    }*/
-    .popup_cont {
+     .configWrapper {
         width: 380px;
     }
+    /*.popup_cont {
+        width: 380px;
+    }*/
+
 }
 
 @media (width: 768px) {
     #nav {
         left: 180px;
+		position:absolute;
     }
 
     .userN {
@@ -4137,9 +4719,25 @@ a:hover.changePsd {
     .drHeightIndividual {
         min-height: 150px;
     }
+
+
 }
 
+@media (min-width: 768px) and (max-width: 800px) {
+     .server-info-heading .servIp{margin-left: 14%;}
+    ul.servers-list li span.servIpNum {margin-left: 3%;}
 
+
+}
+@media (min-width: 700px) and (max-width: 902px) {
+    .overviewTbl {
+    overflow: auto;
+    width: auto;
+}
+}
+@media (max-width: 629px) {
+.textMsgLocalWrapper { width:91%;}
+}
 
 @media (max-width: 980px) {
 
@@ -4162,7 +4760,7 @@ a:hover.changePsd {
 }
 
 @media (width: 320px) {
-    
+
 
     input.icon-search {
         width: 182px;
@@ -4193,7 +4791,7 @@ a:hover.changePsd {
     }
 
     .partitionHeight {
-        height: 300px;
+        height: 300px!important;
         margin-top: 75px;
     }
 }
@@ -4201,7 +4799,7 @@ a:hover.changePsd {
 
 @media (min-width: 300px) and (max-width:438px) {
     .partitionHeight {
-        height: 300px;
+        height: 300px!important;
     }
      .logHeight {
           height: 364px;
@@ -4225,14 +4823,19 @@ a:hover.changePsd {
         position: relative;
         top: -7px;
      }
+
+    .server-info-heading .servIp {
+  margin-left: 30%;
+}
+.refreshBtn { margin-bottom:10px;}
 }
 
 
 @media (min-width: 768px) and (max-width:1246px) {
     .partitionHeight {
-        height: 310px;
+        height: 310px!important;
     }
-     
+
 
     .drScroll {
         overflow: visible !important;
@@ -4242,6 +4845,7 @@ a:hover.changePsd {
 @media screen and (orientation:landscape) {
     .popup_cont {
         top: 5%;
+
     }
 }
 
@@ -4250,10 +4854,11 @@ a:hover.changePsd {
     .overlay-content { /*height: 150px;*/
         height: 20%;
     }
+    .overlayAlert {height: auto;}
 
     .graphPop {
         height: 110px;
-        margin-bottom: 20px;
+        margin-bottom: 10px;
     }
     /*.restoreInfo .overlay-content { height:200px;}
 		.restoreCont {height:200px;}*/
@@ -4274,6 +4879,10 @@ a:hover.changePsd {
     .configWrapper {
         height: 133px;
     }
+    .alertWrap {
+        height:100px;
+
+    }
 }
 
 @media (min-width: 480px) and (max-width: 1024px) and (orientation:landscape) {
@@ -4290,4 +4899,77 @@ a:hover.changePsd {
         height: 150px;
         overflow: auto;
     }
+
+    .alertWrap {
+        height:120px;
+
+    }
+    .split {
+        -webkit-box-sizing:content-box;
+        -moz-box-sizing: content-box;
+        box-sizing: content-box;
+        overflow-x: hidden;
+        overflow-y: auto;
+     }
+    .resultHtml { height:65%;}
+    .queryWrapper {margin: 10px 0 0 0; height:calc(95% - 85px)}
+    .blockWrapper h1.theHeading { /*border:none;*/}
+    /*.queryStatus{ background:#f2f2f2;float:none;padding: 10px;border-bottom: 1px solid#ccc;color: #333;margin-top: -6px;}*/
+    .exportType select {margin-top: 5px;}
+    .queryResultStyle {float:none;}
+    .textWritingArea { height:98%;}
+
 }
+
+@media (max-width:768px) {
+.split.split-horizontal, .gutter.gutter-horizontal{height:75%;}
+
+}
+
+/* ----------- iPad mini ----------- */
+
+
+@media only screen
+  and (min-width: 768px)
+  and (max-width: 1024px)
+   {
+  /*.queryStatus{ float: none;
+    padding: 25px 0 0 10px;
+    position: relative;
+    top: 6px;
+    right: 10px;}*/
+
+
+  }
+
+  @media only screen
+  and (min-width: 768px)
+  and (max-width: 1024px)
+  and (orientation:portrait)
+   {
+     #a{width:100% !important;}
+   }
+
+@media (width: 1024px)
+{
+/*.queryInput { width:580px!important; }*/
+.queryStatus { padding:30px 34px 0 0; float:none;}
+.blockWrapper h1.theHeading{ /*padding:0; */ }
+.queryResultStyle{position: relative;top: 17px;}
+.icon-queryResult {margin-top:13px;}
+.exportType select{margin-top:-3px;}
+#inputQuery{ height:102.8%!important;}
+
+
+}
+
+@media only screen
+  and (min-width: 768px)
+  and (max-width: 1024px)
+  and (orientation:landscape)
+   {
+     .split.split-horizontal{height:99% !important;}
+   }
+
+
+

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -42,13 +42,12 @@ public class NestLoopPlanNode extends AbstractJoinPlanNode {
                                      DatabaseEstimates estimates,
                                      ScalarValueHints[] paramHints)
     {
-        // This method doesn't do anything besides what the parent method does,
-        // but it is a nice place to put a comment.
-        // Since both children's' cost get included in the costing, this
-        // already mirrors the kind of estimating we do in a nestloopjoin.
 
         m_estimatedOutputTupleCount = childOutputTupleCountEstimate;
-        m_estimatedProcessedTupleCount = childOutputTupleCountEstimate;
+        // Discount outer child estimates based on the number of its filters
+        assert(m_children.size() == 2);
+        m_estimatedProcessedTupleCount = discountEstimatedProcessedTupleCount(m_children.get(0)) +
+                m_children.get(1).m_estimatedProcessedTupleCount;
     }
 
     @Override

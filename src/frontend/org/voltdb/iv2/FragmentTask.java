@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,6 +30,7 @@ import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.InterruptException;
 import org.voltdb.exceptions.SQLException;
@@ -47,6 +48,7 @@ public class FragmentTask extends TransactionTask
     final FragmentTaskMessage m_fragmentMsg;
     final Map<Integer, List<VoltTable>> m_inputDeps;
 
+    boolean m_respBufferable = true;
     // This constructor is used during live rejoin log replay.
     FragmentTask(Mailbox mailbox,
                  FragmentTaskMessage message,
@@ -70,6 +72,20 @@ public class FragmentTask extends TransactionTask
         m_initiator = mailbox;
         m_fragmentMsg = message;
         m_inputDeps = inputDeps;
+
+        if (txnState != null && !txnState.isReadOnly()) {
+            m_respBufferable = false;
+        }
+    }
+
+    public void setResponseNotBufferable() {
+        m_respBufferable = false;
+    }
+
+    private void deliverResponse(FragmentResponseMessage response) {
+        response.m_sourceHSId = m_initiator.getHSId();
+        response.setRespBufferable(m_respBufferable);
+        m_initiator.deliver(response);
     }
 
     @Override
@@ -95,10 +111,23 @@ public class FragmentTask extends TransactionTask
                 m_txnState.setBeginUndoToken(siteConnection.getLatestUndoToken());
             }
         }
-        final FragmentResponseMessage response = processFragmentTask(siteConnection);
-        // completion?
-        response.m_sourceHSId = m_initiator.getHSId();
-        m_initiator.deliver(response);
+
+        int originalTimeout = siteConnection.getBatchTimeout();
+        int individualTimeout = m_fragmentMsg.getBatchTimeout();
+        try {
+            if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout)) {
+                siteConnection.setBatchTimeout(individualTimeout);
+            }
+
+            // execute the procedure
+            final FragmentResponseMessage response = processFragmentTask(siteConnection);
+            deliverResponse(response);
+        } finally {
+            if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout)) {
+                siteConnection.setBatchTimeout(originalTimeout);
+            }
+        }
+
         completeFragment();
 
         if (hostLog.isDebugEnabled()) {
@@ -125,7 +154,6 @@ public class FragmentTask extends TransactionTask
 
         final FragmentResponseMessage response =
             new FragmentResponseMessage(m_fragmentMsg, m_initiator.getHSId());
-        response.m_sourceHSId = m_initiator.getHSId();
         response.setRecovering(true);
         response.setStatus(FragmentResponseMessage.SUCCESS, null);
 
@@ -138,7 +166,7 @@ public class FragmentTask extends TransactionTask
             response.addDependency(outputDepId, depTable);
         }
 
-        m_initiator.deliver(response);
+        deliverResponse(response);
         completeFragment();
     }
 
@@ -266,15 +294,30 @@ public class FragmentTask extends TransactionTask
             } catch (final EEException e) {
                 hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                if (currentFragResponse.getTableCount() == 0) {
+                    // Make sure the response has at least 1 result with a valid DependencyId
+                    currentFragResponse.addDependency(outputDepId,
+                            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+                }
                 break;
             } catch (final SQLException e) {
                 hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                if (currentFragResponse.getTableCount() == 0) {
+                    // Make sure the response has at least 1 result with a valid DependencyId
+                    currentFragResponse.addDependency(outputDepId,
+                            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+                }
                 break;
             }
             catch (final InterruptException e) {
                 hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                if (currentFragResponse.getTableCount() == 0) {
+                    // Make sure the response has at least 1 result with a valid DependencyId
+                    currentFragResponse.addDependency(outputDepId,
+                            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+                }
                 break;
             }
             finally {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -47,6 +47,13 @@ public class VoltXMLElement implements IAST {
     public VoltXMLElement withValue(String key, String value) {
         attributes.put(key, value);
         return this;
+    }
+
+    public boolean hasValue(String key, String value) {
+        if (key == null || value == null) {
+            return false;
+        }
+        return value.equals(attributes.get(key));
     }
 
     /**
@@ -428,4 +435,31 @@ public class VoltXMLElement implements IAST {
 
         return true;
     }
+
+    /**
+     * Recursively extract sub elements of a given name with matching attribute if it is not null.
+     * @param elementName element name to look for
+     * @param attrName optional attribute name to look for
+     * @param attrValue optional attribute value to look for
+     * @return output collection containing the matching sub elements
+     */
+    public List<VoltXMLElement> extractSubElements(String elementName, String attrName, String attrValue) {
+        assert(elementName != null);
+        assert((elementName != null && attrValue != null) || attrName == null);
+        List<VoltXMLElement> elements = new ArrayList<>();
+        extractSubElements(elementName, attrName, attrValue, elements);
+        return elements;
+    }
+
+    private void extractSubElements(String elementName, String attrName, String attrValue, List<VoltXMLElement> elements) {
+        if (elementName.equalsIgnoreCase(name)) {
+            if (attrName == null || attrValue.equals(attributes.get(attrName))) {
+                elements.add(this);
+            }
+        }
+        for (VoltXMLElement child : children) {
+            child.extractSubElements(elementName, attrName, attrValue, elements);
+        }
+    }
+
 }

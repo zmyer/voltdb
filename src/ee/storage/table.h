@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -45,16 +45,7 @@
 
 #ifndef HSTORETABLE_H
 #define HSTORETABLE_H
-#ifndef BTREE_DEBUG
-#define BTREE_DEBUG
-#endif
-#include <string>
-#include <vector>
-#include <set>
-#include <list>
-#include <cassert>
 
-#include "common/declarations.h"
 #include "common/ids.h"
 #include "common/types.h"
 #include "common/TupleSchema.h"
@@ -62,10 +53,16 @@
 #include "common/tabletuple.h"
 #include "common/TheHashinator.h"
 #include "storage/TupleBlock.h"
-#include "stx/btree_set.h"
+#include "storage/ExportTupleStream.h"
 #include "common/ThreadLocalPool.h"
 
+#include <vector>
+#include <string>
+#include <cassert>
+
 namespace voltdb {
+class TableIterator;
+class TableStats;
 
 const size_t COLUMN_DESCRIPTOR_SIZE = 1 + 4 + 4; // type, name offset, name length
 
@@ -80,6 +77,7 @@ const size_t COLUMN_DESCRIPTOR_SIZE = 1 + 4 + 4; // type, name offset, name leng
 class Table {
     friend class TableFactory;
     friend class TableIterator;
+    friend class TableTupleFilter;
     friend class CopyOnWriteContext;
     friend class ExecutionEngine;
     friend class TableStats;
@@ -96,7 +94,7 @@ class Table {
     virtual ~Table();
 
     /*
-     * Table lifespan can be managed bya reference count. The
+     * Table lifespan can be managed by a reference count. The
      * reference is trivial to maintain since it is only accessed by
      * the execution engine thread. Snapshot, Export and the
      * corresponding CatalogDelegate may be reference count
@@ -119,21 +117,12 @@ class Table {
     // ACCESS METHODS
     // ------------------------------------------------------------------
     virtual TableIterator& iterator() = 0;
-    virtual TableIterator *makeIterator() = 0;
     virtual TableIterator& iteratorDeletingAsWeGo() = 0;
 
     // ------------------------------------------------------------------
     // OPERATIONS
     // ------------------------------------------------------------------
-    virtual void deleteAllTuples(bool freeAllocatedStrings) = 0;
-    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
-    // The fallible flag is used to denote a change to a persistent table
-    // which is part of a long transaction that has been vetted and can
-    // never fail (e.g. violate a constraint).
-    // The initial use case is a live catalog update that changes table schema and migrates tuples
-    // and/or adds a materialized view.
-    // Constraint checks are bypassed and the change does not make use of "undo" support.
-    virtual bool deleteTuple(TableTuple &tuple, bool fallible=true) = 0;
+    virtual void deleteAllTuples(bool freeAllocatedStrings, bool fallible=true) = 0;
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     // -- Most callers should be using TempTable::insertTempTuple, anyway.
     virtual bool insertTuple(TableTuple &tuple) = 0;
@@ -154,7 +143,7 @@ class Table {
 
     /**
      * Includes tuples that are pending any kind of delete.
-     * Used by iterators to determine how many tupels to expect while scanning
+     * Used by iterators to determine how many tuples to expect while scanning
      */
     virtual int64_t activeTupleCount() const {
         return m_tupleCount;
@@ -162,10 +151,6 @@ class Table {
 
     virtual int64_t allocatedTupleMemory() const {
         return allocatedBlockCount() * m_tableAllocationSize;
-    }
-
-    int64_t occupiedTupleMemory() const {
-        return m_tupleCount * m_tempTuple.tupleLength();
     }
 
     // Only counts persistent table usage, currently
@@ -198,36 +183,6 @@ class Table {
     }
 
     // ------------------------------------------------------------------
-    // INDEXES
-    // ------------------------------------------------------------------
-    virtual int indexCount() const {
-        return static_cast<int>(m_indexes.size());
-    }
-
-    virtual int uniqueIndexCount() const {
-        return static_cast<int>(m_uniqueIndexes.size());
-    }
-
-    // returned via shallow vector copy -- seems good enough.
-    const std::vector<TableIndex*>& allIndexes() const { return m_indexes; }
-
-    virtual TableIndex *index(std::string name);
-
-    virtual TableIndex *primaryKeyIndex() {
-        return m_pkeyIndex;
-    }
-    virtual const TableIndex *primaryKeyIndex() const {
-        return m_pkeyIndex;
-    }
-
-    void configureIndexStats(CatalogId databaseId);
-
-    // mutating indexes
-    virtual void addIndex(TableIndex *index);
-    virtual void removeIndex(TableIndex *index);
-    virtual void setPrimaryKeyIndex(TableIndex *index);
-
-    // ------------------------------------------------------------------
     // UTILITY
     // ------------------------------------------------------------------
     const std::string& name() const {
@@ -245,7 +200,10 @@ class Table {
     // SERIALIZATION
     // ------------------------------------------------------------------
     int getApproximateSizeToSerialize() const;
+    size_t getColumnHeaderSizeToSerialize(bool includeTotalSize) const;
+    size_t getAccurateSizeToSerialize(bool includeTotalSize);
     bool serializeTo(SerializeOutput &serialize_out);
+    bool serializeToWithoutTotalSize(SerializeOutput &serialize_io);
     bool serializeColumnHeaderTo(SerializeOutput &serialize_io);
 
     /*
@@ -316,16 +274,6 @@ class Table {
      */
     virtual void flushOldTuples(int64_t timeInMillis) {
     }
-    /**
-     * Inform the tuple stream wrapper of the table's signature and the timestamp
-     * of the current export generation
-     */
-    virtual void setSignatureAndGeneration(std::string signature, int64_t generation) {
-    }
-
-    virtual bool isExport() {
-        return false;
-    }
 
     /**
      * These metrics are needed by some iterators.
@@ -363,7 +311,7 @@ protected:
 
 public:
 
-    virtual bool equals(voltdb::Table *other);
+    bool equals(voltdb::Table *other);
     virtual voltdb::TableStats* getTableStats() = 0;
 
 protected:
@@ -373,6 +321,9 @@ protected:
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                      "May not use freeLastScanedBlock with streamed tables or persistent tables.");
     }
+
+    // Return tuple blocks addresses
+    virtual std::vector<uint64_t> getBlockAddresses() const = 0;
 
     Table(int tableAllocationTargetSize);
     void resetTable();
@@ -388,10 +339,6 @@ protected:
     }
 
     virtual void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema, int32_t compactionThreshold = 95);
-
-    // per table-type initialization
-    virtual void onSetColumns() {
-    };
 
     // ------------------------------------------------------------------
     // DATA
@@ -425,11 +372,6 @@ protected:
     const int m_tableAllocationTargetSize;
     // This is one block size allocated for this table, equals = m_tuplesPerBlock * m_tupleLength
     int m_tableAllocationSize;
-
-    // indexes
-    std::vector<TableIndex*> m_indexes;
-    std::vector<TableIndex*> m_uniqueIndexes;
-    TableIndex *m_pkeyIndex;
 
   private:
     int32_t m_refcount;

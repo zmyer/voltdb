@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -38,6 +38,7 @@ import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.parser.SQLLexer;
@@ -265,10 +266,11 @@ public class AsyncCompilerAgent {
                 return;
             }
 
-            if (VoltDB.instance().getMode() == OperationMode.PAUSED && !w.adminConnection) {
+            if (!allowPausedModeWork(w)) {
                 AsyncCompilerResult errResult =
                     AsyncCompilerResult.makeErrorResult(w,
-                            "Server is paused and is available in read-only mode - please try again later.");
+                            "Server is paused and is available in read-only mode - please try again later.",
+                            ClientResponse.SERVER_UNAVAILABLE);
                 w.completionHandler.onCompletion(errResult);
                 return;
             }
@@ -277,11 +279,18 @@ public class AsyncCompilerAgent {
         }
     }
 
+    private boolean allowPausedModeWork(AsyncCompilerWork w) {
+         return (VoltDB.instance().getMode() != OperationMode.PAUSED ||
+                 w.isServerInitiated() ||
+                 w.adminConnection);
+    }
+
     void handleCatalogChangeWork(final CatalogChangeWork w) {
-        if (VoltDB.instance().getMode() == OperationMode.PAUSED && !w.adminConnection) {
+        if (!allowPausedModeWork(w)) {
             AsyncCompilerResult errResult =
                     AsyncCompilerResult.makeErrorResult(w,
-                            "Server is paused and is available in read-only mode - please try again later.");
+                            "Server is paused and is available in read-only mode - please try again later.",
+                            ClientResponse.SERVER_UNAVAILABLE);
             w.completionHandler.onCompletion(errResult);
             return;
         }
@@ -320,21 +329,17 @@ public class AsyncCompilerAgent {
 
     private void dispatchCatalogChangeWork(CatalogChangeWork work)
     {
-        final AsyncCompilerResult result = m_helper.prepareApplicationCatalogDiff(work);
-        if (result.errorMsg != null) {
+        final CatalogChangeResult ccr = m_helper.prepareApplicationCatalogDiff(work);
+        if (ccr.errorMsg != null) {
             hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
         }
         // Log something useful about catalog upgrades when they occur.
-        if (result instanceof CatalogChangeResult) {
-            CatalogChangeResult ccr = (CatalogChangeResult)result;
-            if (ccr.upgradedFromVersion != null) {
-                hostLog.info(String.format(
-                            "In order to update the application catalog it was "
-                            + "automatically upgraded from version %s.",
-                            ccr.upgradedFromVersion));
-            }
+        if (ccr.upgradedFromVersion != null) {
+            hostLog.info(String.format("In order to update the application catalog it was "
+                    + "automatically upgraded from version %s.",
+                    ccr.upgradedFromVersion));
         }
-        work.completionHandler.onCompletion(result);
+        work.completionHandler.onCompletion(ccr);
     }
 
     public static final String AdHocErrorResponseMessage =
@@ -393,7 +398,32 @@ public class AsyncCompilerAgent {
             }
             catch (Exception e) {
                 errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e);
-            } catch (AssertionError ae) {
+            }
+            catch (StackOverflowError error) {
+                // Overly long predicate expressions can cause a
+                // StackOverflowError in various code paths that may be
+                // covered by different StackOverflowError/Error/Throwable
+                // catch blocks. The factors that determine which code path
+                // and catch block get activated appears to be platform
+                // sensitive for reasons we do not entirely understand.
+                // To generate a deterministic error message regardless of
+                // these factors, purposely defer StackOverflowError handling
+                // for as long as possible, so that it can be handled
+                // consistently by a minimum number of high level callers like
+                // this one.
+                // This eliminates the need to synchronize error message text
+                // in multiple catch blocks, which becomes a problem when some
+                // catch blocks lead to re-wrapping of exceptions which tends
+                // to adorn the final error text in ways that are hard to track
+                // and replicate.
+                // Deferring StackOverflowError handling MAY mean ADDING
+                // explicit StackOverflowError catch blocks that re-throw
+                // the error to bypass more generic catch blocks
+                // for Error or Throwable on the same try block.
+                errorMsgs.add("Encountered stack overflow error. " +
+                        "Try reducing the number of predicate expressions in the query.");
+            }
+            catch (AssertionError ae) {
                 errorMsgs.add("Assertion Error in Ad Hoc Planning: " + ae);
             }
         }

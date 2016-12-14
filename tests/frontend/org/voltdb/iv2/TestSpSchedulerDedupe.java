@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,9 +23,11 @@
 
 package org.voltdb.iv2;
 
+import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -43,9 +45,11 @@ import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.MapCache;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
+import org.voltdb.Consistency;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SnapshotCompletionMonitor;
@@ -67,6 +71,7 @@ public class TestSpSchedulerDedupe extends TestCase
     VoltDBInterface vdbi;
     ProcedureRunner runner;
     Scheduler dut;
+    Consistency.ReadLevel m_readLevel = Consistency.ReadLevel.SAFE;
 
     static final String MockSPName = "MOCKSP";
     static final long dut_hsid = 11223344l;
@@ -89,10 +94,17 @@ public class TestSpSchedulerDedupe extends TestCase
         fakecache.put("0", new JSONObject("{hsid:0}"));
         when(iv2masters.pointInTimeCache()).thenReturn(ImmutableMap.copyOf(fakecache));
 
+        final CommandLog cl = mock(CommandLog.class);
+        doReturn(CoreUtils.COMPLETED_FUTURE).when(cl).log(any(Iv2InitiateTaskMessage.class), anyLong(), any(int[].class),
+                                                          any(CommandLog.DurabilityListener.class),
+                                                          any(TransactionTask.class));
+
         dut = new SpScheduler(0, getSiteTaskerQueue(), snapMonitor);
         dut.setMailbox(mbox);
-        dut.setCommandLog(mock(CommandLog.class));
+        dut.setCommandLog(cl);
         dut.setLock(mbox);
+
+        ((SpScheduler)dut).setConsistentReadLevelForTestOnly(m_readLevel);
     }
 
     private Iv2InitiateTaskMessage createMsg(long txnId, boolean readOnly,
@@ -108,7 +120,7 @@ public class TestSpSchedulerDedupe extends TestCase
                                        Long.MIN_VALUE, // coordHSID
                                        txnId - 1, // truncationHandle
                                        txnId,     // txnId
-                                       System.currentTimeMillis(), // timestamp
+                                       UniqueIdGenerator.makeIdFromComponents(System.currentTimeMillis(), 0, 0), // uniqueID
                                        readOnly, // readonly
                                        singlePart, // single-part
                                        spi, // invocation
@@ -117,6 +129,7 @@ public class TestSpSchedulerDedupe extends TestCase
                                        false); // isForReplay
         // sp: sphandle == txnid
         task.setTxnId(txnId);
+        task.setSpHandle(txnId);
         return task;
     }
 
@@ -155,6 +168,9 @@ public class TestSpSchedulerDedupe extends TestCase
     @Test
     public void testReplicaInitiateTaskResponseShortCircuitRead() throws Exception
     {
+        // replica does not receive reads on SAFE mode, except for FAST mode
+        m_readLevel = Consistency.ReadLevel.FAST;
+
         long txnid = TxnEgo.makeZero(0).getTxnId();
 
         createObjs();
@@ -167,6 +183,8 @@ public class TestSpSchedulerDedupe extends TestCase
         InitiateResponseMessage resp = new InitiateResponseMessage(sptask);
         dut.deliver(resp);
         verify(mbox, times(1)).send(eq(dut_hsid), eq(resp));
+
+        m_readLevel = Consistency.ReadLevel.SAFE;
     }
 
     @Test
@@ -176,7 +194,8 @@ public class TestSpSchedulerDedupe extends TestCase
         long primary_hsid = 1111l;
 
         createObjs();
-        FragmentTaskMessage sptask = createFrag(txnid, true, primary_hsid);
+        // read only message will not be received on replicas.
+        FragmentTaskMessage sptask = createFrag(txnid, false, primary_hsid);
         dut.deliver(sptask);
         // verify no response sent yet
         verify(mbox, times(0)).send(anyLong(), (VoltMessage)anyObject());

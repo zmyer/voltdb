@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -495,10 +495,10 @@ public class TestIndexReverseScan extends PlannerTestCase {
         assertTrue(ispn.getTargetIndexName().contains(indexName));
         assertEquals(lookupType, ispn.getLookupType());
         assertEquals(searchKeys, ispn.getSearchKeyExpressions().size());
-        assertEquals(endKeys, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
-        assertEquals(predicates, ExpressionUtil.uncombine(ispn.getPredicate()).size());
+        assertEquals(endKeys, ExpressionUtil.uncombinePredicate(ispn.getEndExpression()).size());
+        assertEquals(predicates, ExpressionUtil.uncombinePredicate(ispn.getPredicate()).size());
 
-        assertEquals(initials, ExpressionUtil.uncombine(ispn.getInitialExpression()).size());
+        assertEquals(initials, ExpressionUtil.uncombinePredicate(ispn.getInitialExpression()).size());
 
         // Test artificial post predicate
         if (predicates == 1 && artificial) {
@@ -540,10 +540,10 @@ public class TestIndexReverseScan extends PlannerTestCase {
         assertTrue(ispn.getTargetIndexName().contains(indexName));
         assertEquals(lookupType, ispn.getLookupType());
         assertEquals(searchKeys, ispn.getSearchKeyExpressions().size());
-        assertEquals(endKeys, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
-        assertEquals(predicates, ExpressionUtil.uncombine(ispn.getPredicate()).size());
+        assertEquals(endKeys, ExpressionUtil.uncombinePredicate(ispn.getEndExpression()).size());
+        assertEquals(predicates, ExpressionUtil.uncombinePredicate(ispn.getPredicate()).size());
 
-        assertEquals(0, ExpressionUtil.uncombine(ispn.getInitialExpression()).size());
+        assertEquals(0, ExpressionUtil.uncombinePredicate(ispn.getInitialExpression()).size());
 
         assertEquals(sortType, ispn.getSortDirection());
     }

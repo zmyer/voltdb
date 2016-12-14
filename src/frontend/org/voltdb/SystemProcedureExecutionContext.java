@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.util.List;
+import java.util.Map;
 
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
@@ -25,18 +26,28 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.NodeSettings;
 
 public interface SystemProcedureExecutionContext {
     public Database getDatabase();
 
     public Cluster getCluster();
 
+    public ClusterSettings getClusterSettings();
+
+    public NodeSettings getPaths();
+
     public long getSpHandleForSnapshotDigest();
 
     public long getSiteId();
 
+    public int getLocalSitesCount();
+
     // does this site have "lowest site id" responsibilities.
     public boolean isLowestSiteId();
+
+    public int getClusterId();
 
     public int getHostId();
 
@@ -66,7 +77,9 @@ public interface SystemProcedureExecutionContext {
     public void updateBackendLogLevels();
 
     public boolean updateCatalog(String catalogDiffCommands, CatalogContext context,
-            CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation);
+            CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation, long uniqueId, long spHandle);
+
+    public boolean updateSettings(CatalogContext context, CatalogSpecificPlanner csp);
 
     public TheHashinator getCurrentHashinator();
 
@@ -80,6 +93,20 @@ public interface SystemProcedureExecutionContext {
     boolean activateTableStream(int tableId, TableStreamType type, boolean undo, byte[] predicates);
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync);
+
+    public DRIdempotencyResult isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
+                                                        long lastReceivedDRId);
+
+    public void appendApplyBinaryLogTxns(int producerClusterId, int producerPartitionId,
+                                         long localUniqueId, DRConsumerDrIdTracker tracker);
+
+    public void recoverWithDrAppliedTrackers(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> trackers);
+
+    public void resetDrAppliedTracker();
+
+    public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackers();
+
+    public Pair<Long, Long> getDrLastAppliedUniqueIds();
 
     Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
                                                List<DBBPool.BBContainer> outputBuffers);

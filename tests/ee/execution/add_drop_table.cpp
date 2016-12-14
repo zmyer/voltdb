@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -59,6 +59,7 @@ class AddDropTableTest : public Test {
                              m_hostId,
                              m_hostName,
                              m_drClusterId,
+                             1024,
                              DEFAULT_TEMP_TABLE_MEMORY,
                              false);
         m_engine->updateHashinator( HASHINATOR_LEGACY,
@@ -69,6 +70,7 @@ class AddDropTableTest : public Test {
         std::string initialCatalog =
           "add / clusters cluster\n"
           "add /clusters#cluster databases database\n"
+          "set /clusters#cluster/databases#database isActiveActiveDRed false\n"
           "add /clusters#cluster/databases#database programs program\n";
 
         bool loadResult = m_engine->loadCatalog( -2, initialCatalog);

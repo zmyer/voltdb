@@ -87,6 +87,7 @@ public class SQLParserDriver {
             parser.addErrorListener(errorListener);
         }
         switch (aKind) {
+            /*
             case DML:
                 m_tree = parser.data_manipulation_list();
                 break;
@@ -96,6 +97,7 @@ public class SQLParserDriver {
             case DQL:
                 m_tree = parser.data_query_list();
                 break;
+            */
             default:
                 throw new RuntimeException("Unknown SQL Kind asked for.");
         }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -386,12 +386,13 @@ public class TestVoltMessageSerialization extends TestCase {
                                            true, false, true);
 
         CompleteTransactionResponseMessage ctrm =
-            new CompleteTransactionResponseMessage(ctm, Long.MAX_VALUE - 4);
+            new CompleteTransactionResponseMessage(ctm);
 
         CompleteTransactionResponseMessage ctrm2 =
             (CompleteTransactionResponseMessage) checkVoltMessage(ctrm);
-        assertEquals(ctrm.getExecutionSiteId(), ctrm.getExecutionSiteId());
         assertEquals(ctrm.getTxnId(), ctrm2.getTxnId());
+        assertEquals(ctrm.getSpHandle(), ctrm2.getSpHandle());
+        assertEquals(ctrm.isRestart(), ctrm2.isRestart());
     }
 
     public void testIv2RepairLogRequestMessage() throws IOException
@@ -445,8 +446,7 @@ public class TestVoltMessageSerialization extends TestCase {
         // simulate the first message in the sequence, sequence must be 0
         Iv2RepairLogResponseMessage r1 = new Iv2RepairLogResponseMessage(
                 0, 10, Long.MAX_VALUE, Long.MAX_VALUE,
-                Pair.<Long, byte[]>of(2L, new byte[] {(byte)1,(byte)2,(byte)3}),
-                Long.MIN_VALUE, Long.MIN_VALUE
+                Pair.<Long, byte[]>of(2L, new byte[] {(byte)1,(byte)2,(byte)3})
                 );
         Iv2RepairLogResponseMessage r2 = (Iv2RepairLogResponseMessage)checkVoltMessage(r1);
         assertEquals(r1.getOfTotal(), r2.getOfTotal());
@@ -454,8 +454,36 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(r1.getTxnId(), r2.getTxnId());
         assertEquals(r1.getRequestId(), r2.getRequestId());
         assertEquals(r1.getSequence(), r2.getSequence());
-        assertEquals(r1.getBinaryLogUniqueId(), r2.getBinaryLogUniqueId());
         assertTrue(r1.hasHashinatorConfig());
         assertEquals(r1.getHashinatorVersionedConfig().getFirst(),new Long(2));
+    }
+
+    public void testInvalidTableCount() throws Exception
+    {
+        int size = 1 // version
+            + 8 // clientHandle
+            + 1 // present fields
+            + 1 // status
+            + 1 // app status
+            + 4 // cluster roundtrip time
+            + 2; // number of result tables
+        ByteBuffer buf = ByteBuffer.allocate(size);
+        buf.put((byte)0); //version
+        buf.putLong(1L);
+        byte presentFields = 0;
+        buf.put(presentFields);
+        buf.put(ClientResponse.SUCCESS);
+        buf.put(ClientResponse.SUCCESS);
+        buf.putInt(100);
+        buf.putShort( (short) (Short.MAX_VALUE + 1));
+        buf.flip();
+
+        ClientResponseImpl deserialized = new ClientResponseImpl();
+        try {
+            deserialized.initFromBuffer(buf);
+            fail("Must have failed for invalid table count");
+        } catch(IOException e) {
+            assertTrue(e.getMessage().contains("is negative"));
+        }
     }
 }

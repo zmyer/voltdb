@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -49,9 +49,9 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
 
     private MpRoSitePool m_sitePool = null;
 
-    MpTransactionTaskQueue(SiteTaskerQueue queue, long initialTnxId)
+    MpTransactionTaskQueue(SiteTaskerQueue queue)
     {
-        super(queue, initialTnxId);
+        super(queue);
     }
 
     void setMpRoSitePool(MpRoSitePool sitePool)
@@ -64,9 +64,16 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         m_sitePool.updateCatalog(diffCmds, context, csp);
     }
 
+    synchronized void updateSettings(CatalogContext context, CatalogSpecificPlanner csp)
+    {
+        m_sitePool.updateSettings(context, csp);
+    }
+
     void shutdown()
     {
-        m_sitePool.shutdown();
+        if (m_sitePool != null) {
+            m_sitePool.shutdown();
+        }
     }
 
     /**

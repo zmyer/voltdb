@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,7 +25,6 @@ package org.voltdb.jni;
 
 import static org.mockito.Matchers.contains;
 import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.verify;
 
 import java.util.Arrays;
 
@@ -50,6 +49,7 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
+import static org.mockito.Mockito.verify;
 
 public class TestFragmentProgressUpdate extends TestCase {
 
@@ -73,12 +73,12 @@ public class TestFragmentProgressUpdate extends TestCase {
         private final long m_origInitialLogDuration;
 
         AutoEngineSettings() {
-            m_origTimeoutLatency = m_ee.getTimeoutLatency();
+            m_origTimeoutLatency = m_ee.getBatchTimeout();
             m_origInitialLogDuration = m_ee.getInitialLogDurationForTest();
         }
 
         public void setTimeoutLatency(int timeoutLatency) {
-            m_ee.setTimeoutLatency(timeoutLatency);
+            m_ee.setBatchTimeout(timeoutLatency);
         }
 
         public void setInitialLogDuration(long initialLogDuration) {
@@ -88,7 +88,7 @@ public class TestFragmentProgressUpdate extends TestCase {
         // Sets execution engine settings back to what they were.
         @Override
         public void close() throws Exception {
-            m_ee.setTimeoutLatency(m_origTimeoutLatency);
+            m_ee.setBatchTimeout(m_origTimeoutLatency);
             m_ee.setInitialLogDurationForTest(m_origInitialLogDuration);
         }
 
@@ -476,10 +476,10 @@ public class TestFragmentProgressUpdate extends TestCase {
                 fail();
             }
         } catch (Exception ex) {
-            String msg = String.format("A SQL query was terminated after %.2f seconds "
-                    + "because it exceeded the query timeout period.",
+            String msg = String.format("A SQL query was terminated after %.03f seconds "
+                    + "because it exceeded",
                     timeout/1000.0);
-            assertEquals(msg, ex.getMessage());
+            assertTrue(ex.getMessage().contains(msg));
         }
 
         String expectedSqlTextMsg = null;
@@ -493,7 +493,7 @@ public class TestFragmentProgressUpdate extends TestCase {
             break;
         case STATEMENT_LIST:
             expectedSqlTextMsg = "Unable to report specific SQL statement text "
-                    + "for fragment task message index " + (numFragsToExecute - 1) + ".  "
+                    + "for fragment task message index " + (numFragsToExecute - 1) + ". "
                     + "It MAY be one of these " + (numFragsToExecute - 1) + " items: "
                     + "\"SELECT W_ID FROM WAREHOUSE LIMIT 1;\", ";
             break;
@@ -595,6 +595,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 0,
                 "",
                 0,
+                64*1024,
                 100,
                 new HashinatorConfig(HashinatorType.LEGACY,
                                      LegacyHashinator.getConfigureBytes(1),

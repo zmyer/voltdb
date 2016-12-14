@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -73,12 +73,19 @@ Table* TableFactory::getPersistentTable(
             bool drEnabled)
 {
     Table *table = NULL;
+    StreamedTable *streamedTable = NULL;
+    PersistentTable *persistentTable = NULL;
 
     if (exportOnly) {
-        table = new StreamedTable(exportEnabled);
+        table = streamedTable = new StreamedTable(exportEnabled, partitionColumn);
     }
     else {
-        table = new PersistentTable(partitionColumn, signature, tableIsMaterialized, tableAllocationTargetSize, tupleLimit, drEnabled);
+        table = persistentTable = new PersistentTable(partitionColumn,
+                                                      signature,
+                                                      tableIsMaterialized,
+                                                      tableAllocationTargetSize,
+                                                      tupleLimit,
+                                                      drEnabled);
     }
 
     initCommon(databaseId,
@@ -89,21 +96,59 @@ Table* TableFactory::getPersistentTable(
                true,  // table will take ownership of TupleSchema object
                compactionThreshold);
 
-    // initialize stats for the table
-    configureStats(databaseId, name, table);
+    TableStats *stats;
+    if (exportOnly) {
+        stats = streamedTable->getTableStats();
+    }
+    else {
+        stats = persistentTable->getTableStats();
+        // Allocate and assign the tuple storage block to the persistent table ahead of time instead
+        // of doing so at time of first tuple insertion. The intent of block allocation ahead of time
+        // is to avoid allocation cost at time of tuple insertion
+        TBPtr block = persistentTable->allocateNextBlock();
+        assert(block->hasFreeTuples());
+        persistentTable->m_blocksWithSpace.insert(block);
+    }
 
-    return dynamic_cast<Table*>(table);
+    // initialize stats for the table
+    configureStats(name, stats);
+
+    return table;
 }
 
-TempTable* TableFactory::getTempTable(
-            const voltdb::CatalogId databaseId,
+// This is a convenient wrapper for test only.
+StreamedTable* TableFactory::getStreamedTableForTest(
+            voltdb::CatalogId databaseId,
             const std::string &name,
             TupleSchema* schema,
             const std::vector<std::string> &columnNames,
-            TempTableLimits* limits)
+            ExportTupleStream* wrapper,
+            bool exportEnabled,
+            int32_t compactionThreshold)
 {
+    StreamedTable *table = new StreamedTable(exportEnabled, wrapper);
+
+    initCommon(databaseId,
+               table,
+               name,
+               schema,
+               columnNames,
+               true,  // table will take ownership of TupleSchema object
+               compactionThreshold);
+
+    // initialize stats for the table
+    configureStats(name, table->getTableStats());
+
+    return table;
+}
+
+TempTable* TableFactory::buildTempTable(
+            const std::string &name,
+            TupleSchema* schema,
+            const std::vector<std::string> &columnNames,
+            TempTableLimits* limits) {
     TempTable* table = new TempTable();
-    initCommon(databaseId, table, name, schema, columnNames, true);
+    initCommon(0, table, name, schema, columnNames, true);
     table->m_limits = limits;
     return table;
 }
@@ -111,14 +156,12 @@ TempTable* TableFactory::getTempTable(
 /**
  * Creates a temp table with the same schema as the provided template table
  */
-TempTable* TableFactory::getCopiedTempTable(
-            const voltdb::CatalogId databaseId,
+TempTable* TableFactory::buildCopiedTempTable(
             const std::string &name,
             const Table* template_table,
-            TempTableLimits* limits)
-{
+            TempTableLimits* limits) {
     TempTable* table = new TempTable();
-    initCommon(databaseId, table, name, template_table->m_schema, template_table->m_columnNames, false);
+    initCommon(0, table, name, template_table->m_schema, template_table->m_columnNames, false);
     table->m_limits = limits;
     return table;
 }
@@ -142,12 +185,10 @@ void TableFactory::initCommon(
     assert (table->columnCount() == schema->columnCount());
 }
 
-void TableFactory::configureStats(voltdb::CatalogId databaseId,
-                                  std::string name,
-                                  Table *table) {
+void TableFactory::configureStats(std::string name,
+                                  TableStats *tableStats) {
     // initialize stats for the table
-    table->getTableStats()->configure(name + " stats",
-                                      databaseId);
+    tableStats->configure(name + " stats");
 }
 
 }

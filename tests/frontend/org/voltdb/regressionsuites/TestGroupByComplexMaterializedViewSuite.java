@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -838,7 +838,7 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
             fail();
         } catch (Exception exc) {
             assertTrue(exc.toString().contains("The size 2050 of the value"));
-            assertTrue(exc.toString().contains("exceeds the size of the VARCHAR(2048) column"));
+            assertTrue(exc.toString().contains("exceeds the size of the VARCHAR(2048 BYTES) column"));
         }
     }
 
@@ -1049,6 +1049,26 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
                     + tb).getResults()[0];
             assertEquals(95, vt.asScalarLong());
 
+            // Test for ENG-11025 regression -- mistaken optimization of sum(distinct)
+            vt = client.callProcedure("@AdHoc", "Select sum(distinct V_sum_rent) from "
+                    + tb).getResults()[0];
+            assertEquals(58, vt.asScalarLong());
+
+            // test that count(distinct)s are not mistakenly over-optimized
+            vt = client.callProcedure("@AdHoc", "Select count(distinct V_sum_rent) from "
+                    + tb).getResults()[0];
+            assertEquals(3, vt.asScalarLong());
+
+            // test that counts are not mistakenly over-optimized
+            vt = client.callProcedure("@AdHoc", "Select count(V_sum_rent) from "
+                    + tb).getResults()[0];
+            assertEquals(4, vt.asScalarLong());
+
+            // test that count(*)s are not mistakenly over-optimized
+            vt = client.callProcedure("@AdHoc", "Select count(*) from "
+                    + tb).getResults()[0];
+            assertEquals(4, vt.asScalarLong());
+
             vt = client.callProcedure("@AdHoc", "Select max(V_sum_rent) from "
                     + tb).getResults()[0];
             assertEquals(37, vt.asScalarLong());
@@ -1065,11 +1085,9 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
                     + tb).getResults()[0];
             assertEquals(23, vt.asScalarLong());
 
-            if (!isHSQL()) {
-                vt = client.callProcedure("@AdHoc", "Select sum(V_sum_age) + 5 from "
-                        + tb).getResults()[0];
-                assertEquals(260, vt.asScalarLong());
-            }
+            vt = client.callProcedure("@AdHoc", "Select sum(V_sum_age) + 5 from "
+                    + tb).getResults()[0];
+            assertEquals(260, vt.asScalarLong());
 
             vt = client.callProcedure("@AdHoc", "Select avg(V_sum_age) from "
                     + tb).getResults()[0];

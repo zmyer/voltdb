@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,9 +23,11 @@ import org.voltdb.AuthSystem;
 
 public class AsyncCompilerResult implements Serializable, Cloneable {
     private static final long serialVersionUID = -1538141431615585812L;
+    public static final byte UNINITIALIZED_ERROR_CODE = Byte.MIN_VALUE;
 
     public long clientHandle = -1;
     public String errorMsg = null;
+    public byte errorCode = UNINITIALIZED_ERROR_CODE;
     public long connectionId = -1;
     public String hostname = "";
     public boolean adminConnection = false;
@@ -46,6 +48,13 @@ public class AsyncCompilerResult implements Serializable, Cloneable {
         result.clientData = work.clientData;
         result.errorMsg = errMsg;
         result.user = work.user;
+        return result;
+    }
+
+    public static AsyncCompilerResult makeErrorResult(AsyncCompilerWork work, String errMsg, byte errorCode)
+    {
+        AsyncCompilerResult result = makeErrorResult(work, errMsg);
+        result.errorCode = errorCode;
         return result;
     }
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -43,8 +43,6 @@ public class SpPromoteAlgo implements RepairAlgo
     private final long m_requestId = System.nanoTime();
     private final List<Long> m_survivors;
     private long m_maxSeenTxnId;
-    private long m_maxSeenBinaryLogSequenceNumber;
-    private long m_maxSeenBinaryLogUniqueId;
 
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
@@ -119,8 +117,6 @@ public class SpPromoteAlgo implements RepairAlgo
 
         m_whoami = whoami;
         m_maxSeenTxnId = TxnEgo.makeZero(partitionId).getTxnId();
-        m_maxSeenBinaryLogSequenceNumber = Long.MIN_VALUE;
-        m_maxSeenBinaryLogUniqueId = Long.MIN_VALUE;
     }
 
     @Override
@@ -178,8 +174,6 @@ public class SpPromoteAlgo implements RepairAlgo
             if (response.getHandle() != Long.MAX_VALUE) {
                 m_maxSeenTxnId = Math.max(m_maxSeenTxnId, response.getHandle());
             }
-            m_maxSeenBinaryLogSequenceNumber = Math.max(m_maxSeenBinaryLogSequenceNumber, response.getBinaryLogSequenceNumber());
-            m_maxSeenBinaryLogUniqueId = Math.max(m_maxSeenBinaryLogUniqueId, response.getBinaryLogUniqueId());
 
             if (response.getPayload() != null) {
                 m_repairLogUnion.add(response);
@@ -244,9 +238,6 @@ public class SpPromoteAlgo implements RepairAlgo
         }
         tmLog.debug(m_whoami + "finished queuing " + queued + " replica repair messages.");
 
-        m_promotionResult.set(new RepairResult(
-                m_maxSeenTxnId,
-                m_maxSeenBinaryLogSequenceNumber,
-                m_maxSeenBinaryLogUniqueId));
+        m_promotionResult.set(new RepairResult(m_maxSeenTxnId));
     }
 }

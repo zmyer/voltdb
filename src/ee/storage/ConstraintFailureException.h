@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,7 +26,7 @@
 #include <string>
 
 namespace voltdb {
-class PersistentTable;
+class Table;
 class VoltDBEngine;
 
 /*
@@ -42,7 +42,7 @@ public:
      * @param otherTuple updated tuple values or a null tuple.
      * @param type Type of constraint that was violated
      */
-    ConstraintFailureException(PersistentTable *table, TableTuple tuple, TableTuple otherTuple, ConstraintType type);
+    ConstraintFailureException(Table *table, TableTuple tuple, TableTuple otherTuple, ConstraintType type);
 
     /**
      * Special constructor for partitioning error CFEs only
@@ -51,14 +51,17 @@ public:
      * @param tuple Tuple that was being inserted or updated
      * @param message Description of the partitioning failure.
      */
-    ConstraintFailureException(PersistentTable *table, TableTuple tuple, std::string message);
+    ConstraintFailureException(Table *table, TableTuple tuple, std::string message);
 
     virtual const std::string message() const;
     virtual ~ConstraintFailureException();
+
+    const TableTuple* getConflictTuple() const { return &m_tuple; }
+    const TableTuple* getOriginalTuple() const { return &m_otherTuple; }
 protected:
     void p_serialize(ReferenceSerializeOutput *output) const;
 
-    PersistentTable *m_table;
+    Table *m_table;
     TableTuple m_tuple;
     TableTuple m_otherTuple;
     ConstraintType m_type;

@@ -523,6 +523,16 @@ public final class DRAgent {
      * <code>optional fixed64 timestamp = 2;</code>
      */
     long getTimestamp();
+
+    // optional fixed64 averageRowLatencyNanos = 3;
+    /**
+     * <code>optional fixed64 averageRowLatencyNanos = 3;</code>
+     */
+    boolean hasAverageRowLatencyNanos();
+    /**
+     * <code>optional fixed64 averageRowLatencyNanos = 3;</code>
+     */
+    long getAverageRowLatencyNanos();
   }
   /**
    * Protobuf type {@code pmsg.Ack}
@@ -583,6 +593,11 @@ public final class DRAgent {
             case 17: {
               bitField0_ |= 0x00000002;
               timestamp_ = input.readFixed64();
+              break;
+            }
+            case 25: {
+              bitField0_ |= 0x00000004;
+              averageRowLatencyNanos_ = input.readFixed64();
               break;
             }
           }
@@ -657,9 +672,26 @@ public final class DRAgent {
       return timestamp_;
     }
 
+    // optional fixed64 averageRowLatencyNanos = 3;
+    public static final int AVERAGEROWLATENCYNANOS_FIELD_NUMBER = 3;
+    private long averageRowLatencyNanos_;
+    /**
+     * <code>optional fixed64 averageRowLatencyNanos = 3;</code>
+     */
+    public boolean hasAverageRowLatencyNanos() {
+      return ((bitField0_ & 0x00000004) == 0x00000004);
+    }
+    /**
+     * <code>optional fixed64 averageRowLatencyNanos = 3;</code>
+     */
+    public long getAverageRowLatencyNanos() {
+      return averageRowLatencyNanos_;
+    }
+
     private void initFields() {
       partitionId_ = 0;
       timestamp_ = 0L;
+      averageRowLatencyNanos_ = 0L;
     }
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
@@ -679,6 +711,9 @@ public final class DRAgent {
       if (((bitField0_ & 0x00000002) == 0x00000002)) {
         output.writeFixed64(2, timestamp_);
       }
+      if (((bitField0_ & 0x00000004) == 0x00000004)) {
+        output.writeFixed64(3, averageRowLatencyNanos_);
+      }
       getUnknownFields().writeTo(output);
     }
 
@@ -695,6 +730,10 @@ public final class DRAgent {
       if (((bitField0_ & 0x00000002) == 0x00000002)) {
         size += com.google.protobuf.CodedOutputStream
           .computeFixed64Size(2, timestamp_);
+      }
+      if (((bitField0_ & 0x00000004) == 0x00000004)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeFixed64Size(3, averageRowLatencyNanos_);
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -816,6 +855,8 @@ public final class DRAgent {
         bitField0_ = (bitField0_ & ~0x00000001);
         timestamp_ = 0L;
         bitField0_ = (bitField0_ & ~0x00000002);
+        averageRowLatencyNanos_ = 0L;
+        bitField0_ = (bitField0_ & ~0x00000004);
         return this;
       }
 
@@ -852,6 +893,10 @@ public final class DRAgent {
           to_bitField0_ |= 0x00000002;
         }
         result.timestamp_ = timestamp_;
+        if (((from_bitField0_ & 0x00000004) == 0x00000004)) {
+          to_bitField0_ |= 0x00000004;
+        }
+        result.averageRowLatencyNanos_ = averageRowLatencyNanos_;
         result.bitField0_ = to_bitField0_;
         onBuilt();
         return result;
@@ -873,6 +918,9 @@ public final class DRAgent {
         }
         if (other.hasTimestamp()) {
           setTimestamp(other.getTimestamp());
+        }
+        if (other.hasAverageRowLatencyNanos()) {
+          setAverageRowLatencyNanos(other.getAverageRowLatencyNanos());
         }
         this.mergeUnknownFields(other.getUnknownFields());
         return this;
@@ -963,6 +1011,39 @@ public final class DRAgent {
       public Builder clearTimestamp() {
         bitField0_ = (bitField0_ & ~0x00000002);
         timestamp_ = 0L;
+        onChanged();
+        return this;
+      }
+
+      // optional fixed64 averageRowLatencyNanos = 3;
+      private long averageRowLatencyNanos_ ;
+      /**
+       * <code>optional fixed64 averageRowLatencyNanos = 3;</code>
+       */
+      public boolean hasAverageRowLatencyNanos() {
+        return ((bitField0_ & 0x00000004) == 0x00000004);
+      }
+      /**
+       * <code>optional fixed64 averageRowLatencyNanos = 3;</code>
+       */
+      public long getAverageRowLatencyNanos() {
+        return averageRowLatencyNanos_;
+      }
+      /**
+       * <code>optional fixed64 averageRowLatencyNanos = 3;</code>
+       */
+      public Builder setAverageRowLatencyNanos(long value) {
+        bitField0_ |= 0x00000004;
+        averageRowLatencyNanos_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>optional fixed64 averageRowLatencyNanos = 3;</code>
+       */
+      public Builder clearAverageRowLatencyNanos() {
+        bitField0_ = (bitField0_ & ~0x00000004);
+        averageRowLatencyNanos_ = 0L;
         onChanged();
         return this;
       }
@@ -2344,6 +2425,16 @@ public final class DRAgent {
      * <code>optional fixed64 persistInstanceId = 2;</code>
      */
     long getPersistInstanceId();
+
+    // optional int32 protocolVersion = 3;
+    /**
+     * <code>optional int32 protocolVersion = 3;</code>
+     */
+    boolean hasProtocolVersion();
+    /**
+     * <code>optional int32 protocolVersion = 3;</code>
+     */
+    int getProtocolVersion();
   }
   /**
    * Protobuf type {@code pmsg.Connect}
@@ -2404,6 +2495,11 @@ public final class DRAgent {
             case 17: {
               bitField0_ |= 0x00000002;
               persistInstanceId_ = input.readFixed64();
+              break;
+            }
+            case 24: {
+              bitField0_ |= 0x00000004;
+              protocolVersion_ = input.readInt32();
               break;
             }
           }
@@ -2478,9 +2574,26 @@ public final class DRAgent {
       return persistInstanceId_;
     }
 
+    // optional int32 protocolVersion = 3;
+    public static final int PROTOCOLVERSION_FIELD_NUMBER = 3;
+    private int protocolVersion_;
+    /**
+     * <code>optional int32 protocolVersion = 3;</code>
+     */
+    public boolean hasProtocolVersion() {
+      return ((bitField0_ & 0x00000004) == 0x00000004);
+    }
+    /**
+     * <code>optional int32 protocolVersion = 3;</code>
+     */
+    public int getProtocolVersion() {
+      return protocolVersion_;
+    }
+
     private void initFields() {
       clusterId_ = 0;
       persistInstanceId_ = 0L;
+      protocolVersion_ = 0;
     }
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
@@ -2500,6 +2613,9 @@ public final class DRAgent {
       if (((bitField0_ & 0x00000002) == 0x00000002)) {
         output.writeFixed64(2, persistInstanceId_);
       }
+      if (((bitField0_ & 0x00000004) == 0x00000004)) {
+        output.writeInt32(3, protocolVersion_);
+      }
       getUnknownFields().writeTo(output);
     }
 
@@ -2516,6 +2632,10 @@ public final class DRAgent {
       if (((bitField0_ & 0x00000002) == 0x00000002)) {
         size += com.google.protobuf.CodedOutputStream
           .computeFixed64Size(2, persistInstanceId_);
+      }
+      if (((bitField0_ & 0x00000004) == 0x00000004)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeInt32Size(3, protocolVersion_);
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -2637,6 +2757,8 @@ public final class DRAgent {
         bitField0_ = (bitField0_ & ~0x00000001);
         persistInstanceId_ = 0L;
         bitField0_ = (bitField0_ & ~0x00000002);
+        protocolVersion_ = 0;
+        bitField0_ = (bitField0_ & ~0x00000004);
         return this;
       }
 
@@ -2673,6 +2795,10 @@ public final class DRAgent {
           to_bitField0_ |= 0x00000002;
         }
         result.persistInstanceId_ = persistInstanceId_;
+        if (((from_bitField0_ & 0x00000004) == 0x00000004)) {
+          to_bitField0_ |= 0x00000004;
+        }
+        result.protocolVersion_ = protocolVersion_;
         result.bitField0_ = to_bitField0_;
         onBuilt();
         return result;
@@ -2694,6 +2820,9 @@ public final class DRAgent {
         }
         if (other.hasPersistInstanceId()) {
           setPersistInstanceId(other.getPersistInstanceId());
+        }
+        if (other.hasProtocolVersion()) {
+          setProtocolVersion(other.getProtocolVersion());
         }
         this.mergeUnknownFields(other.getUnknownFields());
         return this;
@@ -2784,6 +2913,39 @@ public final class DRAgent {
       public Builder clearPersistInstanceId() {
         bitField0_ = (bitField0_ & ~0x00000002);
         persistInstanceId_ = 0L;
+        onChanged();
+        return this;
+      }
+
+      // optional int32 protocolVersion = 3;
+      private int protocolVersion_ ;
+      /**
+       * <code>optional int32 protocolVersion = 3;</code>
+       */
+      public boolean hasProtocolVersion() {
+        return ((bitField0_ & 0x00000004) == 0x00000004);
+      }
+      /**
+       * <code>optional int32 protocolVersion = 3;</code>
+       */
+      public int getProtocolVersion() {
+        return protocolVersion_;
+      }
+      /**
+       * <code>optional int32 protocolVersion = 3;</code>
+       */
+      public Builder setProtocolVersion(int value) {
+        bitField0_ |= 0x00000004;
+        protocolVersion_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>optional int32 protocolVersion = 3;</code>
+       */
+      public Builder clearProtocolVersion() {
+        bitField0_ = (bitField0_ & ~0x00000004);
+        protocolVersion_ = 0;
         onChanged();
         return this;
       }
@@ -3519,773 +3681,6 @@ public final class DRAgent {
     // @@protoc_insertion_point(class_scope:pmsg.Subscribe)
   }
 
-  public interface EventAckOrBuilder
-      extends com.google.protobuf.MessageOrBuilder {
-
-    // optional int32 partitionId = 1;
-    /**
-     * <code>optional int32 partitionId = 1;</code>
-     */
-    boolean hasPartitionId();
-    /**
-     * <code>optional int32 partitionId = 1;</code>
-     */
-    int getPartitionId();
-
-    // optional int32 eventType = 2;
-    /**
-     * <code>optional int32 eventType = 2;</code>
-     *
-     * <pre>
-     * poison pill, cluster restart, rejoin
-     * </pre>
-     */
-    boolean hasEventType();
-    /**
-     * <code>optional int32 eventType = 2;</code>
-     *
-     * <pre>
-     * poison pill, cluster restart, rejoin
-     * </pre>
-     */
-    int getEventType();
-
-    // optional bool lookForEvent = 3;
-    /**
-     * <code>optional bool lookForEvent = 3;</code>
-     *
-     * <pre>
-     * if true, the recipient should expect to have
-     * a corresponding event to discard
-     * if false, this is just a query for the next
-     * unique id available for this partition
-     * </pre>
-     */
-    boolean hasLookForEvent();
-    /**
-     * <code>optional bool lookForEvent = 3;</code>
-     *
-     * <pre>
-     * if true, the recipient should expect to have
-     * a corresponding event to discard
-     * if false, this is just a query for the next
-     * unique id available for this partition
-     * </pre>
-     */
-    boolean getLookForEvent();
-
-    // optional fixed64 lastAckedUniqueId = 4;
-    /**
-     * <code>optional fixed64 lastAckedUniqueId = 4;</code>
-     *
-     * <pre>
-     * unique id of the last thing the receiver has
-     * acked for this partition
-     * </pre>
-     */
-    boolean hasLastAckedUniqueId();
-    /**
-     * <code>optional fixed64 lastAckedUniqueId = 4;</code>
-     *
-     * <pre>
-     * unique id of the last thing the receiver has
-     * acked for this partition
-     * </pre>
-     */
-    long getLastAckedUniqueId();
-  }
-  /**
-   * Protobuf type {@code pmsg.EventAck}
-   */
-  public static final class EventAck extends
-      com.google.protobuf.GeneratedMessage
-      implements EventAckOrBuilder {
-    // Use EventAck.newBuilder() to construct.
-    private EventAck(com.google.protobuf.GeneratedMessage.Builder<?> builder) {
-      super(builder);
-      this.unknownFields = builder.getUnknownFields();
-    }
-    private EventAck(boolean noInit) { this.unknownFields = com.google.protobuf.UnknownFieldSet.getDefaultInstance(); }
-
-    private static final EventAck defaultInstance;
-    public static EventAck getDefaultInstance() {
-      return defaultInstance;
-    }
-
-    public EventAck getDefaultInstanceForType() {
-      return defaultInstance;
-    }
-
-    private final com.google.protobuf.UnknownFieldSet unknownFields;
-    @java.lang.Override
-    public final com.google.protobuf.UnknownFieldSet
-        getUnknownFields() {
-      return this.unknownFields;
-    }
-    private EventAck(
-        com.google.protobuf.CodedInputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      initFields();
-      int mutable_bitField0_ = 0;
-      com.google.protobuf.UnknownFieldSet.Builder unknownFields =
-          com.google.protobuf.UnknownFieldSet.newBuilder();
-      try {
-        boolean done = false;
-        while (!done) {
-          int tag = input.readTag();
-          switch (tag) {
-            case 0:
-              done = true;
-              break;
-            default: {
-              if (!parseUnknownField(input, unknownFields,
-                                     extensionRegistry, tag)) {
-                done = true;
-              }
-              break;
-            }
-            case 8: {
-              bitField0_ |= 0x00000001;
-              partitionId_ = input.readInt32();
-              break;
-            }
-            case 16: {
-              bitField0_ |= 0x00000002;
-              eventType_ = input.readInt32();
-              break;
-            }
-            case 24: {
-              bitField0_ |= 0x00000004;
-              lookForEvent_ = input.readBool();
-              break;
-            }
-            case 33: {
-              bitField0_ |= 0x00000008;
-              lastAckedUniqueId_ = input.readFixed64();
-              break;
-            }
-          }
-        }
-      } catch (com.google.protobuf.InvalidProtocolBufferException e) {
-        throw e.setUnfinishedMessage(this);
-      } catch (java.io.IOException e) {
-        throw new com.google.protobuf.InvalidProtocolBufferException(
-            e.getMessage()).setUnfinishedMessage(this);
-      } finally {
-        this.unknownFields = unknownFields.build();
-        makeExtensionsImmutable();
-      }
-    }
-    public static final com.google.protobuf.Descriptors.Descriptor
-        getDescriptor() {
-      return org.voltdb.pmsg.DRAgent.internal_static_pmsg_EventAck_descriptor;
-    }
-
-    protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
-        internalGetFieldAccessorTable() {
-      return org.voltdb.pmsg.DRAgent.internal_static_pmsg_EventAck_fieldAccessorTable
-          .ensureFieldAccessorsInitialized(
-              org.voltdb.pmsg.DRAgent.EventAck.class, org.voltdb.pmsg.DRAgent.EventAck.Builder.class);
-    }
-
-    public static com.google.protobuf.Parser<EventAck> PARSER =
-        new com.google.protobuf.AbstractParser<EventAck>() {
-      public EventAck parsePartialFrom(
-          com.google.protobuf.CodedInputStream input,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return new EventAck(input, extensionRegistry);
-      }
-    };
-
-    @java.lang.Override
-    public com.google.protobuf.Parser<EventAck> getParserForType() {
-      return PARSER;
-    }
-
-    private int bitField0_;
-    // optional int32 partitionId = 1;
-    public static final int PARTITIONID_FIELD_NUMBER = 1;
-    private int partitionId_;
-    /**
-     * <code>optional int32 partitionId = 1;</code>
-     */
-    public boolean hasPartitionId() {
-      return ((bitField0_ & 0x00000001) == 0x00000001);
-    }
-    /**
-     * <code>optional int32 partitionId = 1;</code>
-     */
-    public int getPartitionId() {
-      return partitionId_;
-    }
-
-    // optional int32 eventType = 2;
-    public static final int EVENTTYPE_FIELD_NUMBER = 2;
-    private int eventType_;
-    /**
-     * <code>optional int32 eventType = 2;</code>
-     *
-     * <pre>
-     * poison pill, cluster restart, rejoin
-     * </pre>
-     */
-    public boolean hasEventType() {
-      return ((bitField0_ & 0x00000002) == 0x00000002);
-    }
-    /**
-     * <code>optional int32 eventType = 2;</code>
-     *
-     * <pre>
-     * poison pill, cluster restart, rejoin
-     * </pre>
-     */
-    public int getEventType() {
-      return eventType_;
-    }
-
-    // optional bool lookForEvent = 3;
-    public static final int LOOKFOREVENT_FIELD_NUMBER = 3;
-    private boolean lookForEvent_;
-    /**
-     * <code>optional bool lookForEvent = 3;</code>
-     *
-     * <pre>
-     * if true, the recipient should expect to have
-     * a corresponding event to discard
-     * if false, this is just a query for the next
-     * unique id available for this partition
-     * </pre>
-     */
-    public boolean hasLookForEvent() {
-      return ((bitField0_ & 0x00000004) == 0x00000004);
-    }
-    /**
-     * <code>optional bool lookForEvent = 3;</code>
-     *
-     * <pre>
-     * if true, the recipient should expect to have
-     * a corresponding event to discard
-     * if false, this is just a query for the next
-     * unique id available for this partition
-     * </pre>
-     */
-    public boolean getLookForEvent() {
-      return lookForEvent_;
-    }
-
-    // optional fixed64 lastAckedUniqueId = 4;
-    public static final int LASTACKEDUNIQUEID_FIELD_NUMBER = 4;
-    private long lastAckedUniqueId_;
-    /**
-     * <code>optional fixed64 lastAckedUniqueId = 4;</code>
-     *
-     * <pre>
-     * unique id of the last thing the receiver has
-     * acked for this partition
-     * </pre>
-     */
-    public boolean hasLastAckedUniqueId() {
-      return ((bitField0_ & 0x00000008) == 0x00000008);
-    }
-    /**
-     * <code>optional fixed64 lastAckedUniqueId = 4;</code>
-     *
-     * <pre>
-     * unique id of the last thing the receiver has
-     * acked for this partition
-     * </pre>
-     */
-    public long getLastAckedUniqueId() {
-      return lastAckedUniqueId_;
-    }
-
-    private void initFields() {
-      partitionId_ = 0;
-      eventType_ = 0;
-      lookForEvent_ = false;
-      lastAckedUniqueId_ = 0L;
-    }
-    private byte memoizedIsInitialized = -1;
-    public final boolean isInitialized() {
-      byte isInitialized = memoizedIsInitialized;
-      if (isInitialized != -1) return isInitialized == 1;
-
-      memoizedIsInitialized = 1;
-      return true;
-    }
-
-    public void writeTo(com.google.protobuf.CodedOutputStream output)
-                        throws java.io.IOException {
-      getSerializedSize();
-      if (((bitField0_ & 0x00000001) == 0x00000001)) {
-        output.writeInt32(1, partitionId_);
-      }
-      if (((bitField0_ & 0x00000002) == 0x00000002)) {
-        output.writeInt32(2, eventType_);
-      }
-      if (((bitField0_ & 0x00000004) == 0x00000004)) {
-        output.writeBool(3, lookForEvent_);
-      }
-      if (((bitField0_ & 0x00000008) == 0x00000008)) {
-        output.writeFixed64(4, lastAckedUniqueId_);
-      }
-      getUnknownFields().writeTo(output);
-    }
-
-    private int memoizedSerializedSize = -1;
-    public int getSerializedSize() {
-      int size = memoizedSerializedSize;
-      if (size != -1) return size;
-
-      size = 0;
-      if (((bitField0_ & 0x00000001) == 0x00000001)) {
-        size += com.google.protobuf.CodedOutputStream
-          .computeInt32Size(1, partitionId_);
-      }
-      if (((bitField0_ & 0x00000002) == 0x00000002)) {
-        size += com.google.protobuf.CodedOutputStream
-          .computeInt32Size(2, eventType_);
-      }
-      if (((bitField0_ & 0x00000004) == 0x00000004)) {
-        size += com.google.protobuf.CodedOutputStream
-          .computeBoolSize(3, lookForEvent_);
-      }
-      if (((bitField0_ & 0x00000008) == 0x00000008)) {
-        size += com.google.protobuf.CodedOutputStream
-          .computeFixed64Size(4, lastAckedUniqueId_);
-      }
-      size += getUnknownFields().getSerializedSize();
-      memoizedSerializedSize = size;
-      return size;
-    }
-
-    private static final long serialVersionUID = 0L;
-    @java.lang.Override
-    protected java.lang.Object writeReplace()
-        throws java.io.ObjectStreamException {
-      return super.writeReplace();
-    }
-
-    public static org.voltdb.pmsg.DRAgent.EventAck parseFrom(
-        com.google.protobuf.ByteString data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return PARSER.parseFrom(data);
-    }
-    public static org.voltdb.pmsg.DRAgent.EventAck parseFrom(
-        com.google.protobuf.ByteString data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return PARSER.parseFrom(data, extensionRegistry);
-    }
-    public static org.voltdb.pmsg.DRAgent.EventAck parseFrom(byte[] data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return PARSER.parseFrom(data);
-    }
-    public static org.voltdb.pmsg.DRAgent.EventAck parseFrom(
-        byte[] data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return PARSER.parseFrom(data, extensionRegistry);
-    }
-    public static org.voltdb.pmsg.DRAgent.EventAck parseFrom(java.io.InputStream input)
-        throws java.io.IOException {
-      return PARSER.parseFrom(input);
-    }
-    public static org.voltdb.pmsg.DRAgent.EventAck parseFrom(
-        java.io.InputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return PARSER.parseFrom(input, extensionRegistry);
-    }
-    public static org.voltdb.pmsg.DRAgent.EventAck parseDelimitedFrom(java.io.InputStream input)
-        throws java.io.IOException {
-      return PARSER.parseDelimitedFrom(input);
-    }
-    public static org.voltdb.pmsg.DRAgent.EventAck parseDelimitedFrom(
-        java.io.InputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return PARSER.parseDelimitedFrom(input, extensionRegistry);
-    }
-    public static org.voltdb.pmsg.DRAgent.EventAck parseFrom(
-        com.google.protobuf.CodedInputStream input)
-        throws java.io.IOException {
-      return PARSER.parseFrom(input);
-    }
-    public static org.voltdb.pmsg.DRAgent.EventAck parseFrom(
-        com.google.protobuf.CodedInputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return PARSER.parseFrom(input, extensionRegistry);
-    }
-
-    public static Builder newBuilder() { return Builder.create(); }
-    public Builder newBuilderForType() { return newBuilder(); }
-    public static Builder newBuilder(org.voltdb.pmsg.DRAgent.EventAck prototype) {
-      return newBuilder().mergeFrom(prototype);
-    }
-    public Builder toBuilder() { return newBuilder(this); }
-
-    @java.lang.Override
-    protected Builder newBuilderForType(
-        com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
-    }
-    /**
-     * Protobuf type {@code pmsg.EventAck}
-     */
-    public static final class Builder extends
-        com.google.protobuf.GeneratedMessage.Builder<Builder>
-       implements org.voltdb.pmsg.DRAgent.EventAckOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
-          getDescriptor() {
-        return org.voltdb.pmsg.DRAgent.internal_static_pmsg_EventAck_descriptor;
-      }
-
-      protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
-          internalGetFieldAccessorTable() {
-        return org.voltdb.pmsg.DRAgent.internal_static_pmsg_EventAck_fieldAccessorTable
-            .ensureFieldAccessorsInitialized(
-                org.voltdb.pmsg.DRAgent.EventAck.class, org.voltdb.pmsg.DRAgent.EventAck.Builder.class);
-      }
-
-      // Construct using org.voltdb.pmsg.DRAgent.EventAck.newBuilder()
-      private Builder() {
-        maybeForceBuilderInitialization();
-      }
-
-      private Builder(
-          com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-        super(parent);
-        maybeForceBuilderInitialization();
-      }
-      private void maybeForceBuilderInitialization() {
-        if (com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders) {
-        }
-      }
-      private static Builder create() {
-        return new Builder();
-      }
-
-      public Builder clear() {
-        super.clear();
-        partitionId_ = 0;
-        bitField0_ = (bitField0_ & ~0x00000001);
-        eventType_ = 0;
-        bitField0_ = (bitField0_ & ~0x00000002);
-        lookForEvent_ = false;
-        bitField0_ = (bitField0_ & ~0x00000004);
-        lastAckedUniqueId_ = 0L;
-        bitField0_ = (bitField0_ & ~0x00000008);
-        return this;
-      }
-
-      public Builder clone() {
-        return create().mergeFrom(buildPartial());
-      }
-
-      public com.google.protobuf.Descriptors.Descriptor
-          getDescriptorForType() {
-        return org.voltdb.pmsg.DRAgent.internal_static_pmsg_EventAck_descriptor;
-      }
-
-      public org.voltdb.pmsg.DRAgent.EventAck getDefaultInstanceForType() {
-        return org.voltdb.pmsg.DRAgent.EventAck.getDefaultInstance();
-      }
-
-      public org.voltdb.pmsg.DRAgent.EventAck build() {
-        org.voltdb.pmsg.DRAgent.EventAck result = buildPartial();
-        if (!result.isInitialized()) {
-          throw newUninitializedMessageException(result);
-        }
-        return result;
-      }
-
-      public org.voltdb.pmsg.DRAgent.EventAck buildPartial() {
-        org.voltdb.pmsg.DRAgent.EventAck result = new org.voltdb.pmsg.DRAgent.EventAck(this);
-        int from_bitField0_ = bitField0_;
-        int to_bitField0_ = 0;
-        if (((from_bitField0_ & 0x00000001) == 0x00000001)) {
-          to_bitField0_ |= 0x00000001;
-        }
-        result.partitionId_ = partitionId_;
-        if (((from_bitField0_ & 0x00000002) == 0x00000002)) {
-          to_bitField0_ |= 0x00000002;
-        }
-        result.eventType_ = eventType_;
-        if (((from_bitField0_ & 0x00000004) == 0x00000004)) {
-          to_bitField0_ |= 0x00000004;
-        }
-        result.lookForEvent_ = lookForEvent_;
-        if (((from_bitField0_ & 0x00000008) == 0x00000008)) {
-          to_bitField0_ |= 0x00000008;
-        }
-        result.lastAckedUniqueId_ = lastAckedUniqueId_;
-        result.bitField0_ = to_bitField0_;
-        onBuilt();
-        return result;
-      }
-
-      public Builder mergeFrom(com.google.protobuf.Message other) {
-        if (other instanceof org.voltdb.pmsg.DRAgent.EventAck) {
-          return mergeFrom((org.voltdb.pmsg.DRAgent.EventAck)other);
-        } else {
-          super.mergeFrom(other);
-          return this;
-        }
-      }
-
-      public Builder mergeFrom(org.voltdb.pmsg.DRAgent.EventAck other) {
-        if (other == org.voltdb.pmsg.DRAgent.EventAck.getDefaultInstance()) return this;
-        if (other.hasPartitionId()) {
-          setPartitionId(other.getPartitionId());
-        }
-        if (other.hasEventType()) {
-          setEventType(other.getEventType());
-        }
-        if (other.hasLookForEvent()) {
-          setLookForEvent(other.getLookForEvent());
-        }
-        if (other.hasLastAckedUniqueId()) {
-          setLastAckedUniqueId(other.getLastAckedUniqueId());
-        }
-        this.mergeUnknownFields(other.getUnknownFields());
-        return this;
-      }
-
-      public final boolean isInitialized() {
-        return true;
-      }
-
-      public Builder mergeFrom(
-          com.google.protobuf.CodedInputStream input,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws java.io.IOException {
-        org.voltdb.pmsg.DRAgent.EventAck parsedMessage = null;
-        try {
-          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
-        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
-          parsedMessage = (org.voltdb.pmsg.DRAgent.EventAck) e.getUnfinishedMessage();
-          throw e;
-        } finally {
-          if (parsedMessage != null) {
-            mergeFrom(parsedMessage);
-          }
-        }
-        return this;
-      }
-      private int bitField0_;
-
-      // optional int32 partitionId = 1;
-      private int partitionId_ ;
-      /**
-       * <code>optional int32 partitionId = 1;</code>
-       */
-      public boolean hasPartitionId() {
-        return ((bitField0_ & 0x00000001) == 0x00000001);
-      }
-      /**
-       * <code>optional int32 partitionId = 1;</code>
-       */
-      public int getPartitionId() {
-        return partitionId_;
-      }
-      /**
-       * <code>optional int32 partitionId = 1;</code>
-       */
-      public Builder setPartitionId(int value) {
-        bitField0_ |= 0x00000001;
-        partitionId_ = value;
-        onChanged();
-        return this;
-      }
-      /**
-       * <code>optional int32 partitionId = 1;</code>
-       */
-      public Builder clearPartitionId() {
-        bitField0_ = (bitField0_ & ~0x00000001);
-        partitionId_ = 0;
-        onChanged();
-        return this;
-      }
-
-      // optional int32 eventType = 2;
-      private int eventType_ ;
-      /**
-       * <code>optional int32 eventType = 2;</code>
-       *
-       * <pre>
-       * poison pill, cluster restart, rejoin
-       * </pre>
-       */
-      public boolean hasEventType() {
-        return ((bitField0_ & 0x00000002) == 0x00000002);
-      }
-      /**
-       * <code>optional int32 eventType = 2;</code>
-       *
-       * <pre>
-       * poison pill, cluster restart, rejoin
-       * </pre>
-       */
-      public int getEventType() {
-        return eventType_;
-      }
-      /**
-       * <code>optional int32 eventType = 2;</code>
-       *
-       * <pre>
-       * poison pill, cluster restart, rejoin
-       * </pre>
-       */
-      public Builder setEventType(int value) {
-        bitField0_ |= 0x00000002;
-        eventType_ = value;
-        onChanged();
-        return this;
-      }
-      /**
-       * <code>optional int32 eventType = 2;</code>
-       *
-       * <pre>
-       * poison pill, cluster restart, rejoin
-       * </pre>
-       */
-      public Builder clearEventType() {
-        bitField0_ = (bitField0_ & ~0x00000002);
-        eventType_ = 0;
-        onChanged();
-        return this;
-      }
-
-      // optional bool lookForEvent = 3;
-      private boolean lookForEvent_ ;
-      /**
-       * <code>optional bool lookForEvent = 3;</code>
-       *
-       * <pre>
-       * if true, the recipient should expect to have
-       * a corresponding event to discard
-       * if false, this is just a query for the next
-       * unique id available for this partition
-       * </pre>
-       */
-      public boolean hasLookForEvent() {
-        return ((bitField0_ & 0x00000004) == 0x00000004);
-      }
-      /**
-       * <code>optional bool lookForEvent = 3;</code>
-       *
-       * <pre>
-       * if true, the recipient should expect to have
-       * a corresponding event to discard
-       * if false, this is just a query for the next
-       * unique id available for this partition
-       * </pre>
-       */
-      public boolean getLookForEvent() {
-        return lookForEvent_;
-      }
-      /**
-       * <code>optional bool lookForEvent = 3;</code>
-       *
-       * <pre>
-       * if true, the recipient should expect to have
-       * a corresponding event to discard
-       * if false, this is just a query for the next
-       * unique id available for this partition
-       * </pre>
-       */
-      public Builder setLookForEvent(boolean value) {
-        bitField0_ |= 0x00000004;
-        lookForEvent_ = value;
-        onChanged();
-        return this;
-      }
-      /**
-       * <code>optional bool lookForEvent = 3;</code>
-       *
-       * <pre>
-       * if true, the recipient should expect to have
-       * a corresponding event to discard
-       * if false, this is just a query for the next
-       * unique id available for this partition
-       * </pre>
-       */
-      public Builder clearLookForEvent() {
-        bitField0_ = (bitField0_ & ~0x00000004);
-        lookForEvent_ = false;
-        onChanged();
-        return this;
-      }
-
-      // optional fixed64 lastAckedUniqueId = 4;
-      private long lastAckedUniqueId_ ;
-      /**
-       * <code>optional fixed64 lastAckedUniqueId = 4;</code>
-       *
-       * <pre>
-       * unique id of the last thing the receiver has
-       * acked for this partition
-       * </pre>
-       */
-      public boolean hasLastAckedUniqueId() {
-        return ((bitField0_ & 0x00000008) == 0x00000008);
-      }
-      /**
-       * <code>optional fixed64 lastAckedUniqueId = 4;</code>
-       *
-       * <pre>
-       * unique id of the last thing the receiver has
-       * acked for this partition
-       * </pre>
-       */
-      public long getLastAckedUniqueId() {
-        return lastAckedUniqueId_;
-      }
-      /**
-       * <code>optional fixed64 lastAckedUniqueId = 4;</code>
-       *
-       * <pre>
-       * unique id of the last thing the receiver has
-       * acked for this partition
-       * </pre>
-       */
-      public Builder setLastAckedUniqueId(long value) {
-        bitField0_ |= 0x00000008;
-        lastAckedUniqueId_ = value;
-        onChanged();
-        return this;
-      }
-      /**
-       * <code>optional fixed64 lastAckedUniqueId = 4;</code>
-       *
-       * <pre>
-       * unique id of the last thing the receiver has
-       * acked for this partition
-       * </pre>
-       */
-      public Builder clearLastAckedUniqueId() {
-        bitField0_ = (bitField0_ & ~0x00000008);
-        lastAckedUniqueId_ = 0L;
-        onChanged();
-        return this;
-      }
-
-      // @@protoc_insertion_point(builder_scope:pmsg.EventAck)
-    }
-
-    static {
-      defaultInstance = new EventAck(true);
-      defaultInstance.initFields();
-    }
-
-    // @@protoc_insertion_point(class_scope:pmsg.EventAck)
-  }
-
   public interface ResponseOrBuilder
       extends com.google.protobuf.MessageOrBuilder {
 
@@ -4520,6 +3915,26 @@ public final class DRAgent {
      */
     com.google.protobuf.ByteString
         getFailureCauseBytes();
+
+    // optional bool isEndOfStream = 14;
+    /**
+     * <code>optional bool isEndOfStream = 14;</code>
+     */
+    boolean hasIsEndOfStream();
+    /**
+     * <code>optional bool isEndOfStream = 14;</code>
+     */
+    boolean getIsEndOfStream();
+
+    // optional int32 protocolVersion = 15;
+    /**
+     * <code>optional int32 protocolVersion = 15;</code>
+     */
+    boolean hasProtocolVersion();
+    /**
+     * <code>optional int32 protocolVersion = 15;</code>
+     */
+    int getProtocolVersion();
   }
   /**
    * Protobuf type {@code pmsg.Response}
@@ -4661,6 +4076,16 @@ public final class DRAgent {
             case 106: {
               bitField0_ |= 0x00000400;
               failureCause_ = input.readBytes();
+              break;
+            }
+            case 112: {
+              bitField0_ |= 0x00000800;
+              isEndOfStream_ = input.readBool();
+              break;
+            }
+            case 120: {
+              bitField0_ |= 0x00001000;
+              protocolVersion_ = input.readInt32();
               break;
             }
           }
@@ -5206,6 +4631,38 @@ public final class DRAgent {
       }
     }
 
+    // optional bool isEndOfStream = 14;
+    public static final int ISENDOFSTREAM_FIELD_NUMBER = 14;
+    private boolean isEndOfStream_;
+    /**
+     * <code>optional bool isEndOfStream = 14;</code>
+     */
+    public boolean hasIsEndOfStream() {
+      return ((bitField0_ & 0x00000800) == 0x00000800);
+    }
+    /**
+     * <code>optional bool isEndOfStream = 14;</code>
+     */
+    public boolean getIsEndOfStream() {
+      return isEndOfStream_;
+    }
+
+    // optional int32 protocolVersion = 15;
+    public static final int PROTOCOLVERSION_FIELD_NUMBER = 15;
+    private int protocolVersion_;
+    /**
+     * <code>optional int32 protocolVersion = 15;</code>
+     */
+    public boolean hasProtocolVersion() {
+      return ((bitField0_ & 0x00001000) == 0x00001000);
+    }
+    /**
+     * <code>optional int32 protocolVersion = 15;</code>
+     */
+    public int getProtocolVersion() {
+      return protocolVersion_;
+    }
+
     private void initFields() {
       id_ = org.voltdb.pmsg.DRAgent.UUID.getDefaultInstance();
       mode_ = org.voltdb.pmsg.DRAgent.Response.ReplicationMode.IDLE;
@@ -5220,6 +4677,8 @@ public final class DRAgent {
       catalogCRC_ = 0L;
       catalogSignature_ = "";
       failureCause_ = "";
+      isEndOfStream_ = false;
+      protocolVersion_ = 0;
     }
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
@@ -5279,6 +4738,12 @@ public final class DRAgent {
       }
       if (((bitField0_ & 0x00000400) == 0x00000400)) {
         output.writeBytes(13, getFailureCauseBytes());
+      }
+      if (((bitField0_ & 0x00000800) == 0x00000800)) {
+        output.writeBool(14, isEndOfStream_);
+      }
+      if (((bitField0_ & 0x00001000) == 0x00001000)) {
+        output.writeInt32(15, protocolVersion_);
       }
       getUnknownFields().writeTo(output);
     }
@@ -5340,6 +4805,14 @@ public final class DRAgent {
       if (((bitField0_ & 0x00000400) == 0x00000400)) {
         size += com.google.protobuf.CodedOutputStream
           .computeBytesSize(13, getFailureCauseBytes());
+      }
+      if (((bitField0_ & 0x00000800) == 0x00000800)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeBoolSize(14, isEndOfStream_);
+      }
+      if (((bitField0_ & 0x00001000) == 0x00001000)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeInt32Size(15, protocolVersion_);
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -5498,6 +4971,10 @@ public final class DRAgent {
         bitField0_ = (bitField0_ & ~0x00000800);
         failureCause_ = "";
         bitField0_ = (bitField0_ & ~0x00001000);
+        isEndOfStream_ = false;
+        bitField0_ = (bitField0_ & ~0x00002000);
+        protocolVersion_ = 0;
+        bitField0_ = (bitField0_ & ~0x00004000);
         return this;
       }
 
@@ -5592,6 +5069,14 @@ public final class DRAgent {
           to_bitField0_ |= 0x00000400;
         }
         result.failureCause_ = failureCause_;
+        if (((from_bitField0_ & 0x00002000) == 0x00002000)) {
+          to_bitField0_ |= 0x00000800;
+        }
+        result.isEndOfStream_ = isEndOfStream_;
+        if (((from_bitField0_ & 0x00004000) == 0x00004000)) {
+          to_bitField0_ |= 0x00001000;
+        }
+        result.protocolVersion_ = protocolVersion_;
         result.bitField0_ = to_bitField0_;
         onBuilt();
         return result;
@@ -5698,6 +5183,12 @@ public final class DRAgent {
           bitField0_ |= 0x00001000;
           failureCause_ = other.failureCause_;
           onChanged();
+        }
+        if (other.hasIsEndOfStream()) {
+          setIsEndOfStream(other.getIsEndOfStream());
+        }
+        if (other.hasProtocolVersion()) {
+          setProtocolVersion(other.getProtocolVersion());
         }
         this.mergeUnknownFields(other.getUnknownFields());
         return this;
@@ -6964,6 +6455,72 @@ public final class DRAgent {
   }
   bitField0_ |= 0x00001000;
         failureCause_ = value;
+        onChanged();
+        return this;
+      }
+
+      // optional bool isEndOfStream = 14;
+      private boolean isEndOfStream_ ;
+      /**
+       * <code>optional bool isEndOfStream = 14;</code>
+       */
+      public boolean hasIsEndOfStream() {
+        return ((bitField0_ & 0x00002000) == 0x00002000);
+      }
+      /**
+       * <code>optional bool isEndOfStream = 14;</code>
+       */
+      public boolean getIsEndOfStream() {
+        return isEndOfStream_;
+      }
+      /**
+       * <code>optional bool isEndOfStream = 14;</code>
+       */
+      public Builder setIsEndOfStream(boolean value) {
+        bitField0_ |= 0x00002000;
+        isEndOfStream_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>optional bool isEndOfStream = 14;</code>
+       */
+      public Builder clearIsEndOfStream() {
+        bitField0_ = (bitField0_ & ~0x00002000);
+        isEndOfStream_ = false;
+        onChanged();
+        return this;
+      }
+
+      // optional int32 protocolVersion = 15;
+      private int protocolVersion_ ;
+      /**
+       * <code>optional int32 protocolVersion = 15;</code>
+       */
+      public boolean hasProtocolVersion() {
+        return ((bitField0_ & 0x00004000) == 0x00004000);
+      }
+      /**
+       * <code>optional int32 protocolVersion = 15;</code>
+       */
+      public int getProtocolVersion() {
+        return protocolVersion_;
+      }
+      /**
+       * <code>optional int32 protocolVersion = 15;</code>
+       */
+      public Builder setProtocolVersion(int value) {
+        bitField0_ |= 0x00004000;
+        protocolVersion_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>optional int32 protocolVersion = 15;</code>
+       */
+      public Builder clearProtocolVersion() {
+        bitField0_ = (bitField0_ & ~0x00004000);
+        protocolVersion_ = 0;
         onChanged();
         return this;
       }
@@ -9057,31 +8614,29 @@ public final class DRAgent {
      */
     org.voltdb.pmsg.DRAgent.SubscribeOrBuilder getSubscribeOrBuilder();
 
-    // optional .pmsg.EventAck eventAck = 9;
-    /**
-     * <code>optional .pmsg.EventAck eventAck = 9;</code>
-     */
-    boolean hasEventAck();
-    /**
-     * <code>optional .pmsg.EventAck eventAck = 9;</code>
-     */
-    org.voltdb.pmsg.DRAgent.EventAck getEventAck();
-    /**
-     * <code>optional .pmsg.EventAck eventAck = 9;</code>
-     */
-    org.voltdb.pmsg.DRAgent.EventAckOrBuilder getEventAckOrBuilder();
-
     // optional .pmsg.Connect connect = 10;
     /**
      * <code>optional .pmsg.Connect connect = 10;</code>
+     *
+     * <pre>
+     * Intentionally skip field 9 -- deprecated message type
+     * </pre>
      */
     boolean hasConnect();
     /**
      * <code>optional .pmsg.Connect connect = 10;</code>
+     *
+     * <pre>
+     * Intentionally skip field 9 -- deprecated message type
+     * </pre>
      */
     org.voltdb.pmsg.DRAgent.Connect getConnect();
     /**
      * <code>optional .pmsg.Connect connect = 10;</code>
+     *
+     * <pre>
+     * Intentionally skip field 9 -- deprecated message type
+     * </pre>
      */
     org.voltdb.pmsg.DRAgent.ConnectOrBuilder getConnectOrBuilder();
   }
@@ -9238,22 +8793,9 @@ public final class DRAgent {
               bitField0_ |= 0x00000080;
               break;
             }
-            case 74: {
-              org.voltdb.pmsg.DRAgent.EventAck.Builder subBuilder = null;
-              if (((bitField0_ & 0x00000100) == 0x00000100)) {
-                subBuilder = eventAck_.toBuilder();
-              }
-              eventAck_ = input.readMessage(org.voltdb.pmsg.DRAgent.EventAck.PARSER, extensionRegistry);
-              if (subBuilder != null) {
-                subBuilder.mergeFrom(eventAck_);
-                eventAck_ = subBuilder.buildPartial();
-              }
-              bitField0_ |= 0x00000100;
-              break;
-            }
             case 82: {
               org.voltdb.pmsg.DRAgent.Connect.Builder subBuilder = null;
-              if (((bitField0_ & 0x00000200) == 0x00000200)) {
+              if (((bitField0_ & 0x00000100) == 0x00000100)) {
                 subBuilder = connect_.toBuilder();
               }
               connect_ = input.readMessage(org.voltdb.pmsg.DRAgent.Connect.PARSER, extensionRegistry);
@@ -9261,7 +8803,7 @@ public final class DRAgent {
                 subBuilder.mergeFrom(connect_);
                 connect_ = subBuilder.buildPartial();
               }
-              bitField0_ |= 0x00000200;
+              bitField0_ |= 0x00000100;
               break;
             }
           }
@@ -9348,10 +8890,6 @@ public final class DRAgent {
        * <code>SUBSCRIBE = 10;</code>
        */
       SUBSCRIBE(9, 10),
-      /**
-       * <code>EVENT_ACK = 11;</code>
-       */
-      EVENT_ACK(10, 11),
       ;
 
       /**
@@ -9394,10 +8932,6 @@ public final class DRAgent {
        * <code>SUBSCRIBE = 10;</code>
        */
       public static final int SUBSCRIBE_VALUE = 10;
-      /**
-       * <code>EVENT_ACK = 11;</code>
-       */
-      public static final int EVENT_ACK_VALUE = 11;
 
 
       public final int getNumber() { return value; }
@@ -9414,7 +8948,6 @@ public final class DRAgent {
           case 8: return STOP_SYNC;
           case 9: return CONNECT;
           case 10: return SUBSCRIBE;
-          case 11: return EVENT_ACK;
           default: return null;
         }
       }
@@ -9637,45 +9170,35 @@ public final class DRAgent {
       return subscribe_;
     }
 
-    // optional .pmsg.EventAck eventAck = 9;
-    public static final int EVENTACK_FIELD_NUMBER = 9;
-    private org.voltdb.pmsg.DRAgent.EventAck eventAck_;
-    /**
-     * <code>optional .pmsg.EventAck eventAck = 9;</code>
-     */
-    public boolean hasEventAck() {
-      return ((bitField0_ & 0x00000100) == 0x00000100);
-    }
-    /**
-     * <code>optional .pmsg.EventAck eventAck = 9;</code>
-     */
-    public org.voltdb.pmsg.DRAgent.EventAck getEventAck() {
-      return eventAck_;
-    }
-    /**
-     * <code>optional .pmsg.EventAck eventAck = 9;</code>
-     */
-    public org.voltdb.pmsg.DRAgent.EventAckOrBuilder getEventAckOrBuilder() {
-      return eventAck_;
-    }
-
     // optional .pmsg.Connect connect = 10;
     public static final int CONNECT_FIELD_NUMBER = 10;
     private org.voltdb.pmsg.DRAgent.Connect connect_;
     /**
      * <code>optional .pmsg.Connect connect = 10;</code>
+     *
+     * <pre>
+     * Intentionally skip field 9 -- deprecated message type
+     * </pre>
      */
     public boolean hasConnect() {
-      return ((bitField0_ & 0x00000200) == 0x00000200);
+      return ((bitField0_ & 0x00000100) == 0x00000100);
     }
     /**
      * <code>optional .pmsg.Connect connect = 10;</code>
+     *
+     * <pre>
+     * Intentionally skip field 9 -- deprecated message type
+     * </pre>
      */
     public org.voltdb.pmsg.DRAgent.Connect getConnect() {
       return connect_;
     }
     /**
      * <code>optional .pmsg.Connect connect = 10;</code>
+     *
+     * <pre>
+     * Intentionally skip field 9 -- deprecated message type
+     * </pre>
      */
     public org.voltdb.pmsg.DRAgent.ConnectOrBuilder getConnectOrBuilder() {
       return connect_;
@@ -9690,7 +9213,6 @@ public final class DRAgent {
       response_ = org.voltdb.pmsg.DRAgent.Response.getDefaultInstance();
       snapshotReq_ = org.voltdb.pmsg.DRAgent.SnapshotReq.getDefaultInstance();
       subscribe_ = org.voltdb.pmsg.DRAgent.Subscribe.getDefaultInstance();
-      eventAck_ = org.voltdb.pmsg.DRAgent.EventAck.getDefaultInstance();
       connect_ = org.voltdb.pmsg.DRAgent.Connect.getDefaultInstance();
     }
     private byte memoizedIsInitialized = -1;
@@ -9748,9 +9270,6 @@ public final class DRAgent {
         output.writeMessage(8, subscribe_);
       }
       if (((bitField0_ & 0x00000100) == 0x00000100)) {
-        output.writeMessage(9, eventAck_);
-      }
-      if (((bitField0_ & 0x00000200) == 0x00000200)) {
         output.writeMessage(10, connect_);
       }
       getUnknownFields().writeTo(output);
@@ -9795,10 +9314,6 @@ public final class DRAgent {
           .computeMessageSize(8, subscribe_);
       }
       if (((bitField0_ & 0x00000100) == 0x00000100)) {
-        size += com.google.protobuf.CodedOutputStream
-          .computeMessageSize(9, eventAck_);
-      }
-      if (((bitField0_ & 0x00000200) == 0x00000200)) {
         size += com.google.protobuf.CodedOutputStream
           .computeMessageSize(10, connect_);
       }
@@ -9917,7 +9432,6 @@ public final class DRAgent {
           getResponseFieldBuilder();
           getSnapshotReqFieldBuilder();
           getSubscribeFieldBuilder();
-          getEventAckFieldBuilder();
           getConnectFieldBuilder();
         }
       }
@@ -9971,18 +9485,12 @@ public final class DRAgent {
           subscribeBuilder_.clear();
         }
         bitField0_ = (bitField0_ & ~0x00000080);
-        if (eventAckBuilder_ == null) {
-          eventAck_ = org.voltdb.pmsg.DRAgent.EventAck.getDefaultInstance();
-        } else {
-          eventAckBuilder_.clear();
-        }
-        bitField0_ = (bitField0_ & ~0x00000100);
         if (connectBuilder_ == null) {
           connect_ = org.voltdb.pmsg.DRAgent.Connect.getDefaultInstance();
         } else {
           connectBuilder_.clear();
         }
-        bitField0_ = (bitField0_ & ~0x00000200);
+        bitField0_ = (bitField0_ & ~0x00000100);
         return this;
       }
 
@@ -10074,14 +9582,6 @@ public final class DRAgent {
         if (((from_bitField0_ & 0x00000100) == 0x00000100)) {
           to_bitField0_ |= 0x00000100;
         }
-        if (eventAckBuilder_ == null) {
-          result.eventAck_ = eventAck_;
-        } else {
-          result.eventAck_ = eventAckBuilder_.build();
-        }
-        if (((from_bitField0_ & 0x00000200) == 0x00000200)) {
-          to_bitField0_ |= 0x00000200;
-        }
         if (connectBuilder_ == null) {
           result.connect_ = connect_;
         } else {
@@ -10126,9 +9626,6 @@ public final class DRAgent {
         }
         if (other.hasSubscribe()) {
           mergeSubscribe(other.getSubscribe());
-        }
-        if (other.hasEventAck()) {
-          mergeEventAck(other.getEventAck());
         }
         if (other.hasConnect()) {
           mergeConnect(other.getConnect());
@@ -11033,135 +10530,26 @@ public final class DRAgent {
         return subscribeBuilder_;
       }
 
-      // optional .pmsg.EventAck eventAck = 9;
-      private org.voltdb.pmsg.DRAgent.EventAck eventAck_ = org.voltdb.pmsg.DRAgent.EventAck.getDefaultInstance();
-      private com.google.protobuf.SingleFieldBuilder<
-          org.voltdb.pmsg.DRAgent.EventAck, org.voltdb.pmsg.DRAgent.EventAck.Builder, org.voltdb.pmsg.DRAgent.EventAckOrBuilder> eventAckBuilder_;
-      /**
-       * <code>optional .pmsg.EventAck eventAck = 9;</code>
-       */
-      public boolean hasEventAck() {
-        return ((bitField0_ & 0x00000100) == 0x00000100);
-      }
-      /**
-       * <code>optional .pmsg.EventAck eventAck = 9;</code>
-       */
-      public org.voltdb.pmsg.DRAgent.EventAck getEventAck() {
-        if (eventAckBuilder_ == null) {
-          return eventAck_;
-        } else {
-          return eventAckBuilder_.getMessage();
-        }
-      }
-      /**
-       * <code>optional .pmsg.EventAck eventAck = 9;</code>
-       */
-      public Builder setEventAck(org.voltdb.pmsg.DRAgent.EventAck value) {
-        if (eventAckBuilder_ == null) {
-          if (value == null) {
-            throw new NullPointerException();
-          }
-          eventAck_ = value;
-          onChanged();
-        } else {
-          eventAckBuilder_.setMessage(value);
-        }
-        bitField0_ |= 0x00000100;
-        return this;
-      }
-      /**
-       * <code>optional .pmsg.EventAck eventAck = 9;</code>
-       */
-      public Builder setEventAck(
-          org.voltdb.pmsg.DRAgent.EventAck.Builder builderForValue) {
-        if (eventAckBuilder_ == null) {
-          eventAck_ = builderForValue.build();
-          onChanged();
-        } else {
-          eventAckBuilder_.setMessage(builderForValue.build());
-        }
-        bitField0_ |= 0x00000100;
-        return this;
-      }
-      /**
-       * <code>optional .pmsg.EventAck eventAck = 9;</code>
-       */
-      public Builder mergeEventAck(org.voltdb.pmsg.DRAgent.EventAck value) {
-        if (eventAckBuilder_ == null) {
-          if (((bitField0_ & 0x00000100) == 0x00000100) &&
-              eventAck_ != org.voltdb.pmsg.DRAgent.EventAck.getDefaultInstance()) {
-            eventAck_ =
-              org.voltdb.pmsg.DRAgent.EventAck.newBuilder(eventAck_).mergeFrom(value).buildPartial();
-          } else {
-            eventAck_ = value;
-          }
-          onChanged();
-        } else {
-          eventAckBuilder_.mergeFrom(value);
-        }
-        bitField0_ |= 0x00000100;
-        return this;
-      }
-      /**
-       * <code>optional .pmsg.EventAck eventAck = 9;</code>
-       */
-      public Builder clearEventAck() {
-        if (eventAckBuilder_ == null) {
-          eventAck_ = org.voltdb.pmsg.DRAgent.EventAck.getDefaultInstance();
-          onChanged();
-        } else {
-          eventAckBuilder_.clear();
-        }
-        bitField0_ = (bitField0_ & ~0x00000100);
-        return this;
-      }
-      /**
-       * <code>optional .pmsg.EventAck eventAck = 9;</code>
-       */
-      public org.voltdb.pmsg.DRAgent.EventAck.Builder getEventAckBuilder() {
-        bitField0_ |= 0x00000100;
-        onChanged();
-        return getEventAckFieldBuilder().getBuilder();
-      }
-      /**
-       * <code>optional .pmsg.EventAck eventAck = 9;</code>
-       */
-      public org.voltdb.pmsg.DRAgent.EventAckOrBuilder getEventAckOrBuilder() {
-        if (eventAckBuilder_ != null) {
-          return eventAckBuilder_.getMessageOrBuilder();
-        } else {
-          return eventAck_;
-        }
-      }
-      /**
-       * <code>optional .pmsg.EventAck eventAck = 9;</code>
-       */
-      private com.google.protobuf.SingleFieldBuilder<
-          org.voltdb.pmsg.DRAgent.EventAck, org.voltdb.pmsg.DRAgent.EventAck.Builder, org.voltdb.pmsg.DRAgent.EventAckOrBuilder> 
-          getEventAckFieldBuilder() {
-        if (eventAckBuilder_ == null) {
-          eventAckBuilder_ = new com.google.protobuf.SingleFieldBuilder<
-              org.voltdb.pmsg.DRAgent.EventAck, org.voltdb.pmsg.DRAgent.EventAck.Builder, org.voltdb.pmsg.DRAgent.EventAckOrBuilder>(
-                  eventAck_,
-                  getParentForChildren(),
-                  isClean());
-          eventAck_ = null;
-        }
-        return eventAckBuilder_;
-      }
-
       // optional .pmsg.Connect connect = 10;
       private org.voltdb.pmsg.DRAgent.Connect connect_ = org.voltdb.pmsg.DRAgent.Connect.getDefaultInstance();
       private com.google.protobuf.SingleFieldBuilder<
           org.voltdb.pmsg.DRAgent.Connect, org.voltdb.pmsg.DRAgent.Connect.Builder, org.voltdb.pmsg.DRAgent.ConnectOrBuilder> connectBuilder_;
       /**
        * <code>optional .pmsg.Connect connect = 10;</code>
+       *
+       * <pre>
+       * Intentionally skip field 9 -- deprecated message type
+       * </pre>
        */
       public boolean hasConnect() {
-        return ((bitField0_ & 0x00000200) == 0x00000200);
+        return ((bitField0_ & 0x00000100) == 0x00000100);
       }
       /**
        * <code>optional .pmsg.Connect connect = 10;</code>
+       *
+       * <pre>
+       * Intentionally skip field 9 -- deprecated message type
+       * </pre>
        */
       public org.voltdb.pmsg.DRAgent.Connect getConnect() {
         if (connectBuilder_ == null) {
@@ -11172,6 +10560,10 @@ public final class DRAgent {
       }
       /**
        * <code>optional .pmsg.Connect connect = 10;</code>
+       *
+       * <pre>
+       * Intentionally skip field 9 -- deprecated message type
+       * </pre>
        */
       public Builder setConnect(org.voltdb.pmsg.DRAgent.Connect value) {
         if (connectBuilder_ == null) {
@@ -11183,11 +10575,15 @@ public final class DRAgent {
         } else {
           connectBuilder_.setMessage(value);
         }
-        bitField0_ |= 0x00000200;
+        bitField0_ |= 0x00000100;
         return this;
       }
       /**
        * <code>optional .pmsg.Connect connect = 10;</code>
+       *
+       * <pre>
+       * Intentionally skip field 9 -- deprecated message type
+       * </pre>
        */
       public Builder setConnect(
           org.voltdb.pmsg.DRAgent.Connect.Builder builderForValue) {
@@ -11197,15 +10593,19 @@ public final class DRAgent {
         } else {
           connectBuilder_.setMessage(builderForValue.build());
         }
-        bitField0_ |= 0x00000200;
+        bitField0_ |= 0x00000100;
         return this;
       }
       /**
        * <code>optional .pmsg.Connect connect = 10;</code>
+       *
+       * <pre>
+       * Intentionally skip field 9 -- deprecated message type
+       * </pre>
        */
       public Builder mergeConnect(org.voltdb.pmsg.DRAgent.Connect value) {
         if (connectBuilder_ == null) {
-          if (((bitField0_ & 0x00000200) == 0x00000200) &&
+          if (((bitField0_ & 0x00000100) == 0x00000100) &&
               connect_ != org.voltdb.pmsg.DRAgent.Connect.getDefaultInstance()) {
             connect_ =
               org.voltdb.pmsg.DRAgent.Connect.newBuilder(connect_).mergeFrom(value).buildPartial();
@@ -11216,11 +10616,15 @@ public final class DRAgent {
         } else {
           connectBuilder_.mergeFrom(value);
         }
-        bitField0_ |= 0x00000200;
+        bitField0_ |= 0x00000100;
         return this;
       }
       /**
        * <code>optional .pmsg.Connect connect = 10;</code>
+       *
+       * <pre>
+       * Intentionally skip field 9 -- deprecated message type
+       * </pre>
        */
       public Builder clearConnect() {
         if (connectBuilder_ == null) {
@@ -11229,19 +10633,27 @@ public final class DRAgent {
         } else {
           connectBuilder_.clear();
         }
-        bitField0_ = (bitField0_ & ~0x00000200);
+        bitField0_ = (bitField0_ & ~0x00000100);
         return this;
       }
       /**
        * <code>optional .pmsg.Connect connect = 10;</code>
+       *
+       * <pre>
+       * Intentionally skip field 9 -- deprecated message type
+       * </pre>
        */
       public org.voltdb.pmsg.DRAgent.Connect.Builder getConnectBuilder() {
-        bitField0_ |= 0x00000200;
+        bitField0_ |= 0x00000100;
         onChanged();
         return getConnectFieldBuilder().getBuilder();
       }
       /**
        * <code>optional .pmsg.Connect connect = 10;</code>
+       *
+       * <pre>
+       * Intentionally skip field 9 -- deprecated message type
+       * </pre>
        */
       public org.voltdb.pmsg.DRAgent.ConnectOrBuilder getConnectOrBuilder() {
         if (connectBuilder_ != null) {
@@ -11252,6 +10664,10 @@ public final class DRAgent {
       }
       /**
        * <code>optional .pmsg.Connect connect = 10;</code>
+       *
+       * <pre>
+       * Intentionally skip field 9 -- deprecated message type
+       * </pre>
        */
       private com.google.protobuf.SingleFieldBuilder<
           org.voltdb.pmsg.DRAgent.Connect, org.voltdb.pmsg.DRAgent.Connect.Builder, org.voltdb.pmsg.DRAgent.ConnectOrBuilder> 
@@ -11314,11 +10730,6 @@ public final class DRAgent {
     com.google.protobuf.GeneratedMessage.FieldAccessorTable
       internal_static_pmsg_Subscribe_fieldAccessorTable;
   private static com.google.protobuf.Descriptors.Descriptor
-    internal_static_pmsg_EventAck_descriptor;
-  private static
-    com.google.protobuf.GeneratedMessage.FieldAccessorTable
-      internal_static_pmsg_EventAck_fieldAccessorTable;
-  private static com.google.protobuf.Descriptors.Descriptor
     internal_static_pmsg_Response_descriptor;
   private static
     com.google.protobuf.GeneratedMessage.FieldAccessorTable
@@ -11348,52 +10759,51 @@ public final class DRAgent {
   static {
     java.lang.String[] descriptorData = {
       "\n\rdragent.proto\022\004pmsg\"\'\n\004UUID\022\020\n\010instanc" +
-      "e\030\001 \002(\006\022\r\n\005count\030\002 \002(\006\"-\n\003Ack\022\023\n\013partiti" +
-      "onId\030\001 \001(\005\022\021\n\ttimestamp\030\002 \001(\006\"\034\n\013Snapsho" +
-      "tReq\022\r\n\005nonce\030\001 \001(\t\"/\n\005Reset\022\023\n\013partitio" +
-      "nId\030\001 \001(\005\022\021\n\ttimestamp\030\002 \001(\006\"\034\n\005Pause\022\023\n" +
-      "\013partitionId\030\001 \001(\005\"7\n\007Connect\022\021\n\tcluster" +
-      "Id\030\001 \001(\005\022\031\n\021persistInstanceId\030\002 \001(\006\"t\n\tS" +
-      "ubscribe\022\023\n\013partitionId\030\001 \001(\005\022\021\n\ttimesta" +
-      "mp\030\002 \001(\006\022\022\n\nisCovering\030\003 \001(\010\022\030\n\020rewindTo" +
-      "UniqueId\030\004 \001(\006\022\021\n\tisSyncing\030\005 \001(\010\"c\n\010Eve",
-      "ntAck\022\023\n\013partitionId\030\001 \001(\005\022\021\n\teventType\030" +
-      "\002 \001(\005\022\024\n\014lookForEvent\030\003 \001(\010\022\031\n\021lastAcked" +
-      "UniqueId\030\004 \001(\006\"\351\003\n\010Response\022\026\n\002id\030\001 \002(\0132" +
-      "\n.pmsg.UUID\022,\n\004mode\030\002 \001(\0162\036.pmsg.Respons" +
-      "e.ReplicationMode\022\031\n\021snapshotTimestamp\030\003" +
-      " \001(\006\022\026\n\016instanceIdHash\030\004 \001(\006\022\017\n\007version\030" +
-      "\005 \001(\t\022 \n\010nodeInfo\030\006 \003(\0132\016.pmsg.NodeInfo\022" +
-      "\034\n\024globalPartitionCount\030\007 \001(\005\022*\n\rpartiti" +
-      "onInfo\030\010 \003(\0132\023.pmsg.PartitionInfo\022\021\n\006sta" +
-      "tus\030\t \001(\005:\0010\022%\n\004type\030\n \001(\0162\027.pmsg.CtrlEn",
-      "velope.Type\022\022\n\ncatalogCRC\030\013 \001(\006\022\030\n\020catal" +
-      "ogSignature\030\014 \001(\t\022\024\n\014failureCause\030\r \001(\t\"" +
-      "i\n\017ReplicationMode\022\010\n\004IDLE\020\001\022\026\n\022SYNCING_" +
-      "REPLICATED\020\002\022\027\n\023SYNCING_PARTITIONED\020\003\022\n\n" +
-      "\006ACTIVE\020\004\022\017\n\013UNAVAILABLE\020\005\"@\n\010NodeInfo\022\020" +
-      "\n\010hostname\030\001 \001(\t\022\016\n\006drport\030\002 \001(\005\022\022\n\ncata" +
-      "logCRC\030\003 \001(\006\"\227\002\n\rPartitionInfo\022\023\n\013partit" +
-      "ionId\030\001 \001(\005\022\031\n\021lastSentTimestamp\030\002 \001(\006\022\030" +
-      "\n\020lowestTupleIndex\030\003 \001(\003\022\032\n\022lastSentTupl" +
-      "eIndex\030\004 \001(\003\022\027\n\017totalTupleCount\030\005 \001(\003\022\036\n",
-      "\026outstandingBufferCount\030\006 \001(\003\022\034\n\024outstan" +
-      "dingByteCount\030\007 \001(\003\022\020\n\010isPaused\030\010 \001(\010\022\020\n" +
-      "\010isSynced\030\t \001(\010\022\024\n\014nextUniqueId\030\n \001(\003\022\017\n" +
-      "\007isEnded\030\013 \001(\010\"\355\003\n\014CtrlEnvelope\022%\n\004type\030" +
-      "\001 \002(\0162\027.pmsg.CtrlEnvelope.Type\022\026\n\002id\030\002 \002" +
-      "(\0132\n.pmsg.UUID\022\026\n\003ack\030\003 \001(\0132\t.pmsg.Ack\022\032" +
-      "\n\005reset\030\004 \001(\0132\013.pmsg.Reset\022\032\n\005pause\030\005 \001(" +
-      "\0132\013.pmsg.Pause\022 \n\010response\030\006 \001(\0132\016.pmsg." +
-      "Response\022&\n\013snapshotReq\030\007 \001(\0132\021.pmsg.Sna" +
-      "pshotReq\022\"\n\tsubscribe\030\010 \001(\0132\017.pmsg.Subsc",
-      "ribe\022 \n\010eventAck\030\t \001(\0132\016.pmsg.EventAck\022\036" +
-      "\n\007connect\030\n \001(\0132\r.pmsg.Connect\"\235\001\n\004Type\022" +
-      "\007\n\003ACK\020\001\022\t\n\005RESET\020\002\022\t\n\005PAUSE\020\003\022\t\n\005QUERY\020" +
-      "\004\022\014\n\010RESPONSE\020\005\022\020\n\014SNAPSHOT_REQ\020\006\022\021\n\rSNA" +
-      "PSHOT_TERM\020\007\022\r\n\tSTOP_SYNC\020\010\022\013\n\007CONNECT\020\t" +
-      "\022\r\n\tSUBSCRIBE\020\n\022\r\n\tEVENT_ACK\020\013B\032\n\017org.vo" +
-      "ltdb.pmsgB\007DRAgent"
+      "e\030\001 \002(\006\022\r\n\005count\030\002 \002(\006\"M\n\003Ack\022\023\n\013partiti" +
+      "onId\030\001 \001(\005\022\021\n\ttimestamp\030\002 \001(\006\022\036\n\026average" +
+      "RowLatencyNanos\030\003 \001(\006\"\034\n\013SnapshotReq\022\r\n\005" +
+      "nonce\030\001 \001(\t\"/\n\005Reset\022\023\n\013partitionId\030\001 \001(" +
+      "\005\022\021\n\ttimestamp\030\002 \001(\006\"\034\n\005Pause\022\023\n\013partiti" +
+      "onId\030\001 \001(\005\"P\n\007Connect\022\021\n\tclusterId\030\001 \001(\005" +
+      "\022\031\n\021persistInstanceId\030\002 \001(\006\022\027\n\017protocolV" +
+      "ersion\030\003 \001(\005\"t\n\tSubscribe\022\023\n\013partitionId" +
+      "\030\001 \001(\005\022\021\n\ttimestamp\030\002 \001(\006\022\022\n\nisCovering\030",
+      "\003 \001(\010\022\030\n\020rewindToUniqueId\030\004 \001(\006\022\021\n\tisSyn" +
+      "cing\030\005 \001(\010\"\231\004\n\010Response\022\026\n\002id\030\001 \002(\0132\n.pm" +
+      "sg.UUID\022,\n\004mode\030\002 \001(\0162\036.pmsg.Response.Re" +
+      "plicationMode\022\031\n\021snapshotTimestamp\030\003 \001(\006" +
+      "\022\026\n\016instanceIdHash\030\004 \001(\006\022\017\n\007version\030\005 \001(" +
+      "\t\022 \n\010nodeInfo\030\006 \003(\0132\016.pmsg.NodeInfo\022\034\n\024g" +
+      "lobalPartitionCount\030\007 \001(\005\022*\n\rpartitionIn" +
+      "fo\030\010 \003(\0132\023.pmsg.PartitionInfo\022\021\n\006status\030" +
+      "\t \001(\005:\0010\022%\n\004type\030\n \001(\0162\027.pmsg.CtrlEnvelo" +
+      "pe.Type\022\022\n\ncatalogCRC\030\013 \001(\006\022\030\n\020catalogSi",
+      "gnature\030\014 \001(\t\022\024\n\014failureCause\030\r \001(\t\022\025\n\ri" +
+      "sEndOfStream\030\016 \001(\010\022\027\n\017protocolVersion\030\017 " +
+      "\001(\005\"i\n\017ReplicationMode\022\010\n\004IDLE\020\001\022\026\n\022SYNC" +
+      "ING_REPLICATED\020\002\022\027\n\023SYNCING_PARTITIONED\020" +
+      "\003\022\n\n\006ACTIVE\020\004\022\017\n\013UNAVAILABLE\020\005\"@\n\010NodeIn" +
+      "fo\022\020\n\010hostname\030\001 \001(\t\022\016\n\006drport\030\002 \001(\005\022\022\n\n" +
+      "catalogCRC\030\003 \001(\006\"\227\002\n\rPartitionInfo\022\023\n\013pa" +
+      "rtitionId\030\001 \001(\005\022\031\n\021lastSentTimestamp\030\002 \001" +
+      "(\006\022\030\n\020lowestTupleIndex\030\003 \001(\003\022\032\n\022lastSent" +
+      "TupleIndex\030\004 \001(\003\022\027\n\017totalTupleCount\030\005 \001(",
+      "\003\022\036\n\026outstandingBufferCount\030\006 \001(\003\022\034\n\024out" +
+      "standingByteCount\030\007 \001(\003\022\020\n\010isPaused\030\010 \001(" +
+      "\010\022\020\n\010isSynced\030\t \001(\010\022\024\n\014nextUniqueId\030\n \001(" +
+      "\003\022\017\n\007isEnded\030\013 \001(\010\"\274\003\n\014CtrlEnvelope\022%\n\004t" +
+      "ype\030\001 \002(\0162\027.pmsg.CtrlEnvelope.Type\022\026\n\002id" +
+      "\030\002 \002(\0132\n.pmsg.UUID\022\026\n\003ack\030\003 \001(\0132\t.pmsg.A" +
+      "ck\022\032\n\005reset\030\004 \001(\0132\013.pmsg.Reset\022\032\n\005pause\030" +
+      "\005 \001(\0132\013.pmsg.Pause\022 \n\010response\030\006 \001(\0132\016.p" +
+      "msg.Response\022&\n\013snapshotReq\030\007 \001(\0132\021.pmsg" +
+      ".SnapshotReq\022\"\n\tsubscribe\030\010 \001(\0132\017.pmsg.S",
+      "ubscribe\022\036\n\007connect\030\n \001(\0132\r.pmsg.Connect" +
+      "\"\216\001\n\004Type\022\007\n\003ACK\020\001\022\t\n\005RESET\020\002\022\t\n\005PAUSE\020\003" +
+      "\022\t\n\005QUERY\020\004\022\014\n\010RESPONSE\020\005\022\020\n\014SNAPSHOT_RE" +
+      "Q\020\006\022\021\n\rSNAPSHOT_TERM\020\007\022\r\n\tSTOP_SYNC\020\010\022\013\n" +
+      "\007CONNECT\020\t\022\r\n\tSUBSCRIBE\020\nB\032\n\017org.voltdb." +
+      "pmsgB\007DRAgent"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -11411,7 +10821,7 @@ public final class DRAgent {
           internal_static_pmsg_Ack_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_pmsg_Ack_descriptor,
-              new java.lang.String[] { "PartitionId", "Timestamp", });
+              new java.lang.String[] { "PartitionId", "Timestamp", "AverageRowLatencyNanos", });
           internal_static_pmsg_SnapshotReq_descriptor =
             getDescriptor().getMessageTypes().get(2);
           internal_static_pmsg_SnapshotReq_fieldAccessorTable = new
@@ -11435,43 +10845,37 @@ public final class DRAgent {
           internal_static_pmsg_Connect_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_pmsg_Connect_descriptor,
-              new java.lang.String[] { "ClusterId", "PersistInstanceId", });
+              new java.lang.String[] { "ClusterId", "PersistInstanceId", "ProtocolVersion", });
           internal_static_pmsg_Subscribe_descriptor =
             getDescriptor().getMessageTypes().get(6);
           internal_static_pmsg_Subscribe_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_pmsg_Subscribe_descriptor,
               new java.lang.String[] { "PartitionId", "Timestamp", "IsCovering", "RewindToUniqueId", "IsSyncing", });
-          internal_static_pmsg_EventAck_descriptor =
-            getDescriptor().getMessageTypes().get(7);
-          internal_static_pmsg_EventAck_fieldAccessorTable = new
-            com.google.protobuf.GeneratedMessage.FieldAccessorTable(
-              internal_static_pmsg_EventAck_descriptor,
-              new java.lang.String[] { "PartitionId", "EventType", "LookForEvent", "LastAckedUniqueId", });
           internal_static_pmsg_Response_descriptor =
-            getDescriptor().getMessageTypes().get(8);
+            getDescriptor().getMessageTypes().get(7);
           internal_static_pmsg_Response_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_pmsg_Response_descriptor,
-              new java.lang.String[] { "Id", "Mode", "SnapshotTimestamp", "InstanceIdHash", "Version", "NodeInfo", "GlobalPartitionCount", "PartitionInfo", "Status", "Type", "CatalogCRC", "CatalogSignature", "FailureCause", });
+              new java.lang.String[] { "Id", "Mode", "SnapshotTimestamp", "InstanceIdHash", "Version", "NodeInfo", "GlobalPartitionCount", "PartitionInfo", "Status", "Type", "CatalogCRC", "CatalogSignature", "FailureCause", "IsEndOfStream", "ProtocolVersion", });
           internal_static_pmsg_NodeInfo_descriptor =
-            getDescriptor().getMessageTypes().get(9);
+            getDescriptor().getMessageTypes().get(8);
           internal_static_pmsg_NodeInfo_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_pmsg_NodeInfo_descriptor,
               new java.lang.String[] { "Hostname", "Drport", "CatalogCRC", });
           internal_static_pmsg_PartitionInfo_descriptor =
-            getDescriptor().getMessageTypes().get(10);
+            getDescriptor().getMessageTypes().get(9);
           internal_static_pmsg_PartitionInfo_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_pmsg_PartitionInfo_descriptor,
               new java.lang.String[] { "PartitionId", "LastSentTimestamp", "LowestTupleIndex", "LastSentTupleIndex", "TotalTupleCount", "OutstandingBufferCount", "OutstandingByteCount", "IsPaused", "IsSynced", "NextUniqueId", "IsEnded", });
           internal_static_pmsg_CtrlEnvelope_descriptor =
-            getDescriptor().getMessageTypes().get(11);
+            getDescriptor().getMessageTypes().get(10);
           internal_static_pmsg_CtrlEnvelope_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_pmsg_CtrlEnvelope_descriptor,
-              new java.lang.String[] { "Type", "Id", "Ack", "Reset", "Pause", "Response", "SnapshotReq", "Subscribe", "EventAck", "Connect", });
+              new java.lang.String[] { "Type", "Id", "Ack", "Reset", "Pause", "Response", "SnapshotReq", "Subscribe", "Connect", });
           return null;
         }
       };

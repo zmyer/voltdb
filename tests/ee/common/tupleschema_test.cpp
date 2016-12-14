@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -203,6 +203,35 @@ TEST_F(TupleSchemaTest, EqualsAndCompatibleForMemcpy)
     // first hidden column.
     EXPECT_FALSE(schema2->equals(schema4.get()));
     EXPECT_FALSE(schema4->equals(schema2.get()));
+}
+
+
+TEST_F(TupleSchemaTest, MaxSerializedTupleSize) {
+    voltdb::TupleSchemaBuilder builder(3); // 3 visible columns
+    builder.setColumnAtIndex(0, VALUE_TYPE_DECIMAL);
+    builder.setColumnAtIndex(1, VALUE_TYPE_VARCHAR,
+                             64,     // length
+                             true,   // allow nulls
+                             false); // length not in bytes
+    builder.setColumnAtIndex(2, VALUE_TYPE_TIMESTAMP);
+    ScopedTupleSchema schema(builder.build());
+
+    EXPECT_EQ((4 + 16 + (4 + 64 * 4) + 8),
+              schema.get()->getMaxSerializedTupleSize());
+
+    voltdb::TupleSchemaBuilder hiddenBuilder(3, 2); // 3 visible columns, 2 hidden columns
+    hiddenBuilder.setColumnAtIndex(0, VALUE_TYPE_DECIMAL);
+    hiddenBuilder.setColumnAtIndex(1, VALUE_TYPE_VARCHAR,
+                             64,     // length
+                             true,   // allow nulls
+                             false); // length not in bytes
+    hiddenBuilder.setColumnAtIndex(2, VALUE_TYPE_TIMESTAMP);
+    hiddenBuilder.setHiddenColumnAtIndex(0, VALUE_TYPE_BIGINT);
+    hiddenBuilder.setHiddenColumnAtIndex(1, VALUE_TYPE_VARCHAR, 10, true, true);
+    ScopedTupleSchema schemaWithHidden(hiddenBuilder.build());
+
+    EXPECT_EQ((4 + 16 + (4 + 64 * 4) + 8 + 8 + (4 + 10)),
+              schemaWithHidden.get()->getMaxSerializedTupleSize(true));
 }
 
 int main() {

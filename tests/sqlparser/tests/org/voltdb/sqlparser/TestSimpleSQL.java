@@ -62,7 +62,7 @@ public class TestSimpleSQL {
         IDTable idTable = new IDTable();
         HSQLInterface hif = HSQLInterface.loadHsqldb();
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
-        VoltXMLElement element = hif.getVoltCatalogXML(null, null);
+        VoltXMLElement element = hif.getVoltCatalogXML(null);
         assertThat(element)
             .hasName(1, "databaseschema")
             .hasAllOf(
@@ -98,7 +98,7 @@ public class TestSimpleSQL {
         IDTable idTable = new IDTable();
         HSQLInterface hif = HSQLInterface.loadHsqldb();
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
-        VoltXMLElement element = hif.getVoltCatalogXML(null, null);
+        VoltXMLElement element = hif.getVoltCatalogXML(null);
         assertThat(element)
             .hasName(1, "databaseschema")
             .hasAllOf(
@@ -196,12 +196,13 @@ public class TestSimpleSQL {
                         withAttribute(4, "alias", "ID"),
                         withAttribute(5, "column", "ID"),
                         withIdAttribute(6, idTable),
-                        withAttribute(7, "table", "ALPHA"))),
-                withChildNamed(8, "parameters"),
-                withChildNamed(9, "tablescans",
-                    withChildNamed(10, "tablescan",
-                        withAttribute(11, "jointype", "inner"),
-                        withAttribute(12, "table", "ALPHA"))));
+                        withAttribute(7, "index", "0"),
+                        withAttribute(8, "table", "ALPHA"))),
+                withChildNamed(9, "parameters"),
+                withChildNamed(10, "tablescans",
+                    withChildNamed(11, "tablescan",
+                        withAttribute(12, "jointype", "inner"),
+                        withAttribute(13, "table", "ALPHA"))));
     }
 
     @SuppressWarnings("unchecked")
@@ -221,12 +222,13 @@ public class TestSimpleSQL {
                         withAttribute(4, "alias", "BETA"),
                         withAttribute(5, "column", "BETA"),
                         withIdAttribute(6, idTable),
-                        withAttribute(7, "table", "ALPHA"))),
-                withChildNamed(8, "parameters"),
-                withChildNamed(9, "tablescans",
-                    withChildNamed(10, "tablescan",
-                        withAttribute(11, "jointype", "inner"),
-                        withAttribute(12, "table", "ALPHA"))));
+                        withAttribute(7, "index", "1"),
+                        withAttribute(8, "table", "ALPHA"))),
+                withChildNamed(9, "parameters"),
+                withChildNamed(10, "tablescans",
+                    withChildNamed(11, "tablescan",
+                        withAttribute(12, "jointype", "inner"),
+                        withAttribute(13, "table", "ALPHA"))));
     }
 
     @SuppressWarnings("unchecked")
@@ -246,12 +248,13 @@ public class TestSimpleSQL {
                         withAttribute(4, "alias", "DOOBA"),
                         withAttribute(5, "column", "DOOBA"),
                         withIdAttribute(6, idTable),
-                        withAttribute(7, "table", "FARGLE"))),
-                withChildNamed(8, "parameters"),
-                withChildNamed(9, "tablescans",
-                    withChildNamed(10, "tablescan",
-                        withAttribute(11, "jointype", "inner"),
-                        withAttribute(12, "table", "FARGLE"))));
+                        withAttribute(7, "index", "1"),
+                        withAttribute(8, "table", "FARGLE"))),
+                withChildNamed(9, "parameters"),
+                withChildNamed(10, "tablescans",
+                    withChildNamed(11, "tablescan",
+                        withAttribute(12, "jointype", "inner"),
+                        withAttribute(13, "table", "FARGLE"))));
     }
 
     @SuppressWarnings("unchecked")
@@ -271,12 +274,13 @@ public class TestSimpleSQL {
                         withAttribute(4, "alias", "ID"),
                         withAttribute(5, "column", "ID"),
                         withIdAttribute(6, idTable),
-                        withAttribute(7, "table", "GAMMA"))),
-                withChildNamed(8, "parameters"),
-                withChildNamed(9, "tablescans",
-                    withChildNamed(10, "tablescan",
-                        withAttribute(11, "jointype", "inner"),
-                        withAttribute(12, "table", "GAMMA"))));
+                        withAttribute(7, "index", "0"),
+                        withAttribute(8, "table", "GAMMA"))),
+                withChildNamed(9, "parameters"),
+                withChildNamed(10, "tablescans",
+                    withChildNamed(11, "tablescan",
+                        withAttribute(12, "jointype", "inner"),
+                        withAttribute(13, "table", "GAMMA"))));
     }
 
     @SuppressWarnings("unchecked")
@@ -296,11 +300,12 @@ public class TestSimpleSQL {
                         withAttribute(4, "alias", "ID"),
                         withAttribute(5, "column", "ID"),
                         withIdAttribute(6, idTable),
-                        withAttribute(7, "table", "GAMMA"))),
-                withChildNamed(8, "parameters"),
-                withChildNamed(9, "tablescans",
-                    withChildNamed(10, "tablescan",
-                        withAttribute(11, "jointype", "inner"),
-                        withAttribute(12, "table", "GAMMA"))));
+                        withAttribute(7, "index", "0"),
+                        withAttribute(8, "table", "GAMMA"))),
+                withChildNamed(9, "parameters"),
+                withChildNamed(10, "tablescans",
+                    withChildNamed(11, "tablescan",
+                        withAttribute(12, "jointype", "inner"),
+                        withAttribute(13, "table", "GAMMA"))));
     }
 }

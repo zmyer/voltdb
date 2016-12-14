@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -34,8 +34,8 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractReceivePlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
-import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.types.ConstraintType;
@@ -108,8 +108,7 @@ public class QueryPlanner {
                         AbstractCostModel costModel,
                         ScalarValueHints[] paramHints,
                         String joinOrder,
-                        DeterminismMode detMode)
-    {
+                        DeterminismMode detMode) {
         assert(sql != null);
         assert(stmtName != null);
         assert(procName != null);
@@ -168,7 +167,9 @@ public class QueryPlanner {
         // this is much easier to parse than SQL and is checked against the catalog
         try {
             m_xmlSQL = m_HSQL.getXMLCompiledStatement(m_sql);
-        } catch (HSQLParseException e) {
+            //* enable to debug */ System.out.println("DEBUG: HSQL parsed:" + m_xmlSQL);
+        }
+        catch (HSQLParseException e) {
             // XXXLOG probably want a real log message here
             throw new PlanningErrorException(e.getMessage());
         }
@@ -263,15 +264,14 @@ public class QueryPlanner {
                     if (plan.extractParamValues(m_paramzInfo)) {
                         return plan;
                     }
-                } else {
-                    if (m_debuggingStaticModeToRetryOnError) {
-                         plan = compileFromXML(m_paramzInfo.parameterizedXmlSQL,
-                                               m_paramzInfo.paramLiteralValues);
-                    }
+                }
+                else if (m_debuggingStaticModeToRetryOnError) {
+                    compileFromXML(m_paramzInfo.parameterizedXmlSQL,
+                                   m_paramzInfo.paramLiteralValues);
                 }
                 // fall through to try replan without parameterization.
             }
-            catch (Exception e) {
+            catch (Exception | StackOverflowError e) {
                 // ignore any errors planning with parameters
                 // fall through to re-planning without them
                 m_hasExceptionWhenParameterized = true;
@@ -294,7 +294,6 @@ public class QueryPlanner {
         if (m_isUpsert) {
             replacePlanForUpsert(plan);
         }
-
         return plan;
     }
 
@@ -322,12 +321,52 @@ public class QueryPlanner {
         return m_hasExceptionWhenParameterized;
     }
 
+    /**
+     * Find the best plan given the VoltXMLElement.  By best here we mean the plan
+     * which is scored the best according to our plan metric scoring.  The plan
+     * metric scoring takes into account join order and index use, but it does
+     * not take into account the output schema.  Consequently, we don't compute the
+     * output schema for the plan nodes until after the best plan is discovered.
+     *
+     * The order here is:
+     * <ol>
+     * <li>
+     *   Parse the VoltXMLElement to create an AbstractParsedStatement.  This has
+     *   a second effect of loading lists of join orders and access paths for planning.
+     *   For us, and access path is a way of scanning something scannable.  It's a generalization
+     *   of the notion of scanning a table or an index.
+     * </li>
+     * <li>
+     *   Create a PlanAssembler, and ask it for the best cost plan.  This uses the
+     *   side data created by the parser in the previous step.
+     * </li>
+     * <li>
+     *   If the plan is read only, slap a SendPlanNode on the front.  Presumably
+     *   an insert, delete or upsert will have added the SendPlanNode into the plan node tree already.
+     * </li>
+     * <li>
+     *   Compute the output schema.  This computes the output schema for each
+     *   node recursively, using a node specific method.
+     * </li>
+     * <li>
+     *   Resolve the column indices.  This makes sure that the indices of all
+     *   TVEs in the output columns refer to the right input columns.
+     * </li>
+     * <li>
+     *   Do some final cleaning up and verifying of the plan.  For example,
+     *   We renumber the nodes starting at 1.
+     * </li>
+     * </ol>
+     *
+     * @param xmlSQL
+     * @param paramValues
+     * @return
+     */
     private CompiledPlan compileFromXML(VoltXMLElement xmlSQL, String[] paramValues) {
         // Get a parsed statement from the xml
         // The callers of compilePlan are ready to catch any exceptions thrown here.
         AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(m_sql, xmlSQL, paramValues, m_db, m_joinOrder);
-        if (parsedStmt == null)
-        {
+        if (parsedStmt == null) {
             m_recentErrorMsg = "Failed to parse SQL statement: " + getOriginalSql();
             return null;
         }
@@ -335,7 +374,7 @@ public class QueryPlanner {
         if (m_isUpsert) {
             // no insert/upsert with joins
             if (parsedStmt.m_tableList.size() != 1) {
-                m_recentErrorMsg = "UPSERT is support only with one single table: " + getOriginalSql();
+                m_recentErrorMsg = "UPSERT is supported only with one single table: " + getOriginalSql();
                 return null;
             }
 
@@ -403,8 +442,8 @@ public class QueryPlanner {
         // this makes the ids deterministic
         bestPlan.resetPlanNodeIds(1);
 
-        // split up the plan everywhere we see send/recieve into multiple plan fragments
-        List<AbstractPlanNode> receives = bestPlan.rootPlanGraph.findAllNodesOfType(PlanNodeType.RECEIVE);
+        // split up the plan everywhere we see send/receive into multiple plan fragments
+        List<AbstractPlanNode> receives = bestPlan.rootPlanGraph.findAllNodesOfClass(AbstractReceivePlanNode.class);
         if (receives.size() > 1) {
             // Have too many receive node for two fragment plan limit
             m_recentErrorMsg = "This join of multiple partitioned tables is too complex. "
@@ -418,14 +457,14 @@ public class QueryPlanner {
         }
         // ... enable for debug */
         if (receives.size() == 1) {
-            ReceivePlanNode recvNode = (ReceivePlanNode) receives.get(0);
+            AbstractReceivePlanNode recvNode = (AbstractReceivePlanNode) receives.get(0);
             fragmentize(bestPlan, recvNode);
         }
 
         return bestPlan;
     }
 
-    private static void fragmentize(CompiledPlan plan, ReceivePlanNode recvNode) {
+    private static void fragmentize(CompiledPlan plan, AbstractReceivePlanNode recvNode) {
         assert(recvNode.getChildCount() == 1);
         AbstractPlanNode childNode = recvNode.getChild(0);
         assert(childNode instanceof SendPlanNode);

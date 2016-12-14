@@ -1,6 +1,7 @@
 ﻿var adminDOMObjects = {};
 var adminEditObjects = {};
 var adminClusterObjects = {};
+var duplicateValue = "";
 var editStates = {
     ShowEdit: 0,
     ShowOkCancel: 1,
@@ -28,6 +29,7 @@ function loadAdminPage() {
 
     adminDOMObjects = {
         addConfigLink: $("#addConfigPopupLink"),
+        addImportConfigPopupLink: $("#addImportConfigPopupLink"),
         siteNumberHeader: $("#sitePerHost"),
         kSafety: $("#kSafety"),
         partitionDetection: $("#partitionDetectionIcon"),
@@ -62,6 +64,8 @@ function loadAdminPage() {
         tempTablesMaxSize: $("#temptablesmaxsize"),
         tempTablesMaxSizeLabel: $("#temptablesmaxsizeUnit"),
         snapshotPriority: $("#snapshotpriority"),
+        memoryLimitSize: $("#memoryLimitSize"),
+        memoryLimitSizeUnit: $("#memoryLimitSizeUnit"),
         clientPort: $('#clientport'),
         adminPort: $('#adminport'),
         httpPort: $('#httpport'),
@@ -73,6 +77,7 @@ function loadAdminPage() {
         exportOverflow: $('#exportOverflow'),
         commandLogPath: $('#commandlogpath'),
         commandLogSnapshotPath: $('#commandlogsnapshotpath'),
+        drOverflowPath: $('#droverflowpath'),
         clusterClientPort: $('#clusterClientport'),
         clusterAdminPort: $('#clusterAdminport'),
         clusterHttpPort: $('#clusterHttpport'),
@@ -84,7 +89,7 @@ function loadAdminPage() {
         serverSettingHeader: $('#hServerSettings'),
         lstReplicatedTables: $('#lstDrTblLink'),
         lstExportTable: $('#lstExportTblLink'),
-
+        addDiskLimitLink: $("#addDiskLimitPopupLink"),
 
     };
 
@@ -161,6 +166,21 @@ function loadAdminPage() {
         errorQueryTimeout: $("#errorQueryTimeout"),
         editStateQueryTimeout: editStates.ShowEdit,
 
+        //Memory Size Limit
+        rowMemorySizeTimeout: $("#memorySizeTimeout"),
+        btnEditMemorySize: $("#btnEditMemorySize"),
+        btnEditMemorySizeOk: $("#btnEditMemorySizeOk"),
+        btnEditMemorySizeCancel: $("#btnEditMemorySizeCancel"),
+        btnDeleteMemory: $("#btnDeleteMemory"),
+        spanMemoryLimitSizeValue: $("#memoryLimitSize").text(),
+        spanMemoryLimitSize: $("#memoryLimitSize"),
+        txtMemoryLimitSize: $("#txtMemoryLimitSize"),
+        spanMemoryLimitSizeUnit: $("#memoryLimitSizeUnit"),
+        ddlMemoryLimitSizeUnit: $("#ddlMemoryLimitUnit"),
+        loadingMemoryLimit: $("#loadingMemoryLimit"),
+        errorMemorySize: $("#errorMemorySize"),
+        editStateMemorySize: editStates.ShowEdit,
+
         //Update Error
         updateErrorFieldMsg: $("#updateErrorFieldMsg"),
         updateSnapshotErrorFieldMsg: $("#updateSnapshotErrorFieldMsg"),
@@ -169,16 +189,29 @@ function loadAdminPage() {
         snapshotLabel: $("#row-2").find("td:first-child").text(),
         queryTimeoutFieldLabel: $("#queryTimoutRow").find("td:first-child").text(),
         securityUserErrorFieldMsg: $("#securityUserErrorFieldMsg"),
+        memoryLimitErrorFieldMsg: $("#memorySizeTimeout").find("td:first-child").text(),
+        memoryLimitUpdateErrorFieldMsg: $("#memorySizeUpdateErrorFieldMsg"),
+        diskLimitErrorFieldMsg: $("#diskSizeTimeout").find("td:first-child").text(),
+        diskLimitUpdateErrorFieldMsg: $("#diskSizeUpdateErrorFieldMsg"),
 
         //Export Settings
         addNewConfigLink: $("#addNewConfigLink"),
         loadingConfiguration: $("#loadingConfiguration"),
+
         exportConfiguration: $("#exportConfiguration"),
         exportConfigurationLoading: $('#exportConfigurationLoading'),
 
         //Import Settings
+        addNewImportConfigLink: $("#addNewImportConfigLink"),
+
         loadingImportConfig: $("#loadingImportConfig"),
         importConfiguration: $("#importConfiguration"),
+
+        //Disk Limit Settings
+        editDiskLimitLink: $("#btnEditDiskLimit"),
+        loadingDiskLimit: $("#loadingDiskLimit"),
+        diskLimitConfiguration: $("#diskLimitConfiguration"),
+        
 
         //Dr Mode object
         labelDrmode: $("#drMode"),
@@ -218,7 +251,18 @@ function loadAdminPage() {
             max: "Please enter a positive number between 1 and " + INT_MAX_VALUE + ".",
             digits: "Please enter a positive number without any decimal."
         },
-
+        memoryLimitRules: {
+            required: true,
+            min: 1,
+            max: 99,
+            digits: true
+        },
+        memoryLimitMessages: {
+            required: "This field is required",
+            min: "Please enter a positive number.",
+            max: "Please enter a positive number less than 100.",
+            digits: "Please enter a positive number without any decimal." //"Only four digits are allowed after decimal."
+        },
         fileNameRules: {
             required: true,
             minlength: 2,
@@ -359,6 +403,18 @@ function loadAdminPage() {
 
                 }
             }
+
+            //Handle import configuration
+            if ($(this).text() == "Advanced") {
+                //If parent is closed, then hide export configuration
+                if (!parent.find('td:first-child > a').hasClass('labelExpanded')) {
+                    adminEditObjects.diskLimitConfiguration.hide();
+                    //If parent is open, then open the export configuration.
+                } else {
+                    adminEditObjects.diskLimitConfiguration.show();
+
+                }
+            }
         });
     $('tr[class^=child-]').hide().children('td');
 
@@ -379,24 +435,52 @@ function loadAdminPage() {
 
     $('#shutDownConfirmation').popup({
         open: function (event, ui, ele) {
+            var isProVersion = false;
+            voltDbRenderer.GetDeploymentInformation(function (deploymentDetails) {
+                if (deploymentDetails != undefined) {
+                    var clusterDetails = voltDbRenderer.getClusterDetail(getCurrentServer());
+                    if (clusterDetails != undefined && clusterDetails.LICENSE != undefined) {
+                        licenseInfo = clusterDetails.LICENSE;
+                        if (licenseInfo != undefined && licenseInfo != "") {
+                            isProVersion = true;
+                        }
+                    }
+                }
+                var htmlResult = '';
+
+                if(isProVersion){
+                    htmlResult += '<label>Save Snapshot:</label>' +
+                                '&nbsp <input type="checkbox" checked="true" id="chkSaveSnaps" class="chkStream"/>';
+                }
+
+                htmlResult += '<p class="txt-bold">Are you sure you want to shutdown the cluster?</p>' +
+                    '<p id="shutdownWarningMsg" style="display:none">Any data not saved to a ' +
+                    'snapshot will be lost.</p>' +
+                    '<p id="continueShutdownMsg" style="display:none">Continue with the shutdown?</p>';
+
+                $('#divSaveSnapshot').html(htmlResult);
+
+                $('#chkSaveSnaps').iCheck({
+                    checkboxClass: 'icheckbox_square-aero customCheckbox',
+                    increaseArea: '20%'
+                });
+
+                voltDbRenderer.GetCommandLogStatus(function (commandLogStatus) {
+                    VoltDbAdminConfig.isCommandLogEnabled = commandLogStatus;
+                    showHideIntSnapshotMsg(isProVersion)
+                });
+
+            });
+
+
         },
         afterOpen: function () {
             var popup = $(this)[0];
             $("#btnShutdownConfirmationOk").unbind("click");
             $("#btnShutdownConfirmationOk").on("click", function () {
-                var shutdownTimeout = setTimeout(function () {
-                    $('#serverShutdownPopup').click();
-                    VoltDBCore.isServerConnected = false;
-                    window.clearInterval(VoltDbUI.connectionTimeInterval);
-                }, 10000);
-
-                voltDbRenderer.shutdownCluster(function (success) {
-                    if (!success) {
-                        clearTimeout(shutdownTimeout);
-                        alert("Unable to shutdown cluster.");
-                    }
-                    $("#overlay").hide();
-                });
+                VoltDbAdminConfig.isSaveSnapshot = $('#chkSaveSnaps').is(":checked");
+                $("#btnPrepareShutdown").trigger("click")
+                $(".popup_close").hide();
                 //Close the popup
                 popup.close();
             });
@@ -405,6 +489,382 @@ function loadAdminPage() {
             $("#btnShutdownConfirmationCancel").on("click", function () {
                 popup.close();
             });
+        }
+    });
+
+
+    var displayShutdownStatus = function(btnId, status){
+        if(status == "normal"){
+            $("#" + btnId + "Normal").show()
+            $("#" + btnId + "Load").hide()
+            $("#" + btnId + "Ok").hide()
+            $("#" + btnId + "Failure").hide()
+        } else if(status == "load"){
+            $("#" + btnId + "Normal").hide()
+            $("#" + btnId + "Load").show()
+            $("#" + btnId + "Ok").hide()
+            $("#" + btnId + "Failure").hide()
+        } else if(status == "failure"){
+            $("#" + btnId + "Normal").hide()
+            $("#" + btnId + "Load").hide()
+            $("#" + btnId + "Ok").hide()
+            $("#" + btnId + "Failure").show()
+        } else {
+            $("#" + btnId + "Normal").hide()
+            $("#" + btnId + "Load").hide()
+            $("#" + btnId + "Ok").show()
+            $("#" + btnId + "Failure").hide()
+        }
+    }
+
+    var showHideShutdownErrMsg = function(status, msg){
+        if(!status){
+            $("#shutdownErrMsg").html(msg);
+            $("#divRetryBtn").show()
+            $("#divShutdownErrMsg").show()
+            $("#divShutdownRetryMsg").show()
+        } else {
+            $("#divRetryBtn").hide()
+            $("#divShutdownErrMsg").hide()
+            $("#divShutdownRetryMsg").hide()
+        }
+    }
+
+    var serverShutdown = function(popup){
+        showHideShutdownErrMsg(true);
+        displayShutdownStatus("liPrepareShutdown", "load")
+        voltDbRenderer.prepareShutdownCluster(function (prepare_status) {
+            console.log("Preparing for shutdown.");
+            displayShutdownStatus("liPrepareShutdown", "load");
+            displayShutdownStatus("liQueueExpData", "normal");
+            displayShutdownStatus("liCompleteOutstandingExpDr", "normal");
+            displayShutdownStatus("liCompleteClientTrans", "normal");
+            displayShutdownStatus("liCompleteOutstandingImp", "normal");
+            displayShutdownStatus("liShutdownReady", "normal");
+            showHideShutdownErrMsg(true);
+            var status = prepare_status.status;
+            var zk_pause_txn_id =  prepare_status.zk_pause_txn_id;
+            if (status != 1) {
+                console.log("The preparation for shutdown failed with status: " + status + ".");
+                displayShutdownStatus("liPrepareShutdown", "failure");
+                showHideShutdownErrMsg(false, "The preparation for shutdown failed with status: " + status + ".")
+                $(".popup_close").show();
+                return;
+            } else {
+                console.log('The cluster is paused prior to shutdown.')
+                console.log('Writing out all queued export data.')
+                displayShutdownStatus("liPrepareShutdown", "ok");
+                displayShutdownStatus("liQueueExpData", "load")
+                voltDbRenderer.QuiesceCluster(function (quiesceStatus) {
+                    if(quiesceStatus != 0){
+                        console.log("The cluster has failed to be quiesce with status: " + quiesceStatus + ".")
+                        displayShutdownStatus("liQueueExpData", "failure");
+                        showHideShutdownErrMsg(false, "The cluster has failed to be quiesce with status: " + quiesceStatus + ".")
+                        $(".popup_close").show();
+                        return;
+                    } else {
+                        console.log('Completing outstanding export and DR transactions.')
+                        displayShutdownStatus("liQueueExpData", "ok")
+                        displayShutdownStatus("liCompleteOutstandingExpDr", "load")
+                        var drDetails = {"DrProducer": {
+                                "partition_min": {},
+                                "partition_max": {},
+                                "partition_min_host": {}
+                            }
+                        }
+                        voltDbRenderer.GetDrProducerInformation(function(drDetails){
+                            // check the export stats twice because they are periodic
+                            var export_tables_with_data = {}
+                            voltDbRenderer.GetDrProducerInformation(function(drDetails){
+                                var exportTableDetails = { "ExportTables": {
+                                        "export_tables_with_data": {},
+                                        "last_table_stat_time": 0
+                                    }
+                                }
+                                voltDbRenderer.GetExportTablesInformation(function(exportTableDetails){
+                                    exportTableDetails["ExportTables"]["last_table_stat_time"] = exportTableDetails["ExportTables"]["collection_time"];
+                                    if((drDetails["DrProducer"].partition_min == undefined || $.isEmptyObject(drDetails["DrProducer"].partition_min)) &&
+                                        exportTableDetails["ExportTables"]["last_table_stat_time"] == 1){
+                                        // there are no outstanding export or dr transactions
+                                        continueShutdown(popup, zk_pause_txn_id)
+                                        return
+                                    }
+                                    // after 10 seconds notify admin of what transactions have not drained
+                                    notifyInterval = 10
+                                    // have to get two samples of table stats because the cached value could be
+                                    // from before Quiesce
+
+                                    var setDrExpInterval= setInterval(function(){
+                                        var result = false;
+                                        curr_table_stat_time = 0;
+                                        if(!$.isEmptyObject(drDetails["DrProducer"].partition_min) || drDetails["DrProducer"].partition_min != undefined){
+                                            voltDbRenderer.GetDrProducerInformation(function(drDetails){
+                                                if(exportTableDetails["ExportTables"]["last_table_stat_time"] > 1){
+                                                    voltDbRenderer.GetExportTablesInformation(function(exportTableDetails){
+                                                        curr_table_stat_time = exportTableDetails["ExportTables"]["collection_time"]
+                                                        notifyInterval -= 1
+                                                        result = checkExportAndDr(exportTableDetails["ExportTables"]["last_table_stat_time"],
+                                                                                  curr_table_stat_time, exportTableDetails["ExportTables"]["export_tables_with_data"],
+                                                                                  drDetails["DrProducer"].partition_min, drDetails["DrProducer"].partition_max,
+                                                                                  drDetails["DrProducer"].partition_min_host, notifyInterval);
+                                                        if(result){
+                                                            clearInterval(setDrExpInterval)
+                                                            continueShutdown(popup, zk_pause_txn_id)
+                                                            return;
+                                                        }
+                                                    }, exportTableDetails);
+                                                } else {
+                                                    notifyInterval -= 1
+                                                    result = checkExportAndDr(exportTableDetails["ExportTables"]["last_table_stat_time"],
+                                                                              curr_table_stat_time, exportTableDetails["ExportTables"]["export_tables_with_data"],
+                                                                              drDetails["DrProducer"].partition_min, drDetails["DrProducer"].partition_max,
+                                                                              drDetails["DrProducer"].partition_min_host, notifyInterval);
+                                                    if(result){
+                                                        clearInterval(setDrExpInterval)
+                                                        continueShutdown(popup, zk_pause_txn_id)
+                                                        return;
+                                                    }
+                                                }
+
+                                            }, drDetails);
+                                        } else {
+                                            if(exportTableDetails["ExportTables"]["last_table_stat_time"] > 1){
+                                                voltDbRenderer.GetExportTablesInformation(function(exportTableDetails){
+                                                    curr_table_stat_time = exportTableDetails["ExportTables"]["collection_time"]
+                                                    notifyInterval -= 1
+                                                    result = checkExportAndDr(exportTableDetails["ExportTables"]["last_table_stat_time"],
+                                                                     curr_table_stat_time, exportTableDetails["ExportTables"]["export_tables_with_data"],
+                                                                     drDetails["DrProducer"].partition_min, drDetails["DrProducer"].partition_max,
+                                                                     drDetails["DrProducer"].partition_min_host, notifyInterval);
+                                                    if(result){
+                                                        clearInterval(setDrExpInterval)
+                                                        continueShutdown(popup, zk_pause_txn_id)
+                                                        return;
+                                                    }
+                                                });
+                                            } else{
+                                                notifyInterval -= 1
+                                                result = checkExportAndDr(exportTableDetails["ExportTables"]["last_table_stat_time"],
+                                                                 curr_table_stat_time, exportTableDetails["ExportTables"]["export_tables_with_data"],
+                                                                 drDetails["DrProducer"].partition_min, drDetails["DrProducer"].partition_max,
+                                                                 drDetails["DrProducer"].partition_min_host, notifyInterval);
+                                                if(result){
+                                                    clearInterval(setDrExpInterval)
+                                                    continueShutdown(popup, zk_pause_txn_id)
+                                                    return;
+                                                }
+                                            }
+                                        }
+                                    }, 2000);
+
+                                }, exportTableDetails);
+
+                            }, drDetails);
+                        }, drDetails);
+
+                        voltDbRenderer.GetLiveClientsInfo(function (connection) {
+
+                        });
+
+                    }
+                });
+            }
+            $("#overlay").hide();
+        });
+    }
+
+    var isClientTransFinish = false;
+    var isImportRequestFinish = false
+
+    var continueShutdown = function(popup, zk_pause_txn_id){
+        displayShutdownStatus("liCompleteOutstandingExpDr", "ok")
+        console.log('All export and DR transactions have been processed.')
+        isClientTransFinish = false;
+        check_client();
+        var clientTransInterval = setInterval(function(){
+            if(isClientTransFinish){
+                clearInterval(clientTransInterval);
+                isImportRequestFinish = false;
+                check_importer()
+
+                var importReqInterval = setInterval(function(){
+                    if(isImportRequestFinish){
+                        clearInterval(importReqInterval);
+                        console.log('Cluster is ready for shutdown.')
+                        displayShutdownStatus("liShutdownReady", "ok")
+                        var shutdownTimeout = setTimeout(function () {
+                            $('#serverShutdownPopup').click();
+                            VoltDBCore.isServerConnected = false;
+                            window.clearInterval(VoltDbUI.connectionTimeInterval);
+                        }, 10000);
+                        $(".popup_close").show();
+                        if(VoltDbAdminConfig.isSaveSnapshot){
+                            voltDbRenderer.shutdownCluster(function (success) {
+                                if (!success) {
+                                    clearTimeout(shutdownTimeout);
+                                    console.log("Unable to shutdown cluster.");
+                                    displayShutdownStatus("liShutdownReady", "failure");
+                                    showHideShutdownErrMsg(false, "Unable to shutdown cluster.")
+                                    $(".popup_close").show();
+                                }
+                                $("#overlay").hide();
+
+                            }, zk_pause_txn_id);
+                        } else {
+                            voltDbRenderer.shutdownCluster(function (success) {
+                                if (!success) {
+                                    clearTimeout(shutdownTimeout);
+                                    console.log("Unable to shutdown cluster.");
+                                    displayShutdownStatus("liShutdownReady", "failure");
+                                    showHideShutdownErrMsg(false, "Unable to shutdown cluster.")
+                                    $(".popup_close").show();
+                                }
+                                $("#overlay").hide();
+
+                            });
+                        }
+                    }
+                },2000)
+            }
+        },2000)
+
+
+    }
+
+    var check_client = function(){
+        console.log('Completing outstanding client transactions.');
+        displayShutdownStatus("liCompleteClientTrans", "load")
+        voltDbRenderer.GetLiveClientsInfo(function (clientInfo) {
+            trans = clientInfo['CLIENTS']['bytes'];
+            bytes = clientInfo['CLIENTS']['msgs'];
+            msgs  = clientInfo['CLIENTS']['trans'];
+
+            console.log('Outstanding transactions= ' + trans + ', Outstanding request bytes= ' + bytes + ', Outstanding response messages= ' + msgs)
+            if(trans == 0 && bytes == 0 && msgs == 0){
+                isClientTransFinish = true
+                displayShutdownStatus("liCompleteClientTrans", "ok")
+                return
+            } else {
+                sleepTime(1000);
+                check_Client();
+            }
+            if(isClientTransFinish)
+                return
+        });
+    }
+
+    var check_importer = function(){
+        console.log('Completing outstanding importer requests.')
+        displayShutdownStatus("liCompleteOutstandingImp", "load")
+        voltDbRenderer.GetImportRequestInformation(function (outstanding) {
+            console.log('Outstanding importer requests= ' + outstanding)
+            if(outstanding == 0){
+                isImportRequestFinish = true
+                displayShutdownStatus("liCompleteOutstandingImp", "ok")
+                return;
+            } else {
+                sleepTime(1000);
+                check_importer();
+            }
+            if(isImportRequestFinish)
+                return
+        });
+
+
+    }
+
+    var checkExportAndDr = function(last_table_stat_time, curr_table_stat_time,export_tables_with_data, partition_min, partition_max,
+                                    partition_min_host, notifyInterval){
+        if(last_table_stat_time == 1 || curr_table_stat_time > last_table_stat_time){
+            // have a new sample from table stat cache or there are no tables
+            if($.isEmptyObject(export_tables_with_data) && $.isEmptyObject(partition_min)){
+                console.log('All export and DR transactions have been processed.')
+                return true;
+            }
+        }
+
+        notifyInterval -= 1
+        if(notifyInterval == 0){
+            notifyInterval = 10
+            if(last_table_stat_time > 1 && (!$.isEmptyObject(export_tables_with_data)))
+                print_export_pending(export_tables_with_data)
+            if (!$.isEmptyObject(partition_min))
+                print_dr_pending(partition_min_host, partition_min, partition_max)
+        }
+        return false;
+    }
+
+
+    var print_export_pending = function(export_tables_with_data){
+        console.log('The following export tables have unacknowledged transactions:');
+        var summaryLine = "    {0} needs acknowledgement on host(s) {1} for partition(s) {2}."
+        $.each(export_tables_with_data, function(key, value){
+            var pidlist = []
+            hostlist = Object.keys(export_tables_with_data[key])
+            for(var i = 0; i < hostlist.length; i++){
+                for(var j = 0; j < export_tables_with_data[key][hostlist[i]].length ;j++)
+                    pidlist.push(export_tables_with_data[key][hostlist[i]][j])
+            }
+            var partlist = "";
+
+            for(var j = 0; j < pidlist.length; j++){
+                if(j == 0)
+                    partlist = pidlist[j].toString()
+                else
+                    partlist = partlist + "," + pidlist[j].toString()
+            }
+
+             console.log(summaryLine.format(table, hostlist.join(), partlist))
+        });
+    }
+
+    var print_dr_pending = function(partition_min_host, partition_min, partition_max){
+        console.log('The following partitions have pending DR transactions that the consumer cluster has not processed:')
+        var summaryline = "    Partition {0} needs acknowledgement for drIds {1} to {2} on hosts: {3}."
+        $.each(partition_min_host, function(key, value){
+            pid = key;
+            console.log(summaryline.format(pid, partition_min[pid]+1, partition_max[pid], partition_min_host[pid].join()))
+        });
+    }
+
+    var sleepTime = function(milliseconds) {
+        var start = new Date().getTime();
+        for (var i = 0; i < 1e7; i++) {
+            if ((new Date().getTime() - start) > milliseconds){
+              break;
+            }
+        }
+    }
+
+    String.prototype.format = function () {
+        var args = arguments;
+        return this.replace(/\{\{|\}\}|\{(\d+)\}/g, function (m, n) {
+            if (m == "{{") { return "{"; }
+            if (m == "}}") { return "}"; }
+            return args[n];
+        });
+    };
+
+    $('#btnPrepareShutdown').popup({
+        open: function (event, ui, ele) {
+            var popup = $(this)[0];
+            serverShutdown(popup)
+        },
+        afterOpen: function () {
+            var popup = $(this)[0];
+            $("#btnPrepareShutdownOk").unbind("click");
+            $("#btnPrepareShutdownOk").on("click", function(){
+                popup.close();
+                setTimeout(function(){
+                    $("#btnPrepareShutdown").trigger("click")
+                },500)
+                //$("#btnPrepareShutdown").trigger("click")
+            })
+            $("#btnPrepareShutdownCancel").unbind("click");
+            $("#btnPrepareShutdownCancel").on("click", function(){
+                popup.close();
+            })
+
         }
     });
 
@@ -512,7 +972,6 @@ function loadAdminPage() {
             adminEditObjects.loadingSecurity.show();
 
             userList.hide();
-            //userListEditable.hide();
             adminEditObjects.loadingUserList.show();
         }
         else if (state == editStates.ShowOkCancel) {
@@ -525,7 +984,6 @@ function loadAdminPage() {
             adminEditObjects.chkSecurity.parent().addClass("customCheckbox");
 
             userList.show();
-            //userListEditable.show();
             adminEditObjects.loadingUserList.hide();
         }
         else {
@@ -546,7 +1004,6 @@ function loadAdminPage() {
     adminEditObjects.LinkSecurityEdit.on("click", function () {
         if (adminEditObjects.securityStateOriginal.linkSecurityEdit == true) {
             toggleSecurityEdit(editStates.ShowOkCancel);
-            //VoltDbAdminConfig.getEditUserList(adminClusterObjects.userListObj);
         }
     });
 
@@ -628,7 +1085,7 @@ function loadAdminPage() {
                             msg += "Please try again later.";
                         }
 
-                        adminEditObjects.updateErrorFieldMsg.text(msg);
+                        $("#updateErrorFieldMsg").text(msg);
                         $("#updateErrorPopupLink").trigger("click");
                     }
                 });
@@ -1223,6 +1680,17 @@ function loadAdminPage() {
         }
     });
 
+    $("#formMemoryLimit").validate({
+        rules: {
+            txtMemoryLimitSize: adminValidationRules.memoryLimitRules
+        },
+        messages: {
+            txtMemoryLimitSize: adminValidationRules.memoryLimitMessages
+        }
+    });
+
+    $("#formAddDiskLimit").validate();
+
     adminEditObjects.btnEditAutoSnapshotOk.popup({
         open: function (event, ui, ele) {
         },
@@ -1417,7 +1885,7 @@ function loadAdminPage() {
                             msg += "Please try again later.";
                         }
 
-                        adminEditObjects.updateErrorFieldMsg.text(msg);
+                        $("#updateErrorFieldMsg").text(msg);
                         $("#updateErrorPopupLink").trigger("click");
                     }
                 });
@@ -1487,6 +1955,92 @@ function loadAdminPage() {
         }
     };
 
+    //Memory Limit
+    var toggleMemorySizeEdit = function (state) {
+        adminEditObjects.txtMemoryLimitSize.val(adminEditObjects.spanMemoryLimitSizeValue);
+        if (adminEditObjects.spanMemoryLimitSizeUnit.text() != "")
+            adminEditObjects.ddlMemoryLimitSizeUnit.val(adminEditObjects.spanMemoryLimitSizeUnit.text());
+        else {
+            adminEditObjects.ddlMemoryLimitSizeUnit.val("GB");
+        }
+        setMemoryLimitValidation();
+        VoltDbAdminConfig.isMemoryLimitEditMode = false;
+        if (state == editStates.ShowLoading) {
+            adminEditObjects.spanMemoryLimitSizeUnit.hide();
+            adminEditObjects.ddlMemoryLimitSizeUnit.hide();
+            adminEditObjects.btnEditMemorySize.hide();
+            adminEditObjects.btnEditMemorySizeOk.hide();
+            adminEditObjects.btnEditMemorySizeCancel.hide();
+            adminEditObjects.txtMemoryLimitSize.hide();
+            adminEditObjects.spanMemoryLimitSize.hide();
+            adminEditObjects.errorMemorySize.hide();
+
+            adminEditObjects.loadingMemoryLimit.show();
+        }
+        else if (state == editStates.ShowOkCancel) {
+            VoltDbAdminConfig.isMemoryLimitEditMode = true;
+            adminEditObjects.loadingMemoryLimit.hide();
+            adminEditObjects.btnEditMemorySize.hide();
+            adminEditObjects.btnEditMemorySizeOk.show();
+            adminEditObjects.btnEditMemorySizeCancel.show();
+
+            adminEditObjects.spanMemoryLimitSize.hide();
+            adminEditObjects.spanMemoryLimitSizeUnit.hide();
+            adminEditObjects.txtMemoryLimitSize.show();
+            adminEditObjects.ddlMemoryLimitSizeUnit.show();
+        } else {
+          
+            adminEditObjects.loadingMemoryLimit.hide();
+            adminEditObjects.btnEditMemorySize.show();
+            adminEditObjects.btnEditMemorySizeOk.hide();
+            adminEditObjects.btnEditMemorySizeCancel.hide();
+            adminEditObjects.errorMemorySize.hide();
+
+            adminEditObjects.txtMemoryLimitSize.hide();
+            adminEditObjects.spanMemoryLimitSize.show();
+            if (adminEditObjects.spanMemoryLimitSize.text() != "Not Enforced") {
+                adminEditObjects.btnDeleteMemory.show();
+            }
+            adminEditObjects.ddlMemoryLimitSizeUnit.hide();
+            adminEditObjects.spanMemoryLimitSizeUnit.show();
+        }
+    };
+
+    var setMemoryLimitValidation = function () {
+        $("#errorMemorySize").val("");
+        $("#errorMemorySize").hide();
+        $("#txtMemoryLimitSize").rules("remove");
+        var unit = $('#ddlMemoryLimitUnit').val();
+        if (unit == "%") {
+            $("#txtMemoryLimitSize").rules("add", {
+                required: true,
+                min: 1,
+                max: 99,
+                digits: true,
+                messages: {
+                    required: "This field is required",
+                    min: "Please enter a positive number.",
+                    max: "Maximum value of percentage cannot be greater than 99.",
+                    digits: "Please enter a positive number without any decimal."
+                }
+            });
+        } else if (unit == "GB") {
+            $("#txtMemoryLimitSize").rules("add", {
+                required: true,
+                min: 1,
+                max: 2147483647,
+                digits: true,
+                messages: {
+                    required: "This field is required",
+                    min: "Please enter a positive number.",
+                    max: "Maximum value of GB cannot be greater than 2147483647.",
+                    digits: "Please enter a positive number without any decimal."
+                }
+            });
+        }
+    };
+
+
     adminEditObjects.LinkQueryTimeoutEdit.on("click", function () {
         toggleQueryTimeoutEdit(editStates.ShowOkCancel);
         $("td.queryTimeOut span").toggleClass("unit");
@@ -1517,7 +2071,6 @@ function loadAdminPage() {
             var popup = $(this)[0];
             $("#btnPopupQueryTimeoutOk").unbind("click");
             $("#btnPopupQueryTimeoutOk").on("click", function () {
-
                 var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
                 if (adminConfigurations.systemsettings.query == null) {
                     adminConfigurations.systemsettings.query = {};
@@ -1572,9 +2125,169 @@ function loadAdminPage() {
         }
     });
 
+    //Memory Limit 
+    $('#ddlMemoryLimitUnit').change(function () {
+        setMemoryLimitValidation();
+    });
+
+
+
+    adminEditObjects.btnEditMemorySize.on("click", function () {
+        toggleMemorySizeEdit(editStates.ShowOkCancel);
+        adminEditObjects.btnDeleteMemory.hide();
+        $("td.memorySize span").toggleClass("unit");
+    });
+
+    adminEditObjects.btnEditMemorySizeOk.on("click", function (e) {
+        if (!$("#formMemoryLimit").valid()) {
+            e.preventDefault();
+            e.stopPropagation();
+            adminEditObjects.txtMemoryLimitSize.focus();
+
+            adminEditObjects.errorMemorySize.css("background-color", "yellow");
+            setTimeout(function () {
+                adminEditObjects.errorMemorySize.animate({ backgroundColor: 'white' }, 'slow');
+            }, 2000);
+        }
+    });
+
+
+    adminEditObjects.btnEditMemorySizeCancel.on("click", function () {
+        toggleMemorySizeEdit(editStates.ShowEdit);
+    });
+
+    adminEditObjects.btnEditMemorySizeOk.popup({
+        open: function (event, ui, ele) {
+        },
+        afterOpen: function () {
+            var popup = $(this)[0];
+            $("#btnPopupMemoryLimitOk").unbind("click");
+            $("#btnPopupMemoryLimitOk").on("click", function () {
+                var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
+                if (adminConfigurations.systemsettings.resourcemonitor == null) {
+                    adminConfigurations.systemsettings.resourcemonitor = {};
+                }
+                if (adminConfigurations.systemsettings.resourcemonitor.memorylimit == null) {
+                    adminConfigurations.systemsettings.resourcemonitor.memorylimit = {};
+                }
+                //Set the new value to be saved.
+                var memoryLimitSize = "";
+                memoryLimitSize = adminEditObjects.txtMemoryLimitSize.val() + (adminEditObjects.ddlMemoryLimitSizeUnit.val() == "%" ? "%" : "");
+
+                if (adminEditObjects.txtMemoryLimitSize.val() != "") {
+                    adminConfigurations.systemsettings.resourcemonitor.memorylimit.size = memoryLimitSize;
+                } else {
+                    adminConfigurations.systemsettings.resourcemonitor.memorylimit = null;
+                }
+                //Call the loading image only after setting the new value to be saved.
+                toggleMemorySizeEdit(editStates.ShowLoading);
+                voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
+                    if (result.status == "1") {
+                        
+                        //Reload Admin configurations for displaying the updated value
+                        voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
+                            adminEditObjects.btnDeleteMemory.show();
+                            VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
+                            toggleMemorySizeEdit(editStates.ShowEdit);
+                        });
+
+                    } else {
+                        toggleMemorySizeEdit(editStates.ShowEdit);
+                        var msg = '"' + adminEditObjects.memoryLimitErrorFieldMsg + '". ';
+                        if (result.status == "-1" && result.statusstring == "Query timeout.") {
+                            msg += "The Database is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                        } else {
+                            msg += "Please try again later.";
+                        }
+
+                        adminEditObjects.memoryLimitUpdateErrorFieldMsg.text(msg);
+                        $("#memorySizeUpdateErrorPopupLink").trigger("click");
+                    }
+                });
+
+                //Close the popup
+                popup.close();
+            });
+
+            $("#btnPopupMemoryLimitCancel").on("click", function () {
+                toggleMemorySizeEdit(editStates.ShowEdit);
+                popup.close();
+            });
+
+            $(".popup_back").on("click", function () {
+                toggleMemorySizeEdit(editStates.ShowEdit);
+            });
+
+            $(".popup_close").on("click", function () {
+                toggleMemorySizeEdit(editStates.ShowEdit);
+            });
+        }
+    });
+    //
+
+
+    adminEditObjects.btnDeleteMemory.popup({
+        open: function (event, ui, ele) {
+        },
+        afterOpen: function () {
+            var popup = $(this)[0];
+            $("#btnDelPopupMemoryLimitOk").on("click", function () {
+                adminEditObjects.btnDeleteMemory.hide();
+                var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
+                if (adminConfigurations.systemsettings.resourcemonitor == null) {
+                    adminConfigurations.systemsettings.resourcemonitor = {};
+                }
+                if (adminConfigurations.systemsettings.resourcemonitor.memorylimit == null) {
+                    adminConfigurations.systemsettings.resourcemonitor.memorylimit = {};
+                }
+
+                //Set the memory limit value to null
+                adminConfigurations.systemsettings.resourcemonitor.memorylimit = null;
+
+                //Call the loading image only after setting the new value to be saved.
+                toggleMemorySizeEdit(editStates.ShowLoading);
+                voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
+                    if (result.status == "1") {
+
+                        //Reload Admin configurations for displaying the updated value
+                        voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
+                            VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
+                            toggleMemorySizeEdit(editStates.ShowEdit);
+                        });
+
+                    } else {
+                        toggleMemorySizeEdit(editStates.ShowEdit);
+                        var msg = '"' + adminEditObjects.memoryLimitErrorFieldMsg + '". ';
+                        if (result.status == "-1" && result.statusstring == "Query timeout.") {
+                            msg += "The Database is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                        } else {
+                            msg += "Please try again later.";
+                        }
+
+                        adminEditObjects.memoryLimitUpdateErrorFieldMsg.text(msg);
+                        $("#memorySizeUpdateErrorPopupLink").trigger("click");
+                    }
+                });
+                //Close the popup
+                popup.close();
+            });
+
+            $("#btnDelPopupMemoryLimitCancel").on("click", function () {
+                popup.close();
+            });
+
+        }
+    });
+
+
     $("#addNewConfigLink").on("click", function () {
         adminDOMObjects.addConfigLink.data("id", -1);
         adminDOMObjects.addConfigLink.trigger("click");
+    });
+
+    $("#addNewImportConfigLink").on("click", function () {
+        adminDOMObjects.addImportConfigPopupLink.data("id", -1);
+        adminDOMObjects.addImportConfigPopupLink.trigger("click");
     });
 
     $("#lstDrTbl").on("click", function () {
@@ -1675,7 +2388,9 @@ function loadAdminPage() {
                 '    <td>' +
                 '       <select id="txtType" name="txtType"> ';
 
-            exporttypes.type.splice(3, 1);
+            var customIndex = $.inArray('CUSTOM', exporttypes.type);
+            
+            exporttypes.type.splice(customIndex, 1);
 
             exporttypes.type.push("CUSTOM");
 
@@ -1796,7 +2511,6 @@ function loadAdminPage() {
         afterOpen: function () {
 
 
-
             //For editing an existing configuration
             if (editId != "-1") {
 
@@ -1824,11 +2538,11 @@ function loadAdminPage() {
                         if ($(VoltDbAdminConfig.newStreamMinmPropertyName[properties[i].name]).length) {
                             $(VoltDbAdminConfig.newStreamMinmPropertyName[properties[i].name]).val(properties[i].value);
                             $(".newStreamMinProperty").addClass("orgProperty");
-                        } else if ($(VoltDbAdminConfig.newStreamMinmPropertyName[properties[i].name + '_' + config.type]).length && multiPropertyCount==0) {
+                        } else if ($(VoltDbAdminConfig.newStreamMinmPropertyName[properties[i].name + '_' + config.type]).length && multiPropertyCount == 0) {
                             $(VoltDbAdminConfig.newStreamMinmPropertyName[properties[i].name + '_' + config.type]).val(properties[i].value);
                             $(".newStreamMinProperty").addClass("orgProperty");
                             multiPropertyCount++;
-                        }else {
+                        } else {
                             $("#lnkAddNewProperty").trigger("click");
                             $("#txtName" + count).val(properties[i].name);
                             $("#txtValue" + count).val(properties[i].value);
@@ -1848,7 +2562,6 @@ function loadAdminPage() {
             var popup = $(this)[0];
             $("#btnAddConfigSave").unbind("click");
             $("#btnAddConfigSave").on("click", function (e) {
-
                 var newStreamPropertyNames = $(".newStreamPropertyName");
                 for (var i = 0; i < newStreamPropertyNames.length; i++) {
                     $(newStreamPropertyNames[i]).rules("add", {
@@ -1890,6 +2603,7 @@ function loadAdminPage() {
 
             //Center align the popup
             popup.center();
+
 
             $("#deleteAddConfig").on("click", function () {
                 $("#addConfigControls").hide();
@@ -1984,7 +2698,7 @@ function loadAdminPage() {
                                 msg += "Please try again later.";
                             }
 
-                            adminEditObjects.updateErrorFieldMsg.text(msg);
+                            $("#updateErrorFieldMsg").text(msg);
 
                             $("#updateErrorPopupLink").trigger("click");
                         }, 3000);
@@ -2003,6 +2717,715 @@ function loadAdminPage() {
                     $("#deleteAddConfig").show();
                 }
             });
+        }
+    });
+
+    $("#addImportConfigPopupLink").popup({
+        open: function (event, ui, ele) {
+            editId = adminDOMObjects.addImportConfigPopupLink.data("id");
+
+            //For adding a new import configuration
+            if (editId == "-1") {
+                $("#addImportConfigHeader").text("Add Configuration");
+                $("#deleteImportConfig").hide();
+            }//For editing an existing configuration
+            else {
+                $("#addImportConfigHeader").text("Edit Configuration");
+                $("#deleteImportConfig").show();
+            }
+
+            $("#importSaveConfigText").text("save").data("status", "save");
+            var contents = '' +
+                '<table width="100%" cellpadding="0" cellspacing="0" class="configureImportTbl">' +
+                '<tr>' +
+                '    <td style="width:25%">Type </td>' +
+                '    <td style="width:60%">' +
+                '       <select id="txtImportType" name="txtImportType"> '+
+                '           <option value="KAFKA">KAFKA</option> ' +
+                '           <option value="KINESIS">KINESIS</option> ' +
+                '       </select>' +
+                '    </td>' +
+                '    <td width="8%" align="right"><input type="checkbox" checked="true" id="chkImportStream" class="chkStream"/></td>' +
+                '    <td id="chkImportStreamValue">On</td>' +
+                '</tr>' +
+                '<tr> ' +
+                '   <td>Format</td> ' +
+                '   <td> ' +
+                '       <div class="form-group formatImport"> ' +
+                '           <div class="input-group"> ' +
+                '               <input type="text" class="formatHeight" id="txtImportFormat" name="txtImportFormat"> ' +
+                '               <div id="dropDownImg" class="input-group-addon drop-down-trigger"><span class="downImg"></span></div> ' +
+                '           </div> ' +
+                '           <ul id="ddlFormat" class="drop-down-list"> ' +
+                '               <li class="formatOption">csv</li> ' +
+                '               <li class="formatOption">tsv</li> ' +
+                '           </ul> ' +
+                '       </div> ' +
+                '       <label id="errorImportFormat" for="txtImportFormat" class="error" style="display: none;"></label> ' +
+                '   </td> ' +
+                '   <td>&nbsp;</td> ' +
+                '   <td>&nbsp;</td> ' +
+                '</tr> ' +
+                '<tr id="TrImportConnectorClass" style="display:none">' +
+                '    <td>Module</td>' +
+                '    <td width="15%" id="TdImportConnectorClass">' +
+                '       <input id="txtImportModule" name="txtImportModule" type="text" size="38">' +
+                '       <label id="errorImportModule" for="txtImportModule" class="error" style="display: none;"></label>' +
+                '    </td>' +
+                '    <td>&nbsp;</td>' +
+                '    <td>&nbsp;</td>' +
+                '</tr>' +
+                '</table>' +
+
+                '<table width="100%" cellpadding="0" cellspacing="0" class="configureImportTbl">' +
+                '<tr>' +
+                '    <td class="configLabe1">' +
+                '        <div class="propertiesAlign">' +
+                '            <div class="proLeft ">Properties</div>' +
+                '            <div class="editBtn addProBtn"> ' +
+                '                <a href="javascript:void(0)" id="lnkAddNewImportProperty" class="btnEd"> <span class="userPlus">+</span> Add Property</a> ' +
+                '            </div>' +
+                '            <div class="clear"> </div>' +
+                '        </div>' +
+                '    </td>' +
+                '</tr>' +
+                '<tr>' +
+                '    <td>' +
+                '        <div class="addConfigProperWrapper">' +
+                '            <table id="tblAddNewImportProperty" width="100%" cellpadding="0" cellspacing="0" class="addConfigProperTbl">' +
+                '                <tr class="headerProperty">' +
+                '                    <th>Name</th>' +
+                '                    <th align="right">Value</th>' +
+                '                    <th>Delete</th>' +
+                '                </tr>' +
+
+                '            </table>' +
+                '        </div>' +
+                '    </td>' +
+                '</tr>' +
+                '</table>';
+
+            $("#addImportConfigWrapper").html(contents);
+
+            $("#dropDownImg").on("click", function(){
+                if($("#ddlFormat").is(":visible")){
+                    $("#ddlFormat").hide();
+                } else {
+                    $("#ddlFormat").show();
+                }
+            })
+            $(".formatOption").on("click", function(){
+                $("#txtImportFormat").val($(this).text())
+                $("#ddlFormat").hide()
+            });
+
+            $("#addImportConfigControls").show();
+            $("#saveImportConfigConfirmation").hide();
+
+            $('#chkImportStream').iCheck({
+                checkboxClass: 'icheckbox_square-aero customCheckbox',
+                increaseArea: '20%'
+            });
+
+            $('#chkImportStream').on('ifChanged', function () {
+                $("#chkImportStreamValue").text(getOnOffText($('#chkImportStream').is(":checked")));
+            });
+
+            $('#txtImportType').change(function () {
+                if (typeof type === "undefined") {
+                    addImportProperties();
+                }
+            });
+
+            var count = 0;
+
+            $("#lnkAddNewImportProperty").on("click", function () {
+
+                count++;
+                var nameId = 'txtImportName' + count;
+                var valueId = 'txtImportValue' + count;
+
+                var newRow = '<tr>' +
+                    '   <td>' +
+                    '       <input size="15" id="' + nameId + '" name="' + nameId + '" class="newImportStreamPropertyName newImportStreamProperty" type="text">' +
+                    '       <label id="errorImportName' + count + '" for="' + nameId + '" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td>' +
+                    '       <input size="15" id="' + valueId + '" name="' + valueId + '" class="newImportStreamPropertyValue newImportStreamProperty" type="text">' +
+                    '       <label id="errorImportValue' + count + '" for="' + valueId + '" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td><div class="securityDelete" id="deleteFirstImportProperty" onclick="deleteRow(this)"></div></td>' +
+                    '</tr>';
+                $("#tblAddNewImportProperty").append(newRow);
+            });
+
+            $("#formAddImportConfiguration").validate({
+                rules: {
+                    txtImportModule: adminValidationRules.streamNameRules,
+                    txtImportFormat: adminValidationRules.streamNameRules,
+                },
+                messages: {
+                    txtImportModule: adminValidationRules.streamNameMessages,
+                    txtImportFormat: adminValidationRules.streamNameMessages,
+                }
+            });
+        },
+        afterOpen: function () {
+            //For editing an existing configuration
+            if (editId != "-1") {
+                var existingAdminConfig = VoltDbAdminConfig.getLatestRawAdminConfigurations();
+                var config = existingAdminConfig.import.configuration[editId * 1];
+                $("#txtImportType").val(config.type);
+                addImportProperties();
+                VoltDbAdminConfig.orgTypeValue = config.type;
+                $("#txtImportFormat").val(config.format);
+
+                $("#chkImportStream").iCheck(config.enabled ? 'check' : 'uncheck');
+                $("#txtImportModule").val(config.model);
+                var properties = config.property;
+
+                if (properties.length == 0) {
+                    $("#deleteFirstProperty").trigger("click");
+                }
+                var count = 1;
+                var multiPropertyCount = 0;
+                for (var i = 0; i < properties.length; i++) {
+                    if (VoltDbAdminConfig.newImportStreamMinPropertyName.hasOwnProperty(properties[i].name) || VoltDbAdminConfig.newImportStreamMinPropertyName.hasOwnProperty(properties[i].name + '_' + config.type)) {
+                        if (properties[i].name == "broker.host" || properties[i].name == "amqp.uri") {
+                            $("#selectRabbitMq").val(properties[i].name);
+                        }
+                        if ($(VoltDbAdminConfig.newImportStreamMinPropertyName[properties[i].name]).length) {
+                            $(VoltDbAdminConfig.newImportStreamMinPropertyName[properties[i].name]).val(properties[i].value);
+                            $(".newImportStreamMinProperty").addClass("orgProperty");
+                        } else if ($(VoltDbAdminConfig.newImportStreamMinPropertyName[properties[i].name + '_' + config.type]).length && multiPropertyCount == 0) {
+                            $(VoltDbAdminConfig.newImportStreamMinPropertyName[properties[i].name + '_' + config.type]).val(properties[i].value);
+                            $(".newImportStreamMinProperty").addClass("orgProperty");
+                            multiPropertyCount++;
+                        } else {
+                            $("#lnkAddNewImportProperty").trigger("click");
+                            $("#txtImportName" + count).val(properties[i].name);
+                            $("#txtImportValue" + count).val(properties[i].value);
+                            count++;
+                        }
+                    } else {
+                        $("#lnkAddNewImportProperty").trigger("click");
+                        $("#txtImportName" + count).val(properties[i].name);
+                        $("#txtImportValue" + count).val(properties[i].value);
+                        count++;
+                    }
+                }
+            } else {
+                addImportProperties();
+            }
+            var popup = $(this)[0];
+            $("#btnAddImportConfigSave").unbind("click");
+            $("#btnAddImportConfigSave").on("click", function (e) {
+                var newStreamPropertyNames = $(".newImportStreamPropertyName");
+                for (var i = 0; i < newStreamPropertyNames.length; i++) {
+                    $(newStreamPropertyNames[i]).rules("add", {
+                        required: true,
+                        regex: /^[a-zA-Z0-9_\-.]+$/,
+                        messages: {
+                            required: "This field is required",
+                            regex: 'Only alphabets, numbers, <br/> _, - and . are allowed.'
+                        }
+                    });
+                }
+
+                var newStreamPropertyValues = $(".newImportStreamPropertyValue");
+                for (var j = 0; j < newStreamPropertyValues.length; j++) {
+                    $(newStreamPropertyValues[j]).rules("add", {
+                        required: true,
+                        messages: {
+                            required: "This field is required"
+                        }
+                    });
+                }
+
+                if (!$("#formAddImportConfiguration").valid()) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                } else {
+                    $("#addImportConfigControls").hide();
+                    $("#deleteImportConfig").hide();
+                    $("#saveImportConfigConfirmation").show();
+                }
+            });
+            $("#btnAddImportConfigCancel").unbind("click");
+            $("#btnAddImportConfigCancel").on("click", function () {
+                //Close the popup
+                popup.close();
+            });
+
+            //Center align the popup
+            popup.center();
+
+            $("#deleteImportConfig").on("click", function () {
+                $("#addImportConfigControls").hide();
+                $("#deleteImportConfig").hide();
+                $("#importSaveConfigText").text("delete").data("status", "delete");
+                $("#saveImportConfigConfirmation").show();
+            });
+
+            $("#btnSaveImportConfigOk").unbind("click");
+            $("#btnSaveImportConfigOk").on("click", function () {
+                var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
+                if ($("#importSaveConfigText").data("status") == "delete") {
+                    adminConfigurations.import.configuration.splice(editId * 1, 1);
+                }
+                else {
+                    var newConfig = {};
+                    newConfig["property"] = [];
+
+                    var newStreamProperties = $(".newImportStreamProperty");
+                    for (var i = 0; i < newStreamProperties.length; i += 2) {
+                        newConfig["property"].push({
+                            "name": encodeURIComponent($(newStreamProperties[i]).val()),
+                            "value": encodeURIComponent($(newStreamProperties[i + 1]).val()),
+                        });
+                    }
+                    newConfig["format"] = $("#txtImportFormat").val();
+                    newConfig["type"] = $("#txtImportType").val().trim();
+                    newConfig["enabled"] = $("#chkImportStream").is(':checked');
+                    if ($("#txtImportType").val().trim().toUpperCase() == "CUSTOM") {
+                        newConfig["module"] = $("#txtImportModule").val();
+                    } else {
+                        newConfig["module"] = null
+                    }
+
+                    if (!adminConfigurations.import) {
+                        adminConfigurations.import = {};
+                        adminConfigurations.import["configuration"] = [];
+                    }
+
+                    //For editing an existing configuration
+                    if (editId == "-1") {
+                        adminConfigurations.import.configuration.push(newConfig);
+                    } else {
+                        var updatedConfig = adminConfigurations.import.configuration[editId * 1];
+                        updatedConfig.format = newConfig.format;
+                        updatedConfig.type = newConfig.type;
+                        updatedConfig.enabled = newConfig.enabled;
+                        updatedConfig.property = newConfig.property;
+                        updatedConfig.module = newConfig.module;
+                    }
+                }
+
+                var currentConfig = adminEditObjects.importConfiguration.html();
+
+                var loadingConfig = '<tr class="child-row-4 subLabelRow">' +
+                    '   <td colspan="4" style="position:relative">&nbsp;<div class="loading-small loadExportConfig"></div></td>' +
+                    '</tr>';
+                adminEditObjects.addNewImportConfigLink.hide();
+                adminEditObjects.importConfiguration.html(loadingConfig);
+                adminEditObjects.loadingImportConfig.show();
+                adminEditObjects.importConfiguration.data("status", "loading");
+
+                //Close the popup
+                popup.close();
+
+                voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
+                    if (result.status == "1") {
+
+                        //Reload Admin configurations for displaying the updated value
+                        voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
+                            adminEditObjects.loadingImportConfig.hide();
+                            adminEditObjects.addNewImportConfigLink.show();
+                            adminEditObjects.importConfiguration.data("status", "value");
+
+                            VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
+                        });
+
+                    } else {
+                        setTimeout(function () {
+                            adminEditObjects.loadingImportConfig.hide();
+                            adminEditObjects.addNewImportConfigLink.show();
+                            adminEditObjects.importConfiguration.data("status", "value");
+                            adminEditObjects.importConfiguration.html(currentConfig);
+
+                            var msg = '"Import Configuration". ';
+                            if (result.status == "-1" && result.statusstring == "Query timeout.") {
+                                msg += "The Database is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                            } else if (result.statusstring != "") {
+                                msg += result.statusstring;
+                            } else {
+                                msg += "Please try again later.";
+                            }
+
+                            $("#updateImportErrorFieldMsg").text(msg);
+
+                            $("#updateImportErrorPopupLink").trigger("click");
+                        }, 3000);
+                    }
+                });
+            });
+
+            $("#btnSaveImportConfigCancel").unbind("click");
+            $("#btnSaveImportConfigCancel").on("click", function () {
+                $("#saveImportConfigConfirmation").hide();
+                $("#addImportConfigControls").show();
+                $("#importSaveConfigText").text("save").data("status", "save");
+
+                if (editId != "-1") {
+                    $("#deleteImportConfig").show();
+                }
+            });
+        }
+    });
+
+    $("#addDiskLimitPopupLink").popup({
+        open: function (event, ui, ele) {
+
+            $("#addDiskLimitHeader").text("Edit Disk Limit");
+
+            $("#expotSaveDiskLimitText").text("save").data("status", "save");
+
+            var contents = '<table width="100%" cellpadding="0" cellspacing="0" class="configurTbl">' +
+                 '<tr>' +
+                 '    <td class="configLabe1">' +
+                 '        <div class="featuresAlign">' +
+                 '            <div class="proLeft ">Feature</div>' +
+                 '            <div class="editBtn addProBtn"> ' +
+                 '                <a href="javascript:void(0)" id="lnkAddNewFeature" class="btnEd"> <span class="userPlus">+</span> Add Feature</a> ' +
+                 '            </div>' +
+                 '            <div class="clear"> </div>' +
+                 '        </div>' +
+                 '    </td>' +
+                 '</tr>' +
+                 '<tr>' +
+                 '    <td>' +
+                 '        <div class="addConfigProperWrapper">' +
+                 '            <table id="tblAddNewFeature" width="100%" cellpadding="0" cellspacing="0" class="addConfigProperTbl">' +
+                 '                <tr class="headerFeature">' +
+                 '                    <th width="53%">Name</th>' +
+                 '                    <th align="right" width="37%">Value</th>' +
+                 '                    <th align="right" width="14%">Unit</th>' +
+                 '                    <th width="5%">Delete</th>' +
+                 '                </tr>' +
+
+                 '            </table>' +
+                 '        </div>' +
+                 '    </td>' +
+                 '</tr>' +
+                 '</table>';
+
+            $("#addDiskLimitWrapper").html(contents);
+
+            $("#addDiskLimitControls").show();
+            $("#saveDiskLimitConfirmation").hide();
+
+
+            var count = 0;
+
+            $("#lnkAddNewFeature").on("click", function () {
+                count = $('.newFeatureValue').length;
+                count++;
+
+                var nameId = 'txtNameDL' + count;
+                var valueId = 'txtValueDL' + count;
+                var unitId = 'txtUnitDL' + count;
+
+                var newRow = '<tr>' +
+                    '   <td>' +
+                    '<select  id="' + nameId + '" name="' + nameId + '" class="newFeatureName newFeature">' +
+                    '<option>SNAPSHOTS</option><option>COMMANDLOG</option><option>EXPORTOVERFLOW</option><option>DROVERFLOW</option><option>COMMANDLOGSNAPSHOT</option>' +
+                    '</select>' +
+                    '       <label id="error_' + nameId + '" class="error duplicateError" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td>' +
+                    '       <input size="15" id="' + valueId + '" name="' + valueId + '" class="newFeatureValue newFeature" type="text">' +
+                    '       <label id="errorValueDL' + count + '" for="' + valueId + '" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                     '   <td><select id="' + unitId + '" name="' + unitId + '" class="newFeatureUnit newFeature"><option>GB</option><option>%</option></select>' +
+                    '       <label id="errorValueUnit' + count + '" for="' + unitId + '" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td><div class="securityDelete" id="deleteFirstFeature" onclick="deleteRow(this)"></div></td>' +
+                    '</tr>';
+                $("#tblAddNewFeature").append(newRow);
+            });
+
+            $("#formAddDiskLimit").validate();
+        },
+        afterOpen: function () {
+            $(".duplicateError").hide();
+
+            var existingAdminConfig = VoltDbAdminConfig.getLatestRawAdminConfigurations();
+            if (existingAdminConfig.systemsettings.resourcemonitor != null) {
+                if (existingAdminConfig.systemsettings.resourcemonitor.disklimit != null) {
+
+                    var config = existingAdminConfig.systemsettings.resourcemonitor.disklimit;
+
+                    var features = config.feature;
+
+                    if (features.length == 0) {
+                        $("#deleteFirstProperty").trigger("click");
+                    }
+                    var count = 1;
+                    for (var i = 0; i < features.length; i++) {
+
+                        var nameId = 'txtNameDL' + count;
+                        var valueId = 'txtValueDL' + count;
+                        var unitId = 'txtUnitDL' + count;
+
+                        var newRow = '<tr>' +
+                            '   <td>' +
+                            '<select  id="' + nameId + '" name="' + nameId + '" class="newFeatureName newFeature">' +
+                            '<option>SNAPSHOTS</option><option>COMMANDLOG</option><option>EXPORTOVERFLOW</option><option>DROVERFLOW</option><option>COMMANDLOGSNAPSHOT</option>' +
+                            '</select>' +
+                            '       <label id="error_' + nameId + '" class="error" style="display: none;"></label>' +
+                            '   </td>' +
+                            '   <td>' +
+                            '       <input size="15" id="' + valueId + '" name="' + valueId + '" class="newFeatureValue newFeature" type="text">' +
+                            '       <label id="errorValueDL' + count + '" for="' + valueId + '" class="error" style="display: none;"></label>' +
+                            '   </td>' +
+                            '   <td><select id="' + unitId + '" name="' + unitId + '" class="newFeatureUnit newFeature"><option>GB</option><option>%</option></select>' +
+                            '       <label id="errorValueUnit' + count + '" for="' + unitId + '" class="error" style="display: none;"></label>' +
+                            '   </td>' +
+                            '   <td><div class="securityDelete" id="deleteFirstFeature" onclick="deleteRow(this)"></div></td>' +
+                            '</tr>';
+
+
+                        $("#tblAddNewFeature").append(newRow);
+
+                        $("#" + nameId).val(features[i].name);
+
+
+                        if (features[i].size.indexOf("%") === -1) {
+                            $("#" + valueId).val(features[i].size);
+
+                        } else {
+                            features[i].size = features[i].size.replace("%", "");
+                            $("#" + valueId).val(features[i].size);
+                            $("#" + unitId).val("%");
+                        }
+
+                        count++;
+                    }
+                }
+            }
+
+            var popup = $(this)[0];
+            $("#btnAddDiskLimitSave").unbind("click");
+            $("#btnAddDiskLimitSave").on("click", function (e) {
+                $(".duplicateError").hide();
+                var featuresNames = [];
+
+
+                var newFeatureNames = $(".newFeatureName");
+                for (var i = 0; i < newFeatureNames.length; i++) {
+                    featuresNames.push(newFeatureNames[i].value);
+                    $(newFeatureNames[i]).rules("add", {
+                        required: true,
+                        messages: {
+                            required: "This field is required",
+                        }
+                    });
+                }
+
+                var newFeatureValues = $(".newFeatureValue");
+                var newFeatureUnits = $(".newFeatureUnit");
+                for (var j = 0; j < newFeatureValues.length; j++) {
+                    $(newFeatureValues[j]).rules("remove");
+                    var unit = newFeatureUnits[j].value;
+                    if (unit == "%") {
+                        $(newFeatureValues[j]).rules("add", {
+                            required: true,
+                            min: 0,
+                            max: 99,
+                            digits: true,
+                            messages: {
+                                required: "This field is required",
+                                min: "Please enter a positive number.",
+                                max: "Maximum value of percentage cannot be greater than 99.",
+                                digits: "Please enter a positive number without any decimal."
+                            }
+                        });
+                    } else if (unit == "GB") {
+                        $(newFeatureValues[j]).rules("add", {
+                            required: true,
+                            min: 0,
+                            max: 2147483647,
+                            digits: true,
+                            messages: {
+                                required: "This field is required",
+                                min: "Please enter a positive number.",
+                                max: "Maximum value of GB cannot be greater than 2147483647.",
+                                digits: "Please enter a positive number without any decimal."
+                            }
+                        });
+                    }
+                }
+
+
+
+
+                if (!$("#formAddDiskLimit").valid()) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                } else {
+                    if (hasDuplicates(featuresNames)) {
+
+                        for (var i = 0; i < newFeatureNames.length; i++) {
+                            if (newFeatureNames[i].value == duplicateValue) {
+                                $('#error_' + newFeatureNames[i].id).show();
+                                $('#error_' + newFeatureNames[i].id).html("Duplicate feature names are not allowed.");
+                            }
+                        }
+                        e.preventDefault();
+                        e.stopPropagation();
+                    } else {
+                        $("#addDiskLimitControls").hide();
+                        $("#saveDiskLimitConfirmation").show();
+                    }
+                }
+            });
+
+
+            $("#btnAddDiskLimitCancel").unbind("click");
+            $("#btnAddDiskLimitCancel").on("click", function () {
+
+                //Close the popup
+                popup.close();
+
+            });
+
+            //Center align the popup
+            popup.center();
+
+
+            $("#deleteAddConfig").on("click", function () {
+                $("#addConfigControls").hide();
+                $("#deleteAddConfig").hide();
+                $("#expotSaveConfigText").text("delete").data("status", "delete");
+                $("#saveConfigConfirmation").show();
+            });
+
+            $("#btnSaveDiskLimitOk").unbind("click");
+            $("#btnSaveDiskLimitOk").on("click", function () {
+
+
+                var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
+                if (adminConfigurations.systemsettings.resourcemonitor == null) {
+                    adminConfigurations.systemsettings.resourcemonitor = {};
+                }
+                if (adminConfigurations.systemsettings.resourcemonitor.disklimit == null) {
+                    adminConfigurations.systemsettings.resourcemonitor.disklimit = {};
+                }
+
+                var feature = [];
+
+                var newFeatureNames = $(".newFeatureName");
+                var newFeatureValues = $(".newFeatureValue");
+                var newFeatureUnits = $(".newFeatureUnit");
+                for (var i = 0; i < newFeatureNames.length; i++) {
+                    if (newFeatureUnits[i].value == "GB") {
+                        feature.push(
+                            {
+                                name: newFeatureNames[i].value,
+                                size: newFeatureValues[i].value
+                            }
+                        );
+                    } else {
+                        feature.push(
+                          {
+                              name: newFeatureNames[i].value,
+                              size: newFeatureValues[i].value + newFeatureUnits[i].value
+                          }
+                      );
+
+                    }
+                }
+
+                if (feature.length == 0) {
+                    adminConfigurations.systemsettings.resourcemonitor.disklimit = null;
+
+                } else {
+                    adminConfigurations.systemsettings.resourcemonitor.disklimit.feature = feature;
+                }
+
+                //Set the new value to be saved. 
+
+
+
+                popup.close();
+
+                var currentDiskLimit = adminEditObjects.diskLimitConfiguration.html();
+
+                var loadingConfig = '<tr class="childprop-row-60 subLabelRow" id="loadDL" style="display:none">' +
+                    '   <td colspan="4" style="position:relative;">&nbsp;<div class="loading-small loadExportConfig"></div></td>' +
+                    '</tr>';
+
+                $("#btnEditDiskLimit").hide();
+                $("#loadingDiskLimit").show();
+                adminEditObjects.editDiskLimitLink.hide();
+                adminEditObjects.diskLimitConfiguration.find(".childprop-row-60").remove();
+
+                adminEditObjects.diskLimitConfiguration.append(loadingConfig);
+                if ($("#row-60").find('a:first').hasClass('labelExpanded')) {
+                    $("#loadDL").show();
+                }
+
+                voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
+
+                    if (result.status == "1") {
+
+                        //Reload Admin configurations for displaying the updated value
+                        voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
+                            $("#loadingDiskLimit").hide();
+                            $("#btnEditDiskLimit").show();
+                            adminEditObjects.diskLimitConfiguration.data("status", "value");
+
+                            VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
+                        });
+
+                    } else {
+                        setTimeout(function () {
+                            $("#loadingDiskLimit").hide();
+                            $("#btnEditDiskLimit").show();
+                            adminEditObjects.diskLimitConfiguration.data("status", "value");
+                            adminEditObjects.diskLimitConfiguration.html(currentDiskLimit);
+
+                            var msg = '"Disk Limit Configuration". ';
+                            if (result.status == "-1" && result.statusstring == "Query timeout.") {
+                                msg += "The Database is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                            } else if (result.statusstring != "") {
+                                msg += result.statusstring;
+                            } else {
+                                msg += "Please try again later.";
+                            }
+
+                            $("#updateErrorFieldMsg").text(msg);
+
+                            $("#updateErrorPopupLink").trigger("click");
+                        }, 3000);
+                    }
+                });
+
+            });
+
+            $("#btnSaveDiskLimitCancel").unbind("click");
+            $("#btnSaveDiskLimitCancel").on("click", function () {
+
+                $("#saveDiskLimitConfirmation").hide();
+                $("#addDiskLimitControls").show();
+                $("#expotSaveDiskLimitText").text("save").data("status", "save");
+
+            });
+
+            var hasDuplicates = function (array) {
+                var valuesSoFar = Object.create(null);
+                for (var i = 0; i < array.length; ++i) {
+                    var value = array[i];
+                    if (value in valuesSoFar) {
+                        duplicateValue = value;
+                        return true;
+                    }
+                    valuesSoFar[value] = true;
+                }
+                return false;
+            };
+
         }
     });
 
@@ -2253,7 +3676,7 @@ function loadAdminPage() {
         } else {
             setNormalDisplay($("#selectRabbitMq"));
         }
-        
+
         if (exportType.toUpperCase() == "ELASTICSEARCH") {
             setDefaultDisplay($("#txtEndpointES"));
         } else {
@@ -2278,6 +3701,252 @@ function loadAdminPage() {
         $td.html('<div class="securityDelete" onclick="deleteRow(this)"></div>');
     };
 
+    //set import properties
+    var addImportProperties = function () {
+        var exportType = $('#txtImportType').val();
+        if (editId == 1)
+            VoltDbAdminConfig.orgTypeValue = "";
+        for (var i = 0; i < $(".newImportStreamMinProperty").length; i++) {
+            if (!$($(".newImportStreamMinProperty")[i]).hasClass("orgProperty")) {
+                $($(".newImportStreamMinProperty")[i]).addClass("propertyToRemove");
+            }
+        }
+        $(".propertyToRemove").not(".addedImportProperty").remove();
+
+        var exportProperties = '';
+        if (exportType.toUpperCase() == "KAFKA") {
+            if (!$('#txtBrokers').length) {
+                exportProperties += '<tr class="newImportStreamMinProperty">' +
+                    '   <td>' +
+                    '       <input size="15" id="txtBrokers" name="txtBrokers" value="brokers" disabled="disabled" class="newImportStreamPropertyName newImportStreamProperty requiredImportProperty" type="text">' +
+                    '       <label id="errorBrokers" for="txtBrokers" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td>' +
+                    '       <input size="15" id="txtBrokersValue" name="txtBrokersValue" class="newImportStreamPropertyValue newImportStreamProperty" type="text">' +
+                    '       <label id="errorBrokersValue" for="txtBrokersValue" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td></td>' +
+                    '</tr>';
+            } else {
+                $('#txtBrokers').attr("disabled", "disabled");
+            }
+
+            if (!$('#txtProcedure').length) {
+                exportProperties += '<tr class="newImportStreamMinProperty">' +
+                    '   <td>' +
+                    '       <input size="15" id="txtProcedure" name="txtProcedure" value="procedure" disabled="disabled" class="newImportStreamPropertyName newImportStreamProperty requiredImportProperty" type="text">' +
+                    '       <label id="errorProcedure" for="txtProcedure" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td>' +
+                    '       <input size="15" id="txtProcedureValue" name="txtProcedureValue" class="newImportStreamPropertyValue newImportStreamProperty" type="text">' +
+                    '       <label id="errorProcedureValue" for="txtProcedureValue" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td></td>' +
+                    '</tr>';
+            } else {
+                $('#txtProcedure').attr("disabled", "disabled");
+            }
+
+            if (!$('#txtTopics').length) {
+                exportProperties += '<tr class="newImportStreamMinProperty">' +
+                    '   <td>' +
+                    '       <input size="15" id="txtTopics" name="txtTopics" value="topics" disabled="disabled" class="newImportStreamPropertyName newImportStreamProperty requiredImportProperty" type="text">' +
+                    '       <label id="errorTopics" for="txtTopics" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td>' +
+                    '       <input size="15" id="txtTopicsValue" name="txtTopicsValue" class="newImportStreamPropertyValue newImportStreamProperty" type="text">' +
+                    '       <label id="errorTopicValue" for="txtTopicsValue" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td></td>' +
+                    '</tr>';
+            } else {
+                $('#txtTopics').attr("disabled", "disabled");
+            }
+
+        }
+
+        else if (exportType.toUpperCase() == "KINESIS") {
+            if (!$('#txtAppName').length) {
+                exportProperties += '<tr class="newImportStreamMinProperty">' +
+                    '   <td>' +
+                    '       <input size="15" id="txtAppName" name="txtAppName" value="app.name" disabled="disabled" class="newImportStreamPropertyName newImportStreamProperty requiredImportProperty" type="text">' +
+                    '       <label id="errorAppName" for="txtAppName" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td>' +
+                    '       <input size="15" id="txtAppNameValue" name="txtAppNameValue" class="newImportStreamPropertyValue newImportStreamProperty" type="text">' +
+                    '       <label id="errorAppNameValue" for="txtAppNameValue" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td></td>' +
+                    '</tr>';
+            } else {
+                $('#txtAppName').attr("disabled", "disabled");
+            }
+
+            if (!$('#txtProcedureKi').length) {
+                exportProperties += '<tr class="newImportStreamMinProperty">' +
+                    '   <td>' +
+                    '       <input size="15" id="txtProcedureKi" name="txtProcedureKi" value="procedure" disabled="disabled" class="newImportStreamPropertyName newImportStreamProperty requiredImportProperty" type="text">' +
+                    '       <label id="errorProcedureKi" for="txtProcedureKi" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td>' +
+                    '       <input size="15" id="txtProcedureKiValue" name="txtProcedureKiValue" class="newImportStreamPropertyValue newImportStreamProperty" type="text">' +
+                    '       <label id="errorProcedureKiValue" for="txtProcedureKiValue" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td></td>' +
+                    '</tr>';
+            } else {
+                $('#txtProcedureKi').attr("disabled", "disabled");
+            }
+
+            if (!$('#txtRegion').length) {
+                exportProperties += '<tr class="newImportStreamMinProperty">' +
+                    '   <td>' +
+                    '       <input size="15" id="txtRegion" name="txtRegion" value="region" disabled="disabled" class="newImportStreamPropertyName newImportStreamProperty requiredImportProperty" type="text">' +
+                    '       <label id="errorRegion" for="txtRegion" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td>' +
+                    '       <input size="15" id="txtRegionValue" name="txtRegionValue" class="newImportStreamPropertyValue newImportStreamProperty" type="text">' +
+                    '       <label id="errorRegionValue" for="txtRegionValue" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td></td>' +
+                    '</tr>';
+            } else {
+                $('#txtRegion').attr("disabled", "disabled");
+            }
+
+            if (!$('#txtStreamName').length) {
+                exportProperties += '<tr class="newImportStreamMinProperty">' +
+                    '   <td>' +
+                    '       <input size="15" id="txtStreamName" name="txtStreamName" value="stream.name" disabled="disabled" class="newImportStreamPropertyName newImportStreamProperty requiredImportProperty" type="text">' +
+                    '       <label id="errorStreamName" for="txtStreamName" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td>' +
+                    '       <input size="15" id="txtStreamNameValue" name="txtStreamNameValue" class="newImportStreamPropertyValue newImportStreamProperty" type="text">' +
+                    '       <label id="errorStreamNameValue" for="txtStreamNameValue" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td></td>' +
+                    '</tr>';
+            } else {
+                $('#txtStreamName').attr("disabled", "disabled");
+            }
+
+            if (!$('#txtAccessKey').length) {
+                exportProperties += '<tr class="newImportStreamMinProperty">' +
+                    '   <td>' +
+                    '       <input size="15" id="txtAccessKey" name="txtAccessKey" value="access.key" disabled="disabled" class="newImportStreamPropertyName newImportStreamProperty requiredImportProperty" type="text">' +
+                    '       <label id="errorAccessKey" for="txtAccessKey" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td>' +
+                    '       <input size="15" id="txtAccessKeyValue" name="txtAccessKeyValue" class="newImportStreamPropertyValue newImportStreamProperty" type="text">' +
+                    '       <label id="errorAccessKeyValue" for="txtAccessKeyValue" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td></td>' +
+                    '</tr>';
+            } else {
+                $('#txtAccessKey').attr("disabled", "disabled");
+            }
+
+            if (!$('#txtSecretKey').length) {
+                exportProperties += '<tr class="newImportStreamMinProperty">' +
+                    '   <td>' +
+                    '       <input size="15" id="txtSecretKey" name="txtSecretKey" value="secret.key" disabled="disabled" class="newImportStreamPropertyName newImportStreamProperty requiredImportProperty" type="text">' +
+                    '       <label id="errorSecretKey" for="txtSecretKey" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td>' +
+                    '       <input size="15" id="txtSecretKeyValue" name="txtSecretKeyValue" class="newImportStreamPropertyValue newImportStreamProperty" type="text">' +
+                    '       <label id="errorSecretKeyValue" for="txtSecretKeyValue" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td></td>' +
+                    '</tr>';
+            } else {
+                $('#txtSecretKey').attr("disabled", "disabled");
+            }
+        }
+        $('#tblAddNewImportProperty tr.headerProperty').after(exportProperties);
+
+        removeDuplicateImportProperty();
+        setDefaultImportProperty();
+    };
+
+    var removeDuplicateImportProperty = function () {
+        $('#tblAddNewImportProperty :input').each(function () {
+            if ($(this).val() == "brokers") {
+                removeDuplicateImport(this, "brokers");
+            } else if ($(this).val() == "procedure") {
+                removeDuplicateImport(this, "procedure");
+            } else if ($(this).val() == "topics") {
+                removeDuplicateImport(this, "topics");
+            } else if ($(this).val() == "app.name") {
+                removeDuplicateImport(this, "app.name");
+            } else if ($(this).val() == "stream.name") {
+                removeDuplicateImport(this, "stream.name");
+            } else if ($(this).val() == "access.key") {
+                removeDuplicateImport(this, "access.key");
+            } else if ($(this).val() == "secret.key") {
+                removeDuplicateImport(this, "secret.key");
+            } else if ($(this).val() == "region") {
+                removeDuplicateImport(this, "region");
+            }
+        });
+    };
+
+    var removeDuplicateImport = function (object, propertyName) {
+        var importType = $('#txtImportType').val();
+        if (!$(object).hasClass("requiredImportProperty")) {
+            var val = $(':input:eq(' + ($(':input').index(object) + 1) + ')').val();
+            if ($(VoltDbAdminConfig.newImportStreamMinPropertyName[propertyName]).length) {
+                $(VoltDbAdminConfig.newImportStreamMinPropertyName[propertyName]).val(val);
+                $(".newImportStreamMinProperty").addClass("addedImportProperty");
+                var $row = $(object).closest("tr");
+                $row.remove();
+            } else if ($(VoltDbAdminConfig.newImportStreamMinPropertyName[propertyName + '_' + importType]).length) {
+                $(VoltDbAdminConfig.newImportStreamMinPropertyName[propertyName + '_' + importType]).val(val);
+                $(".newImportStreamMinProperty").addClass("addedImportProperty");
+                var $row1 = $(object).closest("tr");
+                $row1.remove();
+            }
+        }
+    };
+
+    var setDefaultImportProperty = function () {
+        var importType = $('#txtImportType').val();
+        var isKafka = importType.toUpperCase() == "KAFKA"
+        setDefaultNormalImportDisplay(isKafka, $("#txtBrokers"));
+        setDefaultNormalImportDisplay(isKafka, $("#txtProcedure"));
+        setDefaultNormalImportDisplay(isKafka, $("#txtTopics"));
+
+        var isKinesis = importType.toUpperCase() == "KINESIS"
+        setDefaultNormalImportDisplay(isKinesis, $("#txtAppName"));
+        setDefaultNormalImportDisplay(isKinesis, $("#txtProcedureKi"));
+        setDefaultNormalImportDisplay(isKinesis, $("#txtStreamName"));
+        setDefaultNormalImportDisplay(isKinesis, $("#txtAccessKey"));
+        setDefaultNormalImportDisplay(isKinesis, $("#txtSecretKey"));
+        setDefaultNormalImportDisplay(isKinesis, $("#txtRegion"));
+    };
+
+    var setDefaultImportDisplay = function (txtbox) {
+        var $row = txtbox.closest("tr");
+        $('#tblAddNewImportProperty tr.headerProperty').after($row);
+        var $td = $row.find("td:last-child");
+        $td.html('');
+    };
+
+    var setNormalImportDisplay = function (txtbox) {
+        txtbox.removeAttr('disabled');
+        var $row = txtbox.closest("tr");
+        var $td = $row.find("td:last-child");
+        $td.html('<div class="securityDelete" onclick="deleteRow(this)"></div>');
+    };
+
+    var setDefaultNormalImportDisplay = function(isType, txtBox){
+        if(isType){
+            setDefaultImportDisplay(txtBox)
+        } else {
+            setNormalImportDisplay(txtBox)
+        }
+    }
+    //
+
     var editUserState = -1;
     var orguser = '';
     $("#addNewUserLink").popup({
@@ -2297,7 +3966,7 @@ function loadAdminPage() {
                                     '<td width="30%">Username</td>' +
                                     '<td width="10%">' +
                                         '<input id="txtUser" name="txtUser" type="text" size="30" aria-required="true" class="error"/>' +
-                                        '<label id="errorUser" for="txtUser" class="error" style="display:none">This field is required</label>' +
+                                        '<label id="errorUser" for="txtUser" class="error errorHeightFix" style="display:none">This field is required</label>' +
                                         '<input id="txtOrgUser" name="txtOrgUser" type="text" size="30" aria-required="true" style="display:none"/>' +
                                     '</td> ' +
                                     '<td>&nbsp;</td> ' +
@@ -2500,6 +4169,20 @@ function loadAdminPage() {
         }
     });
 
+    $("#updateImportErrorPopupLink").popup({
+        open: function (event, ui, ele) {
+        },
+        afterOpen: function () {
+            var popup = $(this)[0];
+            $("#btnImportUpdateErrorOk").unbind("click");
+            $("#btnImportUpdateErrorOk").on("click", function () {
+                //Close the popup
+                popup.close();
+            });
+        }
+    });
+
+
     $("#sercurityUserPopupLink").popup({
         open: function (event, ui, ele) {
         },
@@ -2525,6 +4208,18 @@ function loadAdminPage() {
             $("#btnQueryTimeoutUpdateErrorOk").on("click", function () {
 
                 //Close the popup
+                popup.close();
+            });
+        }
+    });
+
+    $("#memorySizeUpdateErrorPopupLink").popup({
+        open: function (event, ui, ele) {
+        },
+        afterOpen: function () {
+            var popup = $(this)[0];
+            $("#btnMemorySizeUpdateErrorOk").unbind("click");
+            $("#btnMemorySizeUpdateErrorOk").on("click", function () {
                 popup.close();
             });
         }
@@ -2733,12 +4428,23 @@ function loadAdminPage() {
         "Username already exists."
     );
 
+    showHideIntSnapshotMsg = function(isProVersion){
+        if(!VoltDbAdminConfig.isCommandLogEnabled && isProVersion){
+            $('#continueShutdownMsg').show()
+            $('#shutdownWarningMsg').show()
+        }else{
+            $('#shutdownWarningMsg').hide()
+            $('#continueShutdownMsg').hide()
+        }
+    }
+
 }
 
 (function (window) {
     var iVoltDbAdminConfig = (function () {
 
         var currentRawAdminConfigurations;
+        this.isCommandLogEnabled = false;
         this.isAdmin = false;
         this.registeredElements = [];
         this.servers = [];
@@ -2753,6 +4459,7 @@ function loadAdminPage() {
         this.drReplicaEnabled = true;
         this.isDrMasterEditMode = false;
         this.isSnapshotEditMode = false;
+        this.isMemoryLimitEditMode = false;
         this.newStreamMinmPropertyName = {
             "outdir": "#txtOutdirValue",
             "nonce": "#txtnonceValue",
@@ -2766,13 +4473,28 @@ function loadAdminPage() {
             "endpoint_ELASTICSEARCH": "#txtEndpointESValue"
         };
 
+        this.newImportStreamMinPropertyName= {
+            "metadata.broker.list": "#txtImportMetadataBrokerListValue",
+            "brokers": "#txtBrokersValue",
+            "procedure_KAFKA": "#txtProcedureValue",
+            "topics": "#txtTopicsValue",
+            "app.name": "#txtAppNameValue",
+            "procedure_KINESIS": "#txtProcedureKiValue",
+            "region": "#txtRegionValue",
+            "stream.name": "#txtStreamNameValue",
+            "access.key": "#txtAccessKeyValue",
+            "secret.key": "#txtSecretKeyValue",
+        }
+        this.isImportConfigLoading = false;
         this.orgTypeValue = "";
         this.exportTypes = [];
+        this.isSaveSnapshot = false;
 
-        this.server = function (hostIdvalue, serverNameValue, serverStateValue) {
+        this.server = function (hostIdvalue, serverNameValue, serverStateValue, ipAddress) {
             this.hostId = hostIdvalue;
             this.serverName = serverNameValue;
             this.serverState = serverStateValue;
+            this.ipAddress = ipAddress;
         };
 
         this.stoppedServer = function (hostIdvalue, serverNameValue) {
@@ -2783,6 +4505,7 @@ function loadAdminPage() {
         };
 
         this.displayAdminConfiguration = function (adminConfigValues, rawConfigValues) {
+
             if (!VoltDbAdminConfig.firstResponseReceived)
                 VoltDbAdminConfig.firstResponseReceived = true;
 
@@ -2817,6 +4540,8 @@ function loadAdminPage() {
             return $('<div/>').text(value).html();
         };
 
+
+
         var configureAdminValues = function (adminConfigValues) {
             adminDOMObjects.siteNumberHeader.text(adminConfigValues.sitesperhost);
             adminDOMObjects.kSafety.text(adminConfigValues.kSafety);
@@ -2837,6 +4562,7 @@ function loadAdminPage() {
             adminDOMObjects.retainedLabel.text(adminConfigValues.retained != null ? "Copies" : "");
             adminEditObjects.tBoxAutoSnapshotRetainedValue = adminConfigValues.retained;
             adminEditObjects.tBoxFilePrefixValue = adminConfigValues.filePrefix;
+            VoltDbAdminConfig.isCommandLogEnabled = adminConfigValues.commandLogEnabled;
             adminDOMObjects.commandLog.removeClass().addClass(getOnOffClass(adminConfigValues.commandLogEnabled));
             adminDOMObjects.commandLogLabel.text(adminConfigValues.commandLogEnabled == true ? 'On' : 'Off');
             adminDOMObjects.commandLogFrequencyTime.text(adminConfigValues.commandLogFrequencyTime != null ? adminConfigValues.commandLogFrequencyTime : "");
@@ -2848,7 +4574,7 @@ function loadAdminPage() {
 
 
             if (adminConfigValues.heartBeatTimeout != null) {
-                adminDOMObjects.heartBeatTimeoutLabel.text("ms");
+                adminDOMObjects.heartBeatTimeoutLabel.text("s");
 
                 if (adminEditObjects.editStateHeartbeatTimeout == editStates.ShowEdit)
                     adminEditObjects.LinkHeartbeatEdit.show();
@@ -2860,6 +4586,28 @@ function loadAdminPage() {
             adminDOMObjects.tempTablesMaxSize.text(adminConfigValues.tempTablesMaxSize != null ? adminConfigValues.tempTablesMaxSize : "");
             adminDOMObjects.tempTablesMaxSizeLabel.text(adminConfigValues.tempTablesMaxSize != null ? "MB" : "");
             adminDOMObjects.snapshotPriority.text(adminConfigValues.snapshotPriority);
+            var memoryLimitText = adminConfigValues.memorylimit;
+            var memoryLimitUnit = "GB";
+            var memoryLimitValue = 0;
+            if (memoryLimitText != undefined && memoryLimitText.indexOf("%") > -1) {
+                memoryLimitUnit = "%";
+                memoryLimitValue = memoryLimitText.replace("%", "");
+                if (adminEditObjects.btnEditMemorySize.is(":visible")) {
+                    adminEditObjects.btnDeleteMemory.show();
+                }
+            } else if (memoryLimitText != undefined && memoryLimitText.indexOf("%") == -1) {
+                memoryLimitValue = memoryLimitText;
+                if (adminEditObjects.btnEditMemorySize.is(":visible")) {
+                    adminEditObjects.btnDeleteMemory.show();
+                }
+            } else if (memoryLimitText == undefined) {
+                memoryLimitValue = undefined;
+                adminEditObjects.btnDeleteMemory.hide();
+            }
+            adminDOMObjects.memoryLimitSize.text(adminConfigValues.memorylimit != undefined ? memoryLimitValue : "Not Enforced");
+            if (!VoltDbAdminConfig.isMemoryLimitEditMode)
+                adminDOMObjects.memoryLimitSizeUnit.text(adminConfigValues.memorylimit != undefined ? memoryLimitUnit : "");
+            adminEditObjects.spanMemoryLimitSizeValue = memoryLimitValue;
             configureQueryTimeout(adminConfigValues);
 
             //edit configuration
@@ -2873,18 +4621,19 @@ function loadAdminPage() {
             setSnapShotUnit(spanshotUnit);
             adminClusterObjects.userListObj = adminConfigValues.users;
             getUserList(adminConfigValues.users);
-            //getEditUserList(adminConfigValues.users);
             getExportProperties(adminConfigValues.configuration);
             //dr setting
             getDrMode(adminConfigValues.drListen);
 
             getImportProperties(adminConfigValues.importConfiguration);
-            //adminConfigValues.drListen = false;
+
+
+
+            getDiskLimits(adminConfigValues.disklimit);
             if (VoltDbUI.isDRInfoRequired) {
                 adminEditObjects.labelDrId.text(adminConfigValues.drId);
                 adminEditObjects.chkDrMasterValue = adminConfigValues.drListen;
                 adminEditObjects.iconDrMasterOption.removeClass().addClass(getOnOffClass(adminConfigValues.drListen));
-                //adminEditObjects.txtDrMaster.text(getOnOffText(adminConfigValues.drListen));
                 if (!VoltDbAdminConfig.isDrMasterEditMode)
                     adminEditObjects.txtDrMaster.text(getOnOffText(adminConfigValues.drListen));
                 adminEditObjects.labelReplicaSource.text(adminConfigValues.drConnectionSource == "" ? "" : "(source: " + adminConfigValues.drConnectionSource + ")");
@@ -2971,10 +4720,9 @@ function loadAdminPage() {
                             result += '' +
                                 '<tr class="childprop-' + rowId + ' subLabelRow" ' + style + '>' +
                                 '   <td class="configLabe2">' + name + '</td>' +
-                                '   <td align="right">' + value + '</td>' +
-                                '   <td>&nbsp;</td>' +
-                                '   <td>&nbsp;</td>' +
-                                '   <td>&nbsp;</td>' +
+                                '   <td class="wordBreak" align="right">' + value + '</td>' +
+                                '<td>&nbsp;</td>' +
+                                '<td>&nbsp;</td>' +
                                 '</tr>';
                         }
 
@@ -2990,7 +4738,7 @@ function loadAdminPage() {
 
             if (result == "") {
                 result += '<tr class="propertyLast subLabelRow">' +
-                        '<td width="67%" class="configLabel" colspan="3">No configuration available.</td>' +
+                        '<td width="67%" class="configLabel" colspan="3" id="noConfigExport">No configuration available.</td>' +
                         '<td width="33%">&nbsp</td>' +
                         '</tr>';
             }
@@ -3009,8 +4757,7 @@ function loadAdminPage() {
                 }
 
                 for (var i = 0; i < data.length; i++) {
-                    var module = VoltDbAdminConfig.escapeHtml(data[i].module);
-                    var type = data[i].type ? (" (" + VoltDbAdminConfig.escapeHtml(data[i].type) + ")") : "";
+                    var type = data[i].type ? VoltDbAdminConfig.escapeHtml(data[i].type) : "";
                     var enabled = data[i].enabled;
                     var importProperty = data[i].property;
                     var rowId = 'row-5' + i;
@@ -3024,15 +4771,15 @@ function loadAdminPage() {
 
                     result += '<tr class="child-row-5 subLabelRow parentprop" id="' + rowId + '">' +
                             '   <td class="configLabel expoStream" onclick="toggleProperties(this);" title="Click to expand/collapse">' +
-                            '       <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '"> ' + module + type + '</a>' +
+                            '       <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '"> ' + type + '</a>' +
                             '   </td>' +
                             '   <td align="right">' +
                             '       <div class="' + getOnOffClass(enabled) + '"></div>' +
                             '   </td>' +
                             '   <td>' + getOnOffText(enabled) + '</td>' +
                             '   <td>' +
-                            //'       <div class="exportDelete" style="display:none;"></div>' +
-                            //'       <a href="javascript:void(0)" id="exportEdit' + i + '" class="edit" onclick="editStream(' + i + ')" title="Edit">&nbsp;</a>' +
+                            '       <div class="exportDelete" style="display:none;"></div>' +
+                            '       <a href="javascript:void(0)" id="importEdit' + i + '" class="edit" onclick="editImportStream(' + i + ')" title="Edit">&nbsp;</a>' +
                             '   </td>' +
                             '</tr>';
 
@@ -3045,10 +4792,9 @@ function loadAdminPage() {
                             result += '' +
                                 '<tr class="childprop-' + rowId + ' subLabelRow" ' + style + '>' +
                                 '   <td class="configLabe2">' + name + '</td>' +
-                                '   <td align="right">' + value + '</td>' +
-                                '   <td>&nbsp;</td>' +
-                                '   <td>&nbsp;</td>' +
-                                '   <td>&nbsp;</td>' +
+                                '   <td class="wordBreak" align="right">' + value + '</td>' +
+                                '<td>&nbsp;</td>' +
+                                '<td>&nbsp;</td>' +
                                 '</tr>';
                         }
 
@@ -3071,6 +4817,91 @@ function loadAdminPage() {
 
             $('#importConfiguration').html(result);
         };
+
+        var getDiskLimits = function (data) {
+            var result = "";
+            var style = '';
+            var additionalCss = (VoltDbAdminConfig.toggleStates["row-60"] === true) ? 'labelExpanded' : '';
+            if (!VoltDbAdminConfig.toggleStates.hasOwnProperty("row-60") || VoltDbAdminConfig.toggleStates["row-60"] === false) {
+                VoltDbAdminConfig.toggleStates["row-60"] = false;
+                style = 'style = "display:none;"';
+            }
+            if (data != undefined) {
+
+                //Do not update the data in loading condition
+                if (adminEditObjects.diskLimitConfiguration.data("status") == "loading") {
+                    return;
+                }
+
+                var content = '';
+
+                content = '<a id="btnEditDiskLimit" href="javascript:void(0)" onclick="editDiskLimit(1)" class="edit" title="Edit">&nbsp;</a>' +
+                    '<div id="loadingDiskLimit" class="loading-small loadExport" style="display: none;"></div>';
+
+                result += '<tr class="child-row-6 subLabelRow parentprop" id="row-60">' +
+                       '   <td class="configLabel" id="diskLimit" onclick="toggleProperties(this);" title="Click to expand/collapse" style="cursor: pointer;">' +
+                       '   <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '">  Disk Limit</a>  ' +
+                       '   </td>' +
+                       '   <td align="right"></td>' +
+                       '<td>&nbsp</td>' +
+                       '   <td>' + content + '</td>' +
+                       '</tr>';
+
+                var diskfeature = data.feature;
+
+                if (diskfeature && diskfeature.length > 0) {
+
+                    for (var j = 0; j < diskfeature.length; j++) {
+                        var name = diskfeature[j].name;
+                        var value = diskfeature[j].size;
+                        var unit = "";
+                        if (value.indexOf("%") == -1) {
+                            unit = "GB";
+                        }
+                        result += '' +
+                            '<tr class="childprop-row-60 subLabelRow" ' + style + '>' +
+                            '   <td class="configLabe2">' + name + '</td>' +
+                            '   <td class="wordBreak" colspan="3">' + value + ' ' + unit + '</td>' +
+                            '</tr>';
+                    }
+
+
+                } else {
+                    result += '<tr class="childprop-row-60 subLabelRow">' +
+                        '<td width="67%" class="configLabel" colspan="3">No features enabled for disk space limit.</td>' +
+                        '<td width="33%">&nbsp</td>' +
+                        '</tr>';
+                }
+
+
+            }
+
+            if (result == "") {
+                result += '<tr class="child-row-6 subLabelRow parentprop" id="row-60">' +
+                      '   <td id="diskLimit" class="configLabel" onclick="toggleProperties(this);" title="Click to expand/collapse" style="cursor: pointer">' +
+                      '   <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '"" ;">Disk Limit</a>  ' +
+                      '   </td>' +
+                      '   <td align="right">' +
+                      '   </td>' +
+                   '<td>&nbsp</td>' +
+                      '   <td><a id="btnEditDiskLimit" href="javascript:void(0)" onclick="editDiskLimit(1)" class="edit" title="Edit">&nbsp;</a>' +
+                    '<div id="loadingDiskLimit" class="loading-small loadExport" style="display: none;"></div></td>' +
+                      '</tr>' +
+                    '<tr class="childprop-row-60 subLabelRow" ' + style + '>' +
+                        '<td width="67%" class="configLabel" colspan="3">&nbsp &nbsp &nbsp No features available.</td>' +
+                        '<td width="33%">&nbsp</td>' +
+                        '</tr>';
+
+
+            }
+
+            $('#diskLimitConfiguration').html(result);
+
+            $("#addDiskLimitLink").on("click", function () {
+                adminDOMObjects.addDiskLimitLink.trigger("click");
+            });
+        };
+
 
 
         var getUserList = function (userData) {
@@ -3186,7 +5017,6 @@ function loadAdminPage() {
 
         };
 
-        //var configureAdminValuesFromSystemInfo = function (adminConfigValues) {
         var configureQueryTimeout = function (adminConfigValues) {
 
             if (adminConfigValues.queryTimeout == null) {
@@ -3268,6 +5098,7 @@ function loadAdminPage() {
             adminDOMObjects.exportOverflow.text(directoryConfigValues.exportOverflow);
             adminDOMObjects.commandLogPath.text(directoryConfigValues.commandLogPath);
             adminDOMObjects.commandLogSnapshotPath.text(directoryConfigValues.commandLogSnapshotPath);
+            adminDOMObjects.drOverflowPath.text(directoryConfigValues.drOverflowPath);
         };
 
         var configurePromoteAction = function (adminConfigValues) {
@@ -3289,6 +5120,7 @@ function loadAdminPage() {
                 }
             }
         };
+
     });
     window.VoltDbAdminConfig = VoltDbAdminConfig = new iVoltDbAdminConfig();
 
@@ -3313,7 +5145,6 @@ function insRow() {
     var x = document.getElementById('secTbl');
     var new_row = x.rows[1].cloneNode(true);
     var len = x.rows.length;
-    //new_row.cells[0].innerHTML = len;//sn number increment
 
     var inp1 = new_row.cells[1].getElementsByTagName('input')[0];
     inp1.id = 'input' + (len - 1);
@@ -3365,6 +5196,15 @@ var deleteRow = function (cell) {
 var editStream = function (editId) {
     adminDOMObjects.addConfigLink.data("id", editId);
     adminDOMObjects.addConfigLink.trigger("click");
+};
+
+var editImportStream = function (editId) {
+    adminDOMObjects.addImportConfigPopupLink.data("id", editId);
+    adminDOMObjects.addImportConfigPopupLink.trigger("click");
+};
+
+var editDiskLimit = function (editId) {
+    adminDOMObjects.addDiskLimitLink.trigger("click");
 };
 
 var addUser = function (editId, username, role) {

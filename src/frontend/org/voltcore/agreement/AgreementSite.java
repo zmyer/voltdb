@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -611,17 +611,36 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                     true,
                     null);
         }
-        Map<Long, Long> initiatorSafeInitPoint = m_meshArbiter.reconfigureOnFault(m_hsIds, faultMessage);
-        if (initiatorSafeInitPoint.isEmpty()) return;
+        Set<Long> unknownFaultedHosts = new TreeSet<>();
 
-        Set<Long> failedSites = initiatorSafeInitPoint.keySet();
-        handleSiteFaults(failedSites,initiatorSafeInitPoint);
+        // This one line is a biggie. Gets agreement on what the post-fault cluster will be.
+        Map<Long, Long> initiatorSafeInitPoint = m_meshArbiter.reconfigureOnFault(m_hsIds, faultMessage, unknownFaultedHosts);
+
+        ImmutableSet<Long> failedSites = ImmutableSet.copyOf(initiatorSafeInitPoint.keySet());
+
+        // check if nothing actually happened
+        if (initiatorSafeInitPoint.isEmpty() && unknownFaultedHosts.isEmpty()) {
+            return;
+        }
 
         ImmutableSet.Builder<Integer> failedHosts = ImmutableSet.builder();
         for (long hsId: failedSites) {
             failedHosts.add(CoreUtils.getHostIdFromHSId(hsId));
         }
+        // Remove any hosts associated with failed sites that we don't know
+        // about, as could be the case with a failure early in a rejoin
+        for (long hsId : unknownFaultedHosts) {
+            failedHosts.add(CoreUtils.getHostIdFromHSId(hsId));
+        }
         m_failedHostsCallback.disconnect(failedHosts.build());
+
+        // Handle the failed sites after the failedHostsCallback to ensure
+        // that partition detection is run first -- as this might release
+        // work back to a client waiting on a failure notice. That's unsafe
+        // if we partitioned.
+        if (!initiatorSafeInitPoint.isEmpty()) {
+            handleSiteFaults(failedSites, initiatorSafeInitPoint);
+        }
 
         m_hsIds.removeAll(failedSites);
     }

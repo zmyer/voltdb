@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -27,8 +27,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 
-import junit.framework.TestCase;
-
 import org.voltdb.TableHelper;
 import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -41,7 +39,10 @@ import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 
+import junit.framework.TestCase;
+
 public class TestCatalogDiffs extends TestCase {
+    static final String m_dir = "/tmp" + File.separator + System.getProperty("user.name");
 
     Class<?>[] BASEPROCS =     { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
                                  org.voltdb.benchmark.tpcc.procedures.delivery.class };
@@ -108,7 +109,7 @@ public class TestCatalogDiffs extends TestCase {
         System.out.println(commands);
         catOriginal.execute(commands);
         assertTrue(diff.supported());
-        assertEquals(0, diff.tablesThatMustBeEmpty().length);
+        assertEquals(0, diff.tablesThatMustBeEmpty()[0].length);
         if (expectSnapshotIsolation != null) {
             assertEquals((boolean) expectSnapshotIsolation, diff.requiresSnapshotIsolation());
         }
@@ -152,7 +153,7 @@ public class TestCatalogDiffs extends TestCase {
         catOriginal.execute(diff.commands());
         String updatedOriginalSerialized = catOriginal.serialize();
         assertTrue(diff.supported());
-        assertTrue(diff.tablesThatMustBeEmpty().length > 0);
+        assertTrue(diff.tablesThatMustBeEmpty()[0].length > 0);
         assertEquals(updatedOriginalSerialized, catUpdated.serialize());
     }
 
@@ -335,14 +336,14 @@ public class TestCatalogDiffs extends TestCase {
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addPartitionInfo("A", "C1");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "adminstartup1.jar",
-                1, 1, 0, 1000, true));
+                1, 1, 0, 1000, true, 0));
         Catalog catOriginal = catalogForJar(testDir + File.separator + "adminstartup1.jar");
 
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addPartitionInfo("A", "C1");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "adminstartup2.jar",
-                1, 1, 0, 1000, false)); // setting adminstartup to false is the test
+                1, 1, 0, 1000, false, 0)); // setting adminstartup to false is the test
         Catalog catUpdated = catalogForJar(testDir + File.separator + "adminstartup2.jar");
 
         verifyDiff(catOriginal, catUpdated);
@@ -353,17 +354,23 @@ public class TestCatalogDiffs extends TestCase {
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
-
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "identical3.jar"));
         Catalog c3 = catalogForJar(testDir + File.separator + "identical3.jar");
+
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "identical4.jar"));
@@ -476,23 +483,36 @@ public class TestCatalogDiffs extends TestCase {
     public void testViewConversion() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
-        // Start with table A.
+        // Start with table A, B and a single table view.
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS SELECT C1, COUNT(*) FROM A GROUP BY C1;");
         builder.addPartitionInfo("A", "C1");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "convertmatview1.jar"));
-        Catalog catOriginal = catalogForJar(testDir + File.separator + "convertmatview1.jar");
+        Catalog catOriginalSingle = catalogForJar(testDir + File.separator + "convertmatview1.jar");
 
-        // Add table B and recompile
+        // table A, B and a join query view.
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 GROUP BY A.C1;");
+        builder.addPartitionInfo("A", "C1");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "convertmatview2.jar"));
+        Catalog catOriginalJoin = catalogForJar(testDir + File.separator + "convertmatview2.jar");
+
+        // table A, B and a normal table instead of a view.
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE TABLE MATVIEW(C1 BIGINT NOT NULL, NUM INTEGER);");
         builder.addPartitionInfo("A", "C1");
-        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "convertmatview1.jar"));
-        Catalog catUpdated = catalogForJar(testDir + File.separator + "convertmatview1.jar");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "convertmatview3.jar"));
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "convertmatview3.jar");
 
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiffRejected(catOriginalSingle, catUpdated);
+        verifyDiffRejected(catOriginalJoin, catUpdated);
     }
 
     public void testAddTableColumn() throws IOException {
@@ -908,6 +928,7 @@ public class TestCatalogDiffs extends TestCase {
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "addmatview1.jar"));
@@ -915,6 +936,8 @@ public class TestCatalogDiffs extends TestCase {
 
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 GROUP BY A.C1;");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "addmatview2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "addmatview2.jar");
 
@@ -927,8 +950,11 @@ public class TestCatalogDiffs extends TestCase {
         // with a view
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "remmatview1.jar"));
@@ -937,6 +963,7 @@ public class TestCatalogDiffs extends TestCase {
         // without a view
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "remmatview2.jar"));
@@ -951,8 +978,11 @@ public class TestCatalogDiffs extends TestCase {
         // with a view
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, C3 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C, NUM) AS " +
                                  "\n    SELECT C3, COUNT(*) FROM A GROUP BY C3;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "modmatview1.jar"));
@@ -961,8 +991,11 @@ public class TestCatalogDiffs extends TestCase {
         // with a slightly different view
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, C3 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C, NUM) AS " +
                                  "\n    SELECT C2, COUNT(*) FROM A GROUP BY C2;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C2, COUNT(*) FROM A JOIN B ON A.C1=B.C1 GROUP BY A.C2;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "modmatview2.jar"));
@@ -977,8 +1010,11 @@ public class TestCatalogDiffs extends TestCase {
         // with a view
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "modmatview1.jar"));
@@ -987,9 +1023,11 @@ public class TestCatalogDiffs extends TestCase {
         // with a quite different view
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C2, C1, NUM) AS " +
                                  "\n    SELECT C2, C1, COUNT(*) FROM A GROUP BY C2, C1;");
-
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C2, COUNT(*) FROM A JOIN B ON A.C1=B.C1 GROUP BY A.C2;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "modmatview2.jar"));
@@ -1004,8 +1042,11 @@ public class TestCatalogDiffs extends TestCase {
         // with a view
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "addpredmatview1.jar"));
@@ -1014,8 +1055,11 @@ public class TestCatalogDiffs extends TestCase {
         // without a view
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A WHERE C1 > 0 GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 WHERE A.C1 > 0 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "addpredmatview2.jar"));
@@ -1030,8 +1074,11 @@ public class TestCatalogDiffs extends TestCase {
         // with a view
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A WHERE C1 > 0 GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 WHERE A.C1 > 0 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "droppredmatview1.jar"));
@@ -1040,8 +1087,11 @@ public class TestCatalogDiffs extends TestCase {
         // without a view
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "droppredmatview2.jar"));
@@ -1056,8 +1106,11 @@ public class TestCatalogDiffs extends TestCase {
         // with a view
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A WHERE C1 < 0 GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 WHERE A.C1 > 0 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "modpredmatview1.jar"));
@@ -1066,8 +1119,11 @@ public class TestCatalogDiffs extends TestCase {
         // without a view
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A WHERE C1 > 0 GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 WHERE A.C2 <= 0 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "modpredmatview2.jar"));
@@ -1082,8 +1138,11 @@ public class TestCatalogDiffs extends TestCase {
         // with a view
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "resrcmatview1.jar"));
@@ -1092,8 +1151,11 @@ public class TestCatalogDiffs extends TestCase {
         // without an added column (should work with empty table)
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, C3 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "resrcmatview2.jar"));
@@ -1108,8 +1170,11 @@ public class TestCatalogDiffs extends TestCase {
         // with a view
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "remtablematview1.jar"));
@@ -1117,9 +1182,9 @@ public class TestCatalogDiffs extends TestCase {
 
         // without a view
         builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
-        builder.addPartitionInfo("B", "C1");
-        builder.addProcedures(org.voltdb.catalog.ProcedureB.class);
+        builder.addLiteralSchema("\nCREATE TABLE C (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("C", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureC.class);
         assertTrue("Failed to compile schema", builder.compile(testDir +  File.separator + "remtablematview2.jar"));
         Catalog catUpdated = catalogForJar(testDir +  File.separator + "remtablematview2.jar");
 
@@ -1262,7 +1327,7 @@ public class TestCatalogDiffs extends TestCase {
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
 
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated);
     }
 
     public void testRemoveDRTableColumn() throws IOException {
@@ -1278,23 +1343,92 @@ public class TestCatalogDiffs extends TestCase {
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
 
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated);
     }
 
     public void testModifyDRTableColumn() throws IOException {
+        String originalSchema = "\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 INTEGER NOT NULL);" +
+                                "\nPARTITION TABLE A ON COLUMN C1;" +
+                                "\nDR TABLE A;";
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);" +
-                                 "\nPARTITION TABLE A ON COLUMN C1;" +
-                                 "\nDR TABLE A;");
+        builder.addLiteralSchema(originalSchema);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr1.jar"));
         Catalog catOriginal = catalogForJar(testDir +  File.separator + "dr1.jar");
 
-        builder.addLiteralSchema("\nALTER TABLE A ALTER COLUMN C2 INTEGER;");
+        builder.addLiteralSchema("\nALTER TABLE A ALTER COLUMN C2 BIGINT;");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
 
-        verifyDiffRejected(catOriginal, catUpdated);
+        // Does not require empty table as C2 is made wider
+        verifyDiff(catOriginal, catUpdated);
+
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(originalSchema);
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr3.jar"));
+        catOriginal = catalogForJar(testDir +  File.separator + "dr3.jar");
+
+        builder.addLiteralSchema("\nALTER TABLE A ALTER COLUMN C2 TINYINT;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr4.jar"));
+        catUpdated = catalogForJar(testDir + File.separator + "dr4.jar");
+
+        // Requires empty table as C2 is made narrower
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
+    }
+
+    public void testExportConfigStreamTargetAttribute() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        final String ddl =
+                "CREATE STREAM export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );";
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(ddl);
+
+        String depXml =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export>"
+                + "        <configuration stream='default' enabled='true' type='file'>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "            <property name=\"nonce\">pre-fix</property>"
+                + "            <property name=\"outdir\">"+m_dir+"</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
+
+        builder.compile(testDir + File.separator + "exporttarget1.jar");
+        Catalog cat = catalogForJar(testDir + File.separator + "exporttarget1.jar");
+        File file = VoltProjectBuilder.writeStringToTempFile(depXml);
+        DeploymentType deployment = CatalogUtil.getDeployment(new FileInputStream(file));
+
+        String msg = CatalogUtil.compileDeployment(cat, deployment, false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
+
+        depXml =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export>"
+                + "        <configuration stream='default' target='newtarget' enabled='true' type='file'>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "            <property name=\"nonce\">pre-fix</property>"
+                + "            <property name=\"outdir\">"+m_dir+"</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
+
+        builder.compile(testDir + File.separator + "exporttarget2.jar");
+        cat = catalogForJar(testDir + File.separator + "exporttarget2.jar");
+        file = VoltProjectBuilder.writeStringToTempFile(depXml);
+        deployment = CatalogUtil.getDeployment(new FileInputStream(file));
+
+        msg = CatalogUtil.compileDeployment(cat, deployment, false);
+        assertTrue("Must fail when both 'stream' and 'target' attributes are specified",
+                msg.contains("Only one of 'target' or 'stream' attribute must be specified"));
     }
 
     public void testConnectorPropertiesChanges() throws Exception {
@@ -1313,11 +1447,11 @@ public class TestCatalogDiffs extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration stream='default' enabled='true' type='file'>"
+                + "        <configuration target='default' enabled='true' type='file'>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "            <property name=\"nonce\">pre-fix</property>"
-                + "            <property name=\"outdir\">exportdata</property>"
+                + "            <property name=\"outdir\">"+m_dir+"</property>"
                 + "        </configuration>"
                 + "    </export>"
                 + "</deployment>";
@@ -1335,11 +1469,11 @@ public class TestCatalogDiffs extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration stream='default' enabled='true' type='file'>"
+                + "        <configuration target='default' enabled='true' type='file'>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "            <property name=\"nonce\">pre-fix</property>"
-                + "            <property name=\"outdir\">exportdata</property>"
+                + "            <property name=\"outdir\">"+m_dir+"</property>"
                 + "            <property name=\"iamnew\">see_me_roar</property>"
                 + "        </configuration>"
                 + "    </export>"
@@ -1358,11 +1492,11 @@ public class TestCatalogDiffs extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration stream='default' enabled='true' type='file'>"
+                + "        <configuration target='default' enabled='true' type='file'>"
                 + "            <property name=\"type\">TSV</property>"
                 + "            <property name=\"with-schema\">true</property>"
                 + "            <property name=\"nonce\">pre-fix-other</property>"
-                + "            <property name=\"outdir\">exportdatadata</property>"
+                + "            <property name=\"outdir\">"+m_dir+"</property>"
                 + "        </configuration>"
                 + "    </export>"
                 + "</deployment>";
@@ -1380,7 +1514,7 @@ public class TestCatalogDiffs extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration stream='default' enabled='false' type='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
+                + "        <configuration target='default' enabled='false' type='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"

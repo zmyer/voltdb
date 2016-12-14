@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,6 +29,7 @@ import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -43,7 +44,7 @@ public class AsyncCompilerAgentHelper
         m_licenseApi = licenseApi;
     }
 
-    public AsyncCompilerResult prepareApplicationCatalogDiff(CatalogChangeWork work) {
+    public CatalogChangeResult prepareApplicationCatalogDiff(CatalogChangeWork work) {
         // create the change result and set up all the boiler plate
         CatalogChangeResult retval = new CatalogChangeResult();
         retval.clientData = work.clientData;
@@ -51,9 +52,6 @@ public class AsyncCompilerAgentHelper
         retval.connectionId = work.connectionId;
         retval.adminConnection = work.adminConnection;
         retval.hostname = work.hostname;
-        retval.invocationType = work.invocationType;
-        retval.originalTxnId = work.originalTxnId;
-        retval.originalUniqueId = work.originalUniqueId;
         retval.user = work.user;
         retval.tablesThatMustBeEmpty = new String[0]; // ensure non-null
 
@@ -89,7 +87,7 @@ public class AsyncCompilerAgentHelper
                     newCatalogBytes = context.getCatalogJarBytes();
                 }
                 catch (IOException ioe) {
-                    retval.errorMsg = "Unexpected exception retrieving internal catalog bytes: " +
+                    retval.errorMsg = "Unexpected IO exception retrieving internal catalog bytes: " +
                         ioe.getMessage();
                     return retval;
                 }
@@ -100,7 +98,7 @@ public class AsyncCompilerAgentHelper
                             work.operationBytes);
                 }
                 catch (IOException e) {
-                    retval.errorMsg = "Unexpected exception @UpdateClasses modifying classes " +
+                    retval.errorMsg = "Unexpected IO exception @UpdateClasses modifying classes " +
                         "from catalog: " + e.getMessage();
                     return retval;
                 }
@@ -120,14 +118,22 @@ public class AsyncCompilerAgentHelper
                     return retval;
                 }
                 catch (IOException ioe) {
-                    retval.errorMsg = "Unexpected exception applying DDL statements to " +
+                    retval.errorMsg = "Unexpected IO exception applying DDL statements to " +
                         "original catalog: " + ioe.getMessage();
                     return retval;
                 }
+                catch (Throwable t) {
+                    retval.errorMsg = "Unexpected condition occurred applying DDL statements: " +
+                        t.toString();
+                    compilerLog.error(retval.errorMsg);
+                    return retval;
+                }
+                assert(newCatalogBytes != null);
                 if (newCatalogBytes == null) {
                     // Shouldn't ever get here
                     retval.errorMsg =
                         "Unexpected failure in applying DDL statements to original catalog";
+                    compilerLog.error(retval.errorMsg);
                     return retval;
                 }
                 // Real deploymentString should be the current deployment, just set it to null
@@ -154,7 +160,14 @@ public class AsyncCompilerAgentHelper
             }
             newCatalogBytes = loadResults.getFirst().getFullJarBytes();
             retval.catalogBytes = newCatalogBytes;
-            retval.catalogHash = loadResults.getFirst().getSha1Hash();
+            retval.isForReplay = work.isForReplay();
+            if (!retval.isForReplay) {
+                retval.catalogHash = loadResults.getFirst().getSha1Hash();
+            } else {
+                retval.catalogHash = work.replayHashOverride;
+            }
+            retval.replayTxnId = work.replayTxnId;
+            retval.replayUniqueId = work.replayUniqueId;
             String newCatalogCommands =
                 CatalogUtil.getSerializedCatalogStringFromJar(loadResults.getFirst());
             retval.upgradedFromVersion = loadResults.getSecond();
@@ -185,16 +198,30 @@ public class AsyncCompilerAgentHelper
                 }
             }
 
-            result =
-                CatalogUtil.compileDeploymentString(newCatalog, deploymentString, false);
+            DeploymentType dt  = CatalogUtil.parseDeploymentFromString(deploymentString);
+            if (dt == null) {
+                retval.errorMsg = "Unable to update deployment configuration: Error parsing deployment string";
+                return retval;
+            }
+
+            result = CatalogUtil.compileDeployment(newCatalog, dt, false);
             if (result != null) {
                 retval.errorMsg = "Unable to update deployment configuration: " + result;
                 return retval;
             }
 
-            retval.deploymentString = deploymentString;
+            //In non legacy mode discard the path element.
+            if (!VoltDB.instance().isRunningWithOldVerbs()) {
+                dt.setPaths(null);
+                // set the admin-startup mode to false and fetch update the deployment string from
+                // updated deployment object
+                dt.getAdminMode().setAdminstartup(false);
+            }
+            //Always get deployment after its adjusted.
+            retval.deploymentString = CatalogUtil.getDeployment(dt, true);
+
             retval.deploymentHash =
-                CatalogUtil.makeDeploymentHash(deploymentString.getBytes(Constants.UTF8ENCODING));
+                CatalogUtil.makeDeploymentHash(retval.deploymentString.getBytes(Constants.UTF8ENCODING));
 
             // store the version of the catalog the diffs were created against.
             // verified when / if the update procedure runs in order to verify
@@ -208,10 +235,16 @@ public class AsyncCompilerAgentHelper
                 return retval;
             }
 
+            String commands = diff.commands();
+
             // since diff commands can be stupidly big, compress them here
-            retval.encodedDiffCommands = Encoder.compressAndBase64Encode(diff.commands());
-            retval.tablesThatMustBeEmpty = diff.tablesThatMustBeEmpty();
-            retval.reasonsForEmptyTables = diff.reasonsWhyTablesMustBeEmpty();
+            retval.encodedDiffCommands = Encoder.compressAndBase64Encode(commands);
+            retval.diffCommandsLength = commands.length();
+            String emptyTablesAndReasons[][] = diff.tablesThatMustBeEmpty();
+            assert(emptyTablesAndReasons.length == 2);
+            assert(emptyTablesAndReasons[0].length == emptyTablesAndReasons[1].length);
+            retval.tablesThatMustBeEmpty = emptyTablesAndReasons[0];
+            retval.reasonsForEmptyTables = emptyTablesAndReasons[1];
             retval.requiresSnapshotIsolation = diff.requiresSnapshotIsolation();
             retval.worksWithElastic = diff.worksWithElastic();
         }
@@ -234,32 +267,21 @@ public class AsyncCompilerAgentHelper
     private byte[] addDDLToCatalog(Catalog oldCatalog, byte[] oldCatalogBytes, String[] adhocDDLStmts)
     throws IOException, VoltCompilerException
     {
-        VoltCompilerReader ddlReader = null;
-        try {
-            InMemoryJarfile jarfile = CatalogUtil.loadInMemoryJarFile(oldCatalogBytes);
+        InMemoryJarfile jarfile = CatalogUtil.loadInMemoryJarFile(oldCatalogBytes);
 
-            StringBuilder sb = new StringBuilder();
-            compilerLog.info("Applying the following DDL to cluster:");
-            for (String stmt : adhocDDLStmts) {
-                compilerLog.info("\t" + stmt);
-                sb.append(stmt);
-                sb.append(";\n");
-            }
-            String newDDL = sb.toString();
-            compilerLog.trace("Adhoc-modified DDL:\n" + newDDL);
+        StringBuilder sb = new StringBuilder();
+        compilerLog.info("Applying the following DDL to cluster:");
+        for (String stmt : adhocDDLStmts) {
+            compilerLog.info("\t" + stmt);
+            sb.append(stmt);
+            sb.append(";\n");
+        }
+        String newDDL = sb.toString();
+        compilerLog.trace("Adhoc-modified DDL:\n" + newDDL);
 
-            VoltCompiler compiler = new VoltCompiler();
-            compiler.compileInMemoryJarfileWithNewDDL(jarfile, newDDL, oldCatalog);
-            return jarfile.getFullJarBytes();
-        }
-        finally {
-            if (ddlReader != null) {
-                try {
-                    ddlReader.close();
-                }
-                catch (IOException ioe) {}
-            }
-        }
+        VoltCompiler compiler = new VoltCompiler();
+        compiler.compileInMemoryJarfileWithNewDDL(jarfile, newDDL, oldCatalog);
+        return jarfile.getFullJarBytes();
     }
 
     private byte[] modifyCatalogClasses(byte[] oldCatalogBytes, String deletePatterns,

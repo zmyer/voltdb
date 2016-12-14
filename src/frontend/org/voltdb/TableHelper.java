@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -1337,7 +1337,7 @@ public class TableHelper {
         int pkeyColIndex = getBigintPrimaryKeyIndexIfExists(table);
         if (pkeyColIndex == -1) {
             pkeyColIndex = 0;
-            assert(table.getColumnType(0).isInteger());
+            assert(table.getColumnType(0).isBackendIntegerType());
         }
 
         final AtomicLong rss = new AtomicLong(0);
@@ -1419,7 +1419,7 @@ public class TableHelper {
         int pkeyColIndex = getBigintPrimaryKeyIndexIfExists(table);
         if (pkeyColIndex == -1) {
             pkeyColIndex = 0;
-            assert(table.getColumnType(0).isInteger());
+            assert(table.getColumnType(0).isBackendIntegerType());
         }
         String pkeyColName = table.getColumnName(pkeyColIndex);
 

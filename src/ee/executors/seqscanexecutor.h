@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -53,9 +53,8 @@
 
 namespace voltdb
 {
-    class UndoLog;
-    class ReadWriteSet;
     class AggregateExecutorBase;
+    struct CountingPostfilter;
 
     class SeqScanExecutor : public AbstractExecutor {
     public:
@@ -69,8 +68,10 @@ namespace voltdb
         bool p_execute(const NValueArray& params);
 
     private:
-        AggregateExecutorBase* m_aggExec;
 
+        void outputTuple(CountingPostfilter& postfilter, TableTuple& tuple);
+
+        AggregateExecutorBase* m_aggExec;
     };
 }
 

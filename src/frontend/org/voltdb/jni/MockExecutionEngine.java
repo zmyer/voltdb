@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -125,11 +125,11 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void loadCatalog(final long txnId, final byte[] catalogBytes) throws EEException {
+    public void coreLoadCatalog(final long txnId, final byte[] catalogBytes) throws EEException {
     }
 
     @Override
-    public void updateCatalog(final long txnId, final String catalogDiffs) throws EEException {
+    public void coreUpdateCatalog(final long txnId, final String catalogDiffs) throws EEException {
     }
 
     @Override
@@ -161,7 +161,6 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public void toggleProfiler(final int toggle) {
-        return;
     }
 
     @Override
@@ -176,7 +175,6 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public void quiesce(long lastCommittedTxnId) {
-
     }
 
     @Override
@@ -215,14 +213,12 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void updateHashinator(TheHashinator.HashinatorConfig config)
-    {
-
+    public void updateHashinator(TheHashinator.HashinatorConfig config) {
     }
 
     @Override
-    public void applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId,
-                               long undoToken) throws EEException
+    public long applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId,
+                               int remoteClusterId, long undoToken) throws EEException
     {
         throw new UnsupportedOperationException();
     }

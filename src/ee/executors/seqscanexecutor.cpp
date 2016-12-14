@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -49,6 +49,7 @@
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "executors/aggregateexecutor.h"
+#include "executors/executorutil.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
 #include "plannodes/aggregatenode.h"
@@ -108,12 +109,10 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
 bool SeqScanExecutor::p_execute(const NValueArray &params) {
     SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(m_abstractNode);
     assert(node);
-    Table* output_table = node->getOutputTable();
-    assert(output_table);
 
     // Short-circuit an empty scan
     if (node->isEmptyScan()) {
-        VOLT_DEBUG ("Empty Seq Scan :\n %s", m_outputTable->debug().c_str());
+        VOLT_DEBUG ("Empty Seq Scan :\n %s", node->getOutputTable()->debug().c_str());
         return true;
     }
 
@@ -177,48 +176,44 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             VOLT_TRACE("SCAN PREDICATE :\n%s\n", predicate->debug(true).c_str());
         }
 
-        int limit = -1;
-        int offset = -1;
+        int limit = CountingPostfilter::NO_LIMIT;
+        int offset = CountingPostfilter::NO_OFFSET;
         if (limit_node) {
             limit_node->getLimitAndOffsetByReference(params, limit, offset);
         }
+        // Initialize the postfilter
+        CountingPostfilter postfilter(m_tmpOutputTable, predicate, limit, offset);
 
-        int tuple_ctr = 0;
-        int tuple_skipped = 0;
-        TempTable* output_temp_table = dynamic_cast<TempTable*>(output_table);
-
-        ProgressMonitorProxy pmp(m_engine, this, node->isSubQuery() ? NULL : input_table);
+        ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
         TableTuple temp_tuple;
+        assert(m_tmpOutputTable);
         if (m_aggExec != NULL) {
             const TupleSchema * inputSchema = input_table->schema();
             if (projection_node != NULL) {
                 inputSchema = projection_node->getOutputTable()->schema();
             }
             temp_tuple = m_aggExec->p_execute_init(params, &pmp,
-                    inputSchema, output_temp_table);
+                    inputSchema, m_tmpOutputTable, &postfilter);
         } else {
-            temp_tuple = output_temp_table->tempTuple();
+            temp_tuple = m_tmpOutputTable->tempTuple();
         }
 
-        while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
+        while (postfilter.isUnderLimit() && iterator.next(tuple))
         {
+#if   defined(VOLT_TRACE_ENABLED)
+            int tuple_ctr = 0;
+#endif
             VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
-                       tuple.debug(input_table->name()).c_str(), tuple_ctr,
+                       tuple.debug(input_table->name()).c_str(),
+                       ++tuple_ctr,
                        (int)input_table->activeTupleCount());
             pmp.countdownProgress();
 
             //
-            // For each tuple we need to evaluate it against our predicate
+            // For each tuple we need to evaluate it against our predicate and limit/offset
             //
-            if (predicate == NULL || predicate->eval(&tuple, NULL).isTrue())
+            if (postfilter.eval(&tuple, NULL))
             {
-                // Check if we have to skip this tuple because of offset
-                if (tuple_skipped < offset) {
-                    tuple_skipped++;
-                    continue;
-                }
-                ++tuple_ctr;
-
                 //
                 // Nested Projection
                 // Project (or replace) values from input tuple
@@ -230,27 +225,11 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                         NValue value = projection_node->getOutputColumnExpressions()[ctr]->eval(&tuple, NULL);
                         temp_tuple.setNValue(ctr, value);
                     }
-
-                    if (m_aggExec != NULL) {
-                        if (m_aggExec->p_execute_tuple(temp_tuple)) {
-                            break;
-                        }
-                    } else {
-                        output_temp_table->insertTupleNonVirtual(temp_tuple);
-                    }
+                    outputTuple(postfilter, temp_tuple);
                 }
                 else
                 {
-                    if (m_aggExec != NULL) {
-                        if (m_aggExec->p_execute_tuple(tuple)) {
-                            break;
-                        }
-                    } else {
-                        //
-                        // Insert the tuple into our output table
-                        //
-                        output_temp_table->insertTupleNonVirtual(tuple);
-                    }
+                    outputTuple(postfilter, tuple);
                 }
                 pmp.countdownProgress();
             }
@@ -263,8 +242,20 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     //* for debug */std::cout << "SeqScanExecutor: node id " << node->getPlanNodeId() <<
     //* for debug */    " output table " << (void*)output_table <<
     //* for debug */    " put " << output_table->activeTupleCount() << " tuples " << std::endl;
-    VOLT_TRACE("\n%s\n", output_table->debug().c_str());
+    VOLT_TRACE("\n%s\n", node->getOutputTable()->debug().c_str());
     VOLT_DEBUG("Finished Seq scanning");
 
     return true;
+}
+
+void SeqScanExecutor::outputTuple(CountingPostfilter& postfilter, TableTuple& tuple) {
+    if (m_aggExec != NULL) {
+        m_aggExec->p_execute_tuple(tuple);
+        return;
+    }
+    //
+    // Insert the tuple into our output table
+    //
+    assert(m_tmpOutputTable);
+    m_tmpOutputTable->insertTempTuple(tuple);
 }

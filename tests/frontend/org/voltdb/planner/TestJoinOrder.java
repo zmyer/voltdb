@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -30,6 +30,8 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.types.JoinType;
+import org.voltdb.types.PlanNodeType;
 
 public class TestJoinOrder extends PlannerTestCase {
     public void testBasicJoinOrder() {
@@ -66,7 +68,7 @@ public class TestJoinOrder extends PlannerTestCase {
         }
 
         pn = compileSPWithJoinOrder("select * from T1, T2 where A=B", "  T1  ,  T2  ");
-        /* DEBUG */ System.out.println(pn.toExplainPlanString());
+        //* enable to debug */ System.out.println(pn.toExplainPlanString());
         n = pn.getChild(0).getChild(0);
         assertEquals("T1", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
         assertEquals("T2", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
@@ -225,6 +227,25 @@ public class TestJoinOrder extends PlannerTestCase {
         }
     }
 
+    public void testFullJoinOrder() {
+        AbstractPlanNode pn = compileSPWithJoinOrder("select * FROM T1 JOIN T2 ON T1.A = T2.B FULL JOIN T3 ON T1.A = T3.C", "T1, T2, T3");
+        AbstractPlanNode n = pn.getChild(0).getChild(0);
+        assertEquals(PlanNodeType.NESTLOOP, n.getPlanNodeType());
+        assertEquals(JoinType.FULL, ((NestLoopPlanNode) n).getJoinType());
+        assertTrue(((SeqScanPlanNode)n.getChild(1)).getTargetTableName().equals("T3"));
+        n = n.getChild(0);
+        assertEquals(PlanNodeType.NESTLOOP, n.getPlanNodeType());
+        assertTrue(((SeqScanPlanNode)n.getChild(0)).getTargetTableName().equals("T1"));
+        assertTrue(((SeqScanPlanNode)n.getChild(1)).getTargetTableName().equals("T2"));
+
+        try {
+            compileWithInvalidJoinOrder("select * FROM T1 JOIN T2 ON T1.A = T2.B FULL JOIN T3 ON T1.A = T3.C", "T3, T1, T2");
+            fail();
+        } catch (Exception ex) {
+            assertTrue("The specified join order is invalid for the given query".equals(ex.getMessage()));
+        }
+    }
+
     public void testMicroOptimizationJoinOrder() {
         // Microoptimization can be used for determinism only when working with replicated tables or
         // single-partition queries.
@@ -237,7 +258,7 @@ public class TestJoinOrder extends PlannerTestCase {
         assertTrue(((SeqScanPlanNode)n.getChild(1)).getTargetTableName().equals("P2"));
 
         pns = compileWithJoinOrderToFragments("select * from I1, T2 where A=B", "I1, T2");
-        /*/ to debug */ System.out.println(pns.get(0).toExplainPlanString());
+        //* enable to debug */ System.out.println(pns.get(0).toExplainPlanString());
         n = pns.get(0).getChild(0).getChild(0);
         assertTrue(((IndexScanPlanNode)n.getChild(0)).getTargetTableName().equals("I1"));
         assertTrue(((SeqScanPlanNode)n.getChild(1)).getTargetTableName().equals("T2"));
@@ -302,7 +323,7 @@ public class TestJoinOrder extends PlannerTestCase {
         AbstractPlanNode pn, n;
         pn = compile(sql);
         n = pn.getChild(0).getChild(0);
-        System.out.println(pn.toExplainPlanString());
+        //* enable to debug */ System.out.println(pn.toExplainPlanString());
         // starts from T7
 
         HashSet<Integer> mySets = new HashSet<>();
@@ -400,7 +421,7 @@ public class TestJoinOrder extends PlannerTestCase {
 
     @Override
     protected void setUp() throws Exception {
-        setupSchema(true, TestJoinOrder.class.getResource("testjoinorder-ddl.sql"), "testjoinorder");
+        setupSchema(true, TestJoinOrder.class.getResource("testplans-joinorder-ddl.sql"), "testjoinorder");
     }
 
     @Override

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -34,6 +34,7 @@
 
 namespace voltdb {
 
+class AbstractExpression;
 /**
  * Represents the schema of a tuple or table row. Used to define table rows, as
  * well as index keys. Note: due to arbitrary size embedded array data, this class
@@ -86,6 +87,8 @@ public:
                                                  const std::vector<int32_t> columnSizes,
                                                  const std::vector<bool> allowNull);
 
+    static TupleSchema* createTupleSchema(const std::vector<AbstractExpression *> &exprs);
+
     /** Static factory method fakes a copy constructor (will also
      *  duplicate hidden columns) */
     static TupleSchema* createTupleSchema(const TupleSchema *schema);
@@ -134,6 +137,8 @@ public:
 
     /** Return the number of bytes used by one tuple. */
     inline uint32_t tupleLength() const;
+
+    size_t getMaxSerializedTupleSize(bool includeHiddenColumns = false) const;
 
     /** Get a string representation of this schema for debugging */
     std::string debug() const;

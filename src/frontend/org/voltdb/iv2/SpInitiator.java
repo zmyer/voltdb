@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,7 +28,6 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
-import org.voltdb.ConsumerDRGateway;
 import org.voltdb.MemoryStats;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProducerDRGateway;
@@ -54,7 +53,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
     final private LeaderCache m_leaderCache;
     private boolean m_promoted = false;
     private final TickProducer m_tickProducer;
-    private ConsumerDRGateway m_consumerDRGateway = null;
 
     LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
     {
@@ -88,16 +86,14 @@ public class SpInitiator extends BaseInitiator implements Promotable
     public void configure(BackendTarget backend,
                           CatalogContext catalogContext,
                           String serializedCatalog,
-                          int kfactor, CatalogSpecificPlanner csp,
+                          CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           StartAction startAction,
                           StatsAgent agent,
                           MemoryStats memStats,
                           CommandLog cl,
-                          ProducerDRGateway nodeDRGateway,
-                          ConsumerDRGateway consumerDRGateway,
-                          boolean createMpDRGateway,
-                          String coreBindIds)
+                          String coreBindIds,
+                          boolean hasMPDRGateway)
         throws KeeperException, InterruptedException, ExecutionException
     {
         try {
@@ -106,21 +102,9 @@ public class SpInitiator extends BaseInitiator implements Promotable
             VoltDB.crashLocalVoltDB("Unable to configure SpInitiator.", true, e);
         }
 
-        // configure DR
-        PartitionDRGateway drGateway =
-                PartitionDRGateway.getInstance(m_partitionId, nodeDRGateway,
-                        startAction);
-        ((SpScheduler) m_scheduler).setDRGateway(drGateway);
-        m_consumerDRGateway = consumerDRGateway;
-
-        PartitionDRGateway mpPDRG = null;
-        if (createMpDRGateway) {
-            mpPDRG = PartitionDRGateway.getInstance(MpInitiator.MP_INIT_PID, nodeDRGateway, startAction);
-            setDurableUniqueIdListener(mpPDRG);
-        }
-
         super.configureCommon(backend, catalogContext, serializedCatalog,
-                csp, numberOfPartitions, startAction, agent, memStats, cl, coreBindIds, drGateway, mpPDRG);
+                csp, numberOfPartitions, startAction, agent, memStats, cl,
+                coreBindIds, hasMPDRGateway);
 
         m_tickProducer.start();
 
@@ -129,6 +113,30 @@ public class SpInitiator extends BaseInitiator implements Promotable
         LeaderElector.createParticipantNode(m_messenger.getZK(),
                 LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, m_partitionId),
                 Long.toString(getInitiatorHSId()), null);
+    }
+
+    @Override
+    public void initDRGateway(StartAction startAction, ProducerDRGateway nodeDRGateway, boolean createMpDRGateway)
+    {
+        // configure DR
+        PartitionDRGateway drGateway = PartitionDRGateway.getInstance(m_partitionId, nodeDRGateway, startAction);
+        setDurableUniqueIdListener(drGateway);
+
+        final PartitionDRGateway mpPDRG;
+        if (createMpDRGateway) {
+            mpPDRG = PartitionDRGateway.getInstance(MpInitiator.MP_INIT_PID, nodeDRGateway, startAction);
+            setDurableUniqueIdListener(mpPDRG);
+        } else {
+            mpPDRG = null;
+        }
+
+        m_scheduler.getQueue().offer(new SiteTasker.SiteTaskerRunnable() {
+            @Override
+            void run()
+            {
+                m_executionSite.setDRGateway(drGateway, mpPDRG);
+            }
+        });
     }
 
     @Override
@@ -142,8 +150,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
                     m_whoami);
             m_term.start();
-            long binaryLogDRId = Long.MIN_VALUE;
-            long binaryLogUniqueId = Long.MIN_VALUE;
             while (!success) {
                 RepairAlgo repair =
                         m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami);
@@ -165,8 +171,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 try {
                     RepairResult res = repair.start().get();
                     txnid = res.m_txnId;
-                    binaryLogDRId = res.m_binaryLogDRId;
-                    binaryLogUniqueId = res.m_binaryLogUniqueId;
                     success = true;
                 } catch (CancellationException e) {
                     success = false;
@@ -196,10 +200,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
             }
             // Tag along and become the export master too
             ExportManager.instance().acceptMastership(m_partitionId);
-            // If we are a DR replica, inform that subsystem of any remote data we've seen
-            if (m_consumerDRGateway != null && binaryLogDRId >= 0) {
-                m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, binaryLogDRId, binaryLogUniqueId, Long.MIN_VALUE);
-            }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
         }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,6 +19,7 @@
 #define PERSISTENTTABLEUNDODELETEACTION_H_
 
 #include "common/UndoAction.h"
+#include "common/types.h"
 #include "storage/persistenttable.h"
 
 namespace voltdb {
@@ -26,8 +27,8 @@ namespace voltdb {
 
 class PersistentTableUndoDeleteAction: public UndoAction {
 public:
-    inline PersistentTableUndoDeleteAction(char *deletedTuple, PersistentTableSurgeon *table, size_t drMark)
-        : m_tuple(deletedTuple), m_table(table), m_drMark(drMark)
+    inline PersistentTableUndoDeleteAction(char *deletedTuple, PersistentTableSurgeon *table)
+        : m_tuple(deletedTuple), m_table(table)
     {}
 
 private:
@@ -38,7 +39,6 @@ private:
      */
     virtual void undo() {
         m_table->insertTupleForUndo(m_tuple);
-        m_table->DRRollback(m_drMark);
     }
 
     /*
@@ -50,7 +50,6 @@ private:
 private:
     char *m_tuple;
     PersistentTableSurgeon *m_table;
-    size_t m_drMark;
 };
 
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -49,8 +49,14 @@ public interface ExportDataProcessor  {
 
     /**
      * Inform the processor that initialization is complete; commence work.
+     * @param startup wait or not for the {@link #startPolling()} invocation
      */
-    public void readyForData();
+    public void readyForData(boolean startup);
+
+    /**
+     * Allows processor to initiate polling
+     */
+    public void startPolling();
 
     /**
      * Queue a work message to the processor's mailbox.

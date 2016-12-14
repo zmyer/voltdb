@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,9 +23,14 @@
 
 package org.voltdb.planner;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
+
 import java.io.File;
 import java.io.IOException;
 
+import org.junit.Before;
+import org.junit.Test;
 import org.voltdb.AdHocQueryTester;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
@@ -34,6 +39,8 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.PlannerTool;
+import org.voltdb.settings.DbSettings;
+import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 
@@ -42,26 +49,43 @@ public class TestAdHocPlans extends AdHocQueryTester {
     private PlannerTool m_pt;
     private boolean m_debugging_set_this_to_retry_failures = false;
 
-    @Override
-    protected void setUp() throws Exception {
+    @Before
+    public void setUp() throws Exception {
         // For planner-only testing, we shouldn't care about IV2
         VoltDB.Configuration config = setUpSPDB();
         byte[] bytes = MiscUtils.fileToBytes(new File(config.m_pathToCatalog));
         String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
         Catalog catalog = new Catalog();
         catalog.execute(serializedCatalog);
-        CatalogContext context = new CatalogContext(0, 0, catalog, bytes, new byte[] {}, 0);
+        DbSettings dbSettings = new DbSettings(
+                config.asClusterSettings().asSupplier(),
+                NodeSettings.create(config.asPathSettingsMap()));
+        CatalogContext context = new CatalogContext(0, 0, catalog, dbSettings, bytes, null, new byte[] {}, 0);
         m_pt = new PlannerTool(context.cluster, context.database, context.getCatalogHash());
     }
 
-    @Override
-    protected void tearDown() throws Exception {
-        super.tearDown();
-    }
-
+    @Test
     public void testSP() throws Exception {
         //DB is empty so the hashable numbers don't really seem to matter
         runAllAdHocSPtests(0, 1, 2, 3);
+    }
+
+    @Test
+    public void testAdHocQueryForStackOverFlowCondition() throws NoConnectionsException, IOException, ProcCallException {
+        // query with max predicates in where clause
+        String sql = getQueryForLongQueryTable(300);
+        runQueryTest(sql, 1, 1, 1, VALIDATING_SP_RESULT);
+
+        // generate query with lots of predicate to simulate stack overflow when parsing the expression
+        sql = getQueryForLongQueryTable(2000);
+        try {
+            runQueryTest(sql, 1, 1, 1, VALIDATING_SP_RESULT);
+            fail("Query was expected to generate stack over flow error");
+        }
+        catch (StackOverflowError error) {
+            // The test-only interface to the PlannerTool tests at a level below
+            // any StackOverflowError handling, so expect the raw StackOverflowError.
+        }
     }
 
     /**

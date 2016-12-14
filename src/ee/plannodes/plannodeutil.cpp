@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -56,6 +56,7 @@
 #include "plannodes/limitnode.h"
 #include "plannodes/materializenode.h"
 #include "plannodes/materializedscanplannode.h"
+#include "plannodes/mergereceivenode.h"
 #include "plannodes/nestloopnode.h"
 #include "plannodes/nestloopindexnode.h"
 #include "plannodes/projectionnode.h"
@@ -66,7 +67,7 @@
 #include "plannodes/tuplescannode.h"
 #include "plannodes/unionnode.h"
 #include "plannodes/updatenode.h"
-
+#include "plannodes/windowfunctionnode.h"
 #include <sstream>
 
 namespace plannodeutil {
@@ -194,6 +195,18 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_RECEIVE):
             ret = new voltdb::ReceivePlanNode();
+            break;
+        // ------------------------------------------------------------------
+        // Merge Receive
+        // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_MERGERECEIVE):
+            ret = new voltdb::MergeReceivePlanNode();
+            break;
+        // ------------------------------------------------------------------
+        // Window Function
+        // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_WINDOWFUNCTION):
+            ret = new voltdb::WindowFunctionPlanNode();
             break;
         // default: Don't provide a default, let the compiler enforce complete coverage.
     }

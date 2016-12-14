@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,13 +29,14 @@ import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
-import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.StartAction;
 import org.voltdb.StarvationTracker;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
+import org.voltdb.VoltDB;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
+import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.rejoin.TaskLog;
 
 /**
@@ -60,6 +61,7 @@ public abstract class BaseInitiator implements Initiator
     protected Site m_executionSite = null;
     protected Thread m_siteThread = null;
     protected final RepairLog m_repairLog = new RepairLog();
+
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
             Scheduler scheduler, String whoamiPrefix, StatsAgent agent,
             StartAction startAction)
@@ -126,8 +128,7 @@ public abstract class BaseInitiator implements Initiator
                           MemoryStats memStats,
                           CommandLog cl,
                           String coreBindIds,
-                          PartitionDRGateway drGateway,
-                          PartitionDRGateway mpDrGateway)
+                          boolean hasMPDRGateway)
         throws KeeperException, ExecutionException, InterruptedException
     {
             int snapshotPriority = 6;
@@ -143,7 +144,7 @@ public abstract class BaseInitiator implements Initiator
 
             TaskLog taskLog = null;
             if (m_initiatorMailbox.getJoinProducer() != null) {
-                taskLog = m_initiatorMailbox.getJoinProducer().constructTaskLog(catalogContext.cluster.getVoltroot());
+                taskLog = m_initiatorMailbox.getJoinProducer().constructTaskLog(VoltDB.instance().getVoltDBRootPath());
             }
 
             m_executionSite = new Site(m_scheduler.getQueue(),
@@ -159,8 +160,7 @@ public abstract class BaseInitiator implements Initiator
                                        memStats,
                                        coreBindIds,
                                        taskLog,
-                                       drGateway,
-                                       mpDrGateway);
+                                       hasMPDRGateway);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite, m_executionSite.m_sysprocContext);
 
@@ -230,4 +230,13 @@ public abstract class BaseInitiator implements Initiator
     }
 
     abstract protected void acceptPromotion() throws Exception;
+
+    public ExecutionEngine debugGetSpiedEE() {
+        if (m_executionSite.m_backend == BackendTarget.NATIVE_EE_SPY_JNI) {
+            return m_executionSite.m_ee;
+        }
+        else {
+            return null;
+        }
+    }
 }

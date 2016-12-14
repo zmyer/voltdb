@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -33,7 +33,10 @@ import org.junit.Test;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public class TestDRCatalogDiffs {
     @Test
@@ -216,8 +219,7 @@ public class TestDRCatalogDiffs {
                 "DR TABLE T1;";
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
-        assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("field tuplelimit in schema object Table{T1}"));
+        assertTrue(diff.errors(), diff.supported());
     }
 
     @Test
@@ -232,8 +234,7 @@ public class TestDRCatalogDiffs {
                 "DR TABLE T1;";
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
-        assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("field tuplelimit in schema object Table{T1}"));
+        assertTrue(diff.errors(), diff.supported());
     }
 
     @Test
@@ -248,8 +249,7 @@ public class TestDRCatalogDiffs {
                 "DR TABLE T1;";
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
-        assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("field tuplelimit in schema object Table{T1}"));
+        assertTrue(diff.errors(), diff.supported());
     }
 
     @Test
@@ -264,8 +264,7 @@ public class TestDRCatalogDiffs {
                 "DR TABLE T1;";
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
-        assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("Missing Statement{limit_delete} from Table{T1} on master"));
+        assertTrue(diff.errors(), diff.supported());
     }
 
     @Test
@@ -280,8 +279,7 @@ public class TestDRCatalogDiffs {
                 "DR TABLE T1;";
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
-        assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("Missing Statement{limit_delete} from Table{T1} on replica"));
+        assertTrue(diff.errors(), diff.supported());
     }
 
     @Test
@@ -296,8 +294,7 @@ public class TestDRCatalogDiffs {
                 "DR TABLE T1;";
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
-        assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("field sqltext in schema object Statement{limit_delete}"));
+        assertTrue(diff.errors(), diff.supported());
     }
 
     @Test
@@ -312,8 +309,7 @@ public class TestDRCatalogDiffs {
                 "DR TABLE T1;";
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
-        assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("field sqltext in schema object Statement{limit_delete}"));
+        assertTrue(diff.errors(), diff.supported());
     }
 
     @Test
@@ -328,8 +324,7 @@ public class TestDRCatalogDiffs {
                 "DR TABLE T1;";
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
-        assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("field sqltext in schema object Statement{limit_delete}"));
+        assertTrue(diff.errors(), diff.supported());
     }
 
     @Test
@@ -344,8 +339,7 @@ public class TestDRCatalogDiffs {
                 "DR TABLE T1;";
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
-        assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("field tuplelimit in schema object Table{T1}"));
+        assertTrue(diff.errors(), diff.supported());
     }
 
     @Test
@@ -637,11 +631,16 @@ public class TestDRCatalogDiffs {
     public void testExtraViewOnReplica() throws Exception {
         String masterSchema =
                 "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
-                "DR TABLE T1;";
+                "CREATE TABLE T2 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
+                "DR TABLE T1;\n" +
+                "DR TABLE T2;\n";
         String replicaSchema =
                 "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
+                "CREATE TABLE T2 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
                 "CREATE VIEW foo (C1, total) AS SELECT C1, COUNT(*) FROM T1 GROUP BY C1;\n" +
-                "DR TABLE T1;";
+                "CREATE VIEW foo2 (C1, total) AS SELECT T1.C1, COUNT(*) FROM T1 JOIN T2 ON T1.C1 = T2.C1 GROUP BY T1.C1;\n" +
+                "DR TABLE T1;\n" +
+                "DR TABLE T2;\n";
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
         assertTrue(diff.errors(), diff.supported());
@@ -651,11 +650,16 @@ public class TestDRCatalogDiffs {
     public void testMissingViewOnReplica() throws Exception {
         String masterSchema =
                 "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
+                "CREATE TABLE T2 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
                 "CREATE VIEW foo (C1, total) AS SELECT C1, COUNT(*) FROM T1 GROUP BY C1;\n" +
-                "DR TABLE T1;";
+                "CREATE VIEW foo2 (C1, total) AS SELECT T1.C1, COUNT(*) FROM T1 JOIN T2 ON T1.C1 = T2.C1 GROUP BY T1.C1;\n" +
+                "DR TABLE T1;\n" +
+                "DR TABLE T2;\n";
         String replicaSchema =
                 "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
-                "DR TABLE T1;";
+                "CREATE TABLE T2 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
+                "DR TABLE T1;\n" +
+                "DR TABLE T2;\n";
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
         assertTrue(diff.errors(), diff.supported());
@@ -665,12 +669,18 @@ public class TestDRCatalogDiffs {
     public void testDifferentViewOnReplica() throws Exception {
         String masterSchema =
                 "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
+                "CREATE TABLE T2 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
                 "CREATE VIEW foo (C1, total) AS SELECT C1, COUNT(*) FROM T1 GROUP BY C1;\n" +
-                "DR TABLE T1;";
+                "CREATE VIEW foo2 (C1, total) AS SELECT T1.C1, COUNT(*) FROM T1 JOIN T2 ON T1.C1 = T2.C1 GROUP BY T1.C1;\n" +
+                "DR TABLE T1;\n" +
+                "DR TABLE T2;";
         String replicaSchema =
                 "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
+                "CREATE TABLE T2 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
                 "CREATE VIEW foo (C1, C2, total) AS SELECT C1, C2, COUNT(*) FROM T1 WHERE C2 > 50 GROUP BY C1, C2;\n" +
-                "DR TABLE T1;";
+                "CREATE VIEW foo2 (C1, C2, total) AS SELECT T1.C1, T2.C2, COUNT(*) FROM T1 JOIN T2 ON T1.C1 = T2.C1 GROUP BY T1.C1, T2.C2;\n" +
+                "DR TABLE T1;\n" +
+                "DR TABLE T2;";
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
         assertTrue(diff.errors(), diff.supported());
@@ -740,6 +750,26 @@ public class TestDRCatalogDiffs {
         CatalogDiffEngine diff = runCatalogDiff(nodeOneSchema, nodeTwoSchema);
         assertFalse(diff.supported());
         assertTrue(diff.errors().contains("Incompatible DR modes between two clusters"));
+    }
+
+    @Test
+    public void testUnknownSchemaOption() throws Exception {
+        String masterSchema =
+                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 BIGINT NOT NULL);\n" +
+                "DR TABLE T1;";
+        Catalog masterCatalog = createCatalog(masterSchema);
+
+        String commands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(masterCatalog).getSecond();
+        String decodedCommands = Encoder.decodeBase64AndDecompress(commands);
+        decodedCommands = decodedCommands.replaceFirst("set \\$PREV isDRed true", "set \\$PREV isDRed true\nset \\$PREV isASquirrel false");
+        boolean threw = false;
+        try {
+            DRCatalogDiffEngine.deserializeCatalogCommandsForDr(Encoder.compressAndBase64Encode(decodedCommands));
+        } catch (Exception e) {
+            assertTrue(e.getMessage().contains("$PREV isASquirrel false"));
+            threw = true;
+        }
+        assertTrue(threw);
     }
 
     private CatalogDiffEngine runCatalogDiff(String masterSchema, String replicaSchema) throws Exception {

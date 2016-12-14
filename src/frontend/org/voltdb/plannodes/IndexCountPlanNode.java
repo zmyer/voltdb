@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,11 +21,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Cluster;
@@ -183,7 +183,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         List<AbstractExpression> endKeys = new ArrayList<AbstractExpression>();
         // Initially assume that there will be an equality filter on all key components.
         IndexLookupType endType = IndexLookupType.EQ;
-        List<AbstractExpression> endComparisons = ExpressionUtil.uncombine(isp.getEndExpression());
+        List<AbstractExpression> endComparisons = ExpressionUtil.uncombinePredicate(isp.getEndExpression());
         for (AbstractExpression ae: endComparisons) {
             // There should be no more end expressions after an LT or LTE has reset the end type.
             assert(endType == IndexLookupType.EQ);
@@ -200,7 +200,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             // PlanNodes all need private deep copies of expressions
             // so that the resolveColumnIndexes results
             // don't get bashed by other nodes or subsequent planner runs
-            endKeys.add((AbstractExpression)ae.getRight().clone());
+            endKeys.add(ae.getRight().clone());
         }
 
         int indexSize = 0;
@@ -259,7 +259,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             if (canPadding && missingKeyType.isMaxValuePaddable()) {
                 ConstantValueExpression missingKey = new ConstantValueExpression();
                 missingKey.setValueType(missingKeyType);
-                missingKey.setValue(String.valueOf(VoltType.getPaddedMaxTypeValue(missingKeyType)));
+                missingKey.setValue(String.valueOf(missingKeyType.getMaxValueForKeyPadding()));
                 missingKey.setValueSize(missingKeyType.getLengthInBytesForFixedTypes());
                 endType = IndexLookupType.LTE;
                 endKeys.add(missingKey);
@@ -344,28 +344,19 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.LOOKUP_TYPE.name()).value(m_lookupType.toString());
-        stringer.key(Members.END_TYPE.name()).value(m_endType.toString());
-        stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_targetIndexName);
+        stringer.keySymbolValuePair(Members.LOOKUP_TYPE.name(), m_lookupType.toString());
+        stringer.keySymbolValuePair(Members.END_TYPE.name(), m_endType.toString());
+        stringer.keySymbolValuePair(Members.TARGET_INDEX_NAME.name(), m_targetIndexName);
 
         stringer.key(Members.ENDKEY_EXPRESSIONS.name());
         if ( m_endkeyExpressions.isEmpty()) {
-            stringer.value(null);
-        } else {
-            stringer.array();
-            for (AbstractExpression ae : m_endkeyExpressions) {
-                assert (ae instanceof JSONString);
-                stringer.value(ae);
-            }
-            stringer.endArray();
+            stringer.valueNull();
+        }
+        else {
+            stringer.array(m_endkeyExpressions);
         }
 
-        stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array();
-        for (AbstractExpression ae : m_searchkeyExpressions) {
-            assert (ae instanceof JSONString);
-            stringer.value(ae);
-        }
-        stringer.endArray();
+        stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array(m_searchkeyExpressions);
 
         if (m_skip_null_predicate != null) {
             stringer.key(Members.SKIP_NULL_PREDICATE.name()).value(m_skip_null_predicate);
@@ -489,18 +480,18 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
-
-        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_skip_null_predicate, aeClass));
+    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+        super.findAllExpressionsOfClass(aeClass, collected);
+        if (m_skip_null_predicate != null) {
+            collected.addAll(m_skip_null_predicate.findAllSubexpressionsOfClass(aeClass));
+        }
         for (AbstractExpression ae : m_searchkeyExpressions) {
-            collected.addAll(ExpressionUtil.findAllExpressionsOfClass(ae, aeClass));
+            collected.addAll(ae.findAllSubexpressionsOfClass(aeClass));
         }
         if (m_bindings != null) {
             for (AbstractExpression ae : m_bindings) {
-                collected.addAll(ExpressionUtil.findAllExpressionsOfClass(ae, aeClass));
+                collected.addAll(ae.findAllSubexpressionsOfClass(aeClass));
             }
         }
-        return collected;
     }
 }

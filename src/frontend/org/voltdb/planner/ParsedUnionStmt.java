@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -52,9 +52,9 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     };
 
     // Limit plan node information.
-    private LimitOffset m_limitOffset = new LimitOffset();
+    private final LimitOffset m_limitOffset = new LimitOffset();
     // Order by
-    private ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<ParsedColInfo>();
+    private final ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<ParsedColInfo>();
 
     public ArrayList<AbstractParsedStmt> m_children = new ArrayList<AbstractParsedStmt>();
     public UnionType m_unionType = UnionType.NOUNION;
@@ -166,19 +166,98 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
 
     @Override
     public boolean isOrderDeterministic() {
-        ArrayList<AbstractExpression> nonOrdered = new ArrayList<AbstractExpression>();
-        return orderByColumnsDetermineAllDisplayColumns(nonOrdered);
+
+        switch (m_unionType) {
+        case EXCEPT:
+        case EXCEPT_ALL:
+        case INTERSECT:
+        case INTERSECT_ALL:
+            // In the back end, these set operators all use boost unordered containers
+            // to define the output table.  We're not sure that iterating over these
+            // containers will produce deterministic results, so we need to rely on
+            // the ORDER BY clause on the outermost set operator (if any) to determine
+            // if order is defined deterministically.
+            //
+            // Order by columns always refer to the leftmost select statement.
+            //
+            // If the ordering of the left child is deterministically defined by
+            // order by columns on the outermost set operator, then this is sufficient
+            // for the whole statement to be order deterministic since both EXCEPT and INTERSECT
+            // produce results that are subsets of rows produced by the left child of the
+            // set operator.
+            return orderIsDeterminedByOrderColumns(m_children.get(0), m_orderColumns);
+
+        case UNION:
+        case UNION_ALL:
+
+            if (m_orderColumns.isEmpty()) {
+
+                // The outer ORDER BY on a UNION can undo any ordering imposed on the
+                // children of the union.  E.g.,
+                //
+                // ((select a, b from t order by a, b)
+                //   union
+                //  (select a, b from r order by a, b)
+                // ) order by a
+                //
+                // The above statement is non-deterministic.
+                //
+                // So, only check child-level determinism if there is no outer ORDER BY.
+
+                for (int i = 0; i < m_children.size(); ++i) {
+                    if (! m_children.get(i).isOrderDeterministic()) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            return orderIsDeterminedByOrderColumns(this, m_orderColumns);
+
+        default:
+            return false;
+        }
+    }
+
+    private static boolean orderIsDeterminedByOrderColumns(AbstractParsedStmt stmt, List<ParsedColInfo> orderColumns) {
+
+        if (orderColumns.isEmpty()) {
+            return false;
+        }
+
+        if (stmt instanceof ParsedSelectStmt) {
+            ParsedSelectStmt selectStmt = (ParsedSelectStmt) stmt;
+            ArrayList<AbstractExpression> nonOrdered = new ArrayList<AbstractExpression>();
+            return selectStmt.orderByColumnsDetermineAllDisplayColumns(selectStmt.displayColumns(), orderColumns, nonOrdered);
+        }
+        else {
+            ParsedUnionStmt setOpStmt = (ParsedUnionStmt) stmt;
+            switch (setOpStmt.m_unionType) {
+            case EXCEPT:
+            case EXCEPT_ALL:
+            case INTERSECT:
+            case INTERSECT_ALL:
+                return orderIsDeterminedByOrderColumns(setOpStmt.m_children.get(0), orderColumns);
+
+            case UNION:
+            case UNION_ALL:
+                // We can return true here if the order by columns
+                // list all the columns on the select list of the leftmost statement.
+                // Otherwise, we must return false.
+                return setOpStmt.getLeftmostSelectStmt().orderByColumnsDetermineAllDisplayColumnsForUnion(orderColumns);
+
+            default:
+                return false;
+
+            }
+        }
     }
 
     @Override
     public boolean isOrderDeterministicInSpiteOfUnorderedSubqueries() {
         // Set OP should not have its own subqueries
         return isOrderDeterministic();
-    }
-
-    private boolean orderByColumnsDetermineAllDisplayColumns(List<AbstractExpression> nonOrdered)
-    {
-        return ParsedSelectStmt.orderByColumnsDetermineAllDisplayColumns(getLeftmostSelectStmt().displayColumns(), m_orderColumns, nonOrdered);
     }
 
     @Override
@@ -286,24 +365,6 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     }
 
     @Override
-    public List<StmtSubqueryScan> findAllFromSubqueries() {
-        List<StmtSubqueryScan> subqueries = new ArrayList<StmtSubqueryScan>();
-        for (AbstractParsedStmt childStmt : m_children) {
-            subqueries.addAll(childStmt.findAllFromSubqueries());
-        }
-        return subqueries;
-    }
-
-    @Override
-    public List<AbstractExpression> findAllSubexpressionsOfType(ExpressionType exprType) {
-        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
-        for (AbstractParsedStmt childStmt : m_children) {
-            exprs.addAll(childStmt.findAllSubexpressionsOfType(exprType));
-        }
-        return exprs;
-    }
-
-    @Override
     public Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
         Set<AbstractExpression> exprs = new HashSet<AbstractExpression>();
         for (AbstractParsedStmt childStmt : m_children) {
@@ -373,7 +434,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             }
             newExpr.setExpressionType(expr.getExpressionType());
             if (ExpressionType.COMPARE_EQUAL == expr.getExpressionType()) {
-                newExpr.setLeft((AbstractExpression) expr.getLeft().clone());
+                newExpr.setLeft(expr.getLeft().clone());
                 newExpr.setRight(childSubqueryExpr);
                 assert(newExpr instanceof ComparisonExpression);
                 ((ComparisonExpression)newExpr).setQuantifier(((ComparisonExpression)expr).getQuantifier());
@@ -410,4 +471,24 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             orderCol.expression = expr;
         }
     }
+
+    /**
+     * Here we search all the children, finding if each is content
+     * deterministic. If it is we return right away.
+     */
+    @Override
+    public String calculateContentDeterminismMessage() {
+        String ans = null;
+        for (AbstractParsedStmt child : m_children) {
+            ans = child.getContentDeterminismMessage();
+            if (ans != null) {
+                return ans;
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public boolean isDML() { return false; }
+
 }

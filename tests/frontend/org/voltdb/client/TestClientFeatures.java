@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -27,12 +27,12 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import junit.framework.TestCase;
 
 import org.voltdb.ServerThread;
 import org.voltdb.TableHelper;
@@ -42,6 +42,8 @@ import org.voltdb.VoltTable;
 import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.TestCase;
 
 public class TestClientFeatures extends TestCase {
 
@@ -103,7 +105,7 @@ public class TestClientFeatures extends TestCase {
     public void testPerCallTimeout() throws Exception {
         CSL csl = new CSL();
 
-        ClientConfig config = new ClientConfig(null, null, csl, ClientAuthHashScheme.HASH_SHA1);
+        ClientConfig config = new ClientConfig(null, null, csl, ClientAuthScheme.HASH_SHA1);
         config.setProcedureCallTimeout(500);
         Client client = ClientFactory.createClient(config);
         client.createConnection("localhost");
@@ -205,7 +207,8 @@ public class TestClientFeatures extends TestCase {
         boolean exceptionCalled = false;
         try {
             // Query timeout is in seconds second arg.
-            ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 3, TimeUnit.SECONDS, 6000);
+            ((ClientImpl) client).callProcedureWithClientTimeout(BatchTimeoutOverrideType.NO_TIMEOUT,
+                    "ArbitraryDurationProc", 3, TimeUnit.SECONDS, 6000);
         } catch (ProcCallException ex) {
             assertEquals(ClientResponse.CONNECTION_TIMEOUT, ex.m_response.getStatus());
             exceptionCalled = true;
@@ -216,7 +219,8 @@ public class TestClientFeatures extends TestCase {
         exceptionCalled = false;
         try {
             // Query timeout is in seconds second arg.
-            ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 30, TimeUnit.SECONDS, 6000);
+            ((ClientImpl) client).callProcedureWithClientTimeout(BatchTimeoutOverrideType.NO_TIMEOUT,
+                    "ArbitraryDurationProc", 30, TimeUnit.SECONDS, 6000);
         } catch (ProcCallException ex) {
             exceptionCalled = true;
         }
@@ -225,7 +229,8 @@ public class TestClientFeatures extends TestCase {
         //no timeout of 0
         try {
             // Query timeout is in seconds second arg.
-            ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 0, TimeUnit.SECONDS, 2000);
+            ((ClientImpl) client).callProcedureWithClientTimeout(BatchTimeoutOverrideType.NO_TIMEOUT,
+                    "ArbitraryDurationProc", 0, TimeUnit.SECONDS, 2000);
         } catch (ProcCallException ex) {
             exceptionCalled = true;
         }
@@ -239,11 +244,11 @@ public class TestClientFeatures extends TestCase {
                 System.out.println("Async Query timeout called..");
                 latch.countDown();
             }
-
         }
         // Query timeout is in seconds third arg.
         //Async versions
-        ((ClientImpl) client).callProcedureWithTimeout(new MyCallback(), "ArbitraryDurationProc", 3, TimeUnit.SECONDS, 6000);
+        ((ClientImpl) client).callProcedureWithClientTimeout(new MyCallback(), BatchTimeoutOverrideType.NO_TIMEOUT,
+                "ArbitraryDurationProc", 3, TimeUnit.SECONDS, 6000);
         try {
             latch.await();
         } catch (InterruptedException ex) {
@@ -260,10 +265,10 @@ public class TestClientFeatures extends TestCase {
                 assert (clientResponse.getStatus() == ClientResponse.SUCCESS);
                 latch2.countDown();
             }
-
         }
         // Query timeout is in seconds third arg.
-        ((ClientImpl) client).callProcedureWithTimeout(new MyCallback2(), "ArbitraryDurationProc", 30, TimeUnit.SECONDS, 6000);
+        ((ClientImpl) client).callProcedureWithClientTimeout(new MyCallback2(), BatchTimeoutOverrideType.NO_TIMEOUT,
+                "ArbitraryDurationProc", 30, TimeUnit.SECONDS, 6000);
         try {
             latch2.await();
         } catch (InterruptedException ex) {
@@ -280,10 +285,10 @@ public class TestClientFeatures extends TestCase {
                 assert (clientResponse.getStatus() == ClientResponse.SUCCESS);
                 latch3.countDown();
             }
-
         }
         // Query timeout is in seconds third arg.
-        ((ClientImpl) client).callProcedureWithTimeout(new MyCallback3(), "ArbitraryDurationProc", 0, TimeUnit.SECONDS, 6000);
+        ((ClientImpl) client).callProcedureWithClientTimeout(new MyCallback3(), BatchTimeoutOverrideType.NO_TIMEOUT,
+                "ArbitraryDurationProc", 0, TimeUnit.SECONDS, 6000);
         try {
             latch3.await();
         } catch (InterruptedException ex) {
@@ -299,13 +304,13 @@ public class TestClientFeatures extends TestCase {
                 assert (clientResponse.getStatus() == ClientResponse.CONNECTION_TIMEOUT);
                 latch4.countDown();
             }
-
         }
 
         /*
          * Check that a super tiny timeout triggers fast
          */
-        ((ClientImpl) client).callProcedureWithTimeout(new MyCallback4(), "ArbitraryDurationProc", 50, TimeUnit.NANOSECONDS, 6000);
+        ((ClientImpl) client).callProcedureWithClientTimeout(new MyCallback4(), BatchTimeoutOverrideType.NO_TIMEOUT,
+                "ArbitraryDurationProc", 50, TimeUnit.NANOSECONDS, 6000);
         final long start = System.nanoTime();
         try {
             latch4.await();
@@ -341,6 +346,8 @@ public class TestClientFeatures extends TestCase {
 
     /**
      * Verify a client can reconnect automatically if reconnect on connection loss feature is turned on
+     *
+     * Then verify that nothing is still going when all it shutdown
      */
     public void testAutoReconnect() throws Exception {
         ClientConfig config = new ClientConfig();
@@ -360,14 +367,45 @@ public class TestClientFeatures extends TestCase {
 
         setUp();
 
+        boolean failed = true;
         for (int i = 0; i < 40; i++) {
             if (client.getConnectedHostList().size() > 0) {
-                return;
+                failed = false;
+                break;
             }
             Thread.sleep(500);
         }
+        if (failed) {
+            fail("Client should have been reconnected");
+        }
 
-        fail("Client should have been reconnected");
+        tearDown();
+
+        for (int i = 0; (i < 40) && (client.getConnectedHostList().size() > 0); i++) {
+            Thread.sleep(500);
+        }
+        assertTrue(client.getConnectedHostList().isEmpty());
+
+        client.close();
+
+        // hunt for reconnect thread to make sure it's gone
+        Map<Thread, StackTraceElement[]> stMap = Thread.getAllStackTraces();
+        for (Entry<Thread, StackTraceElement[]> e : stMap.entrySet()) {
+            StackTraceElement[] st = e.getValue();
+            Thread t = e.getKey();
+
+            // skip the current thread
+            if (t == Thread.currentThread()) {
+                continue;
+            }
+
+            for (StackTraceElement ste : st) {
+                if (ste.getClassName().toLowerCase().contains("voltdb.client")) {
+                    System.err.println(ste.getClassName().toLowerCase());
+                    fail("Something failed to clean up.");
+                }
+            }
+        }
     }
 
     public void testGetAddressList() throws UnknownHostException, IOException, InterruptedException {
@@ -419,7 +457,7 @@ public class TestClientFeatures extends TestCase {
 
     public void testDefaultConfigValues() {
         final ClientConfig dut = new ClientConfig();
-        assertEquals(ClientAuthHashScheme.HASH_SHA256, dut.m_hashScheme);
+        assertEquals(ClientAuthScheme.HASH_SHA256, dut.m_hashScheme);
         assertTrue(dut.m_username.isEmpty());
         assertTrue(dut.m_password.isEmpty());
         assertTrue(dut.m_cleartext);

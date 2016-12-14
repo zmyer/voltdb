@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -53,6 +53,8 @@ public class TestSnapshotConverter extends SaveRestoreBase
     public void testSnapshotConverter() throws NoConnectionsException, IOException, ProcCallException
     {
         if (!MiscUtils.isPro()) { return; } // not supported in community
+        if (isValgrind()) return;
+
         Client client = getClient();
         int expectedLines = 10;
         Random r = new Random(Calendar.getInstance().getTimeInMillis());

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,7 +29,7 @@ namespace voltdb
 {
     enum StreamBlockType {
         NORMAL_STREAM_BLOCK = 1,
-        LARGE_STREAM_BLOCK = 2
+        LARGE_STREAM_BLOCK = 2,
     };
     /**
      * A single data block with some buffer semantics.
@@ -45,10 +45,13 @@ namespace voltdb
               m_lastCommittedSpHandle(std::numeric_limits<int64_t>::max()),
               m_lastDRBeginTxnOffset(0),
               m_hasDRBeginTxn(false),
+              m_rowCountForDR(0),
               m_startDRSequenceNumber(std::numeric_limits<int64_t>::max()),
               m_lastDRSequenceNumber(std::numeric_limits<int64_t>::max()),
-              m_lastUniqueId(std::numeric_limits<int64_t>::max()),
-              m_type(voltdb::NORMAL_STREAM_BLOCK)
+              m_lastSpUniqueId(0),
+              m_lastMpUniqueId(0),
+              m_type(NORMAL_STREAM_BLOCK),
+              m_drEventType(voltdb::NOT_A_EVENT)
         {
         }
 
@@ -61,10 +64,13 @@ namespace voltdb
               m_lastCommittedSpHandle(std::numeric_limits<int64_t>::max()),
               m_lastDRBeginTxnOffset(other->m_lastDRBeginTxnOffset),
               m_hasDRBeginTxn(other->m_hasDRBeginTxn),
+              m_rowCountForDR(other->m_rowCountForDR),
               m_startDRSequenceNumber(other->m_startDRSequenceNumber),
               m_lastDRSequenceNumber(other->m_lastDRSequenceNumber),
-              m_lastUniqueId(other->m_lastUniqueId),
-              m_type(other->m_type)
+              m_lastSpUniqueId(other->m_lastSpUniqueId),
+              m_lastMpUniqueId(other->m_lastMpUniqueId),
+              m_type(other->m_type),
+              m_drEventType(other->m_drEventType)
         {
         }
 
@@ -135,13 +141,37 @@ namespace voltdb
             return m_lastDRSequenceNumber;
         }
 
-        int64_t lastUniqueId() const {
-            return m_lastUniqueId;
+        int64_t lastSpUniqueId() const {
+            return m_lastSpUniqueId;
         }
 
-        void recordCompletedTxnForDR(int64_t lastDRSequenceNumber, int64_t lastUniqueId) {
+        int64_t lastMpUniqueId() const {
+            return m_lastMpUniqueId;
+        }
+
+        void recordCompletedSequenceNumForDR(int64_t lastDRSequenceNumber) {
             m_lastDRSequenceNumber = lastDRSequenceNumber;
-            m_lastUniqueId = lastUniqueId;
+        }
+
+        void recordCompletedSpTxnForDR(int64_t lastSpUniqueId) {
+            m_lastSpUniqueId = lastSpUniqueId;
+        }
+
+        void recordCompletedMpTxnForDR(int64_t lastMpUniqueId) {
+            m_lastMpUniqueId = lastMpUniqueId;
+        }
+
+        void markAsEventBuffer(DREventType type) {
+            m_drEventType = type;
+        }
+
+        DREventType drEventType() {
+            return m_drEventType;
+        }
+
+        size_t updateRowCountForDR(size_t rowsToCommit) {
+            m_rowCountForDR += rowsToCommit;
+            return m_rowCountForDR;
         }
 
         StreamBlockType type() const {
@@ -202,14 +232,19 @@ namespace voltdb
         int64_t m_lastCommittedSpHandle;
         size_t m_lastDRBeginTxnOffset;  // keep record of DR begin txn to avoid txn span multiple buffers
         bool m_hasDRBeginTxn;    // only used for DR Buffer
+        size_t m_rowCountForDR;
         int64_t m_startDRSequenceNumber;
         int64_t m_lastDRSequenceNumber;
-        int64_t m_lastUniqueId;
+        int64_t m_lastSpUniqueId;
+        int64_t m_lastMpUniqueId;
         StreamBlockType m_type;
+        DREventType m_drEventType;
 
         friend class TupleStreamBase;
         friend class ExportTupleStream;
+        friend class AbstractDRTupleStream;
         friend class DRTupleStream;
+        friend class CompatibleDRTupleStream;
     };
 }
 

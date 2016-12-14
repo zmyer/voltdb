@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,9 +24,10 @@
 package org.voltdb.regressionsuites;
 
 import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.TheHashinator;
@@ -40,7 +41,13 @@ import org.voltdb.client.ClientUtils;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.common.Constants;
+import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
+import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
+import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.Test;
+
 
 /**
  * Tests a mix of multi-partition and single partition procedures on a
@@ -59,6 +66,23 @@ public class TestUpdateDeployment extends RegressionSuite {
                                     org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
                                     org.voltdb.benchmark.tpcc.procedures.delivery.class };
 
+    // users used by these test
+    static final RoleInfo GROUPS[] = new RoleInfo[] {
+        new RoleInfo("export", false, false, false, false, false, false),
+        new RoleInfo("proc", true, false, true, true, false, false),
+        new RoleInfo("admin", true, false, true, true, false, false)
+    };
+
+    static final UserInfo[] USERS = new UserInfo[] {
+        new UserInfo("fancy pants", "export", new String[]{"export"}),
+        new UserInfo("default", "password", new String[]{"proc"}),
+        new UserInfo("admin", "admin", new String[]{"proc", "admin"})
+    };
+
+    static final UserInfo[] USERS_BAD_PASSWORD = new UserInfo[] {
+            new UserInfo("user1", "E7FA8F38396EF1332A60B629BA69257C462CBF3B95C81F3C556DDB79BD2226BEBCF2086983707FF5CFA72BE03B8B763199BBFFD3", new String[]{"admin"}, false),
+            new UserInfo("user2", "password", new String[]{"admin", "proc"}, false)
+    };
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
      * @param name The name of the method to test. This is just passed to the superclass.
@@ -309,6 +333,77 @@ public class TestUpdateDeployment extends RegressionSuite {
         assertTrue(cb.getResponse().getStatusString().contains("Unable to update"));
     }
 
+    public void testUpdateBadExport() throws Exception
+    {
+        System.out.println("\n\n-----\n testUpdateBadExport \n-----\n\n");
+        System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.export.ExportTestClient");
+        Map<String, String> additionalEnv = new HashMap<String, String>();
+        additionalEnv.put(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.export.ExportTestClient");
+        LocalCluster config = new LocalCluster("catalogupdate-bad-export.jar", SITES_PER_HOST, HOSTS, K,
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+        TPCCProjectBuilder project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addProcedures(BASEPROCS);
+        Properties props = buildProperties(
+                "type", "csv",
+                "batched", "false",
+                "with-schema", "true",
+                "complain", "true",
+                "outdir", "/tmp/" + System.getProperty("user.name"));
+        project.addExport(true /* enabled */, "custom", props);
+        // build the jarfile
+        boolean compile = config.compile(project);
+        assertTrue(compile);
+
+        Client client = getClient();
+        loadSomeData(client, 0, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        // Try to change the schem setting
+        SyncCallback cb = new SyncCallback();
+        client.updateApplicationCatalog(cb, null, new File(project.getPathToDeployment()));
+        cb.waitForResponse();
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, cb.getResponse().getStatus());
+        System.out.println(cb.getResponse().getStatusString());
+        assertTrue(cb.getResponse().getStatusString().contains("Unable to update"));
+    }
+
+    public void testUpdateSecurityBadUsername() throws Exception
+    {
+        System.out.println("\n\n-----\n testUpdateSecurityBadUsername \n-----\n\n");
+        Client client = getClient();
+        loadSomeData(client, 0, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-bad-username.xml");
+        // Try to change the schem setting
+        SyncCallback cb = new SyncCallback();
+        client.updateApplicationCatalog(cb, null, new File(deploymentURL));
+        cb.waitForResponse();
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, cb.getResponse().getStatus());
+        System.out.println(cb.getResponse().getStatusString());
+        assertTrue(cb.getResponse().getStatusString().contains("Unable to update"));
+    }
+
+    public void testBadMaskPassword() throws Exception {
+        System.out.println("\n\n-----\n testBadMaskPassword \n-----\n\n");
+        Client client = getClient();
+        loadSomeData(client, 0, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-bad-masked-password.xml");
+        // Try to change schema setting
+        SyncCallback cb = new SyncCallback();
+        client.updateApplicationCatalog(cb, null, new File(deploymentURL));
+        cb.waitForResponse();
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, cb.getResponse().getStatus());
+        assertTrue(cb.getResponse().getStatusString().contains("Unable to update deployment configuration"));
+    }
+
     private void deleteDirectory(File dir) {
         if (!dir.exists() || !dir.isDirectory()) {
             return;
@@ -433,6 +528,34 @@ public class TestUpdateDeployment extends RegressionSuite {
         compile = config.compile(project);
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-security-no-users.xml"));
+
+        // A deployment change that changes the schema change mechanism
+        config = new LocalCluster("catalogupdate-bad-username.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addProcedures(BASEPROCS);
+        project.setSecurityEnabled(true,true);
+        project.addRoles(GROUPS);
+        project.addUsers(USERS);
+        // build the jarfile
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-bad-username.xml"));
+
+        // A deployment change that has bad masked password
+        config = new LocalCluster("catalogupdate-bad-masked-password.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addProcedures(BASEPROCS);
+        project.setSecurityEnabled(true,true);
+        project.addRoles(GROUPS);
+        project.addUsers(USERS_BAD_PASSWORD);
+        // build the jarfile
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-bad-masked-password.xml"));
 
         return builder;
     }

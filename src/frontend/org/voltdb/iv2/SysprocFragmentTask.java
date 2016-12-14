@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -32,6 +32,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
@@ -50,6 +51,8 @@ public class SysprocFragmentTask extends TransactionTask
     final Mailbox m_initiator;
     final FragmentTaskMessage m_fragmentMsg;
     Map<Integer, List<VoltTable>> m_inputDeps;
+
+    boolean m_respBufferable = true;
 
     // This constructor is used during live rejoin log replay.
     SysprocFragmentTask(Mailbox mailbox,
@@ -73,6 +76,10 @@ public class SysprocFragmentTask extends TransactionTask
             m_inputDeps = new HashMap<Integer, List<VoltTable>>();
         }
         assert(m_fragmentMsg.isSysProcTask());
+
+        if (txnState != null && !txnState.isReadOnly()) {
+            m_respBufferable = false;
+        }
     }
 
     /**
@@ -94,8 +101,12 @@ public class SysprocFragmentTask extends TransactionTask
             final int outputDepId = m_fragmentMsg.getOutputDepId(frag);
             response.addDependency(outputDepId, depTable);
         }
-
+        response.setRespBufferable(m_respBufferable);
         m_initiator.deliver(response);
+    }
+
+    public void setResponseNotBufferable() {
+        m_respBufferable = false;
     }
 
     @Override
@@ -125,6 +136,7 @@ public class SysprocFragmentTask extends TransactionTask
 
         final FragmentResponseMessage response = processFragmentTask(siteConnection);
         response.m_sourceHSId = m_initiator.getHSId();
+        response.setRespBufferable(m_respBufferable);
         m_initiator.deliver(response);
     }
 
@@ -167,7 +179,7 @@ public class SysprocFragmentTask extends TransactionTask
 
 
     // Extracted the sysproc portion of ExecutionSite processFragmentTask(), then
-    // modifed to work in the new world
+    // modified to work in the new world
     public FragmentResponseMessage processFragmentTask(SiteProcedureConnection siteConnection)
     {
         final FragmentResponseMessage currentFragResponse =
@@ -198,11 +210,21 @@ public class SysprocFragmentTask extends TransactionTask
                 hostLog.l7dlog(Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(),
                         new Object[] { Encoder.hexEncode(m_fragmentMsg.getFragmentPlan(frag)) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                if (currentFragResponse.getTableCount() == 0) {
+                    // Make sure the response has at least 1 result with a valid DependencyId
+                    currentFragResponse.addDependency(m_fragmentMsg.getOutputDepId(0),
+                            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+                }
                 break;
             } catch (final SQLException e) {
                 hostLog.l7dlog(Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(),
                         new Object[] { Encoder.hexEncode(m_fragmentMsg.getFragmentPlan(frag)) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                if (currentFragResponse.getTableCount() == 0) {
+                    // Make sure the response has at least 1 result with a valid DependencyId
+                    currentFragResponse.addDependency(m_fragmentMsg.getOutputDepId(0),
+                            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+                }
                 break;
             }
             catch (final SpecifiedException e) {
@@ -215,11 +237,21 @@ public class SysprocFragmentTask extends TransactionTask
                 currentFragResponse.setStatus(
                         FragmentResponseMessage.USER_ERROR,
                         e);
+                if (currentFragResponse.getTableCount() == 0) {
+                    // Make sure the response has at least 1 result with a valid DependencyId
+                    currentFragResponse.addDependency(m_fragmentMsg.getOutputDepId(0),
+                            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+                }
             }
             catch (final VoltAbortException e) {
                 currentFragResponse.setStatus(
                         FragmentResponseMessage.USER_ERROR,
                         new SerializableException(CoreUtils.throwableToString(e)));
+                if (currentFragResponse.getTableCount() == 0) {
+                    // Make sure the response has at least 1 result with a valid DependencyId
+                    currentFragResponse.addDependency(m_fragmentMsg.getOutputDepId(0),
+                            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+                }
                 break;
             }
         }

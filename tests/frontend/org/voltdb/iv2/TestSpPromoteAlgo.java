@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -49,6 +49,7 @@ import org.junit.Test;
 import org.mockito.InOrder;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.Pair;
 import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
@@ -302,7 +303,8 @@ public class TestSpPromoteAlgo
         // at random points to all but one.  Validate that promotion repair
         // results in identical, correct, repair streams to all replicas.
         TxnEgo sphandle = TxnEgo.makeZero(0);
-        UniqueIdGenerator buig = new UniqueIdGenerator(0, 0);
+        UniqueIdGenerator spbuig = new UniqueIdGenerator(0, 0);
+        UniqueIdGenerator mpbuig = new UniqueIdGenerator(0, 0);
         sphandle = sphandle.makeNext();
         RandomMsgGenerator msgGen = new RandomMsgGenerator();
         boolean[] stops = new boolean[3];
@@ -312,7 +314,7 @@ public class TestSpPromoteAlgo
             stops[i] = false;
             finalStreams.put((long)i, new ArrayList<TransactionInfoBaseMessage>());
         }
-        long maxBinaryLogUniqueId = Long.MIN_VALUE;
+        long maxBinaryLogSpUniqueId = Long.MIN_VALUE;
         for (int i = 0; i < 4000; i++) {
             // get next message, update the sphandle according to SpScheduler rules,
             // but only submit messages that would have been forwarded by the master
@@ -320,7 +322,8 @@ public class TestSpPromoteAlgo
             TransactionInfoBaseMessage msg = msgGen.generateRandomMessageInStream();
             msg.setSpHandle(sphandle.getTxnId());
             if (msg instanceof Iv2InitiateTaskMessage) {
-                maxBinaryLogUniqueId = Math.max(maxBinaryLogUniqueId, TestRepairLog.setBinaryLogUniqueId(msg, buig));
+                Pair<Long, Long> uids = TestRepairLog.setBinaryLogUniqueId(msg, spbuig, mpbuig);
+                maxBinaryLogSpUniqueId = Math.max(maxBinaryLogSpUniqueId, uids.getFirst());
             }
             sphandle = sphandle.makeNext();
             if (!msg.isReadOnly() || msg instanceof CompleteTransactionMessage) {
@@ -366,10 +369,8 @@ public class TestSpPromoteAlgo
                 }
             }
         }
-        RepairResult res = result.get();
         assertFalse(result.isCancelled());
         assertTrue(result.isDone());
-        assertEquals(maxBinaryLogUniqueId, res.m_binaryLogUniqueId);
         // Unfortunately, it's painful to try to stub things to make repairSurvivors() work, so we'll
         // go and inspect the guts of SpPromoteAlgo instead.  This iteration is largely a copy of the inner loop
         // of repairSurvivors()

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -43,11 +43,10 @@ import org.voltdb.compiler.VoltProjectBuilder;
  *
  */
 @Deprecated
-public abstract class LocalSingleProcessServer implements VoltServerConfig {
+public abstract class LocalSingleProcessServer extends VoltServerConfig {
 
     public final String m_jarFileName;
     public int m_siteCount;
-    public final BackendTarget m_target;
 
     ServerThread m_server = null;
     boolean m_compiled = false;
@@ -99,7 +98,7 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
             return true;
         }
         m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication,
-                                     null, true, snapshotPath, ppdPrefix);
+                                     null, 0, true, snapshotPath, ppdPrefix);
         m_pathToDeployment = builder.getPathToDeployment();
         m_pathToVoltRoot = builder.getPathToVoltRoot();
 
@@ -118,7 +117,7 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
         }
         m_adminPort = adminPort;
         m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication,
-                                     adminPort, adminOnStartup);
+                                     adminPort, adminOnStartup, 0);
         m_pathToDeployment = builder.getPathToDeployment();
         return m_compiled;
 
@@ -177,20 +176,15 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
     @Override
     public void shutDown() throws InterruptedException {
         m_server.shutdown();
-        m_siteProcess.waitForShutdown();
-        if (m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
-            if (!EEProcess.m_valgrindErrors.isEmpty()) {
-                String failString = "";
-                for (final String error : EEProcess.m_valgrindErrors) {
-                    failString = failString + "\n" +  error;
-                }
-                org.junit.Assert.fail(failString);
-            }
-        }
+        File valgrindOutputFile = m_siteProcess.waitForShutdown();
+        LocalCluster.failIfValgrindErrors(valgrindOutputFile);
+        VoltServerConfig.removeInstance(this);
     }
 
     @Override
     public void startUp(boolean clearLocalDataDirectories) {
+        VoltServerConfig.addInstance(this);
+
         if (clearLocalDataDirectories) {
             File exportOverflow = new File( m_pathToVoltRoot, "export_overflow");
             if (exportOverflow.exists()) {
@@ -228,6 +222,12 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
     public boolean isValgrind() {
         return m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC;
     }
+
+    @Override
+    public boolean isDebug() {
+        return LocalCluster.isDebugDefined();
+    }
+
     @Override
     public void startUp() {
         startUp(true);

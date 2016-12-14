@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,6 +23,11 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -32,6 +37,7 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
 
     // Add a test for partitioning a table
 
+    @Test
     public void testBasicCreateIndex() throws Exception
     {
         VoltDB.Configuration config = new VoltDB.Configuration();
@@ -135,6 +141,71 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
         }
     }
 
+    @Test
+    public void testCreatePartialIndex() throws Exception
+    {
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        String ddl = "create table FOO (" +
+                     "ID integer not null," +
+                     "TS timestamp, " +
+                     "constraint PK_TREE primary key (ID)" +
+                     ");\n" +
+                     "partition table FOO on column ID;\n" +
+                     "create table FOO_R (" +
+                     "ID integer not null," +
+                     "TS timestamp, " +
+                     "constraint PK_TREE_R primary key (ID)" +
+                     ");\n" +
+                     "";
+        createSchema(config, ddl, 2, 1, 0);
+
+        try {
+            startSystem(config);
+
+            // Create a partial index on the partitioned table
+            assertFalse(findIndexInSystemCatalogResults("partial_FOO_ts"));
+            try {
+                // Use a timestamp constant to validate ENG-9283
+                m_client.callProcedure("@AdHoc",
+                        "create index partial_FOO_ts on FOO (TS) where TS > '2000-01-01';");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to create a partial index on a partitioned table");
+            }
+            assertTrue(findIndexInSystemCatalogResults("partial_FOO_ts"));
+
+            // Create a partial index on the replicated table.
+            // It is unlikely that switching to use a replicated table will
+            // uncover a failure when the partitioned table test apparently
+            // succeeded, UNLESS that partitioned table schema change
+            // succeeded BUT left the schema in a compromised state that is
+            // operational but no longer mutable.
+            // This has happened in the past because of issues with
+            // regenerating the SQL DDL syntax that effectively recreates the
+            // pre-existing schema. This kind of error will only be discovered
+            // by a subsequent attempt to alter the schema.
+            // Uncovering that failure mode may be the most useful role
+            // of this additional test step.
+            assertFalse(findIndexInSystemCatalogResults("partial_FOO_R_ts"));
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "create index partial_FOO_R_ts on FOO_R (TS) where TS > '2000-01-01';");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to create a partial index on a replicated table" +
+                     " after apparently succeeding with a partitioned table.");
+            }
+            assertTrue(findIndexInSystemCatalogResults("partial_FOO_R_ts"));
+
+        }
+        finally {
+            teardownSystem();
+        }
+    }
+
+    @Test
     public void testCreateDropIndexonView() throws Exception
     {
         VoltDB.Configuration config = new VoltDB.Configuration();

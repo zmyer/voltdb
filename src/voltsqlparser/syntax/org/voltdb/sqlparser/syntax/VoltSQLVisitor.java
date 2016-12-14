@@ -614,32 +614,32 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
                                      colVals);
         return null;
     }
+    */
 
     @Override
     public void reportAmbiguity(Parser aArg0, DFA aArg1, int aArg2, int aArg3,
-            boolean aArg4, java.util.BitSet aArg5, ATNConfigSet aArg6) {
+                                boolean aArg4, java.util.BitSet aArg5, ATNConfigSet aArg6) {
         // Nothing to be done here.
     }
 
     @Override
     public void reportAttemptingFullContext(Parser aArg0, DFA aArg1, int aArg2,
-            int aArg3, java.util.BitSet aArg4, ATNConfigSet aArg5) {
+                                            int aArg3, java.util.BitSet aArg4, ATNConfigSet aArg5) {
         // Nothing to be done here.
     }
 
     @Override
     public void reportContextSensitivity(Parser aArg0, DFA aArg1, int aArg2,
-            int aArg3, int aArg4, ATNConfigSet aArg5) {
+                                         int aArg3, int aArg4, ATNConfigSet aArg5) {
         // Nothing to be done here.
     }
 
     @Override
     public void syntaxError(Recognizer<?, ?> aArg0, Object aTokObj, int aLine,
-            int aCol, String msg, RecognitionException aArg5) {
+                            int aCol, String msg, RecognitionException aArg5) {
         addError(aLine, aCol, msg);
     }
 
-    */
     public final ISelectQuery getSelectQuery() {
         return getTopSelectQuery();
     }

@@ -1,3 +1,5 @@
+syntax = "proto2";
+
 package pmsg;
 option java_package = "org.voltdb.pmsg";
 option java_outer_classname = "DRAgent";
@@ -10,6 +12,7 @@ message UUID {
 message Ack {
     optional int32 partitionId = 1;
     optional fixed64 timestamp = 2;
+    optional fixed64 averageRowLatencyNanos = 3;
 }
 
 message SnapshotReq {
@@ -28,6 +31,7 @@ message Pause {
 message Connect {
     optional int32 clusterId = 1;
     optional fixed64 persistInstanceId = 2;
+    optional int32 protocolVersion = 3;
 }
 
 message Subscribe {
@@ -36,20 +40,6 @@ message Subscribe {
     optional bool isCovering = 3;
     optional fixed64 rewindToUniqueId = 4;
     optional bool isSyncing = 5;
-}
-
-message EventAck {
-    optional int32 partitionId = 1;
-    // poison pill, cluster restart, rejoin
-    optional int32 eventType = 2;
-    // if true, the recipient should expect to have
-    // a corresponding event to discard
-    // if false, this is just a query for the next
-    // unique id available for this partition
-    optional bool lookForEvent = 3;
-    // unique id of the last thing the receiver has
-    // acked for this partition
-    optional fixed64 lastAckedUniqueId = 4;
 }
 
 message Response {
@@ -77,6 +67,8 @@ message Response {
     optional fixed64 catalogCRC = 11;
     optional string catalogSignature = 12;
     optional string failureCause = 13;
+    optional bool isEndOfStream = 14;
+    optional int32 protocolVersion = 15;
 }
 
 message NodeInfo {
@@ -119,7 +111,6 @@ message CtrlEnvelope {
         STOP_SYNC = 8;
         CONNECT = 9;
         SUBSCRIBE = 10;
-        EVENT_ACK = 11;
     }
     required Type type = 1;
     required UUID id = 2;
@@ -129,6 +120,6 @@ message CtrlEnvelope {
     optional Response response = 6;
     optional SnapshotReq snapshotReq = 7;
     optional Subscribe subscribe = 8;
-    optional EventAck eventAck = 9;
+    // Intentionally skip field 9 -- deprecated message type
     optional Connect connect = 10;
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -46,6 +46,10 @@ public abstract class VoltProtocolHandler implements InputHandler {
         m_connectionId = m_globalConnectionCounter.incrementAndGet();
     }
 
+    public static long getNextConnectionId() {
+        return m_globalConnectionCounter.incrementAndGet();
+    }
+
     @Override
     public ByteBuffer retrieveNextMessage(final NIOReadStream inputStream) throws BadMessageLength {
 
@@ -73,6 +77,7 @@ public abstract class VoltProtocolHandler implements InputHandler {
         }
         if (m_nextLength > 0 && inputStream.dataAvailable() >= m_nextLength) {
             result = ByteBuffer.allocate(m_nextLength);
+            // Copy read buffers to result, move read buffers back to memory pool
             inputStream.getBytes(result.array());
             m_nextLength = 0;
             m_sequenceId++;

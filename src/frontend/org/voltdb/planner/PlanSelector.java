@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -246,6 +246,20 @@ public class PlanSelector implements Cloneable {
                                       true);
     }
 
+    public static String outputPlanDebugString(AbstractPlanNode planGraph) throws JSONException {
+        PlanNodeList nodeList = new PlanNodeList(planGraph);
+
+        // get the json serialized version of the plan
+        String json = null;
+
+        String crunchJson = nodeList.toJSONString();
+        //System.out.println(crunchJson);
+        //System.out.flush();
+        JSONObject jobj = new JSONObject(crunchJson);
+        json = jobj.toString(4);
+        return json;
+    }
+
     /**
      * @param plan
      * @param planGraph
@@ -258,15 +272,9 @@ public class PlanSelector implements Cloneable {
         // convert a tree into an execution list
         PlanNodeList nodeList = new PlanNodeList(planGraph);
 
-        // get the json serialized version of the plan
-        String json = null;
-
+        String json;
         try {
-            String crunchJson = nodeList.toJSONString();
-            //System.out.println(crunchJson);
-            //System.out.flush();
-            JSONObject jobj = new JSONObject(crunchJson);
-            json = jobj.toString(4);
+            json = outputPlanDebugString(planGraph);
         } catch (JSONException e2) {
             // Any plan that can't be serialized to JSON to
             // write to debugging output is also going to fail
@@ -279,7 +287,6 @@ public class PlanSelector implements Cloneable {
             // For now, just skip the output and go on to the next plan.
             return errorMsg;
         }
-
         // output a description of the parsed stmt
         json = "PLAN:\n" + json;
         json = "COST: " + String.valueOf(plan.cost) + "\n" + json;

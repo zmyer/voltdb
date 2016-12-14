@@ -1,6 +1,7 @@
 /.classpath
 /.depcache
 /.project
+/.cproject
 /.settings
 /hs_err_pid*.log
 /last_junit_suite.log
@@ -11,6 +12,7 @@
 /.DS_Store
 .DS_Store
 .cache/
+.pydevproject
 *.pyc
 *.swp
 *~
@@ -39,6 +41,7 @@ doc/tutorials/*/*.jar
 doc/tutorials/auction/csvloader_*.csv
 /src/ee/.cproject
 /src/ee/.project
+/src/ee/.settings/
 /src/catgen/out
 /src/ee/catalog/*
 /src/ee/tags
@@ -53,12 +56,14 @@ doc/tutorials/auction/csvloader_*.csv
 /testobjects/
 /tests/ee/.cproject
 /tests/ee/.project
+/tests/ee/.settings/
 /tests/sqlcmd/scripts/**/*.err
 /tests/sqlcmd/scripts/**/*.errclean
 /tests/sqlcmd/scripts/**/*.errdiffs
 /tests/sqlcmd/scripts/**/*.out
 /tests/sqlcmd/scripts/**/*.outclean
 /tests/sqlcmd/scripts/**/*.outdiffs
+/tests/sqlcmd/sqlcmdtest-*-procs.jar
 /tools/voltify.venv
 /src/ee/org_voltdb_utils_PosixAdvise.h
 /src/frontend/org/voltcore/utils/DBBPool.java
@@ -69,3 +74,18 @@ bundles
 /target/generated-sources/antlr4
 /target/generated-sources/antlr4.touch
 /tests/sqlparser.sqlparserVoltXMLTests.touch
+*.lcbak
+.gradle/*
+build.gradle
+/lib/python/vdm/.idea/
+/lib/python/vdm/server/nohup.out/*
+/lib/python/vdm/tests/geb_vdm/.gradle/*
+/lib/python/vdm/tests/geb_vdm/build/*
+/lib/python/vdm/tests/server/test_reports/*
+/src/frontend/org/voltdb/.gradle/*
+/src/frontend/org/voltdb/.idea/*
+/tests/.idea/*
+/tests/geb/vmc/.idea/*
+/build/lib/voltdb.war
+/tests/geb/vmc/.nb-gradle/
+/lib/python/vdm/tests/geb_vdm/.nb-gradle/

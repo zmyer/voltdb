@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -68,7 +68,7 @@ import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 
 /** Hack subclass of VoltClient that fakes callProcedure. */
-public class MockVoltClient implements Client, ReplicaProcCaller{
+public class MockVoltClient implements Client {
     public MockVoltClient() {
         super();
     }
@@ -137,7 +137,6 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
                 // TODO Auto-generated method stub
                 return 0;
             }
-
         };
     }
 
@@ -250,31 +249,6 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
         return false;
     }
 
-    @Override
-    public boolean callProcedure(long originalTxnId,
-                                 long originalTimestamp,
-                                 ProcedureCallback callback,
-                                 String procName,
-                                 Object... parameters) throws IOException,
-                                                      NoConnectionsException {
-        numCalls += 1;
-        calledName = procName;
-        calledParameters = parameters;
-        m_lastCallback = callback;
-        m_callbacks.add(callback);
-        if (originalTxnId <= lastOrigTxnId)
-        {
-            origTxnIdOrderCorrect = false;
-        }
-        else
-        {
-            lastOrigTxnId = originalTxnId;
-        }
-
-        return m_nextReturn;
-    }
-
-
     public void pokeLastCallback(final byte status, final String message) throws Exception
     {
         ClientResponse clientResponse = new ClientResponseImpl(status, new VoltTable[0], message);
@@ -301,25 +275,6 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     }
 
     @Override
-    public ClientResponse callProcedure(long originalTxnId, long originalTimestamp,
-                                        String procName, Object... parameters)
-    throws IOException, NoConnectionsException, ProcCallException
-    {
-        numCalls += 1;
-        calledName = procName;
-        calledParameters = parameters;
-        if (originalTxnId <= lastOrigTxnId)
-        {
-            origTxnIdOrderCorrect = false;
-        }
-        else
-        {
-            lastOrigTxnId = originalTxnId;
-        }
-        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "");
-    }
-
-    @Override
     public ClientStatsContext createStatsContext() {
         ClientStatsContext mock = Mockito.mock(ClientStatsContext.class);
         doReturn(mock).when(mock).fetchAndResetBaseline();
@@ -335,7 +290,6 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     @Override
     public void writeSummaryCSV(ClientStats stats, String path) throws IOException {
         // TODO Auto-generated method stub
-
     }
 
     @Override
@@ -370,5 +324,32 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     }
 
 
+    @Override
+    public ClientResponse callProcedureWithTimeout(int batchTimeout, String procName, Object... parameters)
+        throws IOException, NoConnectionsException, ProcCallException {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public boolean callProcedureWithTimeout(ProcedureCallback callback,
+            int batchTimeout, String procName, Object... parameters)
+            throws IOException, NoConnectionsException {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    @Override
+    public ClientResponseWithPartitionKey[] callAllPartitionProcedure(String procedureName, Object... params)  throws IOException, NoConnectionsException, ProcCallException{
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public boolean callAllPartitionProcedure(AllPartitionProcedureCallback callback, String procedureName,
+            Object... params)  throws IOException, NoConnectionsException, ProcCallException {
+        // TODO Auto-generated method stub
+        return false;
+    }
 
 }

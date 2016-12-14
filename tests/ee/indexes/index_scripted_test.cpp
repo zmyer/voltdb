@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -99,7 +99,9 @@ bool commandIS(voltdb::TableTuple &key)
 {
     //cout << "running is" << endl;
     //cout << " candidate key : " << key.tupleLength() << " - " << key.debug("") << endl;
-    return currentIndex->addEntry(&key);
+    TableTuple conflict(key.getSchema());
+    currentIndex->addEntry(&key, &conflict);
+    return conflict.isNullTuple();
 }
 
 bool commandIF(voltdb::TableTuple &key)

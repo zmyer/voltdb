@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -74,10 +74,13 @@ class CompactingTreeUniqueIndex : public TableIndex
         return *reinterpret_cast<MapIterator*> (cursor.m_keyIter);
     }
 
-    bool addEntryDo(const TableTuple *tuple)
+    void addEntryDo(const TableTuple *tuple, TableTuple *conflictTuple)
     {
         ++m_inserts;
-        return m_entries.insert(setKeyFromTuple(tuple), tuple->address());
+        const void* const* conflictEntry = m_entries.insert(setKeyFromTuple(tuple), tuple->address());
+        if (conflictEntry != NULL && conflictTuple != NULL) {
+            conflictTuple->move(const_cast<void*>(*conflictEntry));
+        }
     }
 
     bool deleteEntryDo(const TableTuple *tuple)
@@ -98,7 +101,9 @@ class CompactingTreeUniqueIndex : public TableIndex
             if ( ! CompactingTreeUniqueIndex::deleteEntry(&originalTuple)) {
                 return false;
             }
-            return CompactingTreeUniqueIndex::addEntry(&destinationTuple);
+            TableTuple conflict(destinationTuple.getSchema());
+            CompactingTreeUniqueIndex::addEntry(&destinationTuple, &conflict);
+            return conflict.isNullTuple();
         }
 
         MapIterator mapIter = findTuple(originalTuple);
@@ -127,6 +132,20 @@ class CompactingTreeUniqueIndex : public TableIndex
         cursor.m_forward = true;
         MapIterator &mapIter = castToIter(cursor);
         mapIter = findKey(searchKey);
+
+        if (mapIter.isEnd()) {
+            cursor.m_match.move(NULL);
+            return false;
+        }
+        cursor.m_match.move(const_cast<void*>(mapIter.value()));
+        return true;
+    }
+
+    bool moveToKeyByTuple(const TableTuple *persistentTuple, IndexCursor &cursor) const
+    {
+        cursor.m_forward = true;
+        MapIterator &mapIter = castToIter(cursor);
+        mapIter = findTuple(*persistentTuple);
 
         if (mapIter.isEnd()) {
             cursor.m_match.move(NULL);

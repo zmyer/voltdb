@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,6 +30,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotFilter;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SpecificSnapshotFilter;
 
 /**
@@ -92,7 +93,7 @@ public class SnapshotVerifier {
 
         Map<String, Snapshot> snapshots = new HashMap<String, Snapshot>();
         for (String directory : directories) {
-            SnapshotUtil.retrieveSnapshotFiles( new File(directory), snapshots, filter, true, CONSOLE_LOG);
+            SnapshotUtil.retrieveSnapshotFiles(new File(directory), snapshots, filter, true, SnapshotPathType.SNAP_PATH, CONSOLE_LOG);
         }
 
         if (snapshots.isEmpty()) {

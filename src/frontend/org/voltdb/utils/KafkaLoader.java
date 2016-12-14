@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,6 +17,9 @@
 package org.voltdb.utils;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 
 import java.util.HashMap;
 import java.util.List;
@@ -35,7 +38,6 @@ import kafka.message.MessageAndMetadata;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
-import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -92,6 +94,9 @@ public class KafkaLoader {
         // Split server list
         final String[] serverlist = m_config.servers.split(",");
 
+        // If we need to prompt the user for a VoltDB password, do so.
+        m_config.password = m_config.readPasswordIfNeeded(m_config.user, m_config.password, "Enter password: ");
+
         // Create connection
         final ClientConfig c_config = new ClientConfig(m_config.user, m_config.password);
         c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
@@ -104,9 +109,9 @@ public class KafkaLoader {
             m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_config.table, m_config.batch, m_config.update, new KafkaBulkLoaderCallback());
         }
         m_loader.setFlushInterval(m_config.flush, m_config.flush);
-        m_consumer = new KafkaConsumerConnector(m_config.zookeeper, m_config.useSuppliedProcedure ? m_config.procedure : m_config.table);
+        m_consumer = new KafkaConsumerConnector(m_config);
         try {
-            m_es = getConsumerExecutor(m_consumer, m_loader);
+            m_es = getConsumerExecutor(m_config, m_consumer, m_loader);
             if (m_config.useSuppliedProcedure) {
                 m_log.info("Kafka Consumer from topic: " + m_config.topic + " Started using procedure: " + m_config.procedure);
             } else {
@@ -154,6 +159,10 @@ public class KafkaLoader {
 
         @Option(shortOpt = "f", desc = "Periodic Flush Interval in seconds. (default: 10)")
         int flush = 10;
+        @Option(shortOpt = "k", desc = "Kafka Topic Partitions. (default: 10)")
+        int kpartitions = 10;
+        @Option(shortOpt = "c", desc = "Kafka Consumer Configuration File")
+        String config = "";
 
         /**
          * Batch size for processing batched operations.
@@ -228,6 +237,7 @@ public class KafkaLoader {
 
         @Override
         public boolean handleError(RowWithMetaData metaData, ClientResponse response, String error) {
+            if (m_config.maxerrors <= 0) return false;
             if (response != null) {
                 byte status = response.getStatus();
                 if (status != ClientResponse.SUCCESS) {
@@ -258,20 +268,26 @@ public class KafkaLoader {
 
         final ConsumerConfig m_consumerConfig;
         final ConsumerConnector m_consumer;
+        final KafkaConfig m_config;
 
-        public KafkaConsumerConnector(String zk, String groupName) {
+        public KafkaConsumerConnector(KafkaConfig config) throws IOException {
+            m_config = config;
             //Get group id which should be unique for table so as to keep offsets clean for multiple runs.
-            String groupId = "voltdb-" + groupName;
+            String groupId = "voltdb-" + (m_config.useSuppliedProcedure ? m_config.procedure : m_config.table);
             //TODO: Should get this from properties file or something as override?
             Properties props = new Properties();
-            props.put("zookeeper.connect", zk);
+            if (m_config.config.length() > 0) {
+                props.load(new FileInputStream(new File(m_config.config)));
+            } else {
+                props.put("zookeeper.session.timeout.ms", "400");
+                props.put("zookeeper.sync.time.ms", "200");
+                props.put("auto.commit.interval.ms", "1000");
+                props.put("auto.commit.enable", "true");
+                props.put("auto.offset.reset", "smallest");
+                props.put("rebalance.backoff.ms", "10000");
+            }
             props.put("group.id", groupId);
-            props.put("zookeeper.session.timeout.ms", "400");
-            props.put("zookeeper.sync.time.ms", "200");
-            props.put("auto.commit.interval.ms", "1000");
-            props.put("auto.commit.enable", "true");
-            props.put("auto.offset.reset", "smallest");
-            props.put("rebalance.backoff.ms", "10000");
+            props.put("zookeeper.connect", m_config.zookeeper);
 
             m_consumerConfig = new ConsumerConfig(props);
 
@@ -321,13 +337,13 @@ public class KafkaLoader {
 
     }
 
-    private ExecutorService getConsumerExecutor(KafkaConsumerConnector consumer,
+    private ExecutorService getConsumerExecutor(KafkaConfig config, KafkaConsumerConnector consumer,
             CSVDataLoader loader) throws Exception {
 
         Map<String, Integer> topicCountMap = new HashMap<>();
         //Get this from config or arg. Use 3 threads default.
-        ExecutorService executor = Executors.newFixedThreadPool(3);
-        topicCountMap.put(m_config.topic, 3);
+        ExecutorService executor = Executors.newFixedThreadPool(m_config.kpartitions);
+        topicCountMap.put(m_config.topic, m_config.kpartitions);
         Map<String, List<KafkaStream<byte[], byte[]>>> consumerMap = consumer.m_consumer.createMessageStreams(topicCountMap);
         List<KafkaStream<byte[], byte[]>> streams = consumerMap.get(m_config.topic);
 

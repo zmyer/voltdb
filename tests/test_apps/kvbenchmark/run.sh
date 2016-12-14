@@ -45,7 +45,7 @@ function clean() {
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH -d obj \
+    javac -classpath $APPCLASSPATH -d obj \
         src/kvbench/*.java \
         src/kvbench/procedures/*.java
     # stop if compilation fails
@@ -69,14 +69,17 @@ function catalog() {
 function server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
-    FR_TEMP=/tmp/${USER}/fr
-    mkdir -p ${FR_TEMP}
-    # Set up flight recorder options
-    VOLTDB_OPTS="-XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+CMSParallelRemarkEnabled -XX:+UseTLAB"
-    VOLTDB_OPTS="${VOLTDB_OPTS} -XX:CMSInitiatingOccupancyFraction=75 -XX:+UseCMSInitiatingOccupancyOnly"
-    VOLTDB_OPTS="${VOLTDB_OPTS} -XX:+UnlockCommercialFeatures -XX:+FlightRecorder"
-    VOLTDB_OPTS="${VOLTDB_OPTS} -XX:FlightRecorderOptions=maxage=1d,defaultrecording=true,disk=true,repository=${FR_TEMP},threadbuffersize=128k,globalbuffersize=32m"
-    VOLTDB_OPTS="${VOLTDB_OPTS} -XX:StartFlightRecording=name=${APPNAME}"
+    # only on Oracle jdk...
+    if  java -version 2>&1 | grep -q 'Java HotSpot' ; then
+        FR_TEMP=/tmp/${USER}/fr
+        mkdir -p ${FR_TEMP}
+        # Set up flight recorder options
+        VOLTDB_OPTS="-XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+CMSParallelRemarkEnabled -XX:+UseTLAB"
+        VOLTDB_OPTS="${VOLTDB_OPTS} -XX:CMSInitiatingOccupancyFraction=75 -XX:+UseCMSInitiatingOccupancyOnly"
+        VOLTDB_OPTS="${VOLTDB_OPTS} -XX:+UnlockCommercialFeatures -XX:+FlightRecorder"
+        VOLTDB_OPTS="${VOLTDB_OPTS} -XX:FlightRecorderOptions=maxage=1d,defaultrecording=true,disk=true,repository=${FR_TEMP},threadbuffersize=128k,globalbuffersize=32m"
+        VOLTDB_OPTS="${VOLTDB_OPTS} -XX:StartFlightRecording=name=${APPNAME}"
+    fi
     # truncate the voltdb log
     [[ -d log && -w log ]] && > log/volt.log
     # run the server
@@ -106,6 +109,24 @@ function sync-benchmark() {
         kvbench.SyncBenchmark \
         --displayinterval=5 \
         --duration=120 \
+        --servers=localhost \
+        --poolsize=100000 \
+        --preload=true \
+        --getputratio=0.90 \
+        --keysize=32 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
+        --usecompression=false \
+        --threads=40 \
+        --csvfile=periodic.csv.gz
+}
+
+function http-benchmark() {
+    srccompile
+    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        kvbench.HTTPBenchmark \
+        --displayinterval=5 \
+        --duration=10 \
         --servers=localhost \
         --poolsize=100000 \
         --preload=true \

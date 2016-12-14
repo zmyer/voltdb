@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,10 +28,16 @@ import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
+import org.voltdb.DRConsumerDrIdTracker;
+import org.voltdb.DRIdempotencyResult;
 import org.voltdb.DependencyPair;
 import org.voltdb.HsqlBackend;
 import org.voltdb.LoadedProcedureSet;
+import org.voltdb.NonVoltDBBackend;
 import org.voltdb.ParameterSet;
+import org.voltdb.PartitionDRGateway;
+import org.voltdb.PostGISBackend;
+import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
@@ -50,6 +56,8 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.NodeSettings;
 
 /**
  * An implementation of Site which provides only the functionality
@@ -74,8 +82,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     // Manages pending tasks.
     final SiteTaskerQueue m_scheduler;
 
-    // Still need m_hsql here.
-    HsqlBackend m_hsql;
+    // Still need m_non_voltdb_backend (formerly m_hsql) here
+    NonVoltDBBackend m_non_voltdb_backend;
 
     // Current catalog
     volatile CatalogContext m_context;
@@ -106,6 +114,16 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
      */
     SystemProcedureExecutionContext m_sysprocContext = new SystemProcedureExecutionContext() {
         @Override
+        public ClusterSettings getClusterSettings() {
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+        }
+
+        @Override
+        public NodeSettings getPaths() {
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+        }
+
+        @Override
         public Database getDatabase() {
             throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
@@ -126,9 +144,20 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
+        public int getLocalSitesCount() {
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+        }
+
+        @Override
         public boolean isLowestSiteId()
         {
             throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+        }
+
+        @Override
+        public int getClusterId()
+        {
+            return getCorrespondingClusterId();
         }
 
         @Override
@@ -198,7 +227,13 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context,
-                CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation)
+                CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation, long uniqueId, long spHandle)
+        {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
+        public boolean updateSettings(CatalogContext context, CatalogSpecificPlanner csp)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -223,6 +258,42 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public void forceAllDRNodeBuffersToDisk(final boolean nofsync)
+        {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
+        public DRIdempotencyResult isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
+                                                            long lastReceivedDRId)
+        {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
+        public void appendApplyBinaryLogTxns(int producerClusterId, int producerPartitionId,
+                                             long localUniqueId, DRConsumerDrIdTracker tracker)
+        {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
+        public void recoverWithDrAppliedTrackers(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> trackers)
+        {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
+        public void resetDrAppliedTracker() {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
+        public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackers()
+        {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+        @Override
+        public Pair<Long, Long> getDrLastAppliedUniqueIds()
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -265,11 +336,17 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     void initialize()
     {
         if (m_backend == BackendTarget.HSQLDB_BACKEND) {
-            m_hsql = HsqlBackend.initializeHSQLBackend(m_siteId,
+            m_non_voltdb_backend = HsqlBackend.initializeHSQLBackend(m_siteId,
                                                        m_context);
         }
+        else if (m_backend == BackendTarget.POSTGRESQL_BACKEND) {
+            m_non_voltdb_backend = PostgreSQLBackend.initializePostgreSQLBackend(m_context);
+        }
+        else if (m_backend == BackendTarget.POSTGIS_BACKEND) {
+            m_non_voltdb_backend = PostGISBackend.initializePostGISBackend(m_context);
+        }
         else {
-            m_hsql = null;
+            m_non_voltdb_backend = null;
         }
     }
 
@@ -316,8 +393,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
     void shutdown()
     {
-        if (m_hsql != null) {
-            HsqlBackend.shutdownInstance();
+        if (m_non_voltdb_backend != null) {
+            m_non_voltdb_backend.shutdownInstance();
         }
     }
 
@@ -340,6 +417,18 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public int getCorrespondingHostId()
     {
         return CoreUtils.getHostIdFromHSId(m_siteId);
+    }
+
+    @Override
+    public int getCorrespondingClusterId()
+    {
+        return m_context.cluster.getDrclusterid();
+    }
+
+    @Override
+    public PartitionDRGateway getDRGateway()
+    {
+        throw new UnsupportedOperationException("RO MP Site doesn't have DR gateway");
     }
 
     @Override
@@ -400,9 +489,9 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public HsqlBackend getHsqlBackendIfExists()
+    public NonVoltDBBackend getNonVoltDBBackendIfExists()
     {
-        return m_hsql;
+        return m_non_voltdb_backend;
     }
 
     @Override
@@ -468,7 +557,9 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             JoinProducerBase.JoinCompletionAction replayComplete,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
-            boolean requireExistingSequenceNumbers)
+            Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> allConsumerSiteTrackers,
+            boolean requireExistingSequenceNumbers,
+            long clusterCreateTime)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
@@ -545,7 +636,22 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public void applyBinaryLog(long txnId, long spHandle, long uniqueId, byte log[]) {
+    public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte log[]) {
         throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
+    }
+
+    @Override
+    public void setBatchTimeout(int batchTimeout) {
+        throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
+    }
+
+    @Override
+    public int getBatchTimeout() {
+        throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
+    }
+
+    @Override
+    public void setDRProtocolVersion(int drVersion) {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 }

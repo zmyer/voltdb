@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,7 +26,9 @@ package org.voltdb;
 import java.io.File;
 import java.net.URL;
 
+import org.voltcore.common.Constants;
 import org.voltcore.utils.InstanceId;
+import org.voltdb.probe.MeshProber;
 import org.voltdb.utils.MiscUtils;
 
 /**
@@ -34,7 +36,6 @@ import org.voltdb.utils.MiscUtils;
  */
 public class ServerThread extends Thread {
     VoltDB.Configuration m_config;
-    boolean initialized = false;
 
     public ServerThread(VoltDB.Configuration config) {
         m_config = config;
@@ -44,6 +45,12 @@ public class ServerThread extends Thread {
         if (m_config.m_leader == null) {
             m_config.m_leader = "";
         }
+        if (m_config.m_coordinators == null || m_config.m_coordinators.isEmpty()) {
+            m_config.m_coordinators = MeshProber.hosts(m_config.m_internalPort);
+        }
+        if (m_config.m_startAction != StartAction.PROBE) {
+            m_config.m_hostCount = VoltDB.UNDEFINED;
+        }
 
         if (!m_config.validate()) {
             System.exit(-1);
@@ -51,7 +58,10 @@ public class ServerThread extends Thread {
 
         // Disable loading the EE if running against HSQL.
         m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
-
+        m_config.m_forceVoltdbCreate = true;
+        if (config.m_startAction == StartAction.INITIALIZE) {
+            VoltDB.ignoreCrash = true;
+        }
         setName("ServerThread");
     }
 
@@ -63,11 +73,13 @@ public class ServerThread extends Thread {
             m_config.m_pathToLicense = getTestLicensePath();
         }
         m_config.m_leader = "";
+        m_config.m_coordinators = MeshProber.hosts(m_config.m_internalPort);
         VoltDB.instance().setMode(OperationMode.INITIALIZING);
 
 
         // Disable loading the EE if running against HSQL.
         m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
+        m_config.m_forceVoltdbCreate = true;
 
         setName("ServerThread");
     }
@@ -81,11 +93,13 @@ public class ServerThread extends Thread {
             m_config.m_pathToLicense = getTestLicensePath();
         }
         m_config.m_leader = "";
+        m_config.m_coordinators = MeshProber.hosts(m_config.m_internalPort);
         VoltDB.instance().setMode(OperationMode.INITIALIZING);
 
 
         // Disable loading the EE if running against HSQL.
         m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
+        m_config.m_forceVoltdbCreate = true;
 
         if (!m_config.validate()) {
             System.exit(-1);
@@ -99,7 +113,7 @@ public class ServerThread extends Thread {
             int internalPort,
             int zkPort,
             BackendTarget target) {
-        this(pathToCatalog, pathToDeployment, VoltDB.DEFAULT_INTERNAL_PORT, internalPort, zkPort, target);
+        this(pathToCatalog, pathToDeployment, Constants.DEFAULT_INTERNAL_PORT, internalPort, zkPort, target);
     }
 
     private ServerThread(String pathToCatalog,
@@ -117,12 +131,14 @@ public class ServerThread extends Thread {
             m_config.m_pathToLicense = getTestLicensePath();
         }
         m_config.m_leader = MiscUtils.getHostnameColonPortString("localhost", leaderPort);
+        m_config.m_coordinators = MeshProber.hosts(internalPort);
         m_config.m_internalPort = internalPort;
         m_config.m_zkInterface = "127.0.0.1:" + zkPort;
         VoltDB.instance().setMode(OperationMode.INITIALIZING);
 
         // Disable loading the EE if running against HSQL.
         m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
+        m_config.m_forceVoltdbCreate = true;
 
         if (!m_config.validate()) {
             System.exit(-1);
@@ -135,6 +151,11 @@ public class ServerThread extends Thread {
     public void run() {
         VoltDB.initialize(m_config);
         VoltDB.instance().run();
+    }
+
+    //Call this if you are doing init only
+    public void initialize() {
+        VoltDB.initialize(m_config);
     }
 
     public void waitForInitialization() {
@@ -172,7 +193,7 @@ public class ServerThread extends Thread {
      */
     public static String getTestLicensePath() {
         // magic license stored in the voltdb enterprise code
-        URL resource = ServerThread.class.getResource("valid_subscription.xml");
+        URL resource = ServerThread.class.getResource("valid_dr_active_subscription.xml");
 
         // in the community edition, any non-empty string
         // should work fine here, as it won't be checked

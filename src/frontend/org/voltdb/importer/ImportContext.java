@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,6 +20,8 @@ package org.voltdb.importer;
 import java.net.URI;
 import java.util.Properties;
 import java.util.Set;
+
+import org.voltdb.InternalConnectionContext;
 import org.voltdb.client.ProcedureCallback;
 
 /**
@@ -27,7 +29,7 @@ import org.voltdb.client.ProcedureCallback;
  * @author akhanzode
  */
 
-public interface ImportContext {
+public interface ImportContext extends InternalConnectionContext {
 
     /**
      * This is called to configure properties. Just save or configure anything you want here.
@@ -52,14 +54,6 @@ public interface ImportContext {
 
     /**
      * Call this to get the ingested data passed to procedure.
-     * @param procName procedure to invoke.
-     * @param fieldList parameters to the procedure.
-     * @return true if successfully accepted the work.
-     */
-    public boolean callProcedure(String procName, Object... fieldList);
-
-    /**
-     * Call this to get the ingested data passed to procedure.
      * @param invocation indicating what kind of data is passed in for this.
      * @return true if successfully accepted the work.
      */
@@ -74,12 +68,6 @@ public interface ImportContext {
     public boolean callProcedure(ProcedureCallback cb, Invocation invocation);
 
     /**
-     * Returns max time in nanoseconds a call to callProcedure waits in backpressure.
-     * @return
-     */
-    public long getBackpressureTimeout();
-
-    /**
      * This is the real handler dont need to call or extend anything
      * @param handler
      * @throws java.lang.Exception
@@ -90,6 +78,7 @@ public interface ImportContext {
      * Give a friendly name for the importer.
      * @return
      */
+    @Override
     public String getName();
 
     /**
@@ -141,6 +130,8 @@ public interface ImportContext {
      * @param message message to log to Volt server logging system.
      */
     public void warn(String message);
+
+    public void warn(Throwable t, String format, Object...args);
 
     /**
      * log debug message

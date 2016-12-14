@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,11 +19,15 @@ package org.voltcore.logging;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+
+import org.voltcore.utils.EstTime;
+import org.voltcore.utils.RateLimitedLogger;
 
 import com.google_voltpatches.common.base.Throwables;
 
@@ -86,10 +90,32 @@ public class VoltLogger {
             }
             // Any logging that falls after the official shutdown flush of the
             // asynch logger can just fall back to synchronous on the caller thread.
+            m_asynchLoggerPool.shutdown();
+            try {
+                m_asynchLoggerPool.awaitTermination(365, TimeUnit.DAYS);
+            } catch (InterruptedException e) {
+                throw new RuntimeException("Unable to shutdown VoltLogger", e);
+            }
             m_asynchLoggerPool = null;
         }
     }
 
+    public static synchronized void startAsynchronousLogging(){
+        if (m_asynchLoggerPool == null && !Boolean.getBoolean("DISABLE_ASYNC_LOGGING")) {
+            m_asynchLoggerPool = new ThreadPoolExecutor(
+               1, 1, 0L, TimeUnit.MILLISECONDS,
+               new LinkedBlockingQueue<Runnable>(),
+               new LoggerThreadFactory());
+            try {
+                m_asynchLoggerPool.submit(new Runnable() {
+                    @Override
+                    public void run() {}
+                }).get();
+            } catch (InterruptedException | ExecutionException e) {
+                throw new RuntimeException("Unable to prime asynchronous logging", e);
+            }
+        }
+    }
 
     /**
      * Abstraction of core functionality shared between Log4j and
@@ -347,5 +373,22 @@ public class VoltLogger {
         }
         // set the final variable for the core logger
         m_logger = tempLogger;
+    }
+
+    /**
+     * Constructor used by VoltNullLogger
+     */
+    protected VoltLogger(CoreVoltLogger logger) {
+        assert(logger != null);
+        m_logger = logger;
+    }
+
+    public void rateLimitedLog(long suppressInterval, Level level, Throwable cause, String format, Object...args) {
+        RateLimitedLogger.tryLogForMessage(
+                EstTime.currentTimeMillis(),
+                suppressInterval, TimeUnit.SECONDS,
+                this, level,
+                cause, format, args
+                );
     }
 }

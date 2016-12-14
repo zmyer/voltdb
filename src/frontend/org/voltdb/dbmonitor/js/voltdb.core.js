@@ -1,5 +1,3 @@
-
-
 (function (window, unused) {
 
     var iVoltDbCore = (function () {
@@ -29,18 +27,23 @@
                 return (new iQueue(this));
             };
 
-            this.BuildParamSetForClusterState = function (procedure) {
+            this.BuildParamSetForClusterState = function (procedure, parameters) {
                 var credentials = [];
                 credentials[credentials.length] = encodeURIComponent('Procedure') + '=' + encodeURIComponent(procedure);
+                if(parameters != undefined)
+                    credentials[credentials.length] = encodeURIComponent('Parameters') + '=' + encodeURIComponent('[' + parameters + ']');
                 if (this.admin)
                     credentials[credentials.length] = 'admin=true';
                 var param = '';
-                param = credentials.join('&') + '&jsonp=?';
+                if(procedure != '@PrepareShutdown')
+                    param = credentials.join('&') + '&jsonp=?';
+                else
+                    param = credentials.join('&')
 
                 return param;
             };
 
-            this.BuildParamSet = function (procedure, parameters, shortApiCallDetails, isPostRequest) {
+            this.BuildParamSet = function (procedure, parameters, shortApiCallDetails, isPostRequest, isSqlQuery, timeoutTime) {
                 var s = [];
                 if (!(shortApiCallDetails != null && shortApiCallDetails != null)) {
                     if (!this.procedures.hasOwnProperty(procedure)) {
@@ -67,6 +70,10 @@
                         for (i = 0; i < localParameters.length; i++) {
                             if (i > 0) {
                                 params += ',';
+                            }
+                            if (localParameters[i] === null) {
+                                params += "null";
+                                continue;
                             }
                             switch (signature[i]) {
                                 case 'tinyint':
@@ -113,6 +120,9 @@
                     paramSet = s.join('&');
                 }
 
+                if(isSqlQuery && timeoutTime != undefined)
+                    paramSet +=   '&Querytimeout=' + timeoutTime;
+
                 if (VoltDBCore.shortApiCredentials == "" && VoltDBCore.isLoginVerified) {
                     var credentials = [];
                     if (this.user != null)
@@ -137,13 +147,13 @@
                         callback({ "status": -1, "statusstring": "Error: Please specify apiPath.", "results": [] });
                     }
 
-                    uri = 'http://' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/';
+                    uri = window.location.protocol + '/\/' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/';
                 } else {
-                    uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
+                    uri = window.location.protocol + '/\/' + this.server + ':' + this.port + '/api/1.0/';
                 }
                 var params = '';
-                if (procedure == '@Pause' || procedure == '@Resume' || procedure == '@Shutdown' || procedure == '@Promote') {
-                    params = this.BuildParamSetForClusterState(procedure);
+                if (procedure == '@Pause' || procedure == '@Resume' || procedure == '@Shutdown' || procedure == '@Promote' || procedure == '@PrepareShutdown' || procedure == '@Quiesce'  ) {
+                    params = this.BuildParamSetForClusterState(procedure, parameters);
                 } else {
                     params = this.BuildParamSet(procedure, parameters, shortApiCallDetails, false);
                 }
@@ -166,7 +176,7 @@
                     callback({ "status": -1, "statusstring": "PrepareStatement error: " + params[0], "results": [] });
             };
 
-            this.CallExecuteUpdate = function (procedure, parameters, callback, shortApiCallDetails, isSqlQuery) {
+            this.CallExecuteUpdate = function (procedure, parameters, callback, shortApiCallDetails, isSqlQuery, timeoutTime) {
                 var uri;
                 if (shortApiCallDetails != null && shortApiCallDetails.isShortApiCall) {
                     if (shortApiCallDetails.apiPath == null || shortApiCallDetails.apiPath == "") {
@@ -176,7 +186,7 @@
                     if (shortApiCallDetails.updatedData == null) {
                         callback({ "status": -1, "statusstring": "Error: Please specify parameters", "results": [] });
                     }
-                    uri = 'http://' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/?admin=true';
+                    uri = window.location.protocol + '/\/' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/?admin=true';
 
                     if (VoltDBCore.isServerConnected && VoltDbUI.hasPermissionToView) {
                         var ah = null;
@@ -196,9 +206,8 @@
                         }
                     }
                 } else {
-                    uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
-
-                    var params = this.BuildParamSet(procedure, parameters, shortApiCallDetails, true);
+                    uri = window.location.protocol + '/\/' + this.server + ':' + this.port + '/api/1.0/';
+                    var params = this.BuildParamSet(procedure, parameters, shortApiCallDetails, true, isSqlQuery, timeoutTime);
                     if (typeof (params) == 'string') {
                         if (VoltDBCore.isServerConnected && VoltDbUI.hasPermissionToView) {
                             var ah = null;
@@ -207,7 +216,7 @@
                             } else {
                                 VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password);
                             }
-                            jQuery.postJSON(uri, params, callback, ah);
+                            jQuery.postJSON(uri, params, callback, ah, isSqlQuery);
                         }
                     } else if (callback != null)
                         callback({ "status": -1, "statusstring": "PrepareStatement error: " + params[0], "results": [] });
@@ -229,9 +238,9 @@
                 return this;
             };
 
-            this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails, isLongOutput) {
+            this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails, isLongOutput, timeoutTime) {
                 var isHighTimeout = (procedure == "@SnapshotRestore" || isLongOutput === true);
-                this.CallExecute(procedure, parameters, (new callbackWrapper(callback, isHighTimeout)).Callback, shortApiCallDetails);
+                this.CallExecute(procedure, parameters, (new callbackWrapper(callback, isHighTimeout)).Callback, shortApiCallDetails, timeoutTime);
             };
 
             var iQueue = function (connection) {
@@ -251,8 +260,8 @@
                     return this;
                 };
 
-                this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails, isSqlQuery) {
-                    stack.push([procedure, parameters, callback, shortApiCallDetails, isSqlQuery]);
+                this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails, isSqlQuery, timeoutTime) {
+                    stack.push([procedure, parameters, callback, shortApiCallDetails, isSqlQuery, timeoutTime]);
                     return this;
                 };
                 this.EndExecute = function () {
@@ -290,7 +299,7 @@
                             })(this, item), isHighTimeout)).Callback;
 
                         if ((shortApiCallDetails != null && shortApiCallDetails.isShortApiCall && shortApiCallDetails.isUpdateConfiguration) || item[4] === true) {
-                            Connection.CallExecuteUpdate(item[0], item[1], callback, item[3], item[4]);
+                            Connection.CallExecuteUpdate(item[0], item[1], callback, item[3], item[4], item[5]);
                         } else {
                             Connection.CallExecute(item[0], item[1], callback, item[3]);
                         }
@@ -319,6 +328,7 @@
                 '@AdHoc': { '1': ['varchar'] },
                 '@Explain': { '1': ['varchar'] },
                 '@ExplainProc': { '1': ['varchar'] },
+                '@ExplainView': { '1': ['varchar'] },
                 '@Pause': { '0': [] },
                 '@Promote': { '0': [] },
                 '@Quiesce': { '0': [] },
@@ -437,13 +447,20 @@
                 callback(false, { "status": -100, "statusstring": "Server is not available." }, isLoginTest);
             }, callbackTimeout);
 
+            var unauthorizedTimeout = setTimeout(function () {
+                callback(false, { "status": -100, "statusstring": "Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser" }, isLoginTest);
+            }, callbackTimeout);
+
             conn.BeginExecute('@Statistics', ['TABLE', 0], function (response) {
                 try {
                     clearTimeout(timeout);
                     if (response.status == 1) {
                         VoltDBCore.isLoginVerified = true;
                         callback(true, response, isLoginTest);
-                    } else {
+                    } else if(response.status == 401){
+                        clearTimeout(unauthorizedTimeout);
+                        callback(true, response, isLoginTest);
+                    }else{
                         callback(false, response, isLoginTest);
                     }
                 } catch (x) {
@@ -455,7 +472,7 @@
 
         this.CheckServerConnection = function (server, port, admin, user, password, isHashedPassword, processName, checkConnection) {
             var conn = new DbConnection(server, port, admin, user, password, isHashedPassword, processName);
-            var uri = 'http://' + server + ':' + port + '/api/1.0/';
+            var uri = window.location.protocol + '/\/' + server + ':' + port + '/api/1.0/';
             var params = conn.BuildParamSet('@Statistics', ['TABLE', 0]);
             $.ajax({
                 url: uri + '?' + params,
@@ -476,8 +493,14 @@
                     }
                 },
                 error: function (e) {
-                    if (e.status != 200) {
+                    if (e.status != 200)
+                    {
                         checkConnection(false);
+                    }
+                },
+                 statusCode:{
+                    401: function(response){
+                        alert('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser')
                     }
                 },
                 timeout: 60000
@@ -527,7 +550,7 @@
             } else {
                 jQuery.each(connection.procedureCommands.procedures, function (id, procedure) {
                     connectionQueue.BeginExecute(procedure['procedure'], (procedure['value'] === undefined ? procedure['parameter'] : [procedure['parameter'], procedure['value']]), function (data) {
-                        var suffix = (processName == "GRAPH_MEMORY" || processName == "GRAPH_TRANSACTION") || processName == "TABLE_INFORMATION" || processName == "TABLE_INFORMATION_CLIENTPORT" || processName == "CLUSTER_INFORMATION" || processName == "CLUSTER_REPLICA_INFORMATION" || processName == "GET_HOST_SITE_COUNT" ? "_" + processName : "";
+                        var suffix = (processName == "GRAPH_MEMORY" || processName == "GRAPH_TRANSACTION") || processName == "TABLE_INFORMATION" || processName == "TABLE_INFORMATION_CLIENTPORT" || processName == "CLUSTER_INFORMATION" || processName == "CLUSTER_REPLICA_INFORMATION" || processName == "GET_HOST_SITE_COUNT" || processName == "EXPORT_TABLE_INFORMATION"? "_" + processName : "";
 
                         if (processName == "SYSTEMINFORMATION_STOPSERVER") {
                             connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix + "_status"] = data.status;
@@ -536,7 +559,8 @@
                         else if (processName == "SYSTEMINFORMATION_PAUSECLUSTER" || processName == "SYSTEMINFORMATION_RESUMECLUSTER" || processName == "SYSTEMINFORMATION_SHUTDOWNCLUSTER") {
                             connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
                         }
-                        else if (processName == "SYSTEMINFORMATION_SAVESNAPSHOT" || processName == "SYSTEMINFORMATION_RESTORESNAPSHOT") {
+                        else if (processName == "SYSTEMINFORMATION_SAVESNAPSHOT" || processName == "SYSTEMINFORMATION_RESTORESNAPSHOT" || processName == "PREPARE_SHUTDOWN_CLUSTER"
+                        || processName == "QUIESCE_CLUSTER") {
                             connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
                             connection.Metadata[procedure['procedure'] + "_data"] = data.results[0];
                             connection.Metadata[procedure['procedure'] + "_statusstring"] = data.statusstring;
@@ -563,6 +587,7 @@
                 connection.Metadata['sysprocs'] = {
                     '@Explain': { '1': ['SQL (varchar)', 'Returns Table[]'] },
                     '@ExplainProc': { '1': ['Stored Procedure Name (varchar)', 'Returns Table[]'] },
+                    '@ExplainView': { '1': ['Materialized View Name (varchar)', 'Returns Table[]'] },
                     '@Pause': { '0': ['Returns bit'] },
                     '@Quiesce': { '0': ['Returns bit'] },
                     '@Resume': { '0': ['Returns bit'] },
@@ -617,7 +642,6 @@
 
 jQuery.extend({
     postJSON: function (url, formData, callback, authorization, isSqlQuery) {
-
         if (isSqlQuery == false) {
             if (VoltDBCore.hostIP == "") {
                 jQuery.ajax({
@@ -700,9 +724,41 @@ jQuery.extend({
                 },
                 error: function (e) {
                     console.log(e.message);
+                },
+                 statusCode:{
+                    401: function(response){
+                        console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser')
+                    }
                 }
             });
 
+        } else if(formData.indexOf('PrepareShutdown') > -1){
+            jQuery.ajax({
+                type: 'GET',
+                url: url,
+                data: formData,
+                dataType: 'text',
+                beforeSend: function (request) {
+                    if (authorization != null) {
+                        request.setRequestHeader("Authorization", authorization);
+                    }
+                },
+                success: function (data) {
+                    final_data = json_parse(data, function (key, value) {
+                                                return value;
+                                            });
+                    final_data.results[0].data[0][0] = final_data.results[0].data[0][0]['c'].join('')
+                    callback(final_data);
+                },
+                error: function (e) {
+                    console.log(e.message);
+                },
+                 statusCode:{
+                    401: function(response){
+                        console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser');
+                    }
+                }
+            });
         } else {
             jQuery.ajax({
                 type: 'GET',
@@ -717,6 +773,11 @@ jQuery.extend({
                 success: callback,
                 error: function (e) {
                     console.log(e.message);
+                },
+                 statusCode:{
+                    401: function(response){
+                        console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser');
+                    }
                 }
             });
         }

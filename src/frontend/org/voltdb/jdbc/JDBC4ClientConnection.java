@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -33,6 +33,7 @@ import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
+import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
@@ -108,13 +109,15 @@ public class JDBC4ClientConnection implements Closeable {
      *            allows 3,000 open transactions before preventing the client from posting more
      *            work, thus preventing server fire-hosing. In some cases however, with very fast,
      *            small transactions, this limit can be raised.
+     * @param reconnectOnConnectionLoss
+     *            Attempts to reconnect to a node with retry after connection loss
      * @throws IOException
      * @throws UnknownHostException
      */
     protected JDBC4ClientConnection(
             String clientConnectionKeyBase, String clientConnectionKey,
             String[] servers, String user, String password, boolean isHeavyWeight,
-            int maxOutstandingTxns)
+            int maxOutstandingTxns, boolean reconnectOnConnectionLoss)
                     throws UnknownHostException, IOException
     {
         // Save the list of trimmed non-empty server names.
@@ -137,6 +140,8 @@ public class JDBC4ClientConnection implements Closeable {
         config.setHeavyweight(isHeavyWeight);
         if (maxOutstandingTxns > 0)
             config.setMaxOutstandingTxns(maxOutstandingTxns);
+
+        this.config.setReconnectOnConnectionLoss(reconnectOnConnectionLoss);
 
         // Create client and connect.
         createClientAndConnect();
@@ -272,14 +277,14 @@ public class JDBC4ClientConnection implements Closeable {
      */
    public ClientResponse execute(String procedure, long timeout, TimeUnit unit, Object... parameters)
             throws NoConnectionsException, IOException, ProcCallException {
-        long start = System.currentTimeMillis();
         ClientImpl currentClient = this.getClient();
         if (unit == null) {
             unit = TimeUnit.SECONDS;
         }
         try {
             // If connections are lost try reconnecting.
-            ClientResponse response = currentClient.callProcedureWithTimeout(procedure, timeout, unit, parameters);
+            ClientResponse response = currentClient.callProcedureWithClientTimeout(
+                    BatchTimeoutOverrideType.NO_TIMEOUT, procedure, timeout, unit, parameters);
             return response;
         }
         catch (ProcCallException pce) {

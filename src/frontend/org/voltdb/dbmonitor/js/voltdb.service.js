@@ -277,15 +277,59 @@
                         }
 
                     });
-                } //else {
-                //    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, lconnection, function (connection, status) {
-                //        lconnection = connection;
-                //    });
-
-                //}
+                }
                 return lconnection;
 
+            } catch (e) {
+                console.log(e.message);
+            }
+        };
 
+        this.GetExportTablesInformation = function (onConnectionAdded) {
+            try {
+                var processName = "EXPORT_TABLE_INFORMATION";
+                var procedureNames = ['@Statistics'];
+                var parameters = ["TABLE"];
+                var values = ['0'];
+                var lconnection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (lconnection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            });
+                        }
+                    });
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, lconnection, function (connection, status) {
+                        onConnectionAdded(connection, status);
+                    });
+                }
+            } catch (e) {
+                console.log(e.message);
+            }
+        };
+
+        this.GetImportRequestInformation = function (onConnectionAdded) {
+            try {
+                var processName = "IMPORT_REQUEST_INFORMATION";
+                var procedureNames = ['@Statistics'];
+                var parameters = ["IMPORTER"];
+                var values = ['0'];
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            });
+                        }
+                    });
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        onConnectionAdded(connection, status);
+                    });
+                }
             } catch (e) {
                 console.log(e.message);
             }
@@ -648,6 +692,41 @@
         //Update admin configuration
         this.UpdateAdminConfiguration = function (updatedData, onConnectionAdded) {
             try {
+                if (updatedData.systemsettings.resourcemonitor != null) {
+                    if (updatedData.systemsettings.resourcemonitor.memorylimit != null) {
+                        var memorySize = "";
+                        if (updatedData.systemsettings.resourcemonitor.memorylimit.size.indexOf("%")>-1) {
+                            memorySize = parseInt(updatedData.systemsettings.resourcemonitor.memorylimit.size.replace("%", ""));
+                            updatedData.systemsettings.resourcemonitor.memorylimit.size = memorySize + encodeURIComponent("%");
+                        } else {
+                            updatedData.systemsettings.resourcemonitor.memorylimit.size = encodeURIComponent(parseInt(updatedData.systemsettings.resourcemonitor.memorylimit.size));
+                        }
+                    }
+                }
+
+                var features = [];
+
+                if (updatedData.systemsettings.resourcemonitor != null) {
+                    if (updatedData.systemsettings.resourcemonitor.disklimit != null) {
+                        for (var i = 0; i < updatedData.systemsettings.resourcemonitor.disklimit.feature.length; i++) {
+                            var diskSize = "";
+                            if (updatedData.systemsettings.resourcemonitor.disklimit.feature[i].size.indexOf("%")>-1) {
+                                diskSize = parseInt(updatedData.systemsettings.resourcemonitor.disklimit.feature[i].size.replace("%", ""));
+                                updatedData.systemsettings.resourcemonitor.disklimit.feature[i].size = diskSize + encodeURIComponent("%");
+                            } else {
+                                updatedData.systemsettings.resourcemonitor.disklimit.feature[i].size = encodeURIComponent(parseInt(updatedData.systemsettings.resourcemonitor.disklimit.feature[i].size));
+                            }
+
+                            features.push({
+                                name: updatedData.systemsettings.resourcemonitor.disklimit.feature[i].name,
+                                size: updatedData.systemsettings.resourcemonitor.disklimit.feature[i].size
+                            });
+                        }
+                        updatedData.systemsettings.resourcemonitor.disklimit.feature = features;
+                    }
+
+                }
+
                 var processName = "SHORTAPI_UPDATEDEPLOYMENT";
                 var procedureNames = [];
                 var parameters = [];
@@ -863,11 +942,11 @@
 
         };
 
-        this.ShutdownClusterState = function (onConnectionAdded) {
+        this.ShutdownClusterState = function (onConnectionAdded, zk_pause_txn_id) {
             try {
                 var processName = "SYSTEMINFORMATION_SHUTDOWNCLUSTER";
                 var procedureNames = ['@Shutdown'];
-                var parameters = [undefined];
+                var parameters = [zk_pause_txn_id];
                 var values = [undefined];
 
                 _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
@@ -900,6 +979,93 @@
             }
 
 
+        };
+
+        this.PrepareShutdownCluster = function (onConnectionAdded) {
+            try {
+                var processName = "PREPARE_SHUTDOWN_CLUSTER";
+                var procedureNames = ['@PrepareShutdown'];
+                var parameters = [undefined];
+                var values = [undefined];
+
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            });
+                        }
+                    });
+
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                            onConnectionAdded(connection, status);
+                    });
+
+                }
+
+            } catch (e) {
+                console.log(e.message);
+            }
+
+
+        };
+
+        this.QuiesceCluster = function (onConnectionAdded) {
+            try {
+                var processName = "QUIESCE_CLUSTER";
+                var procedureNames = ['@Quiesce'];
+                var parameters = [undefined];
+                var values = [undefined];
+
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            });
+                        }
+                    });
+
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                            onConnectionAdded(connection, status);
+                    });
+
+                }
+
+            } catch (e) {
+                console.log(e.message);
+            }
+
+
+        };
+
+        this.GetDrProducerInformation = function (onConnectionAdded) {
+            try {
+                var processName = "DR_PRODUCER_INFORMATION";
+                var procedureNames = ['@Statistics'];
+                var parameters = ["DRPRODUCER"];
+                var values = ['0'];
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            });
+                        }
+                    });
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        onConnectionAdded(connection, status);
+                    });
+                }
+            } catch (e) {
+                console.log(e.message);
+            }
         };
 
         this.PromoteCluster = function (onConnectionAdded) {
@@ -1191,6 +1357,33 @@
 
         };
         //
+
+        this.GetLiveClientsInfo = function (onConnectionAdded) {
+            try {
+                var processName = "LIVE_CLIENTS_INFORMATION";
+                var procedureNames = ['@Statistics'];
+                var parameters = ["LIVECLIENTS"];
+                var values = ['0'];
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            });
+                        }
+                    });
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        onConnectionAdded(connection, status);
+
+                    });
+                }
+            } catch (e) {
+                console.log(e.message);
+            }
+
+        };
 
         //Get host and site count
         this.GetHostAndSiteCount = function (onConnectionAdded) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -22,20 +22,22 @@
  */
 
 #include "harness.h"
+
+#include "common/serializeio.h"
 #include "common/TupleSchema.h"
 #include "common/types.h"
-#include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
-#include "common/serializeio.h"
 #include "execution/VoltDBEngine.h"
+#include "storage/DRTupleStream.h"
+#include "indexes/tableindex.h"
+#include "indexes/tableindexfactory.h"
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
 #include "storage/tableutil.h"
-#include "storage/DRTupleStream.h"
-#include "indexes/tableindex.h"
-#include <vector>
-#include <string>
+
 #include <stdint.h>
+#include <string>
+#include <vector>
 
 using namespace voltdb;
 
@@ -44,7 +46,7 @@ public:
     PersistentTableLogTest() {
         m_engine = new voltdb::VoltDBEngine();
         int partitionCount = 1;
-        m_engine->initialize(1,1, 0, 0, "", 0, DEFAULT_TEMP_TABLE_MEMORY, false);
+        m_engine->initialize(1,1, 0, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, false);
         m_engine->updateHashinator( HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
 
         m_columnNames.push_back("1");
@@ -133,7 +135,7 @@ public:
                                              TableIndex::simplyIndexColumns(),
                                              true, true, m_tableSchema);
 
-        TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
+        TableIndex *pkeyIndex = TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);
         m_table->addIndex(pkeyIndex);
         m_table->setPrimaryKeyIndex(pkeyIndex);
@@ -235,9 +237,16 @@ TEST_F(PersistentTableLogTest, LoadTableThenUndoTest) {
     tableutil::getRandomTuple(m_table, tuple);
     ASSERT_FALSE( m_table->lookupTupleForUndo(tuple).isNullTuple());
 
+    // After calling undoUndoToken(), variable "tuple" is deactivated and the uninlined
+    // data it contains maybe freed, the safe way is to copy the "tuple" before undo.
+    voltdb::TableTuple tupleBackup(m_tableSchema);
+    tupleBackup.move(new char[tupleBackup.tupleLength()]);
+    tupleBackup.copyForPersistentInsert(tuple);
+    StackCleaner cleaner(tupleBackup);
+
     m_engine->undoUndoToken(INT64_MIN + 3);
 
-    ASSERT_TRUE(m_table->lookupTupleForUndo(tuple).isNullTuple());
+    ASSERT_TRUE(m_table->lookupTupleForUndo(tupleBackup).isNullTuple());
     ASSERT_TRUE(m_table->activeTupleCount() == (int64_t)0);
 }
 
@@ -357,9 +366,9 @@ TEST_F(PersistentTableLogTest, FindBlockTest) {
     TBBucketPtr bucket(new TBBucket());
 
     // these will be used as artificial tuple block addresses
-    TBPtr block1(new (ThreadLocalPool::getExact(sizeof(TupleBlock))->malloc()) TupleBlock(m_table, bucket));
-    TBPtr block2(new (ThreadLocalPool::getExact(sizeof(TupleBlock))->malloc()) TupleBlock(m_table, bucket));
-    TBPtr block3(new (ThreadLocalPool::getExact(sizeof(TupleBlock))->malloc()) TupleBlock(m_table, bucket));
+    TBPtr block1(new TupleBlock(m_table, bucket));
+    TBPtr block2(new TupleBlock(m_table, bucket));
+    TBPtr block3(new TupleBlock(m_table, bucket));
 
     TBMap blocks;
     char *base = block1->address();

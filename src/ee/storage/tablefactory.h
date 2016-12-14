@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -46,30 +46,29 @@
 #ifndef HSTORETABLEFACTORY_H
 #define HSTORETABLEFACTORY_H
 
-#include <string>
-#include <vector>
-#include "boost/shared_ptr.hpp"
+#include "persistenttable.h"
+
 #include "common/ids.h"
 #include "common/types.h"
-#include "common/TupleSchema.h"
-#include "common/Pool.hpp"
-#include "indexes/tableindex.h"
-#include "indexes/tableindexfactory.h"
+
+#include "boost/shared_ptr.hpp"
+
+#include <string>
+#include <vector>
 
 namespace voltdb {
 
-class Table;
-class PersistentTable;
-template <Endianess E> class SerializeInput;
+class ExportTupleStream;
+class StreamedTable;
 class TempTable;
 class TempTableLimits;
-class TableColumn;
-class TableIndex;
-class ExecutorContext;
-class DRTupleStream;
 
 class TableFactory {
 public:
+    //
+    // Every PersistentTable must be instantiated via one of these methods.
+    //
+
     /**
     * Creates an empty persistent table with given name, columns, PK index, other indexes, partition column, etc.
     * Every PersistentTable must be instantiated via this method.
@@ -91,26 +90,42 @@ public:
         int32_t compactionThreshold = 95,
         bool drEnabled = false);
 
+    static StreamedTable* getStreamedTableForTest(
+                voltdb::CatalogId databaseId,
+                const std::string &name,
+                TupleSchema* schema,
+                const std::vector<std::string> &columnNames,
+                ExportTupleStream* mockWrapper = NULL,
+                bool exportEnabled = false,
+                int32_t compactionThreshold = 95);
+
     /**
-    * Creates an empty temp table with given name and columns.
-    * Every TempTable must be instantiated via these factory methods.
-    * TempTable doesn't have constraints or indexes. Also, insert/delete/update
-    * of tuples doesn't involve Undolog.
-    */
-    static TempTable* getTempTable(
-        voltdb::CatalogId databaseId,
+     * Creates an empty temp table with given name and columns.
+     * Every TempTable must be instantiated via these factory methods.
+     * TempTable doesn't have constraints or indexes. Also, insert/delete/update
+     * of tuples doesn't involve Undolog.
+     */
+    static TempTable* buildTempTable(
         const std::string &name,
         TupleSchema* schema,
         const std::vector<std::string> &columnNames,
         TempTableLimits* limits);
 
+    // DEPRECATED name and signature. Use buildTempTable.
+    static TempTable* getTempTable(voltdb::CatalogId databaseId,
+                                   const std::string &name,
+                                   TupleSchema* schema,
+                                   const std::vector<std::string> &columnNames,
+                                   TempTableLimits* limits) {
+        return buildTempTable(name, schema, columnNames, limits);
+    }
+
     /**
-    * Creates an empty temp table with given template table.
-    */
-    static TempTable* getCopiedTempTable(
-        const voltdb::CatalogId databaseId,
+     * Creates an empty temp table from the given template table.
+     */
+    static TempTable* buildCopiedTempTable(
         const std::string &name,
-        const Table* templateTablezz,
+        const Table* templateTable,
         TempTableLimits* limits);
 
 private:
@@ -124,11 +139,10 @@ private:
         const int32_t compactionThreshold = 95);
 
     static void configureStats(
-        voltdb::CatalogId databaseId,
         std::string name,
-        Table *table);
+        TableStats *tableStats);
 };
 
-}
+}// namespace voltdb
 
 #endif

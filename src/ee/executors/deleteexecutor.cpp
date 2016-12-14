@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -106,11 +106,10 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
                    (int)targetTable->visibleTupleCount(),
                    (int)targetTable->allocatedTupleCount());
 
-        // actually delete all the tuples: undo by table not by each tuple.
+        // empty the table either by table swap or iteratively deleting tuple-by-tuple
         targetTable->truncateTable(m_engine);
     }
-    else
-    {
+    else {
         assert(m_inputTable);
         assert(m_inputTuple.sizeInValues() == m_inputTable->columnCount());
         assert(targetTuple.sizeInValues() == targetTable->columnCount());
@@ -127,11 +126,7 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
             targetTuple.move(targetAddress);
 
             // Delete from target table
-            if (!targetTable->deleteTuple(targetTuple, true)) {
-                VOLT_ERROR("Failed to delete tuple from table '%s'",
-                           targetTable->name().c_str());
-                return false;
-            }
+            targetTable->deleteTuple(targetTuple, true);
         }
         modified_tuples = m_inputTable->tempTableTupleCount();
         VOLT_TRACE("Deleted %d rows from table : %s with %d active, %d visible, %d allocated",

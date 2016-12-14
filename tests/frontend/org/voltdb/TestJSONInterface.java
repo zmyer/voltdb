@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -58,10 +58,10 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.security.MessageDigest;
@@ -70,11 +70,22 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import junit.framework.TestCase;
-
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.HttpVersion;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.ResponseHandler;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -82,7 +93,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientAuthHashScheme;
+import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
@@ -93,6 +104,8 @@ import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
+import org.voltdb.compiler.deploymentfile.ResourceMonitorType;
+import org.voltdb.compiler.deploymentfile.ResourceMonitorType.Memorylimit;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Query;
 import org.voltdb.compiler.deploymentfile.UsersType;
@@ -104,7 +117,11 @@ import org.voltdb.utils.Base64;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
+import junit.framework.TestCase;
+
 public class TestJSONInterface extends TestCase {
+    final static ContentType utf8ApplicationFormUrlEncoded =
+            ContentType.create("application/x-www-form-urlencoded","UTF-8");
 
     ServerThread server;
     Client client;
@@ -138,70 +155,38 @@ public class TestJSONInterface extends TestCase {
         return String.format("http://localhost:%d/%s", port, path);
     }
 
-    public static String callProcOverJSONRaw(String varString, int expectedCode) throws Exception {
-        URL jsonAPIURL = new URL("http://localhost:8095/api/1.0/");
-
-        HttpURLConnection conn = (HttpURLConnection) jsonAPIURL.openConnection();
-        conn.setRequestMethod("POST");
-        conn.setDoOutput(true);
-        conn.connect();
-
-        OutputStreamWriter out = new OutputStreamWriter(conn.getOutputStream());
-        out.write(varString);
-        out.flush();
-        out.close();
-        out = null;
-        conn.getOutputStream().close();
-
-        BufferedReader in = null;
-        try {
-            if (conn.getInputStream() != null) {
-                in = new BufferedReader(
-                        new InputStreamReader(
-                                conn.getInputStream(), "UTF-8"));
-            }
-        } catch (IOException e) {
-            if (conn.getErrorStream() != null) {
-                in = new BufferedReader(
-                        new InputStreamReader(
-                                conn.getErrorStream(), "UTF-8"));
-            }
+    public static String callProcOverJSONRaw(String varString, final int expectedCode) throws Exception {
+        URI jsonAPIURI = URI.create("http://localhost:8095/api/1.0/");
+        try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
+            HttpPost post = new HttpPost(jsonAPIURI);
+            // play nice by using HTTP 1.1 continue requests where the client sends the request headers first
+            // to the server to see if the server is willing to accept it. This allows us to test large requests
+            // without incurring server socket connection terminations
+            RequestConfig rc = RequestConfig.copy(RequestConfig.DEFAULT).setExpectContinueEnabled(true).build();
+            post.setProtocolVersion(HttpVersion.HTTP_1_1);
+            post.setConfig(rc);
+            post.setEntity(new StringEntity(varString, utf8ApplicationFormUrlEncoded));
+            ResponseHandler<String> rh = new ResponseHandler<String>() {
+                @Override
+                public String handleResponse(final HttpResponse response) throws ClientProtocolException, IOException {
+                    int status = response.getStatusLine().getStatusCode();
+                    assertEquals(expectedCode, status);
+                    if ((status >= 200 && status < 300) || status == 400) {
+                        HttpEntity entity = response.getEntity();
+                        return entity != null ? EntityUtils.toString(entity) : null;
+                    }
+                    return null;
+                }
+            };
+            return httpclient.execute(post,rh);
         }
-        if (in == null) {
-            throw new Exception("Unable to read response from server");
-        }
-
-        StringBuilder decodedString = new StringBuilder();
-        String line;
-        while ((line = in.readLine()) != null) {
-            decodedString.append(line);
-        }
-        in.close();
-        in = null;
-        // get result code
-        int responseCode = conn.getResponseCode();
-
-        String response = decodedString.toString();
-
-        assertEquals(expectedCode, responseCode);
-
-        try {
-            conn.getInputStream().close();
-            conn.disconnect();
-        } // ignore closing problems here
-        catch (Exception e) {
-        }
-        conn = null;
-
-        //System.err.println(response);
-        return response;
     }
 
-    private static String getUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt) throws Exception {
+    public static String getUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt) throws Exception {
         return httpUrlOverJSON("GET", url, user, password, scheme, expectedCode, expectedCt, null);
     }
 
-    private static String postUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt, Map<String,String> params) throws Exception {
+    public static String postUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt, Map<String,String> params) throws Exception {
         return httpUrlOverJSON("POST", url, user, password, scheme, expectedCode, expectedCt, params);
     }
 
@@ -300,12 +285,12 @@ public class TestJSONInterface extends TestCase {
         return response;
     }
 
-    public static String getHashedPasswordForHTTPVar(String password, ClientAuthHashScheme scheme) {
+    public static String getHashedPasswordForHTTPVar(String password, ClientAuthScheme scheme) {
         assert (password != null);
 
         MessageDigest md = null;
         try {
-            md = MessageDigest.getInstance(ClientAuthHashScheme.getDigestScheme(scheme));
+            md = MessageDigest.getInstance(ClientAuthScheme.getDigestScheme(scheme));
         } catch (NoSuchAlgorithmException e) {
             fail();
         }
@@ -317,25 +302,32 @@ public class TestJSONInterface extends TestCase {
         }
 
         String retval = Encoder.hexEncode(hashedPassword);
-        assertEquals(ClientAuthHashScheme.getHexencodedDigestLength(scheme), retval.length());
+        assertEquals(ClientAuthScheme.getHexencodedDigestLength(scheme), retval.length());
         return retval;
     }
 
     public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash) throws Exception {
-        return callProcOverJSON(procName, pset, username, password, preHash, false, 200 /* HTTP_OK */, ClientAuthHashScheme.HASH_SHA256);
+        return callProcOverJSON(procName, pset, username, password, preHash, false, 200 /* HTTP_OK */, ClientAuthScheme.HASH_SHA256);
     }
 
     public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin) throws Exception {
-        return callProcOverJSON(procName, pset, username, password, preHash, admin, 200 /* HTTP_OK */, ClientAuthHashScheme.HASH_SHA256);
+        return callProcOverJSON(procName, pset, username, password, preHash, admin, 200 /* HTTP_OK */, ClientAuthScheme.HASH_SHA256);
     }
 
-    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin, int expectedCode, ClientAuthHashScheme scheme) throws Exception {
+    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin, int expectedCode, ClientAuthScheme scheme) throws Exception {
+        return callProcOverJSON(procName, pset, username, password, preHash, admin, expectedCode /* HTTP_OK */, scheme, -1);
+    }
+
+    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin, int expectedCode, ClientAuthScheme scheme, int procCallTimeout) throws Exception {
         // Call insert
         String paramsInJSON = pset.toJSONString();
         //System.out.println(paramsInJSON);
         HashMap<String, String> params = new HashMap<String, String>();
         params.put("Procedure", procName);
         params.put("Parameters", paramsInJSON);
+        if (procCallTimeout > 0) {
+            params.put(HTTPClientInterface.QUERY_TIMEOUT_PARAM, String.valueOf(procCallTimeout));
+        }
         if (username != null) {
             params.put("User", username);
         }
@@ -357,7 +349,7 @@ public class TestJSONInterface extends TestCase {
         String ret = callProcOverJSONRaw(varString, expectedCode);
         if (preHash) {
             //If prehash make same call with SHA1 to check expected code.
-            params.put("Hashedpassword", getHashedPasswordForHTTPVar(password, ClientAuthHashScheme.HASH_SHA1));
+            params.put("Hashedpassword", getHashedPasswordForHTTPVar(password, ClientAuthScheme.HASH_SHA1));
             varString = getHTTPVarString(params);
 
             varString = getHTTPVarString(params);
@@ -634,7 +626,7 @@ public class TestJSONInterface extends TestCase {
             builder.addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);");
             builder.addProcedures(CrazyBlahProc.class);
             builder.setHTTPDPort(8095);
-            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 21213, true);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 21213, true, 0);
             assertTrue(success);
 
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
@@ -735,7 +727,7 @@ public class TestJSONInterface extends TestCase {
             builder.addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);");
             builder.addProcedures(CrazyBlahProc.class);
             builder.setHTTPDPort(8095);
-            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 21213, false);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 21213, false, 0);
             assertTrue(success);
 
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
@@ -1200,7 +1192,7 @@ public class TestJSONInterface extends TestCase {
             // test not enabled
             ParameterSet pset = ParameterSet.fromArrayNoCopy("foo", "bar", "foobar");
             try {
-                callProcOverJSON("Insert", pset, null, null, false, false, 403, ClientAuthHashScheme.HASH_SHA256); // HTTP_FORBIDDEN
+                callProcOverJSON("Insert", pset, null, null, false, false, 403, ClientAuthScheme.HASH_SHA256); // HTTP_FORBIDDEN
             } catch (Exception e) {
                 // make sure failed due to permissions on http
                 assertTrue(e.getMessage().contains("403"));
@@ -1237,7 +1229,7 @@ public class TestJSONInterface extends TestCase {
             server.start();
             server.waitForInitialization();
 
-            ParameterSet pset = ParameterSet.fromArrayNoCopy(30000);
+            ParameterSet pset = ParameterSet.fromArrayNoCopy(14_000);
             String response = callProcOverJSON("DelayProc", pset, null, null, false);
             Response r = responseFromJSON(response);
             assertEquals(ClientResponse.SUCCESS, r.status);
@@ -1248,6 +1240,80 @@ public class TestJSONInterface extends TestCase {
             }
             server = null;
         }
+    }
+
+    public void testProcTimeout() throws Exception {
+        try {
+            String simpleSchema
+                    = "CREATE TABLE foo (\n"
+                    + "    bar BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (bar)\n"
+                    + ");";
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addLiteralSchema(simpleSchema);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addProcedures(InsertProc.class);
+            builder.addProcedures(LongReadProc.class);
+            builder.setHTTPDPort(8095);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            ParameterSet pset = null;
+
+            int batchSize = 10000;
+            for (int i=0; i<10; i++) {
+                pset = ParameterSet.fromArrayNoCopy(i*batchSize, batchSize);
+                String response = callProcOverJSON("TestJSONInterface$InsertProc", pset, null, null, false, false, 200, ClientAuthScheme.HASH_SHA256);
+                Response r = responseFromJSON(response);
+                assertEquals(ClientResponse.SUCCESS, r.status);
+            }
+
+            pset = ParameterSet.fromArrayNoCopy(100000);
+            String response = callProcOverJSON("TestJSONInterface$LongReadProc", pset, null, null, false, false, 200, ClientAuthScheme.HASH_SHA256, 1);
+            Response r = responseFromJSON(response);
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, r.status);
+            assertTrue(r.statusString.contains("Transaction Interrupted"));
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
+
+    public static class InsertProc extends VoltProcedure {
+
+        public final SQLStmt stmt = new SQLStmt("INSERT INTO foo values (?);");
+
+        public long run(int startValue, long numRows) {
+            for (int i=0; i<numRows; i++) {
+                voltQueueSQL(stmt, i+startValue);
+            }
+            voltExecuteSQL();
+            return 1;
+        }
+
+    }
+
+    public static class LongReadProc extends VoltProcedure {
+
+        public final SQLStmt stmt = new SQLStmt("SELECT * FROM foo");
+
+        public long run(long numLoops) {
+            voltQueueSQL(stmt);
+            voltExecuteSQL();
+            return 1;
+        }
+
     }
 
     public void testLongQuerySTring() throws Exception {
@@ -1274,14 +1340,15 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //create a large query string
-            final StringBuilder b = new StringBuilder();
-            b.append("Procedure=@Statistics&Parameters=[TABLE]&jsonpxx=");
+            final StringBuilder s = new StringBuilder();
+            s.append("Procedure=@Statistics&Parameters=[TABLE]&jsonpxx=");
             for (int i = 0; i < 450000; i++) {
-                b.append(i);
+                s.append(i);
             }
+            String query = s.toString();
             //call multiple times.
             for (int i = 0; i < 500; i++) {
-                String response = callProcOverJSONRaw(b.toString(), 200);
+                String response = callProcOverJSONRaw(query, 200);
                 System.out.println(response);
                 Response r = responseFromJSON(response);
                 assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
@@ -1290,7 +1357,6 @@ public class TestJSONInterface extends TestCase {
                 String responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
                 System.out.println(responseJSON);
                 r = responseFromJSON(responseJSON);
-                System.out.println(r.statusString);
                 assertEquals(ClientResponse.SUCCESS, r.status);
             }
             //make sure good queries can still work after.
@@ -1395,8 +1461,8 @@ public class TestJSONInterface extends TestCase {
             server.start();
             server.waitForInitialization();
 
-            callProcOverJSONRaw(getHTTPURL(null, "api/1.0/Tim"), 404);
-            callProcOverJSONRaw(getHTTPURL(null, "api/1.0/Tim?Procedure=foo&Parameters=[x4{]"), 404);
+            callProcOverJSONRaw(getHTTPURL(null, "api/1.0/Tim"), 400);
+            callProcOverJSONRaw(getHTTPURL(null, "api/1.0/Tim?Procedure=foo&Parameters=[x4{]"), 400);
         } finally {
             if (server != null) {
                 server.shutdown();
@@ -1483,7 +1549,7 @@ public class TestJSONInterface extends TestCase {
             String pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", null);
             assertTrue(pdep.contains("Failed"));
             Map<String,String> params = new HashMap<>();
-            params.put("deployment", jdep);
+            params.put("deployment", URLEncoder.encode(jdep, "UTF-8"));
             pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
 
@@ -1504,7 +1570,7 @@ public class TestJSONInterface extends TestCase {
                 deptype.getHeartbeat().setTimeout(99);
             }
             String ndeptype = mapper.writeValueAsString(deptype);
-            params.put("deployment", ndeptype);
+            params.put("deployment", URLEncoder.encode(ndeptype, "UTF-8"));
             pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             System.out.println("POST result is: " + pdep);
             assertTrue(pdep.contains("Deployment Updated"));
@@ -1530,7 +1596,7 @@ public class TestJSONInterface extends TestCase {
             ss.setQuery(qv);
             deptype.setSystemsettings(ss);
             ndeptype = mapper.writeValueAsString(deptype);
-            params.put("deployment", ndeptype);
+            params.put("deployment", URLEncoder.encode(ndeptype, "UTF-8"));
             pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             System.out.println("POST result is: " + pdep);
             assertTrue(pdep.contains("Deployment Updated"));
@@ -1544,7 +1610,7 @@ public class TestJSONInterface extends TestCase {
             ss.setQuery(qv);
             deptype.setSystemsettings(ss);
             ndeptype = mapper.writeValueAsString(deptype);
-            params.put("deployment", ndeptype);
+            params.put("deployment", URLEncoder.encode(ndeptype, "UTF-8"));
             pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             System.out.println("POST result is: " + pdep);
             assertTrue(pdep.contains("Deployment Updated"));
@@ -1553,6 +1619,87 @@ public class TestJSONInterface extends TestCase {
             deptype = mapper.readValue(jdep, DeploymentType.class);
             nto = deptype.getSystemsettings().getQuery().getTimeout();
             assertEquals(88, nto);
+
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
+
+    public void testUpdateDeploymentMemoryLimit() throws Exception {
+        try {
+            String simpleSchema
+                    = "CREATE TABLE foo (\n"
+                    + "    bar BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (bar)\n"
+                    + ");";
+
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addProcedures(DelayProc.class);
+            builder.setHTTPDPort(8095);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            //Get deployment
+            String jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            Map<String,String> params = new HashMap<>();
+
+            ObjectMapper mapper = new ObjectMapper();
+            DeploymentType deptype = mapper.readValue(jdep, DeploymentType.class);
+
+            SystemSettingsType ss = deptype.getSystemsettings();
+            if (ss == null) {
+                ss = new SystemSettingsType();
+                deptype.setSystemsettings(ss);
+            }
+
+            ResourceMonitorType resourceMonitor = new ResourceMonitorType();
+            Memorylimit memLimit = new Memorylimit();
+            memLimit.setSize("10");
+            resourceMonitor.setMemorylimit(memLimit);
+            ss.setResourcemonitor(resourceMonitor);
+            String ndeptype = mapper.writeValueAsString(deptype);
+            params.put("deployment", ndeptype);
+            String pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            assertTrue(pdep.contains("Deployment Updated"));
+            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            DeploymentType gotValue = mapper.readValue(jdep, DeploymentType.class);
+            assertEquals("10", gotValue.getSystemsettings().getResourcemonitor().getMemorylimit().getSize());
+
+            memLimit.setSize("90%25");
+            ndeptype = mapper.writeValueAsString(deptype);
+            params.put("deployment", ndeptype);
+            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            assertTrue(pdep.contains("Deployment Updated"));
+            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            gotValue = mapper.readValue(jdep, DeploymentType.class);
+            assertEquals("90%", gotValue.getSystemsettings().getResourcemonitor().getMemorylimit().getSize());
+
+            // decimal values not allowed for percentages
+            memLimit.setSize("90.5%25");
+            ndeptype = mapper.writeValueAsString(deptype);
+            params.put("deployment", ndeptype);
+            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            gotValue = mapper.readValue(jdep, DeploymentType.class);
+            // must be still the old value
+            assertEquals("90%", gotValue.getSystemsettings().getResourcemonitor().getMemorylimit().getSize());
 
         } finally {
             if (server != null) {
@@ -1907,5 +2054,175 @@ public class TestJSONInterface extends TestCase {
             }
             server = null;
         }
+    }
+
+    public void testConnectionsWithUpdateCatalog() throws Exception {
+        runConnectionsWithUpdateCatalog(false);
+    }
+
+    public void testConnectionsWithUpdateCatalogWithSecurity() throws Exception {
+        runConnectionsWithUpdateCatalog(true);
+    }
+
+    public void runConnectionsWithUpdateCatalog(boolean securityOn) throws Exception {
+        try {
+            String simpleSchema
+                    = "CREATE TABLE test1 (\n"
+                    + "    fld1 BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (fld1)\n"
+                    + ");";
+
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("test1", "fld1");
+            builder.addProcedures(WorkerProc.class);
+            UserInfo[] ui = new UserInfo[5];
+            if (securityOn) {
+                RoleInfo ri = new RoleInfo("role1", true, false, true, true, false, false);
+                builder.addRoles(new RoleInfo[] { ri });
+
+                for (int i = 0; i < ui.length; i++) {
+                    ui[i] = new UserInfo("user" + String.valueOf(i), "password" + String.valueOf(i), new String[] { "role1" } );
+                }
+                builder.addUsers(ui);
+
+                builder.setSecurityEnabled(true, true);
+            }
+            builder.setHTTPDPort(8095);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            TestWorker.s_insertCount = new AtomicLong(0);
+            int poolSize = 25;
+            ExecutorService executor = Executors.newFixedThreadPool(poolSize);
+            int workCount = 200;
+            for (int i=0; i<workCount; i++) {
+                executor.execute(new TestWorker(i, workCount/10,
+                        (securityOn ? ui[workCount%ui.length].name : null),
+                        (securityOn ? ui[workCount%ui.length].password : null) ));
+            }
+
+            // wait for everything to be done and check status
+            executor.shutdown();
+            if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
+                fail("Workers should have finished execution by now");
+            }
+            assertTrue(TestWorker.s_success);
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
+
+    private static class TestWorker implements Runnable {
+
+        public static boolean s_success = true; // this is set by worker threads on failure only
+        public static AtomicLong s_insertCount = new AtomicLong(0);
+
+        private final int m_id;
+        private final int m_catUpdateCount;
+        private final String m_username;
+        private final String m_password;
+
+        public TestWorker(int id, int catUpdateCount, String username, String password) {
+            m_id = id;
+            m_catUpdateCount = catUpdateCount;
+            m_username = username;
+            m_password = password;
+        }
+
+        @Override
+        public void run()
+        {
+            try {
+                if (m_id==0) { // do all deployment update from one thread to avoid version error on server side
+                    for (int i=0; i<m_catUpdateCount; i++) {
+                        // update deployment to force a catalog update and resetting connections
+                        String jdep = getUrlOverJSON("http://localhost:8095/deployment", m_username, m_password, "hashed", 200,  "application/json");
+                        ObjectMapper mapper = new ObjectMapper();
+                        DeploymentType deptype = mapper.readValue(jdep, DeploymentType.class);
+                        int timeout = 100 + m_id;
+                        if (deptype.getHeartbeat() == null) {
+                            HeartbeatType hb = new HeartbeatType();
+                            hb.setTimeout(timeout);
+                            deptype.setHeartbeat(hb);
+                        } else {
+                            deptype.getHeartbeat().setTimeout(timeout);
+                        }
+                        Map<String,String> params = new HashMap<>();
+                        params.put("deployment", URLEncoder.encode(mapper.writeValueAsString(deptype), "UTF-8"));
+                        params.put("admin", "true");
+                        String responseJSON = postUrlOverJSON("http://localhost:8095/deployment/", m_username, m_password, "hashed", 200, "application/json", params);
+                        if (!responseJSON.contains("Deployment Updated.")) {
+                            System.out.println("Failed to update deployment");
+                            s_success = false;
+                        }
+                    }
+                } else {
+                    // do a write and a read
+                    ParameterSet pset = ParameterSet.fromArrayNoCopy("insert into test1 values (" + (m_id) + ")");
+                    String responseJSON = callProcOverJSON("@AdHoc", pset, m_username, m_password, false, false);
+                    //System.out.println("Insert response: " + responseJSON);
+                    if (!responseJSON.contains("\"data\":[[1]]")) {
+                        System.out.println("Insert should have returned 1. Got: " + responseJSON);
+                        s_success = false;
+                        return;
+                    }
+                    s_insertCount.incrementAndGet();
+                    Thread.sleep(200);
+                    pset = ParameterSet.fromArrayNoCopy("select count(*) from test1");
+                    long expectedCount = s_insertCount.get();
+                    responseJSON = callProcOverJSON("@AdHoc", pset, m_username, m_password, false, false);
+                    int startIndex = responseJSON.indexOf(":[[");
+                    int endIndex = responseJSON.indexOf("]]");
+                    if (startIndex==-1 || endIndex==-1) {
+                        System.out.println("Invalid response from select: " + responseJSON);
+                        s_success = false;
+                        return;
+                    }
+                    int count = Integer.parseInt(responseJSON.substring(startIndex+3, endIndex));
+                    if (count < expectedCount) {
+                        System.out.println("Select must have returned at least " + expectedCount + ". Got "+ count);
+                        s_success = false;
+                        return;
+                    }
+                    // do a proc cal that takes longer
+                    pset = ParameterSet.fromArrayNoCopy(500);
+                    responseJSON = callProcOverJSON("TestJSONInterface$WorkerProc", pset, m_username, m_password, false, false);
+                    //System.out.println("WorkperProc response: " + responseJSON);
+                }
+            } catch(Exception e) {
+                e.printStackTrace();
+                s_success = false;
+            }
+        }
+    }
+
+    public static class WorkerProc extends VoltProcedure {
+
+        public long run(long delay) {
+            try {
+                Thread.sleep(delay);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+                throw new VoltAbortException(e.getMessage());
+            }
+            return 0;
+        }
+
     }
 }

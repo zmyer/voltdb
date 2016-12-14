@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -63,7 +63,7 @@ class TableStats;
  * Represents a Temporary Table to store temporary result (final
  * result or intermediate result).  Temporary Table has no indexes,
  * constraints and reverting.  So, appending tuples to temporary table
- * is much faster than PersistentTable.  deleteTuple is not suported
+ * is much faster than PersistentTable.  deleteTuple is not supported
  * in TempTable to make it faster, use deleteAllTuples instead.  As
  * there is no deleteTuple, there is no freelist; TempTable does a
  * efficient thing for iterating and deleteAllTuples.
@@ -102,38 +102,27 @@ class TempTable : public Table {
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
-    virtual void deleteAllTuples(bool freeAllocatedStrings);
-    // Deleting a tuple from temp table is not supported. use deleteAllTuples instead
-    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
-    virtual bool deleteTuple(TableTuple &tuple, bool);
+    virtual void deleteAllTuples(bool freeAllocatedStrings, bool=true);
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     // -- Most callers should be using TempTable::insertTempTuple, anyway.
     virtual bool insertTuple(TableTuple &tuple);
-    // Updating temp tuples is not required in production code
-    // -- it may be used in tests, though, for no especially good reason.
-    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
-    virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
-                                                TableTuple &sourceTupleWithNewValues,
-                                                std::vector<TableIndex*> const &indexesToUpdate,
-                                                bool);
 
+    void deleteAllTempTupleDeepCopies();
 
-    void deleteAllTuplesNonVirtual(bool freeAllocatedStrings);
+    void deleteAllTempTuples();
 
     /**
      * Uses the pool to do a deep copy of the tuple including allocations
      * for all uninlined columns. Used by CopyOnWriteContext to back up tuples
      * before they are dirtied
      */
-    void insertTupleNonVirtualWithDeepCopy(TableTuple &source, Pool *pool);
+    void insertTempTupleDeepCopy(const TableTuple &source, Pool *pool);
 
     /**
      * Does a shallow copy that copies the pointer to uninlined columns.
      */
     void insertTempTuple(TableTuple &source);
     // Deprecating this ugly name, and bogus return value. For now it's a wrapper.
-    bool insertTupleNonVirtual(TableTuple &source) { insertTempTuple(source); return true; };
-
     bool isTempTableEmpty() { return m_tupleCount == 0; }
 
     int64_t tempTableTupleCount() const { return m_tupleCount; }
@@ -149,9 +138,9 @@ class TempTable : public Table {
     // ------------------------------------------------------------------
     virtual std::string tableType() const;
     virtual voltdb::TableStats* getTableStats();
-
-    // ptr to global integer tracking temp table memory allocated per frag
-    TempTableLimits* m_limits;
+    const TempTableLimits* getTempTableLimits() const {
+        return m_limits;
+    }
 
   protected:
     // can not use this constructor to coerce a cast
@@ -171,12 +160,17 @@ class TempTable : public Table {
         m_data.clear();
     };
 
+    std::vector<uint64_t> getBlockAddresses() const;
+
   private:
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
     std::vector<TBPtr> m_data;
+
+    // ptr to global integer tracking temp table memory allocated per frag
+    TempTableLimits* m_limits;
 };
 
-inline void TempTable::insertTupleNonVirtualWithDeepCopy(TableTuple &source, Pool *pool) {
+inline void TempTable::insertTempTupleDeepCopy(const TableTuple &source, Pool *pool) {
 
     // First get the next free tuple by
     // grabbing a tuple at the end of our chunk of memory
@@ -212,43 +206,31 @@ inline void TempTable::insertTempTuple(TableTuple &source) {
     target.setPendingDeleteOnUndoReleaseFalse();
 }
 
-inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
-
+inline void TempTable::deleteAllTempTuples() {
     if (m_tupleCount == 0) {
         return;
     }
 
-    // Mark tuples as deleted and free strings. No indexes to update.
-    // Don't call deleteTuple() here.
-    const uint16_t uninlinedStringColumnCount = m_schema->getUninlinedObjectColumnCount();
-    if (freeAllocatedStrings && uninlinedStringColumnCount > 0) {
-        TableTuple target(m_schema);
-        TableIterator iter(this, m_data.begin());
-        while (iter.hasNext()) {
-            iter.next(target);
-            target.freeObjectColumns();
-        }
-    }
-
     m_tupleCount = 0;
-    while (m_data.size() > 1) {
-        // This block of temp table may have been clean up already
-        // because of delete as we go feature.
+    int remaining = m_data.size();
+    for (; remaining > 1; --remaining) {
         TBPtr blockPtr = m_data.back();
         m_data.pop_back();
+        // These temp table blocks may have been cleaned up
+        // and set null already by the delete as we go feature.
         if (m_limits && blockPtr) {
             m_limits->reduceAllocated(m_tableAllocationSize);
         }
     }
 
     // cheap clear of the preserved first block
-    if (!m_data.empty()) {
+    if (remaining) {
         m_data[0]->reset();
     }
 }
 
 inline TBPtr TempTable::allocateNextBlock() {
-    TBPtr block(new (ThreadLocalPool::getExact(sizeof(TupleBlock))->malloc()) TupleBlock(this, TBBucketPtr()));
+    TBPtr block(new TupleBlock(this, TBBucketPtr()));
     m_data.push_back(block);
 
     if (m_limits) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -49,6 +49,7 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Table;
@@ -63,13 +64,12 @@ import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
-import org.voltdb.catalog.Column;
 
 /**
  * Export data from a single catalog version and database instance.
  *
  */
-public class ExportGeneration {
+public class ExportGeneration implements Generation {
     /**
      * Processors also log using this facility.
      */
@@ -87,8 +87,12 @@ public class ExportGeneration {
      * are configured by the Export manager at initialization time.
      * partitionid : <tableid : datasource>.
      */
-    public final HashMap<Integer, Map<String, ExportDataSource>> m_dataSourcesByPartition
-            = new HashMap<Integer, Map<String, ExportDataSource>>();
+    private final Map<Integer, Map<String, ExportDataSource>> m_dataSourcesByPartition
+            =        new HashMap<Integer, Map<String, ExportDataSource>>();
+    @Override
+    public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition() {
+        return m_dataSourcesByPartition;
+    }
 
     private int m_numSources = 0;
     private final AtomicInteger m_drainedSources = new AtomicInteger(0);
@@ -156,7 +160,6 @@ public class ExportGeneration {
 
     //This is maintained to detect if this is a continueing generation or not
     private final boolean m_isContinueingGeneration;
-
     /**
      * Constructor to create a new generation of export data
      * @param exportOverflowDirectory
@@ -171,6 +174,7 @@ public class ExportGeneration {
             }
         }
         m_isContinueingGeneration = true;
+
         exportLog.info("Creating new export generation " + m_timestamp + " Rejoin: " + isRejoin);
     }
 
@@ -187,6 +191,7 @@ public class ExportGeneration {
         } catch (NumberFormatException ex) {
             throw new IOException("Invalid Generation directory, directory name must be a number.");
         }
+
         m_isContinueingGeneration = (catalogGen == m_timestamp);
     }
 
@@ -362,14 +367,16 @@ public class ExportGeneration {
         String leader = Collections.min(children);
         String part = m_partitionLeaderZKName.get(partition);
         if (part == null) {
-            exportLog.error("Unable to start exporting for partition: " + partition);
+            exportLog.warn("Unable to start exporting for partition (not master of): " + partition);
             return;
         }
         if (m_partitionLeaderZKName.get(partition).equals(leader)) {
             if (m_partitionsIKnowIAmTheLeader.add(partition)) {
                 for (ExportDataSource eds : m_dataSourcesByPartition.get(partition).values()) {
                     try {
-                        eds.acceptMastership();
+                        if (!eds.setMaster()) {
+                            eds.acceptMastership();
+                        }
                     } catch (Exception e) {
                         exportLog.error("Unable to start exporting", e);
                     }
@@ -433,6 +440,7 @@ public class ExportGeneration {
                     buf.get(stringBytes);
                     String signature = new String(stringBytes, Constants.UTF8ENCODING);
                     final long ackUSO = buf.getLong();
+                    final boolean runEveryWhere = (buf.getShort() == (short )1);
 
                     final Map<String, ExportDataSource> partitionSources = m_dataSourcesByPartition.get(partition);
                     if (partitionSources == null) {
@@ -449,7 +457,7 @@ public class ExportGeneration {
                     }
 
                     try {
-                        eds.ack(ackUSO);
+                        eds.ack(ackUSO, runEveryWhere);
                     } catch (RejectedExecutionException ignoreIt) {
                         // ignore it: as it is already shutdown
                     }
@@ -505,7 +513,6 @@ public class ExportGeneration {
                         mailboxes.add(Long.valueOf(child));
                     }
                     ImmutableList<Long> mailboxHsids = mailboxes.build();
-
                     for( ExportDataSource eds:
                         m_dataSourcesByPartition.get( partition).values()) {
                         eds.updateAckMailboxes(Pair.of(m_mbox, mailboxHsids));
@@ -513,6 +520,7 @@ public class ExportGeneration {
                 }
             }
         });
+
         try {
             fut.get();
         } catch (Throwable t) {
@@ -648,8 +656,7 @@ public class ExportGeneration {
     }
 
     // silly helper to add datasources for a table catalog object
-    private void addDataSources(
-            Table table, int hostId, List<Integer> partitions)
+    private void addDataSources(Table table, int hostId, List<Integer> partitions)
     {
         for (Integer partition : partitions) {
 
@@ -768,7 +775,10 @@ public class ExportGeneration {
                             source.getPartitionId());
                 }
                 else {
-                    tasks.add(source.truncateExportToTxnId(truncationPoint));
+                    //If this was drained and closed we may not have truncation point and we dont want to reopen PBDs
+                    if (!source.isClosed()) {
+                        tasks.add(source.truncateExportToTxnId(truncationPoint));
+                    }
                 }
             }
         }
@@ -782,6 +792,24 @@ public class ExportGeneration {
         }
 
         return m_drainedSources.get() == m_numSources;
+    }
+
+    public void sync(final boolean nofsync) {
+        List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
+        for (Map<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
+            for (ExportDataSource source : dataSources.values()) {
+                ListenableFuture<?> syncFuture = source.sync(nofsync);
+                if (syncFuture != null)
+                    tasks.add(syncFuture);
+            }
+        }
+
+        try {
+            if (!tasks.isEmpty())
+                Futures.allAsList(tasks).get();
+        } catch (Exception e) {
+            exportLog.error("Unexpected exception syncing export data during snapshot save.", e);
+        }
     }
 
     public void close() {
@@ -814,10 +842,11 @@ public class ExportGeneration {
             return;
         }
 
-        exportLog.info("Export generation " + m_timestamp + " accepting mastership for partition " + partitionId);
         for( ExportDataSource eds: partitionDataSourceMap.values()) {
             try {
-                eds.acceptMastership();
+                if (!eds.setMaster()) {
+                    eds.acceptMastership();
+                }
             } catch (Exception e) {
                 exportLog.error("Unable to start exporting", e);
             }

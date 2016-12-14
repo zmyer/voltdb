@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2015 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -200,9 +200,15 @@
 
 # To test index scan: forward scan, reverse scan
     "index-scan": {"schema": "index-scan-schema.py",
-        "ddl": "index-DDL.sql",
-        "template": "index-scan.sql",
-        "normalizer": "nulls-lowest-normalizer.py"},
+                   "ddl": "index-DDL.sql",
+                   "template": "index-scan.sql",
+                   "normalizer": "nulls-lowest-normalizer.py"},
+
+# To test index with varbinary
+    "index-varbinary": {"schema": "index-varbinary-schema.py",
+                        "ddl": "index-DDL.sql",
+                        "template": "index-varbinary.sql",
+                        "normalizer": "normalizer.py"},
 
 # This suite written to test push-down of aggregates and limits in combination
 # with indexes, projections and order-by.

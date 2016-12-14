@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,6 +23,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -42,11 +43,13 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.PlanStatistics;
 import org.voltdb.planner.StatsField;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SortDirectionType;
 
 public abstract class AbstractPlanNode implements JSONString, Comparable<AbstractPlanNode> {
 
@@ -58,8 +61,13 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     // Keep this flag turned off in production or when testing user-accessible EXPLAIN output or when
     // using EXPLAIN output to validate plans.
-    protected static boolean m_verboseExplainForDebugging = false; // CODE REVIEWER! this SHOULD be false!
-    public static void enableVerboseExplainForDebugging() { m_verboseExplainForDebugging = true; }
+    protected static boolean m_verboseExplainForDebugging = false; // CODE REVIEWER! KEEP false on master!
+    public static boolean enableVerboseExplainForDebugging()
+    {
+        boolean was = m_verboseExplainForDebugging;
+        m_verboseExplainForDebugging = true;
+        return was;
+    }
     public static boolean disableVerboseExplainForDebugging()
     {
         boolean was = m_verboseExplainForDebugging;
@@ -106,7 +114,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * having to re-read tuples from intermediate results
      */
     protected Map<PlanNodeType, AbstractPlanNode> m_inlineNodes =
-        new HashMap<PlanNodeType, AbstractPlanNode>();
+        new LinkedHashMap<PlanNodeType, AbstractPlanNode>();
     protected boolean m_isInline = false;
 
     /**
@@ -124,10 +132,25 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     public int overrideId(int newId) {
         m_id = newId++;
         // Override subqueries ids
-        Collection<AbstractExpression> subqueries = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
-        for (AbstractExpression subquery : subqueries) {
-            assert(subquery instanceof AbstractSubqueryExpression);
-            newId = ((AbstractSubqueryExpression) subquery).overrideSubqueryNodeIds(newId);
+        Collection<AbstractExpression> subqueries = findAllSubquerySubexpressions();
+        for (AbstractExpression expr : subqueries) {
+            assert(expr instanceof AbstractSubqueryExpression);
+            AbstractSubqueryExpression subquery = (AbstractSubqueryExpression) expr;
+            // overrideSubqueryNodeIds(newId) will get an NPE if the subquery
+            // has not been planned, presumably the effect of hitting a bug
+            // earlier in the planner. If that happens again, it MAY be useful
+            // to preempt those cases here and single-step through a replay of
+            // findAllSubquerySubexpressions. Determining where in the parent
+            // plan this subquery expression was found MAY provide a clue
+            // as to why the subquery was not planned. It has helped before.
+            //REDO to debug*/ if (subquery instanceof SelectSubqueryExpression) {
+            //REDO to debug*/     CompiledPlan subqueryPlan = ((SelectSubqueryExpression)subquery)
+            //REDO to debug*/             .getSubqueryScan().getBestCostPlan();
+            //REDO to debug*/     if (subqueryPlan == null) {
+            //REDO to debug*/         findAllSubquerySubexpressions();
+            //REDO to debug*/     }
+            //REDO to debug*/ }
+            newId = subquery.overrideSubqueryNodeIds(newId);
         }
         return newId;
     }
@@ -185,7 +208,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         // default behavior: just copy the input schema
         // to the output schema
         assert(m_children.size() == 1);
-        m_children.get(0).generateOutputSchema(db);
+        AbstractPlanNode childNode = m_children.get(0);
+        childNode.generateOutputSchema(db);
         // Replace the expressions in our children's columns with TVEs.  When
         // we resolve the indexes in these TVEs they will point back at the
         // correct input column, which we are assuming that the child node
@@ -195,8 +219,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         // resolveColumnIndexes/generateOutputSchema/getOutputSchema protocol
         // until it can be fixed up  -- see the FIXME comment on generateOutputSchema.
         m_hasSignificantOutputSchema = false;
-        m_outputSchema =
-            m_children.get(0).getOutputSchema().copyAndReplaceWithTVE();
+        m_outputSchema = childNode.getOutputSchema().copyAndReplaceWithTVE();
     }
 
     /**
@@ -213,6 +236,14 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * FIXME: This needs to be reworked with generateOutputSchema to eliminate redundancies.
      */
     public abstract void resolveColumnIndexes();
+
+    protected void resolveSubqueryColumnIndexes() {
+        // Possible subquery expressions
+        Collection<AbstractExpression> exprs = findAllSubquerySubexpressions();
+        for (AbstractExpression expr: exprs) {
+            ((AbstractSubqueryExpression) expr).resolveColumnIndexes();
+        }
+    }
 
     public void validate() throws Exception {
         //
@@ -304,6 +335,23 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             }
         }
         return true;
+    }
+
+    /**
+     * Does the plan guarantee a result sorted according to the required sort order.
+     * The default implementation delegates the question to its child if there is only one child.
+     *
+     *@param sortExpressions list of ordering columns expressions
+     *@param sortDirections list of corresponding sort orders
+     *
+     * @return TRUE if the node's output table is ordered. FALSE otherwise
+     */
+    public boolean isOutputOrdered (List<AbstractExpression> sortExpressions, List<SortDirectionType> sortDirections) {
+        assert(sortExpressions.size() == sortDirections.size());
+        if (m_children.size() == 1) {
+            return m_children.get(0).isOutputOrdered(sortExpressions, sortDirections);
+        }
+        return false;
     }
 
     /**
@@ -409,12 +457,14 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * @param child The node to add.
      */
     public void addAndLinkChild(AbstractPlanNode child) {
+        assert(child != null);
         m_children.add(child);
         child.m_parents.add(this);
     }
 
     // called by PushDownLimit, re-link the child without changing the order
     public void setAndLinkChild(int index, AbstractPlanNode child) {
+        assert(child != null);
         m_children.set(index, child);
         child.m_parents.add(this);
     }
@@ -423,6 +473,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * @param child to remove.
      */
     public void unlinkChild(AbstractPlanNode child) {
+        assert(child != null);
         m_children.remove(child);
         child.m_parents.remove(this);
     }
@@ -434,6 +485,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * @return true if the child was replaced
      */
     public boolean replaceChild(AbstractPlanNode oldChild, AbstractPlanNode newChild) {
+        assert(oldChild != null);
+        assert(newChild != null);
         int idx = 0;
         for (AbstractPlanNode child : m_children) {
             if (child.equals(oldChild)) {
@@ -446,15 +499,13 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         return false;
     }
 
-    public boolean replaceChild(int oldChildIdx, AbstractPlanNode newChild) {
-        if (oldChildIdx < 0 || oldChildIdx >= getChildCount()) {
-            return false;
-        }
-
+    public void replaceChild(int oldChildIdx, AbstractPlanNode newChild) {
+        assert(oldChildIdx >= 0 && oldChildIdx < getChildCount());
+        assert(newChild != null);
         AbstractPlanNode oldChild = m_children.get(oldChildIdx);
+        assert(oldChild != null);
         oldChild.m_parents.clear();
         setAndLinkChild(oldChildIdx, newChild);
-        return true;
     }
 
 
@@ -671,11 +722,22 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     public ArrayList<AbstractPlanNode> findAllNodesOfType(PlanNodeType type) {
         HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
         ArrayList<AbstractPlanNode> collected = new ArrayList<AbstractPlanNode>();
-        findAllNodesOfType_recurse(type, collected, visited);
+        findAllNodesOfType_recurse(type, null, collected, visited);
         return collected;
     }
 
-    private void findAllNodesOfType_recurse(PlanNodeType type,ArrayList<AbstractPlanNode> collected,
+    /**
+     * @param pnClass plan node class to search for
+     * @return a list of nodes that are eventual successors of this node of the desired class
+     */
+    public ArrayList<AbstractPlanNode> findAllNodesOfClass(Class< ? extends AbstractPlanNode> pnClass) {
+        HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
+        ArrayList<AbstractPlanNode> collected = new ArrayList<AbstractPlanNode>();
+        findAllNodesOfType_recurse(null, pnClass, collected, visited);
+        return collected;
+    }
+
+    private void findAllNodesOfType_recurse(PlanNodeType type, Class< ? extends AbstractPlanNode> pnClass, ArrayList<AbstractPlanNode> collected,
         HashSet<AbstractPlanNode> visited)
     {
         if (visited.contains(this)) {
@@ -683,46 +745,42 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             return;
         }
         visited.add(this);
-        if (getPlanNodeType() == type)
+        if (getPlanNodeType() == type) {
+                collected.add(this);
+        } else if (pnClass != null && pnClass.isAssignableFrom(getClass())) {
             collected.add(this);
+        }
 
         for (AbstractPlanNode child : m_children)
-            child.findAllNodesOfType_recurse(type, collected, visited);
+            child.findAllNodesOfType_recurse(type, pnClass, collected, visited);
 
         for (AbstractPlanNode inlined : m_inlineNodes.values())
-            inlined.findAllNodesOfType_recurse(type, collected, visited);
+            inlined.findAllNodesOfType_recurse(type, pnClass, collected, visited);
+    }
+
+    final public Collection<AbstractExpression> findAllSubquerySubexpressions() {
+        Set<AbstractExpression> collected = new HashSet<AbstractExpression>();
+        findAllExpressionsOfClass(AbstractSubqueryExpression.class, collected);
+        return collected;
     }
 
     /**
      * Collect a unique list of expressions of a given type that this node has including its inlined nodes
-     * @param type expression type to search for
-     * @return a collection(set) of expressions that this node has
+     * @param aeClass AbstractExpression class to search for
+     * @param collection set to populate with expressions that this node has
      */
-    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        Set<AbstractExpression> collected = new HashSet<AbstractExpression>();
-        findAllExpressionsOfClass(aeClass, collected);
-        return collected;
-    }
-
-    protected void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+    protected void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass,
+            Set<AbstractExpression> collected) {
         // Check the inlined plan nodes
         for (AbstractPlanNode inlineNode: getInlinePlanNodes().values()) {
             // For inline node we MUST go recursive to its children!!!!!
-            Collection<AbstractExpression> exprs = inlineNode.findAllExpressionsOfClass(aeClass);
-            collected.addAll(exprs);
+            inlineNode.findAllExpressionsOfClass(aeClass, collected);
         }
 
         // and the output column expressions if there were no projection
         NodeSchema schema = getOutputSchema();
         if (schema != null) {
-            for (SchemaColumn col : schema.getColumns()) {
-                AbstractExpression expr = col.getExpression();
-                if (expr != null) {
-                    List<AbstractExpression> exprs = expr.findAllSubexpressionsOfClass(
-                            aeClass);
-                    collected.addAll(exprs);
-                }
-            }
+            schema.addAllSubexpressionsOfClassFromNodeSchema(collected, aeClass);
         }
     }
 
@@ -731,8 +789,9 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * @return whether a node of that type is contained in the plan tree
      */
     public boolean hasAnyNodeOfType(PlanNodeType type) {
-        if (getPlanNodeType() == type)
+        if (getPlanNodeType() == type) {
             return true;
+        }
 
         for (AbstractPlanNode n : m_children) {
             if (n.hasAnyNodeOfType(type)) {
@@ -742,6 +801,30 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
         for (AbstractPlanNode inlined : m_inlineNodes.values()) {
             if (inlined.hasAnyNodeOfType(type)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param pnClass plan node class to search for
+     * @return whether a node of that type is contained in the plan tree
+     */
+    public boolean hasAnyNodeOfClass(Class< ? extends AbstractPlanNode> pnClass) {
+        if (pnClass.isAssignableFrom(getClass())) {
+            return true;
+        }
+
+        for (AbstractPlanNode n : m_children) {
+            if (n.hasAnyNodeOfClass(pnClass)) {
+                return true;
+            }
+        }
+
+        for (AbstractPlanNode inlined : m_inlineNodes.values()) {
+            if (inlined.hasAnyNodeOfClass(pnClass)) {
                 return true;
             }
         }
@@ -808,7 +891,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         if (isInline()) {
             return "fontcolor=\"white\" style=\"filled\" fillcolor=\"red\"";
         }
-        if (pnt == PlanNodeType.SEND || pnt == PlanNodeType.RECEIVE) {
+        if (pnt == PlanNodeType.SEND || pnt == PlanNodeType.RECEIVE || pnt == PlanNodeType.MERGERECEIVE) {
             return "fontcolor=\"white\" style=\"filled\" fillcolor=\"black\"";
         }
         return "";
@@ -832,22 +915,21 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     public void toJSONString(JSONStringer stringer) throws JSONException {
-        stringer.key(Members.ID.name()).value(m_id);
-        stringer.key(Members.PLAN_NODE_TYPE.name()).value(getPlanNodeType().toString());
+        stringer.keySymbolValuePair(Members.ID.name(), m_id);
+        stringer.keySymbolValuePair(Members.PLAN_NODE_TYPE.name(), getPlanNodeType().toString());
 
         if (m_inlineNodes.size() > 0) {
-            stringer.key(Members.INLINE_NODES.name()).array();
-
             PlanNodeType types[] = new PlanNodeType[m_inlineNodes.size()];
             int i = 0;
             for (PlanNodeType type : m_inlineNodes.keySet()) {
                 types[i++] = type;
             }
             Arrays.sort(types);
+
+            stringer.key(Members.INLINE_NODES.name()).array();
             for (PlanNodeType type : types) {
                 AbstractPlanNode node = m_inlineNodes.get(type);
                 assert(node != null);
-                assert(node instanceof JSONString);
                 stringer.value(node);
             }
             stringer.endArray();
@@ -914,23 +996,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     public void explainPlan_recurse(StringBuilder sb, String indent) {
-        if (m_verboseExplainForDebugging && m_hasSignificantOutputSchema) {
-            sb.append(indent + "Detailed Output Schema: ");
-            JSONStringer stringer = new JSONStringer();
-            try
-            {
-                stringer.object();
-                outputSchemaToJSON(stringer);
-                stringer.endObject();
-                sb.append(stringer.toString());
-            }
-            catch (Exception e)
-            {
-                sb.append(indent + "CORRUPTED beyond the ability to format? " + e);
-                e.printStackTrace();
-            }
-            sb.append(indent + "from\n");
-        }
         String extraIndent = " ";
         // Except when verbosely debugging,
         // skip projection nodes basically (they're boring as all get out)
@@ -942,7 +1007,13 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
                 sb.append(indent);
             }
             String nodePlan = explainPlanForNode(indent);
-            sb.append(nodePlan + "\n");
+            sb.append(nodePlan);
+
+            if (m_verboseExplainForDebugging && m_outputSchema != null) {
+                sb.append(indent + " " + m_outputSchema.toExplainPlanString());
+            }
+
+            sb.append("\n");
         }
 
         // Agg < Proj < Limit < Scan
@@ -1039,15 +1110,29 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         collected.add(this);
     }
 
-    abstract protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException;
+    abstract protected void loadFromJSONObject(JSONObject obj, Database db)
+            throws JSONException;
 
-    protected final void helpLoadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
-        assert( jobj != null );
-        m_id = jobj.getInt( Members.ID.name() );
+    protected static NodeSchema loadSchemaFromJSONObject(JSONObject jobj,
+            String jsonKey) throws JSONException {
+        NodeSchema nodeSchema = new NodeSchema();
+        JSONArray jarray = jobj.getJSONArray(jsonKey);
+        int size = jarray.length();
+        for (int i = 0; i < size; ++i) {
+            nodeSchema.addColumn(SchemaColumn.fromJSONObject(
+                    jarray.getJSONObject(i)) );
+        }
+        return nodeSchema;
+    }
+
+    protected final void helpLoadFromJSONObject(JSONObject jobj, Database db)
+            throws JSONException {
+        assert(jobj != null);
+        m_id = jobj.getInt(Members.ID.name());
 
         JSONArray jarray = null;
         //load inline nodes
-        if( !jobj.isNull( Members.INLINE_NODES.name() ) ){
+        if ( ! jobj.isNull(Members.INLINE_NODES.name())) {
             jarray = jobj.getJSONArray( Members.INLINE_NODES.name() );
             PlanNodeTree pnt = new PlanNodeTree();
             pnt.loadPlanNodesFromJSONArrays(jarray, db);
@@ -1059,26 +1144,39 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         //children and parents list loading implemented in planNodeTree.loadFromJsonArray
 
         // load the output schema if it was marked significant.
-        if ( !jobj.isNull( Members.OUTPUT_SCHEMA.name() ) ) {
-            m_outputSchema = new NodeSchema();
+        if ( ! jobj.isNull(Members.OUTPUT_SCHEMA.name())) {
             m_hasSignificantOutputSchema = true;
-            jarray = jobj.getJSONArray( Members.OUTPUT_SCHEMA.name() );
-            int size = jarray.length();
-            for( int i = 0; i < size; i++ ) {
-                m_outputSchema.addColumn( SchemaColumn.fromJSONObject(jarray.getJSONObject(i)) );
-            }
+            m_outputSchema = loadSchemaFromJSONObject(jobj,
+                    Members.OUTPUT_SCHEMA.name());
         }
     }
 
-    public boolean reattachFragment( SendPlanNode child ) {
-        for( AbstractPlanNode pn : m_inlineNodes.values() ) {
-            if( pn.reattachFragment( child) )
+    public boolean reattachFragment(AbstractPlanNode child) {
+        for (AbstractPlanNode pn : m_children) {
+            if (pn.reattachFragment(child)) {
                 return true;
-        }
-        for( AbstractPlanNode pn : m_children ) {
-            if( pn.reattachFragment( child) )
-                return true;
+            }
         }
         return false;
+    }
+
+    public boolean planNodeClassNeedsProjectionNode() {
+        return true;
+    }
+
+    /**
+     * When a project node is added to the top of the plan, we need to adjust
+     * the differentiator field of TVEs to reflect differences in the scan
+     * schema vs the storage schema of a table, so that fields with duplicate names
+     * produced by expanding "SELECT *" can resolve correctly.
+     *
+     * We recurse until we find either a join node or a scan node.
+     *
+     * @param  existing differentiator field of a TVE
+     * @return new differentiator value
+     */
+    public void adjustDifferentiatorField(TupleValueExpression tve) {
+        assert (m_children.size() == 1);
+        m_children.get(0).adjustDifferentiatorField(tve);
     }
 }

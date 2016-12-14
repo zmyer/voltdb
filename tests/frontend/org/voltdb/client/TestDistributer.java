@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -191,7 +191,7 @@ public class TestDistributer extends TestCase {
                         final ByteBuffer schemeBuffer = ByteBuffer.allocate(1);//Extra byte for scheme also
                         client.read(schemeBuffer);
                         schemeBuffer.flip();
-                        ClientAuthHashScheme scheme = ClientAuthHashScheme.get(schemeBuffer.get());
+                        ClientAuthScheme scheme = ClientAuthScheme.get(schemeBuffer.get());
 
                         final ByteBuffer serviceLengthBuffer = ByteBuffer.allocate(4);
                         while (serviceLengthBuffer.remaining() > 0)
@@ -212,13 +212,13 @@ public class TestDistributer extends TestCase {
                             client.read(usernameBuffer);
                         usernameBuffer.flip();
 
-                        final ByteBuffer passwordBuffer = ByteBuffer.allocate(ClientAuthHashScheme.getDigestLength(scheme));
+                        final ByteBuffer passwordBuffer = ByteBuffer.allocate(ClientAuthScheme.getDigestLength(scheme));
                         while (passwordBuffer.remaining() > 0)
                             client.read(passwordBuffer);
                         passwordBuffer.flip();
 
                         final byte usernameBytes[] = new byte[usernameLength];
-                        final byte passwordBytes[] = new byte[ClientAuthHashScheme.getDigestLength(scheme)];
+                        final byte passwordBytes[] = new byte[ClientAuthScheme.getDigestLength(scheme)];
                         usernameBuffer.get(usernameBytes);
                         passwordBuffer.get(passwordBytes);
 
@@ -278,7 +278,7 @@ public class TestDistributer extends TestCase {
         volatile ServerSocketChannel socket = null;
         volatile MockInputHandler handler = null;
         volatile VoltNetworkPool network;
-        List<SocketChannel> channels = new ArrayList<SocketChannel>();
+        List<SocketChannel> channels = new ArrayList<>();
     }
 
     private static class CSL extends ClientStatusListenerExt {
@@ -321,8 +321,8 @@ public class TestDistributer extends TestCase {
 
             // And a distributer
             Distributer dist = new Distributer();
-            dist.createConnection("localhost", "", "", 20000, ClientAuthHashScheme.HASH_SHA1);
-            dist.createConnection("localhost", "", "", 20001, ClientAuthHashScheme.HASH_SHA1);
+            dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
+            dist.createConnection("localhost", "", "", 20001, ClientAuthScheme.HASH_SHA1);
 
             Thread.sleep(1000);
             assertTrue(volt1.handler != null);
@@ -355,8 +355,8 @@ public class TestDistributer extends TestCase {
 
             // And a distributer
             Distributer dist = new Distributer();
-            dist.createConnection("localhost", "", "", 20000, ClientAuthHashScheme.HASH_SHA256);
-            dist.createConnection("localhost", "", "", 20001, ClientAuthHashScheme.HASH_SHA256);
+            dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA256);
+            dist.createConnection("localhost", "", "", 20001, ClientAuthScheme.HASH_SHA256);
 
             Thread.sleep(1000);
             assertTrue(volt1.handler != null);
@@ -389,8 +389,8 @@ public class TestDistributer extends TestCase {
 
             // And a distributer
             Distributer dist = new Distributer();
-            dist.createConnection("localhost", "", "", 20000, ClientAuthHashScheme.HASH_SHA1);
-            dist.createConnection("localhost", "", "", 20001, ClientAuthHashScheme.HASH_SHA256);
+            dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
+            dist.createConnection("localhost", "", "", 20001, ClientAuthScheme.HASH_SHA256);
 
             Thread.sleep(1000);
             assertTrue(volt1.handler != null);
@@ -426,11 +426,11 @@ public class TestDistributer extends TestCase {
             Distributer dist = new Distributer(false,
                     ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                     ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
-                    false, null /* subject */);
+                    false, false, null /* subject */);
             dist.addClientStatusListener(csl);
-            dist.createConnection("localhost", "", "", 20000, ClientAuthHashScheme.HASH_SHA1);
-            dist.createConnection("localhost", "", "", 20001, ClientAuthHashScheme.HASH_SHA1);
-            dist.createConnection("localhost", "", "", 20002, ClientAuthHashScheme.HASH_SHA1);
+            dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
+            dist.createConnection("localhost", "", "", 20001, ClientAuthScheme.HASH_SHA1);
+            dist.createConnection("localhost", "", "", 20002, ClientAuthScheme.HASH_SHA1);
 
             assertTrue(volt1.handler != null);
             assertTrue(volt0.handler != null);
@@ -494,11 +494,11 @@ public class TestDistributer extends TestCase {
             Distributer dist = new Distributer(false,
                     ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                     ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
-                    false, null /* subject */);
+                    false, false, null /* subject */);
             dist.addClientStatusListener(csl);
-            dist.createConnection("localhost", "", "", 20000, ClientAuthHashScheme.HASH_SHA1);
-            dist.createConnection("localhost", "", "", 20001, ClientAuthHashScheme.HASH_SHA256);
-            dist.createConnection("localhost", "", "", 20002, ClientAuthHashScheme.HASH_SHA1);
+            dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
+            dist.createConnection("localhost", "", "", 20001, ClientAuthScheme.HASH_SHA256);
+            dist.createConnection("localhost", "", "", 20002, ClientAuthScheme.HASH_SHA1);
 
             assertTrue(volt1.handler != null);
             assertTrue(volt0.handler != null);
@@ -579,9 +579,9 @@ public class TestDistributer extends TestCase {
         Distributer dist = new Distributer(false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 1000 /* One second connection timeout */,
-                false, null /* subject */);
+                false, false, null /* subject */);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
-        dist.createConnection("localhost", "", "", 20000, ClientAuthHashScheme.HASH_SHA1);
+        dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
 
         // make sure it connected
         assertTrue(volt.handler != null);
@@ -643,9 +643,9 @@ public class TestDistributer extends TestCase {
         Distributer dist = new Distributer(false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 2000 /* Two seconds connection timeout */,
-                false, null /* subject */);
+                false, false, null /* subject */);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
-        dist.createConnection("localhost", "", "", 20000, ClientAuthHashScheme.HASH_SHA1);
+        dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
 
         // make sure it connected
         assertTrue(volt.handler != null);
@@ -710,8 +710,8 @@ public class TestDistributer extends TestCase {
         Distributer dist = new Distributer(false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 30000 /* thirty second connection timeout */,
-                false, null /* subject */);
-        dist.createConnection("localhost", "", "", 20000, ClientAuthHashScheme.HASH_SHA1);
+                false, false, null /* subject */);
+        dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
 
         // make sure it connected
         assertTrue(volt.handler != null);
@@ -763,10 +763,10 @@ public class TestDistributer extends TestCase {
         Distributer dist = new Distributer( false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 CONNECTION_TIMEOUT /* six second connection timeout */,
-                false, null /* subject */);
+                false, false, null /* subject */);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
         long start = System.currentTimeMillis();
-        dist.createConnection("localhost", "", "", 20000, ClientAuthHashScheme.HASH_SHA1);
+        dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
 
         // don't respond to pings
         volt.handler.sendResponses.set(false);
@@ -806,12 +806,12 @@ public class TestDistributer extends TestCase {
 
            // this call blocks for a result!
            clt.callProcedure("Foo", new Integer(1));
-           assertEquals(4, volt.handler.roundTrips.get());
+           assertEquals(5, volt.handler.roundTrips.get());
 
            // this call doesn't block! (use drain)
            clt.callProcedure(new ProcCallback(), "Bar", new Integer(2));
            clt.drain();
-           assertEquals(5, volt.handler.roundTrips.get());
+           assertEquals(6, volt.handler.roundTrips.get());
        }
        finally {
            if (volt != null) {
@@ -872,7 +872,7 @@ public class TestDistributer extends TestCase {
         final String hostname = "doesnotexist";
         boolean threwException = false;
         try {
-            ConnectionUtil.getAuthenticatedConnection(hostname, "", new byte[0], 32, null, ClientAuthHashScheme.HASH_SHA1);
+            ConnectionUtil.getAuthenticatedConnection(hostname, "", new byte[0], 32, null, ClientAuthScheme.HASH_SHA1);
         } catch (java.net.UnknownHostException e) {
             threwException = true;
             assertTrue(e.getMessage().equals(hostname));

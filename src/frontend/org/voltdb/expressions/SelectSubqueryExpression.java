@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -148,7 +148,7 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
     }
 
     @Override
-    public Object clone() {
+    public SelectSubqueryExpression clone() {
         SelectSubqueryExpression clone = (SelectSubqueryExpression) super.clone();
         if (!m_allParameterIdxList.isEmpty()) {
             clone.m_allParameterIdxList = new ArrayList<Integer>();
@@ -178,7 +178,7 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
             // Calculate the difference between two sets of parameters
             Set<Integer> allParams = new HashSet<Integer>();
             allParams.addAll(m_allParameterIdxList);
-            allParams.removeAll(m_parameterIdxList);
+            allParams.removeAll(getParameterIdxList());
             if (!allParams.isEmpty()) {
                 stringer.key(Members.OTHER_PARAM_IDX.name()).array();
                 for (Integer idx : allParams) {
@@ -198,7 +198,7 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
             for (int i = 0; i < paramSize; ++i) {
                 m_allParameterIdxList.add(otherParamIdxArray.getInt(i));
             }
-            m_allParameterIdxList.addAll(m_parameterIdxList);
+            m_allParameterIdxList.addAll(getParameterIdxList());
         }
     }
 
@@ -250,19 +250,20 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
             AbstractExpression expr = entry.getValue();
             if (expr instanceof TupleValueExpression) {
                 TupleValueExpression tve = (TupleValueExpression) expr;
-                if(tve.getOrigStmtId() == parentStmt.m_stmtId) {
-                    // TVE originates from the statement where this SubqueryExpression belongs to
-                    m_args.add(expr);
-                    m_parameterIdxList.add(paramIdx);
-                } else {
+                if (tve.getOrigStmtId() == parentStmt.m_stmtId) {
+                    // TVE originates from the statement that this SubqueryExpression belongs to
+                    addArgumentParameter(paramIdx, expr);
+                }
+                else {
                     // TVE originates from a statement above this parent. Move it up.
                     parentStmt.m_parameterTveMap.put(paramIdx, expr);
                 }
-            } else if (expr instanceof AggregateExpression) {
+            }
+            else if (expr instanceof AggregateExpression) {
                 // An aggregate expression is always from THIS parent statement.
-                m_args.add(expr);
-                m_parameterIdxList.add(paramIdx);
-            } else {
+                addArgumentParameter(paramIdx, expr);
+            }
+            else {
                 // so far it should be either AggregateExpression or TupleValueExpression types
                 assert(false);
             }
@@ -270,4 +271,7 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
         subqueryStmt.m_parameterTveMap.clear();
     }
 
+    public String calculateContentDeterminismMessage() {
+        return m_subquery.calculateContentDeterminismMessage();
+    }
 }

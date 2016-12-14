@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,6 +23,7 @@
 package org.voltdb;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -55,9 +56,15 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.DbSettings;
+import org.voltdb.settings.NodeSettings;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -71,7 +78,7 @@ public class MockVoltDB implements VoltDBInterface
     final String m_clusterName = "cluster";
     final String m_databaseName = "database";
     StatsAgent m_statsAgent = null;
-    HostMessenger m_hostMessenger = new HostMessenger(new HostMessenger.Config());
+    HostMessenger m_hostMessenger = new HostMessenger(new HostMessenger.Config(), null);
     private OperationMode m_mode = OperationMode.RUNNING;
     private volatile String m_localMetadata;
     final SnapshotCompletionMonitor m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
@@ -84,8 +91,9 @@ public class MockVoltDB implements VoltDBInterface
     public int m_hostId = 0;
     private SiteTracker m_siteTracker;
     private final Map<MailboxType, List<MailboxNodeContent>> m_mailboxMap =
-            new HashMap<MailboxType, List<MailboxNodeContent>>();
+            new HashMap<>();
     private boolean m_replicationActive = false;
+    private CommandLog m_cl = null;
 
     public MockVoltDB() {
         this(VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT, -1, VoltDB.DEFAULT_DR_PORT);
@@ -197,16 +205,16 @@ public class MockVoltDB implements VoltDBInterface
         getTable(tableName).setSignature(tableName);
     }
 
-    public void setDRProducerClusterId(int clusterId)
+    public void setDRProducerEnabled()
     {
         getCluster().setDrproducerenabled(true);
-        getCluster().setDrclusterid(clusterId);
     }
 
     public void setDRConsumerConnectionEnabled(boolean enabled) {
         getCluster().setDrconsumerenabled(enabled);
     }
 
+    String m_clSnapshotPath = "command_log_snapshot";
     public void configureLogging(boolean enabled, boolean sync,
             int fsyncInterval, int maxTxns, String logPath, String snapshotPath) {
         org.voltdb.catalog.CommandLog logConfig = getCluster().getLogconfig().get("log");
@@ -217,16 +225,24 @@ public class MockVoltDB implements VoltDBInterface
         logConfig.setSynchronous(sync);
         logConfig.setFsyncinterval(fsyncInterval);
         logConfig.setMaxtxns(maxTxns);
-        logConfig.setLogpath(logPath);
-        logConfig.setInternalsnapshotpath(snapshotPath);
+        m_clSnapshotPath = snapshotPath;
+    }
+    @Override
+    public String getCommandLogSnapshotPath() {
+        return m_clSnapshotPath;
     }
 
+    String m_autoSnapshotPath = "snapshots";
     public void configureSnapshotSchedulePath(String autoSnapshotPath) {
         org.voltdb.catalog.SnapshotSchedule scheduleConfig = getDatabase().getSnapshotschedule().get("default");
         if (scheduleConfig == null) {
             scheduleConfig = getDatabase().getSnapshotschedule().add("default");
         }
-        scheduleConfig.setPath(autoSnapshotPath);
+        m_autoSnapshotPath = autoSnapshotPath;
+    }
+    @Override
+    public String getSnapshotPath() {
+        return m_autoSnapshotPath;
     }
 
     public void addColumnToTable(String tableName, String columnName,
@@ -274,7 +290,9 @@ public class MockVoltDB implements VoltDBInterface
     public CatalogContext getCatalogContext()
     {
         long now = System.currentTimeMillis();
-        m_context = new CatalogContext( now, now, m_catalog, new byte[] {}, new byte[] {}, 0) {
+        DbSettings settings = new DbSettings(ClusterSettings.create().asSupplier(), NodeSettings.create());
+
+        m_context = new CatalogContext( now, now, m_catalog, settings, new byte[] {}, null, new byte[] {}, 0) {
             @Override
             public long getCatalogCRC() {
                 return 13;
@@ -354,6 +372,11 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public boolean isCompatibleVersionString(String versionString) {
         return true;
+    }
+
+    @Override
+    public boolean isRunningWithOldVerbs() {
+        return voltconfig.m_startAction.isLegacy();
     }
 
     @Override
@@ -466,6 +489,12 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public Pair<CatalogContext, CatalogSpecificPlanner> settingsUpdate(ClusterSettings settings, int expectedVersionId)
+    {
+        throw new UnsupportedOperationException("unimplemented");
+    }
+
+    @Override
     public BackendTarget getBackendTargetType() {
         return BackendTarget.NONE;
     }
@@ -481,11 +510,61 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public CommandLog getCommandLog() {
-        return new DummyCommandLog();
+        if (m_cl != null) {
+            return m_cl;
+        } else {
+            return new DummyCommandLog();
+        }
+    }
+
+    public void setCommandLog(CommandLog cl) {
+        m_cl = cl;
     }
 
     @Override
     public boolean rejoining() {
+        return false;
+    }
+
+    @Override
+    public String getVoltDBRootPath(PathsType.Voltdbroot path) { return path.getPath(); }
+    @Override
+    public String getCommandLogPath(PathsType.Commandlog path) { return path.getPath(); }
+    @Override
+    public String getCommandLogSnapshotPath(PathsType.Commandlogsnapshot path) { return path.getPath(); }
+    @Override
+    public String getSnapshotPath(PathsType.Snapshots path) { return path.getPath(); }
+    @Override
+    public String getExportOverflowPath(PathsType.Exportoverflow path) { return path.getPath(); }
+    @Override
+    public String getDROverflowPath(PathsType.Droverflow path) { return path.getPath(); }
+
+    @Override
+    public String getCommandLogPath() {
+        return "command_log";
+    }
+
+    @Override
+    public void loadLegacyPathProperties(DeploymentType deployment) throws IOException {
+    }
+
+    @Override
+    public String getVoltDBRootPath() {
+        return "voltdbroot";
+    }
+
+    @Override
+    public String getExportOverflowPath() {
+        return "export_overflow";
+    }
+
+    @Override
+    public String getDROverflowPath() {
+        return "dr_overflow";
+    }
+
+    @Override
+    public boolean isBare() {
         return false;
     }
 
@@ -622,6 +701,7 @@ public class MockVoltDB implements VoltDBInterface
                 return false;
             }
 
+            @Override
             public boolean isDrActiveActiveAllowed() {
                 // TestExecutionSite (and probably others)
                 // use MockVoltDB without requiring unique
@@ -631,6 +711,46 @@ public class MockVoltDB implements VoltDBInterface
 
             @Override
             public boolean isCommandLoggingAllowed() {
+                return true;
+            }
+
+            @Override
+            public boolean isAWSMarketplace() {
+                return false;
+            }
+
+            @Override
+            public boolean isEnterprise() {
+                return false;
+            }
+
+            @Override
+            public boolean isPro() {
+                return false;
+            }
+
+            @Override
+            public String licensee() {
+                return null;
+            }
+
+            @Override
+            public Calendar issued() {
+                return null;
+            }
+
+            @Override
+            public String note() {
+                return null;
+            }
+
+            @Override
+            public boolean hardExpiration() {
+                return false;
+            }
+
+            @Override
+            public boolean secondaryInitialization() {
                 return true;
             }
         };
@@ -684,5 +804,19 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public void onSyncSnapshotCompletion() {
+    }
+
+    @Override
+    public boolean isShuttingdown() {
+        return false;
+    }
+
+    @Override
+    public void setShuttingdown(boolean shuttingdown) {
+    }
+
+    @Override
+    public Cartographer getCartograhper() {
+        return null;
     }
 }

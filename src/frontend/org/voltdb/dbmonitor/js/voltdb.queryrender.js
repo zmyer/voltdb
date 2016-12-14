@@ -1,7 +1,47 @@
-function QueryUI(queryString, userName) {
+
+    function QueryUI(queryTab) {
     "use strict";
     var CommandParser,
-        queryToRun = queryString;
+        queryToRun = '';
+    this.QueryTab = queryTab;
+
+
+    function getSelectedTextWithin(el) {
+    var selectedText = "";
+    if (typeof window.getSelection != "undefined") {
+        var sel = window.getSelection(), rangeCount;
+        if ( (rangeCount = sel.rangeCount) > 0 ) {
+            var range = document.createRange();
+            for (var i = 0, selRange; i < rangeCount; ++i) {
+                range.selectNodeContents(el);
+                selRange = sel.getRangeAt(i);
+                if (selRange.compareBoundaryPoints(range.START_TO_END, range) == 1 && selRange.compareBoundaryPoints(range.END_TO_START, range) == -1) {
+                    if (selRange.compareBoundaryPoints(range.START_TO_START, range) == 1) {
+                        range.setStart(selRange.startContainer, selRange.startOffset);
+                    }
+                    if (selRange.compareBoundaryPoints(range.END_TO_END, range) == -1) {
+                        range.setEnd(selRange.endContainer, selRange.endOffset);
+                    }
+                    selectedText += range.toString();
+                }
+            }
+        }
+    } else if (typeof document.selection != "undefined" && document.selection.type == "Text") {
+        var selTextRange = document.selection.createRange();
+        var textRange = selTextRange.duplicate();
+        textRange.moveToElementText(el);
+        if (selTextRange.compareEndPoints("EndToStart", textRange) == 1 && selTextRange.compareEndPoints("StartToEnd", textRange) == -1) {
+            if (selTextRange.compareEndPoints("StartToStart", textRange) == 1) {
+                textRange.setEndPoint("StartToStart", selTextRange);
+            }
+            if (selTextRange.compareEndPoints("EndToEnd", textRange) == -1) {
+                textRange.setEndPoint("EndToEnd", selTextRange);
+            }
+            selectedText = textRange.text;
+        }
+    }
+    return selectedText;
+}
 
     function ICommandParser() {
         var MatchEndOfLineComments = /^\s*(?:\/\/|--).*$/gm,
@@ -49,10 +89,11 @@ function QueryUI(queryString, userName) {
                 }
                 nonceNum = parseInt(nextNonce[1], 10);
                 src = src.replace(QuotedStringNonceLiteral + nonceNum,
-                                  stringBank[nonceNum - QuotedStringNonceBase]);
+                            stringBank[nonceNum - QuotedStringNonceBase]);
             }
             return src;
         }
+
 
         // break down a multi-statement string into a statement array.
         function parseUserInputMethod(src) {
@@ -60,7 +101,12 @@ function QueryUI(queryString, userName) {
                 stringBank = [],
                 statementBank = [];
             // Eliminate line comments permanently.
+
+            //escape $ sign
+            src = src.replace(new RegExp('\\$', 'g'), '$$$$');
+
             src = src.replace(MatchEndOfLineComments, '');
+
 
             // Extract quoted strings to keep their content from getting confused with
             // interesting statement syntax. This is required for statement splitting at 
@@ -104,7 +150,7 @@ function QueryUI(queryString, userName) {
                     if (param.toLowerCase() === 'null') {
                         parameterBank.push(null);
                     } else {
-                        if (param.indexOf(QuotedStringNonceLiteral) == 0) {
+                        if (param.indexOf(QuotedStringNonceLiteral) > -1) {
                             // Clean up by restoring the replaced quoted strings.
                             param = undisguiseQuotedStrings(param, stringBank);
                         }
@@ -118,23 +164,21 @@ function QueryUI(queryString, userName) {
         this.parseProcedureCallParameters = parseProcedureCallParametersMethod
         this.parseUserInput = parseUserInputMethod;
     }
-
     CommandParser = new ICommandParser();
 
     //TODO: Apply reasonable coding standards to the code below...
 
-    function executeCallback(format, target, id, isExplainQuery) {
+    function executeCallback(format, target, id, isExplainQuery, tab_id) {
         var Format = format;
-        var targetHtml = target.find('#resultHtml');
-        var targetCsv = target.find('#resultCsv');
-        var targetMonospace = target.find('#resultMonospace');
+        var targetHtml = target.find('#resultHtml-' + tab_id);
+        var targetCsv = target.find('#resultCsv-' + tab_id);
+        var targetMonospace = target.find('#resultMonospace-' + tab_id);
         var Id = id;
         $(targetHtml).html('');
         $(targetCsv).html('');
         $(targetMonospace).html('');
 
         function callback(response) {
-
             var processResponseForAllViews = function () {
                 processResponse('HTML', targetHtml, Id + '_html', response, isExplainQuery);
                 processResponse('CSV', targetCsv, Id + '_csv', response, isExplainQuery);
@@ -175,8 +219,9 @@ function QueryUI(queryString, userName) {
     }
 
     function executeMethod() {
-        var target = $('.queryResult');
-        var format = $('#exportType').val();
+        var query_id = this.QueryTab[0].id.split('-')[1]
+        var target = $('.queryResult-' + query_id);
+        var format = $('#exportType-' + query_id).val();
 
         var dataSource = VoltDbUI.getCookie('connectionkey') == undefined ? '' : VoltDbUI.getCookie('connectionkey');
         if (!VoltDBCore.connections.hasOwnProperty(dataSource)) {
@@ -185,14 +230,22 @@ function QueryUI(queryString, userName) {
         }
 
         var connection = VoltDBCore.connections[dataSource];
-        var source = '';
-        source = queryToRun;
-        source = source.replace(/^\s+|\s+$/g, '');
+        var source = getSelectedTextWithin(document.getElementById('querybox-' + query_id))
+//        $('#querybox-' + query_id).getSelectedText();
+        if (source != null){
+            source = source.replace(/^\s+|\s+$/g,'');
+            if (source == '')
+                source = $('#querybox-' + query_id).text();
+        }
+        else
+            source = $('#querybox-' + query_id).text();
+
+        source = source.replace(/^\s+|\s+$/g,'');
         if (source == '')
             return;
 
-        $("#runBTn").attr('disabled', 'disabled');
-        $("#runBTn").addClass("graphOpacity");
+        $('#runBTn-' + query_id).attr('disabled', 'disabled');
+        $('#runBTn-' + query_id).addClass("graphOpacity");
 
         var statements = CommandParser.parseUserInput(source);
         var start = (new Date()).getTime();
@@ -206,7 +259,7 @@ function QueryUI(queryString, userName) {
             if (statements[i].toLowerCase().indexOf('@explain') >= 0) {
                 isExplainQuery = true;
             }
-            var callback = new executeCallback(format, target, id, isExplainQuery);
+            var callback = new executeCallback(format, target, id, isExplainQuery, query_id);
             if (/^execute /i.test(statements[i])) {
                 statements[i] = 'exec ' + statements[i].substr(8);
             }
@@ -219,28 +272,29 @@ function QueryUI(queryString, userName) {
             }
             else
                 if (/^explain /i.test(statements[i])) {
-                    connectionQueue.BeginExecute('@Explain', statements[i].substr(8).replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback, null, true);
+                    connectionQueue.BeginExecute('@Explain', statements[i].substr(8).replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback, null, true,
+                        SQLQueryRender.getCookie("timeoutTime"));
                 }
                 else
                     if (/^explainproc /i.test(statements[i])) {
-                        connectionQueue.BeginExecute('@ExplainProc', statements[i].substr(12).replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback, null, true);
+                        connectionQueue.BeginExecute('@ExplainProc', statements[i].substr(12).replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback, null, true, SQLQueryRender.getCookie("timeoutTime"));
                     }
                     else {
-                        connectionQueue.BeginExecute('@AdHoc', statements[i].replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback, null, true);
+                        connectionQueue.BeginExecute('@AdHoc', statements[i].replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback, null, true, SQLQueryRender.getCookie("timeoutTime"));
                     }
         }
 
         function atEnd(state, success) {
             var totalDuration = (new Date()).getTime() - state;
             if (success) {
-                $('#queryResults').removeClass('errorValue');
-                $('#queryResults').html('Query Duration: ' + (totalDuration / 1000.0) + 's');
+                $('#queryResults-' + query_id).removeClass('errorValue');
+                $('#queryResults-' + query_id).html('Query Duration: ' + (totalDuration / 1000.0) + 's');
             } else {
-                $('#queryResults').addClass('errorValue');
-                $('#queryResults').html('Query error | Query Duration: ' + (totalDuration / 1000.0) + 's');
+                $('#queryResults-' + query_id).addClass('errorValue');
+                $('#queryResults-' + query_id).html('Query error | Query Duration: ' + (totalDuration / 1000.0) + 's');
             }
-            $("#runBTn").removeAttr('disabled');
-            $("#runBTn").removeClass("graphOpacity");
+            $('#runBTn-' + query_id).removeAttr('disabled');
+            $('#runBTn-' + query_id).removeClass("graphOpacity");
         }
         connectionQueue.End(atEnd, start);
     }
@@ -316,7 +370,7 @@ function QueryUI(queryString, userName) {
             for (var k = 0; k < table.data[j].length; k++) {
                 var val = table.data[j][k];
                 var typ = table.schema[k].type;
-                if (typ == 11) {
+                if (typ == 11 && val) {
                     var us = val % 1000;
                     var dt = new Date(val / 1000);
                     val = lPadZero(dt.getUTCFullYear(), 4) + "-"
@@ -327,6 +381,11 @@ function QueryUI(queryString, userName) {
                         + lPadZero(dt.getUTCSeconds(), 2) + "."
                         + lPadZero((dt.getUTCMilliseconds()) * 1000 + us, 6);
                     typ = 9;  //code for varchar
+                }
+                else if(typ == 22){
+                    if(val!= null){
+                        val = parseFloat(val).toFixed(12)
+                    }
                 }
                 if (isExplainQuery == true) {
                     val = applyFormat(val);
@@ -393,6 +452,5 @@ function QueryUI(queryString, userName) {
             return $('<div/>').text(value).html();
         }
     }
-
     this.execute = executeMethod;
 }

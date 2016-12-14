@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -47,6 +47,7 @@ import org.voltdb.utils.Encoder;
  */
 public class PlannerTool {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger compileLog = new VoltLogger("COMPILE");
 
     private final Database m_database;
     private final Cluster m_cluster;
@@ -108,6 +109,10 @@ public class PlannerTool {
         return planSql(sqlIn, infer, false, null);
     }
 
+    private void logException(Exception e, String fmtLabel) {
+        compileLog.error(fmtLabel + ": ", e);
+    }
+
     /**
      * Stripped down compile that is ONLY used to plan default procedures.
      */
@@ -116,7 +121,7 @@ public class PlannerTool {
         DatabaseEstimates estimates = new DatabaseEstimates();
         QueryPlanner planner = new QueryPlanner(
             sql, "PlannerTool", "PlannerToolProc", m_cluster, m_database,
-            partitioning, m_hsql, estimates, true,
+            partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE,
             AD_HOC_JOINED_TABLE_LIMIT, costModel, null, null, DeterminismMode.FASTER);
 
         CompiledPlan plan = null;
@@ -127,7 +132,16 @@ public class PlannerTool {
             assert(plan != null);
         }
         catch (Exception e) {
-            throw new RuntimeException("Error compiling query: " + e.toString(), e);
+            /*
+             * Don't log PlanningErrorExceptions or HSQLParseExceptions, as they
+             * are at least somewhat expected.
+             */
+            String loggedMsg = "";
+            if (!(e instanceof PlanningErrorException || e instanceof HSQLParseException)) {
+                logException(e, "Error compiling query");
+                loggedMsg = " (Stack trace has been written to the log.)";
+            }
+            throw new RuntimeException("Error compiling query: " + e.toString() + loggedMsg, e);
         }
 
         if (plan == null) {
@@ -183,7 +197,7 @@ public class PlannerTool {
             DatabaseEstimates estimates = new DatabaseEstimates();
             QueryPlanner planner = new QueryPlanner(
                     sql, "PlannerTool", "PlannerToolProc", m_cluster, m_database,
-                    partitioning, m_hsql, estimates, true,
+                    partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE,
                     AD_HOC_JOINED_TABLE_LIMIT, costModel, null, null, DeterminismMode.FASTER);
 
             CompiledPlan plan = null;
@@ -254,8 +268,19 @@ public class PlannerTool {
                 if (plan != null && plan.getStatementPartitioning() != null) {
                     partitioning = plan.getStatementPartitioning();
                 }
-            } catch (Exception e) {
-                throw new RuntimeException("Error compiling query: " + e.toString(), e);
+            }
+            catch (Exception e) {
+                /*
+                 * Don't log PlanningErrorExceptions or HSQLParseExceptions, as
+                 * they are at least somewhat expected.
+                 */
+                String loggedMsg = "";
+                if (!((e instanceof PlanningErrorException) || (e instanceof HSQLParseException))) {
+                    logException(e, "Error compiling query");
+                    loggedMsg = " (Stack trace has been written to the log.)";
+                }
+                throw new RuntimeException("Error compiling query: " + e.toString() + loggedMsg,
+                                           e);
             }
 
             if (plan == null) {

@@ -34,13 +34,15 @@ fi
 APPCLASSPATH=$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
+    \ls -1 "$VOLTDB_LIB"/kafka*.jar; \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
 CLIENTCLASSPATH=client.jar:$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
-    \ls -1 "$VOLTDB_LIB"/commons-cli-1.2.jar; \
+    \ls -1 "$VOLTDB_LIB"/kafka*.jar; \
+    \ls -1 "$VOLTDB_LIB"/slf4j-api-1.6.2.jar; \
 } 2> /dev/null | paste -sd ':' - )
-LOG4J="$VOLTDB_VOLTDB/log4j.xml"
+# LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 
@@ -58,6 +60,7 @@ function cleanall() {
 # compile the source code for procedures and the client into jarfiles
 function jars() {
     ant all
+    cp formatter.jar $VOLTDB_BASE/bundles
 }
 
 # compile the procedure and client jarfiles if they don't exist
@@ -69,9 +72,13 @@ function jars-ifneeded() {
 }
 
 # run the voltdb server locally
+# note -- use something like this to create the Kafka topic, name
+# matching the name used in the deployment file:
+#   /home/opt/kafka/bin/kafka-topics.sh --zookeeper kafka2:2181 --topic A7_KAFKAEXPORTTABLE2 --partitions 2 --replication-factor 1 --create
 function server() {
     jars-ifneeded
     echo "Starting the VoltDB server."
+    echo "Remember -- the Kafka topic must exist before launching this test."
     echo "To perform this action manually, use the command line: "
     echo
     echo "voltdb create -d deployment.xml -l $LICENSE -H $HOST"
@@ -88,28 +95,6 @@ function kafka() {
     echo "voltdb create -d deployment-kafka.xml -l $LICENSE -H $HOST"
     echo
     voltdb create -d deployment-kafka.xml -l $LICENSE -H $HOST
-}
-
-#log4j importer
-function log4j() {
-    jars-ifneeded
-    echo "Starting the VoltDB server."
-    echo "To perform this action manually, use the command line: "
-    echo
-    echo "voltdb create -d deployment-log4j.xml -l $LICENSE -H $HOST"
-    echo
-    voltdb create -d deployment-log4j.xml -l $LICENSE -H $HOST
-}
-
-#all importer
-function all() {
-    jars-ifneeded
-    echo "Starting the VoltDB server."
-    echo "To perform this action manually, use the command line: "
-    echo
-    echo "voltdb create -d deployment-all.xml -l $LICENSE -H $HOST"
-    echo
-    voltdb create -d deployment-all.xml -l $LICENSE -H $HOST
 }
 
 # load schema and procedures
@@ -157,11 +142,14 @@ function async-benchmark-help() {
 # Disable the comments to get latency report
 function async-benchmark() {
     jars-ifneeded
-    java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        kafkaimporter.client.kafkaimporter.KafkaImportBenchmark \
+    java -classpath $CLIENTCLASSPATH \
+        client.kafkaimporter.KafkaImportBenchmark \
         --displayinterval=5 \
-        --warmup=10 \
-        --duration=60 \
+        --duration=180 \
+        --kafkaserverlist=localhost:9092 \
+        --alltypes=false \
+        --useexport=false \
+        --expected_rows=6000000 \
         --servers=localhost
 }
 

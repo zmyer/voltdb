@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # This file is part of VoltDB.
-# Copyright (C) 2008-2015 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -91,7 +91,7 @@ def launch_and_wait_on_voltdb(reportout):
     # Launch a single local voltdb server to serve all scripted sqlcmd runs.
     # The scripts are expected to clean up after themselves  -- and/or defensively
     # drop and create all of their tables up front.
-    subprocess.Popen(['../../bin/voltdb', 'create'], shell=False)
+    subprocess.Popen(['../../bin/voltdb', 'create', '--force'], shell=False)
     # give server a little startup time.
     time.sleep(5)
 
@@ -150,7 +150,7 @@ def clean_output(parent, path):
     memory_check_matcher = re.compile(r"""
             ^(WARN:\s)?Strict\sjava\smemory\schecking.*$  # Match the start.
             """, re.VERBOSE)
-    # 2. Allow different latency numbers to be reported like
+    # 2. Allow different latency numbers to be reported, like
     # "(Returned 3 rows in 9.99s)" vs. "(Returned 3 rows in 10.01s)".
     # These both get "fuzzed" into the same generic string "(Returned 3 rows in #.##s)".
     # This produces identical 'baseline` results on platforms and builds that
@@ -160,6 +160,29 @@ def clean_output(parent, path):
                                  # survives as \g<1>
             [0-9]+\.[0-9]+s      # also required, replaced with #.##s
             """, re.VERBOSE)
+    # 3. Allow different query timeout periods to be reported, like
+    # "A SQL query was terminated after 1.000 seconds because it exceeded the query timeout period." vs.
+    # "A SQL query was terminated after 1.001 seconds because it exceeded the query timeout period.".
+    # These both get "fuzzed" into the same generic string:
+    # "A SQL query was terminated after 1.00# seconds because it exceeded the query timeout period."
+    # ignoring the final milliseconds digit.
+    # This produces identical 'baseline` results on platforms and builds that
+    # may terminate a query after a slightly different number of milliseconds.
+    query_timeout_matcher = re.compile(r"""
+            (terminated\safter\s[0-9]+\.[0-9][0-9])  # required to match a query timeout
+                                                     # line, survives as \g<1>
+            [0-9]                                    # final digit, replaced with #
+            (\sseconds)                              # survives as \g<2>
+            """, re.VERBOSE)
+    # 4. Allow stack trace differences that might normally arise from different versions of
+    # voltdb or other library (e.g. reflection) source code.
+    stack_frame_matcher = re.compile(r"""
+            (at\s.+\.java\:)                         # required to match a stack trace line
+                                                     # line, survives as \g<1>
+            [0-9]+                                   # line number digits, replaced with #
+            (\))                                     # survives as \g<2>
+            """, re.VERBOSE)
+
     for line in outbackin:
         # Note len(cleanedline) here counts 1 EOL character.
         # Preserve blank lines as is -- there's no need to try cleaning them.
@@ -168,6 +191,8 @@ def clean_output(parent, path):
             continue
         cleanedline = memory_check_matcher.sub("", line)
         cleanedline = latency_matcher.sub("\g<1>#.##s", cleanedline)
+        cleanedline = query_timeout_matcher.sub("\g<1>#\g<2>", cleanedline)
+        cleanedline = stack_frame_matcher.sub("\g<1>#\g<2>", cleanedline)
         # # enable for debug print "DEBUG line length %d" % (len(cleanedline))
         # # enable for debug #print cleanedline
         # Here, a blank line resulted from a total text replacement,
@@ -272,15 +297,29 @@ def do_main():
             for inpath in files:
                 if not inpath.endswith(".in"):
                     continue
-                print "Running ", os.path.join(parent, inpath)
                 prefix = inpath[:-3]
+
+                config_params = ""
+                prompt = "Running " + os.path.join(parent, inpath)
+                if os.path.isfile(os.path.join(parent, prefix + '.config')):
+                    with open (os.path.join(parent, prefix + '.config'), "r") as configFile:
+                        config_params=configFile.read().strip()
+                    prompt += " with configuration:" + config_params.replace('\n', ' ')
+                print prompt
+
                 childin = open(os.path.join(parent, inpath))
                 # TODO use temp scratch files instead of local files to avoid polluting the git
                 # workspace. Ideally they would be self-purging except in failure cases or debug
                 # modes when they may contain useful diagnostic detail.
                 childout = open(os.path.join(parent, prefix + '.out'), 'w+')
                 childerr = open(os.path.join(parent, prefix + '.err'), 'w+')
-                subprocess.call(['../../bin/sqlcmd'],
+
+
+                if config_params:
+                    subprocess.call(['../../bin/sqlcmd'] + config_params.split("\n"),
+                        stdin=childin, stdout=childout, stderr=childerr)
+                else:
+                    subprocess.call(['../../bin/sqlcmd'],
                         stdin=childin, stdout=childout, stderr=childerr)
 
                 # TODO launch a hard-coded script that verifies a clean database and healthy server

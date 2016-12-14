@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,10 +17,17 @@
 
 package org.voltcore.logging;
 
+import static com.google_voltpatches.common.base.Preconditions.checkArgument;
+
+import java.io.File;
+import java.io.IOException;
 import java.io.StringReader;
+import java.util.Enumeration;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 
+import org.apache.log4j.Appender;
+import org.apache.log4j.DailyRollingFileAppender;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.apache.log4j.xml.DOMConfigurator;
@@ -178,4 +185,73 @@ public class VoltLog4jLogger implements CoreVoltLogger {
         configurator.doConfigure(sr, LogManager.getLoggerRepository());
     }
 
+    /**
+     * Static method to change the log directory root
+     * @param logRootDH log directory root
+     */
+    public static void setFileLoggerRoot(File logRootDH) {
+        if (System.getProperty("log4j.configuration", "").toLowerCase().contains("/voltdb/tests/")) {
+            return;
+        }
+        if (Boolean.parseBoolean(System.getProperty("DISABLE_LOG_RECONFIGURE", "false"))) {
+            return;
+        }
+        checkArgument(logRootDH != null, "log root directory is null");
+
+        File logDH = new File(logRootDH, "log");
+        File napFH = new File(logDH, "volt.log");
+
+        Logger rootLogger = LogManager.getRootLogger();
+        DailyRollingFileAppender oap = null;
+
+        @SuppressWarnings("unchecked")
+        Enumeration<Appender> appen = rootLogger.getAllAppenders();
+        while (appen.hasMoreElements()) {
+            Appender appndr = appen.nextElement();
+            if (!(appndr instanceof DailyRollingFileAppender)) continue;
+            oap = (DailyRollingFileAppender)appndr;
+            File logFH = new File(oap.getFile());
+            if (!logFH.isAbsolute()) break;
+            oap = null;
+        }
+        if (oap == null) {
+            return;
+        }
+
+        DailyRollingFileAppender nap = null;
+        try {
+            if (!logDH.exists() && !logDH.mkdirs()) {
+                throw new IllegalArgumentException("failed to create directory " + logDH);
+            }
+            if (!logDH.isDirectory() || !logDH.canRead() || !logDH.canWrite() || !logDH.canExecute()) {
+                throw new IllegalArgumentException("Cannot access " + logDH);
+            }
+            nap = new DailyRollingFileAppender(oap.getLayout(), napFH.getPath(), oap.getDatePattern());
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Failed to instantiate a DailyRollingFileAppender for file " + napFH, e);
+        }
+        nap.setName(oap.getName());
+
+        rootLogger.removeAppender(oap.getName());
+        rootLogger.addAppender(nap);
+
+        File oldFH = new File(oap.getFile());
+        if (oldFH.exists() && oldFH.isFile() && oldFH.length() == 0L && oldFH.delete()) {
+            File oldDH = oldFH.getParentFile();
+            if (oldDH.list().length == 0) {
+                oldDH.delete();
+            }
+        }
+
+        @SuppressWarnings("unchecked")
+        Enumeration<Logger> e = LogManager.getCurrentLoggers();
+        while (e.hasMoreElements()) {
+            Logger lgr = e.nextElement();
+            Appender apndr = lgr.getAppender(oap.getName());
+            if (apndr != null) {
+                lgr.removeAppender(oap.getName());
+                lgr.addAppender(nap);
+            }
+        }
+    }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,28 +17,24 @@
 
 package org.voltdb.importer;
 
-import static org.voltcore.common.Constants.VOLT_TMP_DIR;
-
-import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-import java.util.ServiceLoader;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.osgi.framework.BundleException;
-import org.osgi.framework.Constants;
-import org.osgi.framework.launch.Framework;
-import org.osgi.framework.launch.FrameworkFactory;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
+import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.compiler.deploymentfile.ImportType;
+import org.voltdb.importer.formatter.AbstractFormatterFactory;
+import org.voltdb.modular.ModuleManager;
 import org.voltdb.utils.CatalogUtil;
-
-import com.google_voltpatches.common.collect.ImmutableMap;
+import org.voltdb.utils.CatalogUtil.ImportConfiguration;
 
 /**
  *
@@ -52,16 +48,19 @@ public class ImportManager implements ChannelChangeCallback {
     private static final VoltLogger importLog = new VoltLogger("IMPORT");
 
     AtomicReference<ImportDataProcessor> m_processor = new AtomicReference<ImportDataProcessor>();
-    private volatile Map<String, Properties> m_processorConfig = new HashMap<>();
+    private volatile Map<String, ImportConfiguration> m_processorConfig = new HashMap<>();
+    private final Map<String, AbstractFormatterFactory> m_formatterFactories = new HashMap<String, AbstractFormatterFactory>();
 
     /** Obtain the global ImportManager via its instance() method */
     private static ImportManager m_self;
     private final HostMessenger m_messenger;
 
-    private final Map<String, String> m_frameworkProps;
     private final int m_myHostId;
-    private Framework m_framework;
     private ChannelDistributer m_distributer;
+    private boolean m_serverStarted;
+    private final ImporterStatsCollector m_statsCollector;
+    private final ModuleManager m_moduleManager;
+
     /**
      * Get the global instance of the ImportManager.
      * @return The global single instance of the ImportManager.
@@ -70,42 +69,22 @@ public class ImportManager implements ChannelChangeCallback {
         return m_self;
     }
 
-    protected ImportManager(int myHostId, HostMessenger messenger) throws IOException {
-        m_myHostId = myHostId;
-        m_messenger = messenger;
-
-        String tmpFilePath = System.getProperty(VOLT_TMP_DIR, System.getProperty("java.io.tmpdir"));
-        //Create a directory in temp + username
-        File f = new File(tmpFilePath, System.getProperty("user.name"));
-        if (!f.exists() && !f.mkdirs()) {
-            throw new IOException("Failed to create required OSGI cache directory: " + f.getAbsolutePath());
-        }
-
-        if (!f.isDirectory() || !f.canRead() || !f.canWrite() || !f.canExecute()) {
-            throw new IOException("Cannot access OSGI cache directory: " + f.getAbsolutePath());
-        }
-
-        m_frameworkProps = ImmutableMap.<String,String>builder()
-                .put(Constants.FRAMEWORK_SYSTEMPACKAGES_EXTRA, "org.voltcore.network;version=1.0.0"
-                    + ",org.voltdb.importer;version=1.0.0,org.apache.log4j;version=1.0.0"
-                    + ",org.voltdb.client;version=1.0.0,org.slf4j;version=1.0.0,org.voltcore.utils;version=1.0.0")
-                .put("org.osgi.framework.storage.clean", "onFirstInit")
-                .put("felix.cache.rootdir", f.getAbsolutePath())
-                .put("felix.cache.locking", Boolean.FALSE.toString())
-                .build();
-
+    private ModuleManager getModuleManager() {
+        return ModuleManager.instance();
     }
 
-    private void startOSGiFramework() throws BundleException {
+    protected ImportManager(int myHostId, HostMessenger messenger, ImporterStatsCollector statsCollector) throws IOException {
+        m_myHostId = myHostId;
+        m_messenger = messenger;
+        m_statsCollector = statsCollector;
+        m_moduleManager = getModuleManager();
+    }
+
+    private void initializeChannelDistributer() throws BundleException {
         if (m_distributer != null) return;
 
         m_distributer = new ChannelDistributer(m_messenger.getZK(), String.valueOf(m_myHostId));
         m_distributer.registerCallback("__IMPORT_MANAGER__", this);
-
-        FrameworkFactory frameworkFactory = ServiceLoader.load(FrameworkFactory.class).iterator().next();
-        importLog.info("Framework properties are: " + m_frameworkProps);
-        m_framework = frameworkFactory.newFramework(m_frameworkProps);
-        m_framework.start();
     }
 
     /**
@@ -117,7 +96,12 @@ public class ImportManager implements ChannelChangeCallback {
      * @throws java.io.IOException
      */
     public static synchronized void initialize(int myHostId, CatalogContext catalogContext, HostMessenger messenger) throws BundleException, IOException {
-        ImportManager em = new ImportManager(myHostId, messenger);
+        ImporterStatsCollector statsCollector = new ImporterStatsCollector(myHostId);
+        ImportManager em = new ImportManager(myHostId, messenger, statsCollector);
+        VoltDB.instance().getStatsAgent().registerStatsSource(
+                StatsSelector.IMPORTER,
+                myHostId,
+                statsCollector);
 
         m_self = em;
         em.create(myHostId, catalogContext);
@@ -134,16 +118,46 @@ public class ImportManager implements ChannelChangeCallback {
             if (importElement == null || importElement.getConfiguration().isEmpty()) {
                 return;
             }
-            startOSGiFramework();
+            initializeChannelDistributer();
 
-            ImportDataProcessor newProcessor = new ImportProcessor(myHostId, m_distributer, m_framework);
+            final String clusterTag = m_distributer.getClusterTag();
+
+            ImportDataProcessor newProcessor = new ImportProcessor(
+                    myHostId, m_distributer, m_moduleManager, m_statsCollector, clusterTag);
             m_processorConfig = CatalogUtil.getImportProcessorConfig(catalogContext.getDeployment().getImport());
-            newProcessor.setProcessorConfig(m_processorConfig);
+            m_formatterFactories.clear();
+
+            for (ImportConfiguration config : m_processorConfig.values()) {
+                Properties prop = config.getformatterProperties();
+                String module = prop.getProperty(ImportDataProcessor.IMPORT_FORMATTER);
+                try {
+                    AbstractFormatterFactory formatterFactory = m_formatterFactories.get(module);
+                    if (formatterFactory == null) {
+                        URI moduleURI = URI.create(module);
+                        formatterFactory = m_moduleManager.getService(moduleURI, AbstractFormatterFactory.class);
+                        if (formatterFactory == null) {
+                            VoltDB.crashLocalVoltDB("Failed to initialize formatter from: " + module);
+                        }
+                        m_formatterFactories.put(module, formatterFactory);
+                    }
+                    config.setFormatterFactory(formatterFactory);
+                } catch(Throwable t) {
+                    VoltDB.crashLocalVoltDB("Failed to configure import handler for " + module);
+                }
+            }
+
+            newProcessor.setProcessorConfig(catalogContext, m_processorConfig);
             m_processor.set(newProcessor);
-            importLog.info("Import Processor is configured.");
         } catch (final Exception e) {
             VoltDB.crashLocalVoltDB("Error creating import processor", true, e);
         }
+    }
+
+    public static int getPartitionsCount() {
+        if (m_self.m_processor.get() != null) {
+            return m_self.m_processor.get().getPartitionsCount();
+        }
+        return 0;
     }
 
     public synchronized void shutdown() {
@@ -158,18 +172,20 @@ public class ImportManager implements ChannelChangeCallback {
         if (m_processor.get() == null) {
             return;
         }
-        m_processor.get().shutdown();
+        if (m_serverStarted) {
+            m_processor.get().shutdown();
+        }
         //Unset until it gets started.
         m_processor.set(null);
     }
 
     public synchronized void start(CatalogContext catalogContext, HostMessenger messenger) {
         m_self.create(m_myHostId, catalogContext);
-        m_self.readyForData(catalogContext, messenger);
+        m_self.readyForDataInternal(catalogContext, messenger);
     }
 
     //Call this method to restart the whole importer system. It takes current catalogcontext and hostmessenger
-    public synchronized void restart(CatalogContext catalogContext, HostMessenger messenger) {
+    private synchronized void restart(CatalogContext catalogContext, HostMessenger messenger) {
         //Shutdown and recreate.
         m_self.close();
         assert(m_processor.get() == null);
@@ -181,6 +197,18 @@ public class ImportManager implements ChannelChangeCallback {
     }
 
     public synchronized void readyForData(CatalogContext catalogContext, HostMessenger messenger) {
+        m_serverStarted = true; // Note that server is ready, so that we know whether to process catalog updates
+        readyForDataInternal(catalogContext, messenger);
+    }
+
+    public synchronized void readyForDataInternal(CatalogContext catalogContext, HostMessenger messenger) {
+        if (!m_serverStarted) {
+            if (importLog.isDebugEnabled()) {
+                importLog.debug("Server not started. Not sending readyForData to ImportProcessor");
+            }
+            return;
+        }
+
         //If we dont have any processors we dont have any import configured.
         if (m_processor.get() == null) {
             return;
@@ -195,7 +223,7 @@ public class ImportManager implements ChannelChangeCallback {
     }
 
     @Override
-    public void onClusterStateChange(VersionedOperationMode mode) {
+    public synchronized void onClusterStateChange(VersionedOperationMode mode) {
         switch (mode.getMode()) {
             case PAUSED:
                 importLog.info("Cluster is paused shutting down all importers.");

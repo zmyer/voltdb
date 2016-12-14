@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,11 +17,12 @@
 
 package org.voltdb.sysprocs;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.SortedSet;
-import java.util.TreeSet;
+import java.util.TreeMap;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -31,6 +32,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DependencyPair;
+import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.StatsSelector;
@@ -57,6 +59,7 @@ import com.google_voltpatches.common.base.Throwables;
 
 @ProcInfo(singlePartition = false)
 public class UpdateApplicationCatalog extends VoltSystemProcedure {
+    static JavaClassForTest m_javaClass = new JavaClassForTest();
 
     VoltLogger log = new VoltLogger("HOST");
 
@@ -84,7 +87,13 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
      * return the pre-provided error message that corresponds to the non-empty
      * tables.
      *
-     * @param tablesThatMustBeEmpty List of table names that must be empty.
+     * Each of the tablesThatMustBeEmpty strings represents a set of tables.
+     * This is is a sequence of names separated by plus signs (+).  For example,
+     * "A+B+C" is the set {A, B, C}, and "A" is the singleton set {A}.  In
+     * these sets, only one needs to be empty.
+     *
+     * @param tablesThatMustBeEmpty List of sets of table names that must include
+     *                              an empty table.
      * @param reasonsForEmptyTables Error messages to return if that table isn't
      * empty.
      * @param context
@@ -104,9 +113,11 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         // fetch the id of the tables that must be empty from the
         //  current catalog (not the new one).
         CatalogMap<Table> tables = context.getDatabase().getTables();
-        int[] tableIds = new int[tablesThatMustBeEmpty.length];
+        List<List<String>> allTableSets = decodeTables(tablesThatMustBeEmpty);
+        Map<String, Boolean> allTables = collapseSets(allTableSets);
+        int[] tableIds = new int[allTables.size()];
         int i = 0;
-        for (String tableName : tablesThatMustBeEmpty) {
+        for (String tableName : allTables.keySet()) {
             Table table = tables.get(tableName);
             if (table == null) {
                 String msg = String.format("@UpdateApplicationCatalog was checking to see if table %s was empty, " +
@@ -131,28 +142,98 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             throw new SpecifiedException(ClientResponse.UNEXPECTED_FAILURE, msg);
         }
         VoltTable stats = s1[0];
-        SortedSet<String> nonEmptyTables = new TreeSet<String>();
 
-        // find all empty tables
+        // find all empty tables and mark that they are empty.
         while (stats.advanceRow()) {
             long tupleCount = stats.getLong("TUPLE_COUNT");
             String tableName = stats.getString("TABLE_NAME");
+            boolean isEmpty = true;
             if (tupleCount > 0 && !"StreamedTable".equals(stats.getString("TABLE_TYPE"))) {
-                nonEmptyTables.add(tableName);
+                isEmpty = false;
             }
+            allTables.put(tableName.toUpperCase(), isEmpty);
         }
 
-        // return an error containing the names of all non-empty tables
-        // via the propagated reasons why each needs to be empty
-        if (!nonEmptyTables.isEmpty()) {
-            String msg = "Unable to make requested schema change:\n";
-            for (i = 0; i < tablesThatMustBeEmpty.length; ++i) {
-                if (nonEmptyTables.contains(tablesThatMustBeEmpty[i])) {
-                    msg += reasonsForEmptyTables[i] + "\n";
+        // Reexamine the sets of sets and see if any of them has
+        // one empty element.  If not, then add the respective
+        // error message to the output message
+        String msg = "Unable to make requested schema change:\n";
+        boolean allOk = true;
+        for (int idx = 0; idx < allTableSets.size(); idx += 1) {
+            List<String> tableNames = allTableSets.get(idx);
+            boolean allNonEmpty = true;
+            for (String tableName : tableNames) {
+                Boolean oneEmpty = allTables.get(tableName);
+                if (oneEmpty != null && oneEmpty) {
+                    allNonEmpty = false;
+                    break;
                 }
             }
+            if (allNonEmpty) {
+                String errMsg = reasonsForEmptyTables[idx];
+                msg += errMsg + "\n";
+                allOk = false;
+            }
+        }
+        if ( ! allOk) {
             throw new SpecifiedException(ClientResponse.GRACEFUL_FAILURE, msg);
         }
+    }
+
+    /**
+     * Take a list of list of table names and collapse into a map
+     * which maps all table names to false.  We will set the correct
+     * values later on.  We just want to get the structure right now.
+     * Note that tables may be named multiple time in the lists of
+     * lists of tables.  Everything gets mapped to false, so we don't
+     * care.
+     *
+     * @param allTableSets
+     * @return
+     */
+    private Map<String, Boolean> collapseSets(List<List<String>> allTableSets) {
+        Map<String, Boolean> answer = new TreeMap<>();
+        for (List<String> tables : allTableSets) {
+            for (String table : tables) {
+                answer.put(table, false);
+            }
+        }
+        return answer;
+    }
+
+    /**
+     * Decode sets of names encoded as by concatenation with plus signs
+     * into lists of lists of strings.  Preserve the order, since we need
+     * it to match to error messages later on.
+     *
+     * @param tablesThatMustBeEmpty
+     * @return The decoded lists.
+     */
+    private List<List<String>> decodeTables(String[] tablesThatMustBeEmpty) {
+        List<List<String>> answer = new ArrayList<>();
+        for (String tableSet : tablesThatMustBeEmpty) {
+            String tableNames[] = tableSet.split("\\+");
+            answer.add(Arrays.asList(tableNames));
+        }
+        return answer;
+    }
+
+    public static class JavaClassForTest {
+        public Class<?> forName(String name, boolean initialize, ClassLoader jarfileLoader) throws ClassNotFoundException {
+            return CatalogContext.classForProcedure(name, jarfileLoader);
+        }
+    }
+
+    public final static HashMap<Integer, String> m_versionMap = new HashMap<>();
+    static {
+        m_versionMap.put(45, "Java 1.1");
+        m_versionMap.put(46, "Java 1.2");
+        m_versionMap.put(47, "Java 1.3");
+        m_versionMap.put(48, "Java 1.4");
+        m_versionMap.put(49, "Java 5");
+        m_versionMap.put(50, "Java 6");
+        m_versionMap.put(51, "Java 7");
+        m_versionMap.put(52, "Java 8");
     }
 
     @Override
@@ -168,8 +249,23 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             // Send out fragments to do the initial round-trip to synchronize
             // all the cluster sites on the start of catalog update, we'll do
             // the actual work on the *next* round-trip below
+
             // Don't actually care about the returned table, just need to send something
             // back to the MPI scoreboard
+            DependencyPair success = new DependencyPair(DEP_updateCatalogSync,
+                    new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
+
+            if ( ! context.isLowestSiteId()) {
+                // Any class-loading issues with the new catalog jar only need
+                // to be flagged by one site per host. So, for speed, return
+                // early from all sites except one -- the site with the lowest
+                // id on this host.
+                if (log.isInfoEnabled()) {
+                    log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
+                            " completed data precheck.");
+                }
+                return success;
+            }
 
             // We know the ZK bytes are okay because the run() method wrote them before sending
             // out fragments
@@ -180,10 +276,31 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                 JarLoader testjarloader = testjar.getLoader();
                 for (String classname : testjarloader.getClassNames()) {
                     try {
-                        Class.forName(classname, true, testjarloader);
+                        m_javaClass.forName(classname, true, testjarloader);
                     }
                     // LinkageError catches most of the various class loading errors we'd
                     // care about here.
+                    catch (UnsupportedClassVersionError e) {
+                        String msg = "Cannot load classes compiled with a higher version of Java than currently" +
+                                     " in use. Class " + classname + " was compiled with ";
+
+                        Integer major = 0;
+                        try {
+                            major = Integer.parseInt(e.getMessage().split("version")[1].trim().split("\\.")[0]);
+                        } catch (Exception ex) {
+                            log.debug("Unable to parse compile version number from UnsupportedClassVersionError.",
+                                    ex);
+                        }
+
+                        if (m_versionMap.containsKey(major)) {
+                            msg = msg.concat(m_versionMap.get(major) + ", current runtime version is " +
+                                             System.getProperty("java.version") + ".");
+                        } else {
+                            msg = msg.concat("an incompatable Java version.");
+                        }
+                        log.error(msg);
+                        throw new VoltAbortException(msg);
+                    }
                     catch (LinkageError | ClassNotFoundException e) {
                         String cause = e.getMessage();
                         if (cause == null && e.getCause() != null) {
@@ -199,12 +316,17 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                 Throwables.propagate(e);
             }
 
-            return new DependencyPair(DEP_updateCatalogSync,
-                    new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
+            if (log.isInfoEnabled()) {
+                log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
+                        " completed data and catalog precheck.");
+            }
+            return success;
         }
         else if (fragmentId == SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate) {
             // Don't actually care about the returned table, just need to send something
             // back to the MPI scoreboard
+            log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
+                    " acknowledged data and catalog prechecks.");
             return new DependencyPair(DEP_updateCatalogSyncAggregate,
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
         }
@@ -234,25 +356,29 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                         catalogStuff.catalogBytes,
                         catalogStuff.getCatalogHash(),
                         expectedCatalogVersion,
-                        getVoltPrivateRealTransactionIdDontUseMe(),
+                        DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
                         getUniqueId(),
                         catalogStuff.deploymentBytes,
                         catalogStuff.getDeploymentHash());
 
                 // update the local catalog.  Safe to do this thanks to the check to get into here.
-                context.updateCatalog(commands, p.getFirst(), p.getSecond(), requiresSnapshotIsolation);
+                long uniqueId = m_runner.getUniqueId();
+                long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
+                context.updateCatalog(commands, p.getFirst(), p.getSecond(),
+                        requiresSnapshotIsolation, uniqueId, spHandle);
 
-                log.debug(String.format("Site %s completed catalog update with catalog hash %s, deployment hash %s%s.",
-                        CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),
-                        Encoder.hexEncode(catalogStuff.getCatalogHash()).substring(0, 10),
-                        Encoder.hexEncode(catalogStuff.getDeploymentHash()).substring(0, 10),
-                        replayInfo));
+                if (log.isDebugEnabled()) {
+                    log.debug(String.format("Site %s completed catalog update with catalog hash %s, deployment hash %s%s.",
+                            CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),
+                            Encoder.hexEncode(catalogStuff.getCatalogHash()).substring(0, 10),
+                            Encoder.hexEncode(catalogStuff.getDeploymentHash()).substring(0, 10),
+                            replayInfo));
+                }
             }
             // if seen before by this code, then check to see if this is a restart
-            else if ((context.getCatalogVersion() == (expectedCatalogVersion + 1) &&
-                     (Arrays.equals(context.getCatalogHash(), catalogStuff.getCatalogHash()) &&
-                      Arrays.equals(context.getDeploymentHash(), catalogStuff.getDeploymentHash()))))
-            {
+            else if (context.getCatalogVersion() == (expectedCatalogVersion + 1) &&
+                    Arrays.equals(context.getCatalogHash(), catalogStuff.getCatalogHash()) &&
+                    Arrays.equals(context.getDeploymentHash(), catalogStuff.getDeploymentHash())) {
                 log.info(String.format("Site %s will NOT apply an assumed restarted and identical catalog update with catalog hash %s and deployment hash %s.",
                             CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),
                             Encoder.hexEncode(catalogStuff.getCatalogHash()),
@@ -266,10 +392,12 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
             result.addRow(VoltSystemProcedure.STATUS_OK);
             return new DependencyPair(DEP_updateCatalog, result);
-        } else if (fragmentId == SysProcFragmentId.PF_updateCatalogAggregate) {
+        }
+        else if (fragmentId == SysProcFragmentId.PF_updateCatalogAggregate) {
             VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_updateCatalog));
             return new DependencyPair(DEP_updateCatalogAggregate, result);
-        } else {
+        }
+        else {
             VoltDB.crashLocalVoltDB(
                     "Received unrecognized plan fragment id " + fragmentId + " in UpdateApplicationCatalog",
                     false,
@@ -344,6 +472,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
      * @param expectedCatalogVersion
      * @return Standard STATUS table.
      */
+    @SuppressWarnings("deprecation")
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
                            String catalogDiffCommands,
                            byte[] catalogHash,
@@ -377,17 +506,20 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         CatalogAndIds catalogStuff = CatalogUtil.getCatalogFromZK(zk);
         // New update?
         if (catalogStuff.version == expectedCatalogVersion) {
-            log.debug("New catalog update from: " + catalogStuff.toString());
-            log.debug("To: catalog hash: " + Encoder.hexEncode(catalogHash).substring(0, 10) +
-                    ", deployment hash: " + Encoder.hexEncode(deploymentHash).substring(0, 10));
+            if (log.isInfoEnabled()) {
+                log.info("New catalog update from: " + catalogStuff.toString());
+                log.info("To: catalog hash: " + Encoder.hexEncode(catalogHash).substring(0, 10) +
+                        ", deployment hash: " + Encoder.hexEncode(deploymentHash).substring(0, 10));
+            }
         }
         // restart?
         else {
             if (catalogStuff.version == (expectedCatalogVersion + 1) &&
-                (Arrays.equals(catalogStuff.getCatalogHash(), catalogHash) &&
-                 Arrays.equals(catalogStuff.getDeploymentHash(), deploymentHash)))
-            {
-                log.debug("Restarting catalog update: " + catalogStuff.toString());
+                    Arrays.equals(catalogStuff.getCatalogHash(), catalogHash) &&
+                    Arrays.equals(catalogStuff.getDeploymentHash(), deploymentHash)) {
+                if (log.isInfoEnabled()) {
+                    log.info("Restarting catalog update: " + catalogStuff.toString());
+                }
             }
             else {
                 String errmsg = "Invalid catalog update.  Catalog or deployment change was planned " +
@@ -408,9 +540,10 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         CatalogUtil.updateCatalogToZK(
                 zk,
                 expectedCatalogVersion + 1,
-                getVoltPrivateRealTransactionIdDontUseMe(),
+                DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
                 getUniqueId(),
                 catalogBytes,
+                catalogHash,
                 deploymentBytes);
 
         try {
@@ -432,6 +565,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                     catalogStuff.txnId,
                     catalogStuff.uniqueId,
                     catalogStuff.catalogBytes,
+                    catalogStuff.getCatalogHash(),
                     catalogStuff.deploymentBytes);
 
             // hopefully this will throw a SpecifiedException if the fragment threw one
@@ -451,5 +585,9 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
         result.addRow(VoltSystemProcedure.STATUS_OK);
         return (new VoltTable[] {result});
+    }
+
+    public static void setJavaClassForTest(JavaClassForTest fakeJavaClass) {
+        m_javaClass = fakeJavaClass;
     }
 }
