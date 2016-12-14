@@ -72,5 +72,13 @@
 	<classpathentry kind="lib" path="lib/tomcat-juli.jar"/>
 	<classpathentry kind="lib" path="lib/scala-parser-combinators_2.11-1.0.2.jar"/>
 	<classpathentry kind="lib" path="lib/scala-xml_2.11-1.0.2.jar"/>
+	<classpathentry kind="lib" path="lib/antlr-runtime-4.5.jar"/>
+	<classpathentry kind="src" path="target/generated-sources/antlr4"/>
+	<classpathentry kind="src" path="src/voltsqlparser/syntax"/>
+	<classpathentry kind="src" path="src/voltsqlparser/semantics"/>
+	<classpathentry kind="src" path="tests/sqlparser/tests"/>
+	<classpathentry kind="src" path="tests/sqlparser/tools"/>
+	<classpathentry kind="lib" path="lib/assertj-assertions-generator-maven-plugin-1.6.0.jar"/>
+	<classpathentry kind="lib" path="lib/assertj-core-2.0.0.jar"/>
 	<classpathentry kind="output" path="obj/eclipse"/>
 </classpath>

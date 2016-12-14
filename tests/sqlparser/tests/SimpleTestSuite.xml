@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<VoltXMLElementTestSuite name="SimpleTestSuite"
+    xmlns="http://www.voltdb.org"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.voltdb.org VoltXMLElementTestSuite.xsd">
+    <tests>
+        <test name="TestArithmeticExpression" sourcefolder="tests/sqlparser/tests" classname="org.voltdb.sqlparser.TestArithmeticExpressions">
+            <schema>
+                <ddl>create table alpha ( id integer, beta integer, gamma integer )</ddl>
+                <ddl>create table gamma ( id integer not null, zooba integer )</ddl>
+                <ddl>create table fargle ( id integer not null, dooba integer )</ddl>
+            </schema>
+            <testpoint testKind="dql" testName="TestSum"      testSQL="select * from alpha where id + id = 0"/>
+            <testpoint testKind="dql" testName="TestDiff"     testSQL="select * from alpha where id - id = 0"/>
+            <testpoint testKind="dql" testName="TestProd"     testSQL="select * from alpha where id * id = 0"/>
+            <testpoint testKind="dql" testName="TestDiv"      testSQL="select * from alpha where id / id = 0"/>
+            <testpoint testKind="dql" testName="TestSumProd"  testSQL="select * from alpha where id + beta * gamma = 0" />
+            <testpoint testKind="dql" testName="TestProdSum"  testSQL="select * from alpha where id * beta + gamma = 0" />
+            <testpoint testKind="dql" testName="TestSumDiv"   testSQL="select * from alpha where id + beta / gamma = 0" />
+            <testpoint testKind="dql" testName="TestDivSum"   testSQL="select * from alpha where id / beta + gamma = 0" />
+            <testpoint testKind="dql" testName="TestDiffProd" testSQL="select * from alpha where id - beta * gamma = 0" />
+            <testpoint testKind="dql" testName="TestProdDiff" testSQL="select * from alpha where id * beta - gamma = 0" />
+            <testpoint testKind="dql" testName="TestDiffDiv"  testSQL="select * from alpha where id - beta / gamma = 0" />
+            <testpoint testKind="dql" testName="TestDivDiff"  testSQL="select * from alpha where id / beta - gamma = 0" />
+            <testpoint testKind="dql" testName="TestSumDiff"  testSQL="select * from alpha where id + beta - gamma = 0" />
+            <testpoint testKind="dql" testName="TestDiffSum"  testSQL="select * from alpha where id - beta + gamma = 0" />
+            <testpoint testKind="dql" testName="TestProdDiv"  testSQL="select * from alpha where id * beta / gamma = 0" />
+            <testpoint testKind="dql" testName="TestDivProd"  testSQL="select * from alpha where id / beta * gamma = 0" />
+            <testpoint testKind="dql" testName="TestSumSum"   testSQL="select * from alpha where id + beta + gamma = 0" />
+            <testpoint testKind="dql" testName="TestDiffDiff" testSQL="select * from alpha where id - beta - gamma = 0" />
+            <testpoint testKind="dql" testName="TestProdProd" testSQL="select * from alpha where id * beta * gamma = 0" />
+            <testpoint testKind="dql" testName="TestDivDiv"   testSQL="select * from alpha where id / beta / gamma = 0" />
+        </test>
+        <test name="TestBooleanOperators" sourcefolder="tests/sqlparser/tests" classname="org.voltdb.sqlparser.TestBooleanOperators">
+            <schema>
+                <ddl>create table alpha ( id integer, beta integer )</ddl>
+                <ddl>create table gamma ( id integer not null, zooba integer )</ddl>
+                <ddl>create table fargle ( id integer not null, dooba integer )</ddl>
+            </schema>
+            <testpoint testKind="dql" testName="TestAnd" testSQL="select * from alpha where id = 0 and id = 1" />
+            <testpoint testKind="dql" testName="TestOr" testSQL="select * from alpha where id != 0 or id = 1" />
+            <testpoint testKind="dql" testName="TestNot" testSQL="select * from alpha where not id != 0" />
+            <testpoint testKind="dql" testName="TestPrecedenceNotAndL" testSQL='select * from alpha where not id != 0 and beta != 0' />
+            <testpoint testKind="dql" testName="TestPrecedenceNotOrL" testSQL='select * from alpha where not id != 0 or beta != 0' />
+            <testpoint testKind="dql" testName="TestPrecedenceNotAndR" testSQL='select * from alpha where id != 0 and not beta != 0' />
+            <testpoint testKind="dql" testName="TestPrecedenceNotOrR" testSQL='select * from alpha where id != 0 or not beta != 0' />
+            <testpoint testKind="dql" testName="TestPrecedenceOrOr" testSQL='select * from alpha where id != 0 or beta != 0 or beta !=  1' />
+            <testpoint testKind="dql" testName="TestPrecedenceOrAnd" testSQL='select * from alpha where id != 0 or beta != 0 and beta != 1' />
+            <!-- We need to be a bit careful here. HSQLDB seems to want to 
+                 rearrange the expressions so that equality tests are done first.
+                 This is mostly irrelevant to us, but it make our tests fail. We only use
+                 equality and inequality tests. -->
+            <testpoint testKind="dql" testName="TestPrecedenceAndAnd" testSQL='select * from alpha where id != 0 and beta != 0 and beta != 1' />
+            <testpoint testKind="dql" testName="TestPrecedenceAndOr" testSQL='select * from alpha where id != 0 and beta != 0 or beta != 1' />
+        </test>
+        <test name="TestRelationalOperators" sourcefolder="tests/sqlparser/tests" classname="org.voltdb.sqlparser.TestRelationalOperators">
+            <schema>
+                <ddl>create table alpha ( id integer, beta integer )</ddl>
+                <ddl>create table gamma ( id integer not null, zooba integer )</ddl>
+                <ddl>create table fargle ( id integer not null, dooba integer )</ddl>
+            </schema>
+            <testpoint testKind="dql" testName="TestEq" testSQL="select * from alpha where id = 0" />
+            <testpoint testKind="dql" testName="TestNotEq" testSQL="select * from alpha where id != 0" />
+            <testpoint testKind="dql" testName="TestLessThan" testSQL="select * from alpha where id &lt; 0" />
+            <testpoint testKind="dql" testName="TestLessEqual" testSQL="select * from alpha where id &lt;= 0" />
+            <testpoint testKind="dql" testName="TestGreaterThan" testSQL="select * from alpha where id &gt; 0" />
+            <testpoint testKind="dql" testName="TestGreaterEqual" testSQL="select * from alpha where id != 0" />
+        </test>
+        <test name="TestRelationalOperators" sourcefolder="tests/sqlparser/tests" classname="org.voltdb.sqlparser.TestRelationalOperators">
+            <schema>
+                <ddl>create table alpha ( id integer, beta integer )</ddl>
+                <ddl>create table gamma ( id integer not null, zooba integer )</ddl>
+                <ddl>create table fargle ( id integer not null, dooba integer )</ddl>
+            </schema>
+            <testpoint testKind="dql" testName="TestEq" testSQL="select * from alpha where id = 0" />
+            <testpoint testKind="dql" testName="TestNotEq" testSQL="select * from alpha where id != 0" />
+            <testpoint testKind="dql" testName="TestLessThan" testSQL="select * from alpha where id &lt; 0" />
+            <testpoint testKind="dql" testName="TestLessEqual" testSQL="select * from alpha where id &lt;= 0" />
+            <testpoint testKind="dql" testName="TestGreaterThan" testSQL="select * from alpha where id &gt; 0" />
+            <testpoint testKind="dql" testName="TestGreaterEqual" testSQL="select * from alpha where id &gt;= 0" />
+        </test>
+        <test name="TestSimpleSQL" sourcefolder="tests/sqlparser/tests" classname="org.voltdb.sqlparser.TestSimpleSQL">
+            <schema>
+                <ddl>create table alpha ( id integer, beta integer )</ddl>
+                <ddl>create table gamma ( id integer not null, zooba integer )</ddl>
+                <ddl>create table fargle ( id integer not null, dooba integer )</ddl>
+            </schema>
+            <testpoint testKind="ddl" testName="testCreateTable" testSQL="create table alpha ( id integer not null, beta integer)" />
+            <testpoint testKind="ddl" testName="testCreateTableWithDecimal" testSQL="create table alpha ( id integer not null, beta Decimal)" />
+            <testpoint testKind="dml" testName="testInsert1" testSQL="insert into alpha values (1, 1)" />
+            <testpoint testKind="dml" testName="testInsert2" testSQL="insert into alpha (beta, id) values (100, 101)" />
+            <testpoint testKind="dql" testName="testSelectId" testSQL="select id from alpha" />
+            <testpoint testKind="dql" testName="testSelectBeta" testSQL="select beta from alpha" />
+            <testpoint testKind="dql" testName="testSelectFromFargle" testSQL="select dooba from fargle" />
+            <testpoint testKind="dql" testName="testSelectFromGamma" testSQL="select id from gamma" />
+            <testpoint testKind="dql" testName="testCaseSelect" testSQL="select ID from GAMMA" />
+        </test>
+        <test name="TestTableCreation" sourcefolder="tests/sqlparser/tests" classname="org.voltdb.sqlparser.TestTableCreation">
+            <schema/>
+            <testpoint testKind="ddl" testName="testCreateTableTinyInt" testSQL="create table alpha ( id TiNyInT not null, beta TINYINT)"
+                comment="Test TINYINT type."/>
+            <testpoint testKind="ddl" testName="testCreateTableSmallInt" testSQL="create table alpha ( id SmallInt not null, beta SMALLINT)"
+                comment="Test SMALLINT type."/>
+            <testpoint testKind="ddl" testName="testCreateTableInteger" testSQL="create table alpha ( id integer not null, beta integer)"
+                comment="Test INTEGER type."/>
+            <testpoint testKind="ddl" testName="testCreateTableBigInt" testSQL="create table alpha ( id BiGiNt not null, beta bIgInT)"
+                comment="Test BIGINT type."/>
+            <testpoint testKind="ddl" testName="testCreateTableWithDecimal" testSQL="create table alpha ( id integer not null, beta Decimal
+                not null)" comment="Test DECIMAL type, default scale and precision."/>
+            <testpoint testKind="ddl"
+                       testName="testCreateTableWithDecimalScalePrecision"
+                       testSQL="create table alpha ( id integer not null, beta Decimal (10, 100) not null)"
+                       comment="Test DECIMAL type with scale and precision."/>
+            <testpoint testKind="ddl" 
+                       testName="testCreateTableFloat" 
+                       testSQL="create table alpha ( id BiGiNt not null, beta FlOaT)" 
+                       comment="Test FLOAT type"/>
+            <testpoint testKind="ddl" 
+                       testName="testCreateTableVarchar"
+                       testSQL="create table alpha ( id BiGiNt not null, beta varchar(100))"
+                       comment="Test VARCHAR type"/>
+            <testpoint testKind="ddl" 
+                       testName="testCreateTableVarbinary"
+                       testSQL="create table alpha ( id BiGiNt not null, beta varbinary(100))"
+                       comment="Test VARBINARY type"/>
+            <testpoint testKind="ddl"
+                       testName="testCreateTableTimestamp" 
+                       testSQL="create table alpha ( id BiGiNt not null, beta timestamp)"
+                       comment="Test TIMESTAMP type"/>
+        </test>
+        <test name="TestWhereExpressions" sourcefolder="tests/sqlparser/tests" classname="org.voltdb.sqlparser.TestWhereExpressions">
+            <schema>
+                <ddl>create table alpha ( id integer, beta integer )</ddl>
+                <ddl>create table gamma ( id integer not null, zooba integer )</ddl>
+                <ddl>create table fargle ( id integer not null, dooba integer )</ddl>
+            </schema>
+            <testpoint testKind="dql" testName="TestColumnRef1" testSQL="select * from alpha where id = 0" />
+            <testpoint testKind="dql" testName="TestColumnRefAliases" testSQL="select * from alpha as alef where alef.id = alef.beta"
+                />
+        </test>
+        <test sourcefolder="tests/sqlparser/tests" name="TestTypeConversions" classname="org.voltdb.sqlparser.TestTypeConversions">
+          <schema>
+            <ddl>create table alltypes (ftinyint tinyint, fsmallint smallint, finteger integer, fbigint bigint, ffloat float, fdecimal decimal, ftimestamp timestamp)</ddl>
+          </schema>
+	  <!-- convert tinyint to other types -->
+          <testpoint testName="TestTISI" testKind="dql" testSQL="select * from alltypes where fsmallint + ftinyint  = 0" />
+          <testpoint testName="TestSITI" testKind="dql" testSQL="select * from alltypes where ftinyint  + fsmallint = 0" />
+          <testpoint testName="TestTII"  testKind="dql" testSQL="select * from alltypes where ftinyint  + finteger  = 0" />
+          <testpoint testName="TestITI"  testKind="dql" testSQL="select * from alltypes where finteger  + ftinyint  = 0" />
+          <testpoint testName="TestTIBI" testKind="dql" testSQL="select * from alltypes where fbigint   + ftinyint  = 0" />
+          <testpoint testName="TestBITI" testKind="dql" testSQL="select * from alltypes where ftinyint  + fbigint   = 0" />
+          <testpoint testName="TestTIF"  testKind="dql" testSQL="select * from alltypes where ffloat    + ftinyint  = 0" />
+          <testpoint testName="TestFTI"  testKind="dql" testSQL="select * from alltypes where ftinyint  + ffloat    = 0" />
+          <testpoint testName="TestTID"  testKind="dql" testSQL="select * from alltypes where fdecimal  + ftinyint  = 0" />
+          <testpoint testName="TestDTI"  testKind="dql" testSQL="select * from alltypes where ftinyint  + fdecimal  = 0" />
+	  <!-- convert smallint to other types -->
+          <testpoint testName="TestSII"  testKind="dql" testSQL="select * from alltypes where fsmallint + finteger  = 0" />
+          <testpoint testName="TestISI"  testKind="dql" testSQL="select * from alltypes where finteger  + fsmallint = 0" />
+          <testpoint testName="TestSIBI" testKind="dql" testSQL="select * from alltypes where fbigint   + fsmallint = 0" />
+          <testpoint testName="TestBISI" testKind="dql" testSQL="select * from alltypes where fsmallint + fbigint   = 0" />
+          <testpoint testName="TestSIF"  testKind="dql" testSQL="select * from alltypes where ffloat    + fsmallint = 0" />
+          <testpoint testName="TestFSI"  testKind="dql" testSQL="select * from alltypes where fsmallint + ffloat    = 0" />
+          <testpoint testName="TestSID"  testKind="dql" testSQL="select * from alltypes where fdecimal  + fsmallint = 0" />
+          <testpoint testName="TestDSI"  testKind="dql" testSQL="select * from alltypes where fsmallint + fdecimal  = 0" />
+	  <!-- convert integer to other types -->
+          <testpoint testName="TestIBI"  testKind="dql" testSQL="select * from alltypes where fbigint   + finteger  = 0" />
+          <testpoint testName="TestBII"  testKind="dql" testSQL="select * from alltypes where finteger  + fbigint   = 0" />
+          <testpoint testName="TestIF"   testKind="dql" testSQL="select * from alltypes where ffloat    + finteger  = 0" />
+          <testpoint testName="TestFI"   testKind="dql" testSQL="select * from alltypes where finteger  + ffloat    = 0" />
+          <testpoint testName="TestID"   testKind="dql" testSQL="select * from alltypes where fdecimal  + finteger  = 0" />
+          <testpoint testName="TestDI"   testKind="dql" testSQL="select * from alltypes where finteger  + fdecimal  = 0" />
+        </test>
+    </tests>
+</VoltXMLElementTestSuite>

@@ -17,18 +17,24 @@
 
 package org.hsqldb_voltpatches;
 
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
 
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
 import org.hsqldb_voltpatches.index.Index;
 import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
 import org.hsqldb_voltpatches.result.Result;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.sqlparser.semantics.symtab.CatalogAdapter;
+import org.voltdb.sqlparser.semantics.symtab.Column;
+import org.voltdb.sqlparser.syntax.SQLKind;
+import org.voltdb.sqlparser.syntax.SQLParserDriver;
 
 /**
  * This class is built to create a single in-memory database
@@ -57,12 +63,13 @@ public class HSQLInterface {
     public static final String AUTO_GEN_CONSTRAINT_PREFIX = AUTO_GEN_IDX_PREFIX + "CT_";
     public static final String AUTO_GEN_PRIMARY_KEY_PREFIX = AUTO_GEN_IDX_PREFIX + "PK_";
     public static final String AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX = AUTO_GEN_PREFIX + "CONSTRAINT_IDX_";
-
+    
     /**
      * The spacer to use for nested XML elements
      */
     public static final String XML_INDENT = "    ";
 
+    public final VoltSQLInterface m_voltSQLInterface = new VoltSQLInterface();
     /**
      * Exception subclass that is thrown from <code>getXMLCompiledStatement</code>
      * and <code>runDDLCommand</code> when a SQL parse error is encountered.
@@ -204,6 +211,8 @@ public class HSQLInterface {
             expectFailure = true;
         }
 
+        // This will add the internal representation of the DDL to
+        // HSQL or VoltSQLParser, whichever is configured.
         runDDLCommand(ddl);
 
         // If we expect to fail, but the statement above didn't bail...
@@ -268,6 +277,10 @@ public class HSQLInterface {
      * encountered.
      */
     public void runDDLCommand(String ddl) throws HSQLParseException {
+        if (m_voltSQLInterface.usingVoltSQLParser()) {
+            m_voltSQLInterface.processDDLStatementsUsingVoltSQLParser(ddl, null);
+            return;
+        }
         Result result = sessionProxy.executeDirectStatement(ddl);
         if (result.hasError()) {
             throw new HSQLParseException(result.getMainString());
@@ -279,7 +292,7 @@ public class HSQLInterface {
      * on every DDL statment in the file.
      *
      * @param path Path to a text file containing semi-colon
-     * delimeted SQL DDL statements.
+     * delimited SQL DDL statements.
      * @throws HSQLParseException throws an exeption if there
      * is a problem reading, parsing, or running the file.
      */
@@ -305,9 +318,18 @@ public class HSQLInterface {
      * @return Pseudo XML representation of the compiled statement.
      * @throws HSQLParseException Throws exception if SQL parse error is
      * encountered.
+     * @throws HSQLParseException
      */
     public VoltXMLElement getXMLCompiledStatement(String sql) throws HSQLParseException
     {
+        if (m_logger.isDebugEnabled()) {
+            m_logger.debug("\nSQL: " + sql + "\n");
+        }
+        if (m_voltSQLInterface.usingVoltSQLParser()) {
+            VoltXMLElement xml = m_voltSQLInterface.getVoltXMLFromSQLUsingVoltSQLParser(sql, null, SQLKind.DQL);
+            assert(xml != null);
+            return xml;
+        }
         Statement cs = null;
         // clear the expression node id set for determinism
         sessionProxy.resetVoltNodeIds();
@@ -590,7 +612,9 @@ public class HSQLInterface {
      */
     public VoltXMLElement getXMLForTable(String tableName) throws HSQLParseException {
         VoltXMLElement xml = emptySchema.duplicate();
-
+        if (m_voltSQLInterface.usingVoltSQLParser()) {
+            return m_voltSQLInterface.getVoltCatalogXML(tableName);
+        }
         // search all the tables XXX probably could do this non-linearly,
         //  but i don't know about case-insensitivity yet
         HashMappedList hsqlTables = getHSQLTables();
@@ -625,4 +649,17 @@ public class HSQLInterface {
         }
 
     }
+
+	public VoltXMLElement getVoltCatalogXML(String tableName) {
+		// TODO Auto-generated method stub
+		return m_voltSQLInterface.getVoltCatalogXML(tableName);
+	}
+	
+	public VoltXMLElement getVoltXMLFromSQLUsingVoltSQLParser(String aSQL, CatalogAdapter aAdapter, SQLKind aKind) throws HSQLParseException {
+		return m_voltSQLInterface.getVoltXMLFromSQLUsingVoltSQLParser(aSQL, aAdapter, aKind);
+	}
+
+	public void processDDLStatementsUsingVoltSQLParser(String sql, CatalogAdapter aAdapter) throws HSQLParseException {
+		m_voltSQLInterface.processDDLStatementsUsingVoltSQLParser(sql, aAdapter);
+	}
 }
