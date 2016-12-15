@@ -27,10 +27,10 @@ namespace voltdb {
 
 class UserDefinedFunction {
 public:
-    UserDefinedFunction() : m_returnType(VALUE_TYPE_INVALID) {}
+    UserDefinedFunction() {}
     virtual ~UserDefinedFunction() {}
 
-    ValueType getReturnType() { return m_returnType; }
+    const ValueType getReturnType() const { return m_returnType; }
 
     void setReturnType(ValueType returnType) {
         m_returnType = returnType;
@@ -66,23 +66,23 @@ public:
     virtual NValue p_execute() = 0;
 
 protected:
-    double getDoubleArgument(int index) {
+    const double getDoubleArgument(int index) const {
         return ValuePeeker::peekDouble(m_arguments[index]);
     }
 
-    int8_t getTinyIntArgument(int index) {
+    const int8_t getTinyIntArgument(int index) const {
         return ValuePeeker::peekTinyInt(m_arguments[index]);
     }
 
-    int16_t getSmallIntArgument(int index) {
+    const int16_t getSmallIntArgument(int index) const {
         return ValuePeeker::peekSmallInt(m_arguments[index]);
     }
 
-    int32_t getIntegerArgument(int index) {
+    const int32_t getIntegerArgument(int index) const {
         return ValuePeeker::peekInteger(m_arguments[index]);
     }
 
-    bool getBooleanArgument(int index) {
+    const bool getBooleanArgument(int index) const {
         return ValuePeeker::peekBoolean(m_arguments[index]);
     }
 
