@@ -42,4 +42,9 @@ public interface IColumn extends ITop {
 
     public void setIsUniqueConstraint(boolean isUniqueConstraint);
     public boolean isUniqueConstraint();
+
+	public abstract void setIsAssumedUnique(boolean m_isAssumedUnique);
+	boolean isAssumedUnique();
+
+	void setAssumedUnique(boolean value);
 }

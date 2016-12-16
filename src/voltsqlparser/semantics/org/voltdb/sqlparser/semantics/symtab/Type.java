@@ -37,17 +37,23 @@ import org.voltdb.sqlparser.syntax.symtab.TypeKind;
 
 /**
  * This is the base class of all types.  All types have a name,
- * a nominal and maximum size and a kind.
+ * a maximum size and a kind.
  *
  * @author bwhite
  *
  */
 public class Type extends Top implements IType {
     public TypeKind m_kind;
+    public long     m_maxSize;
 
     public Type(String aName, TypeKind aKind) {
+    	this(aName, aKind, -1);
+    }
+    
+    public Type(String aName, TypeKind aKind, long aMaxSize) {
         super(aName);
         m_kind = aKind;
+        m_maxSize = aMaxSize;
     }
 
     public boolean equals(Type other) {
@@ -58,10 +64,6 @@ public class Type extends Top implements IType {
         return this;
     }
 
-    public String toString() {
-        return this.getClass().toString();
-    }
-
     public boolean isEqualType(Type rightType) {
         return m_kind == rightType.getTypeKind();
     }
@@ -70,6 +72,10 @@ public class Type extends Top implements IType {
         return m_kind;
     }
 
+    public long getMaxSize() {
+    	return m_maxSize;
+    }
+    
     @Override
     public boolean isBooleanType() {
         return m_kind.isBoolean();
@@ -82,5 +88,22 @@ public class Type extends Top implements IType {
     @Override
     public boolean isErrorType() {
         return false;
+    }
+    
+    @Override
+    public IType makeInstance(long ... params) {
+    	assert(false);
+    	return null;
+    }
+    
+    public boolean isFixedSize() {
+    	return true;
+    }
+    @Override
+    public String toString() {
+    	if (0 <= m_kind.getSizeInBytes() || getMaxSize() < 0) {
+    		return getName();
+    	}
+    	return String.format("%s(%d)", getName(), getMaxSize());
     }
 }

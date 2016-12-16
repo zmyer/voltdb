@@ -35,18 +35,18 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
+import org.voltdb.sqlparser.syntax.grammar.IIndex;
 import org.voltdb.sqlparser.syntax.symtab.ITable;
 
 public class CatalogAdapter implements ICatalogAdapter {
-    private TreeMap<String,Table> tables = new TreeMap<String,Table>(String.CASE_INSENSITIVE_ORDER);
+    private TreeMap<String,Table> m_tables = new TreeMap<String,Table>(String.CASE_INSENSITIVE_ORDER);
+    private TreeMap<String, Index> m_indexes = new TreeMap<String, Index>(String.CASE_INSENSITIVE_ORDER);
 
-    // insert all tables from catalog into table array?
-
-     public void addTable (ITable aTable) {
-         assert(aTable instanceof Table);
-         Table table = (Table)aTable;
-         String name = table.getName();
-         tables.put(name, table);
+    public void addTable (ITable aTable) {
+    	assert(aTable instanceof Table);
+    	Table table = (Table)aTable;
+    	String name = table.getName();
+    	m_tables.put(name, table);
      }
 
    /**
@@ -56,11 +56,20 @@ public class CatalogAdapter implements ICatalogAdapter {
     * @return
     */
     public Table getTableByName(String tablename) {
-        return tables.get(tablename);
+        return m_tables.get(tablename);
     }
 
     public Set<String> getTableNames() {
-        return tables.keySet();
+        return m_tables.keySet();
     }
+
+    public Index getIndexByName(String indexName) {
+    	return m_indexes.get(indexName);
+    }
+	@Override
+	public void addIndex(IIndex idx) {
+		assert(idx instanceof Index);
+		m_indexes.put(idx.getName(), (Index)idx);
+	}
 
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -458,5 +458,174 @@ public class TestTableCreation {
                         withAttribute(20, "name", "indexes")),
                     withChildNamed(21, "constraints",
                         withAttribute(22, "name", "constraints"))));
+    }
+    /**
+     * Test bigint PRIMARY KEY
+     *
+     * Throws: Exception
+     */
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void testCreateTablePrimaryKey() throws Exception {
+        String ddl    = "create table alpha ( id BiGiNt not null PRIMARY KEY, beta timestamp)";
+        IDTable idTable = new IDTable();
+        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
+        VoltXMLElement element = hif.getVoltCatalogXML(null);
+        assertThat(element)
+            .hasName(1, "databaseschema")
+            .hasAllOf(
+                withAttribute(2, "name", "databaseschema"),
+                withChildNamed(3, "table",
+                    withAttribute(4, "name", "ALPHA"),
+                    withChildNamed(5, "columns",
+                        withAttribute(6, "name", "columns"),
+                        withChildNamed(7, "column",
+                                       "name", "ID",
+                            withAttribute(8, "index", "0"),
+                            withAttribute(9, "name", "ID"),
+                            withAttribute(10, "nullable", "false"),
+                            withAttribute(11, "size", "19"),
+                            withAttribute(12, "valuetype", "BIGINT")),
+                        withChildNamed(13, "column",
+                                       "name", "BETA",
+                            withAttribute(14, "index", "1"),
+                            withAttribute(15, "name", "BETA"),
+                            withAttribute(16, "nullable", "true"),
+                            withAttribute(17, "size", "8"),
+                            withAttribute(18, "valuetype", "TIMESTAMP"))),
+                    withChildNamed(19, "indexes",
+                        withAttribute(20, "name", "indexes")),
+                    withChildNamed(21, "constraints",
+                        withAttribute(22, "name", "constraints"))));
+    }
+    /**
+     * Test bigint UNIQUE KEY
+     *
+     * Throws: Exception
+     */
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void testCreateTableUniqueKey() throws Exception {
+        String ddl    = "create table alpha ( id BiGiNt not null UNIQUE, beta timestamp)";
+        IDTable idTable = new IDTable();
+        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
+        VoltXMLElement element = hif.getVoltCatalogXML(null);
+        assertThat(element)
+            .hasName(1, "databaseschema")
+            .hasAllOf(
+                withAttribute(2, "name", "databaseschema"),
+                withChildNamed(3, "table",
+                    withAttribute(4, "name", "ALPHA"),
+                    withChildNamed(5, "columns",
+                        withAttribute(6, "name", "columns"),
+                        withChildNamed(7, "column",
+                                       "name", "ID",
+                            withAttribute(8, "index", "0"),
+                            withAttribute(9, "name", "ID"),
+                            withAttribute(10, "nullable", "false"),
+                            withAttribute(11, "size", "19"),
+                            withAttribute(12, "valuetype", "BIGINT")),
+                        withChildNamed(13, "column",
+                                       "name", "BETA",
+                            withAttribute(14, "index", "1"),
+                            withAttribute(15, "name", "BETA"),
+                            withAttribute(16, "nullable", "true"),
+                            withAttribute(17, "size", "8"),
+                            withAttribute(18, "valuetype", "TIMESTAMP"))),
+                    withChildNamed(19, "indexes",
+                        withAttribute(20, "name", "indexes")),
+                    withChildNamed(21, "constraints",
+                        withAttribute(22, "name", "constraints"))));
+    }
+    /**
+     * Test bigint ASSUMEUNIQUE KEY
+     *
+     * Throws: Exception
+     */
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void testCreateTableAssumeUniqueKey() throws Exception {
+        String ddl    = "create table alpha ( id BiGiNt not null ASSUMEUNIQUE, beta timestamp)";
+        IDTable idTable = new IDTable();
+        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
+        VoltXMLElement element = hif.getVoltCatalogXML(null);
+        assertThat(element)
+            .hasName(1, "databaseschema")
+            .hasAllOf(
+                withAttribute(2, "name", "databaseschema"),
+                withChildNamed(3, "table",
+                    withAttribute(4, "name", "ALPHA"),
+                    withChildNamed(5, "columns",
+                        withAttribute(6, "name", "columns"),
+                        withChildNamed(7, "column",
+                                       "name", "ID",
+                            withAttribute(8, "index", "0"),
+                            withAttribute(9, "name", "ID"),
+                            withAttribute(10, "nullable", "false"),
+                            withAttribute(11, "size", "19"),
+                            withAttribute(12, "valuetype", "BIGINT")),
+                        withChildNamed(13, "column",
+                                       "name", "BETA",
+                            withAttribute(14, "index", "1"),
+                            withAttribute(15, "name", "BETA"),
+                            withAttribute(16, "nullable", "true"),
+                            withAttribute(17, "size", "8"),
+                            withAttribute(18, "valuetype", "TIMESTAMP"))),
+                    withChildNamed(19, "indexes",
+                        withAttribute(20, "name", "indexes")),
+                    withChildNamed(21, "constraints",
+                        withAttribute(22, "name", "constraints"))));
+    }
+    /**
+     * Test bigint ASSUMEUNIQUE KEY
+     *
+     * Throws: Exception
+     */
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void testCreateTableDefaultValue() throws Exception {
+        String ddl    = "create table alpha ( id BiGiNt default '100', beta timestamp)";
+        IDTable idTable = new IDTable();
+        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
+        VoltXMLElement element = hif.getVoltCatalogXML(null);
+        assertThat(element)
+            .hasName(1, "databaseschema")
+            .hasAllOf(
+                withAttribute(2, "name", "databaseschema"),
+                withChildNamed(3, "table",
+                    withAttribute(4, "name", "ALPHA"),
+                    withChildNamed(5, "columns",
+                        withAttribute(6, "name", "columns"),
+                        withChildNamed(7, "column",
+                                       "name", "ID",
+                            withAttribute(8, "index", "0"),
+                            withAttribute(9, "name", "ID"),
+                            withAttribute(10, "nullable", "true"),
+                            withAttribute(11, "size", "19"),
+                            withAttribute(12, "valuetype", "BIGINT"),
+                            withChildNamed(13, "default",
+                                withChildNamed(14, "value",
+                                    withIdAttribute(15, idTable),
+                                    withAttribute(16, "value", "100"),
+                                    withAttribute(17, "valuetype", "BIGINT")))),
+                        withChildNamed(18, "column",
+                                       "name", "BETA",
+                            withAttribute(19, "index", "1"),
+                            withAttribute(20, "name", "BETA"),
+                            withAttribute(21, "nullable", "true"),
+                            withAttribute(22, "size", "8"),
+                            withAttribute(23, "valuetype", "TIMESTAMP"))),
+                    withChildNamed(24, "indexes",
+                        withAttribute(25, "name", "indexes")),
+                    withChildNamed(26, "constraints",
+                        withAttribute(27, "name", "constraints"))));
     }
 }

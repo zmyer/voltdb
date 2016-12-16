@@ -24,4 +24,6 @@ public interface ICatalogAdapter {
 
     ITable getTableByName(String aTableName);
 
+	void addIndex(IIndex idx);
+
 }

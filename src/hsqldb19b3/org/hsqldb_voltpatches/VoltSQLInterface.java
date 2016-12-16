@@ -6,7 +6,7 @@ import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.voltdb.sqlparser.semantics.symtab.CatalogAdapter;
 import org.voltdb.sqlparser.syntax.SQLKind;
 import org.voltdb.sqlparser.syntax.SQLParserDriver;
-
+import org.voltdb.sqlparser.syntax.symtab.IColumn;
 import org.voltdb.sqlparser.semantics.symtab.CatalogAdapter;
 import org.voltdb.sqlparser.semantics.symtab.Column;
 
@@ -24,7 +24,7 @@ public class VoltSQLInterface {
     public void processDDLStatementsUsingVoltSQLParser(String sql, CatalogAdapter aAdapter) throws HSQLParseException {
         CatalogAdapter adapter = (aAdapter == null) ? m_catalogAdapter : aAdapter;
         VoltParserFactory factory = new VoltParserFactory(adapter);
-        VoltDDLVisitor visitor = new VoltDDLVisitor(factory);
+        VoltDDLVisitor visitor = new VoltDDLVisitor(factory, null);
         processSQLWithListener(sql, visitor, SQLKind.DDL);
     }
 
@@ -56,7 +56,7 @@ public class VoltSQLInterface {
     public VoltXMLElement getVoltXMLFromSQLUsingVoltSQLParser(String aSQL, CatalogAdapter aAdapter, SQLKind aKind) throws HSQLParseException {
         CatalogAdapter adapter = (aAdapter == null) ? m_catalogAdapter : aAdapter;
         VoltParserFactory factory = new VoltParserFactory(adapter);
-        VoltDDLVisitor visitor = new VoltDDLVisitor(factory);
+        VoltDDLVisitor visitor = new VoltDDLVisitor(factory, null);
         processSQLWithListener(aSQL, visitor, aKind);
         return visitor.getVoltXML();
     }
@@ -98,15 +98,15 @@ public class VoltSQLInterface {
             VoltXMLElement columnsXML = new VoltXMLElement("columns");
             columnsXML.withValue("name", "columns");
             tableXML.children.add(columnsXML);
-            int colidx = 0;
-            for (String colName : table.getColumnNames()) {
-                Column col = table.getColumnByName(colName);
+            for (int colIdx = 0; colIdx < table.getColumnCount(); colIdx += 1) {
+                IColumn col = table.getColumnByIndex(colIdx);
+                String colName = col.getName();
                 VoltXMLElement colXML = new VoltXMLElement("column");
                 colXML.withValue("name", colName.toUpperCase())
-                      .withValue("index", Integer.toString(colidx))
-                      .withValue("nullable", "false")
+                      .withValue("index", Integer.toString(colIdx))
+                      .withValue("nullable", (col.isNullable() ? "true" : "false"))
                       .withValue("valuetype", col.getType().getName().toUpperCase());
-                colidx += 1;
+                // What about the default value?
                 columnsXML.children.add(colXML);
             }
             VoltXMLElement indicesXML = new VoltXMLElement("indexes");

@@ -19,13 +19,15 @@
 
 import java.util.List;
 
-import org.voltdb.sqlparser.syntax.IColumnIdent;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
+import org.voltdb.sqlparser.syntax.grammar.IColumnIdent;
+import org.voltdb.sqlparser.syntax.grammar.IIndex;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
 import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
 import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.grammar.Projection;
+import org.voltdb.sqlparser.syntax.grammar.QuerySetOp;
 import org.voltdb.sqlparser.syntax.util.ErrorMessageSet;
 
 /**
@@ -77,7 +79,7 @@ public interface IParserFactory {
     ITable newTable(String aTableName);
 
     /**
-     * Create a new select query object.  This is a complicated
+     * Create a new simple table select query object.  This is a complicated
      * object which reads some projections, some tables, some join conditions,
      * group by and having clauses, then processes projections.
      *
@@ -86,8 +88,17 @@ public interface IParserFactory {
      * @param aLineNo
      * @return
      */
-    ISelectQuery newSelectQuery(ISymbolTable aSymbolTable, int aLineNo, int aColNo);
+    ISelectQuery newSimpleTableSelectQuery(ISymbolTable aSymbolTable, int aLineNo, int aColNo);
 
+    /**
+     * Create a new compound query object.  This is a boolean combination
+     * of smaller queries.
+     * @param op
+     * @param left
+     * @param right
+     * @return
+     */
+    ISelectQuery newCompoundQuery(QuerySetOp op, ISelectQuery left, ISelectQuery right);
     /**
      * Once all the parts of a select statement have been seen,
      * type checked and processed, this is called to tie all the
@@ -261,8 +272,24 @@ public interface IParserFactory {
     /**
      * Make a Semantino for a query statement.
      *
-     * @param query
+     * @param query The query.
      * @return
      */
     ISemantino makeQuerySemantino(ISelectQuery query);
+    
+    /**
+     * Make a new index with the given name, on the given
+     * table, column and index type.
+     * 
+     * @param table The table of the index.
+     * @param column The column of the index
+     * @param m_isUniqueConstraint UNIQUE is specified.
+     * @param m_isAssumedUnique ASSUMEUNIQUE is specified.
+     * @param m_isPrimaryKey PRIMARY KEY is specified.
+     * @return A new index.
+     */
+	IIndex newIndex(String indexName,
+				    ITable table,
+					IColumn column,
+					IndexType it);
 }

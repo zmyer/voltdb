@@ -2,15 +2,16 @@ package org.hsqldb_voltpatches;
 
 import org.voltdb.sqlparser.semantics.grammar.InsertStatement;
 import org.voltdb.sqlparser.semantics.symtab.ParserFactory;
+import org.voltdb.sqlparser.syntax.VoltSQLState;
 import org.voltdb.sqlparser.syntax.VoltSQLVisitor;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
 import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
 import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.symtab.IAST;
 
-public class VoltDDLVisitor extends VoltSQLVisitor {
-    public VoltDDLVisitor(ParserFactory aFactory) {
-        super(aFactory);
+public class VoltDDLVisitor extends VoltSQLVisitor<VoltSQLState> {
+    public VoltDDLVisitor(ParserFactory aFactory, VoltSQLState state) {
+        super(aFactory, state);
     }
 
     /**

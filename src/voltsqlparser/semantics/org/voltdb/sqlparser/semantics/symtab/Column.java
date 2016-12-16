@@ -41,7 +41,8 @@ public class Column extends Top implements IColumn {
     protected boolean m_isNullable      = false;
     protected boolean m_isPrimaryKey    = false;
     protected boolean m_isUnique        = false;
-    protected boolean m_isNull          = false;
+    protected boolean m_isAssumedUnique = false;
+	protected boolean m_isNull          = false;
 
     public Column(String name,Type type) {
         super(name);
@@ -117,7 +118,22 @@ public class Column extends Top implements IColumn {
 
     @Override
     public boolean isNull() {
-        // TODO Auto-generated method stub
         return m_isNull;
     }
+    
+    @Override
+    public boolean isAssumedUnique() {
+		return m_isAssumedUnique;
+	}
+    
+    @Override
+    public void setAssumedUnique(boolean value) {
+    	m_isAssumedUnique = value;
+    }
+
+	@Override
+	public void setIsAssumedUnique(boolean m_isAssumedUnique) {
+		// TODO Auto-generated method stub
+		
+	}
 }

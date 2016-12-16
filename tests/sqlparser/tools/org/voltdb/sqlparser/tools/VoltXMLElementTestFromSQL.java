@@ -51,6 +51,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.List;
 
 import javax.xml.bind.JAXBContext;
@@ -344,7 +345,7 @@ public class VoltXMLElementTestFromSQL {
         String prefixFmt =
             ""
             + "/* This file is part of VoltDB.\n"
-            + " * Copyright (C) 2008-2015 VoltDB Inc.\n"
+            + " * Copyright (C) 2008-%d VoltDB Inc.\n"
             + " *\n"
             + " * This file contains original code and/or modifications of original code.\n"
             + " * Any modifications made by VoltDB Inc. are licensed under the following\n"
@@ -400,7 +401,13 @@ public class VoltXMLElementTestFromSQL {
             + (!haveSchema() ? "" : "            System.err.printf(\"Error parsing ddl: %%s\\n\", ex.getMessage());\n")
             + (!haveSchema() ? "" : "        }\n")
             + "    }\n";
-        m_outputStream.printf(prefixFmt, m_packageName, m_className, m_className, getSchema());
+        m_outputStream.printf(prefixFmt, currentYear(), m_packageName, m_className, m_className, getSchema());
+    }
+
+    private int currentYear() {
+    	Calendar now = Calendar.getInstance();
+    	int year = now.get(Calendar.YEAR);
+    	return year;
     }
 
     private void writeDDLTestBody(String aSql, String aTestName, String aComment) {
@@ -432,6 +439,7 @@ public class VoltXMLElementTestFromSQL {
             m_outputStream.print(sb.toString());
         } catch (HSQLParseException e) {
             System.err.printf("Test %s: DDL \"%s\" does not compile\n", aTestName, aSql);
+            System.err.printf("  Err: %s\n", e.getMessage());
             m_errors += 1;
         }
 

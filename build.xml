@@ -1359,25 +1359,29 @@ Antlr4 Compilation Macro
 -->
 <target name="check_for_sql_grammar">
     <uptodate property="sqlGrammarIsUpToDate"
-	      targetfile="${antlr4.touch}"
-	      srcfile="${pkg.sqlparser.syntax.dir}/grammar/SQLParser.g4" />
+              targetfile="${antlr4.touch}">
+      <srcfiles dir="${pkg.sqlparser.syntax.dir}/grammar" includes="*.g4" />
+    </uptodate>
 </target>
 <target name="compile_sql_grammar"
-	depends="check_for_sql_grammar"
-	description="Compile the VoltDB SQL Parser using ANTLR4."
-	unless="sqlGrammarIsUpToDate" >
+        depends="check_for_sql_grammar"
+        description="Compile the VoltDB SQL Parser using ANTLR4."
+        unless="sqlGrammarIsUpToDate" >
     <path id="antlr.class.path">
-	<pathelement location="${antlr.complete.name}" />
+        <pathelement location="${antlr.complete.name}" />
     </path>
+    <!-- Compile only the top level grammar file,
+         which is SQLParser.g4.  The SQLLexer.g4 file
+         will be imported by this, so it will be included -->
     <java classname="org.antlr.v4.Tool" fork="true" failonerror="true"
-	  dir="${pkg.sqlparser.syntax.dir}/grammar">
+          dir="${pkg.sqlparser.syntax.dir}/grammar">
         <arg value="-o"/>
         <arg value="${pkg.antlr.generated.dir}"/>
-	<arg value="-no-listener" />
-	<arg value="-visitor" />
-	<arg value="-encoding" />
-	<arg value="UTF-8" />
-	<arg value="SQLParser.g4" />
+        <arg value="-no-listener" />
+        <arg value="-visitor" />
+        <arg value="-encoding" />
+        <arg value="UTF-8" />
+        <arg value="SQLParser.g4" />
     <classpath>
        <path refid="antlr.class.path"/>
     </classpath>
@@ -1391,25 +1395,25 @@ Create the sqlparser's SQL to VoltXMLElement Tests.
 ****************************************************
 -->
 <target name="check_for_sqlparser_VoltXML_tests"
-	    description="Check that the sqlparser's SQL to VoltXMLElement tests are up to date.">
+            description="Check that the sqlparser's SQL to VoltXMLElement tests are up to date.">
     <uptodate property="sqlparserVoltXMLTestsUpToDate"
-		      targetfile="${sqlparserVoltXMLTests.touch}"
-		      srcfile="${src.sqlparser.tests.dir}/tests/SimpleTestSuite.xml" />
+                      targetfile="${sqlparserVoltXMLTests.touch}"
+                      srcfile="${src.sqlparser.tests.dir}/tests/SimpleTestSuite.xml" />
 </target>
 
 <target name="create_sqlparser_tools"
-		description="Compile the sqlparser VoltXMLElement test generator.">
-	<invoke-javac srcdir="${src.sqlparser.tests.dir}/tools" />
+                description="Compile the sqlparser VoltXMLElement test generator.">
+        <invoke-javac srcdir="${src.sqlparser.tests.dir}/tools" />
 </target>
 <target name="create_sqlparser_tests"
-		description="Generate the sqlparser's SQL to VoltXMLELement tests"
-		depends="check_for_sqlparser_VoltXML_tests, create_sqlparser_tools" >
-	<java classname="org.voltdb.sqlparser.tools.VoltXMLElementTestFromSQL" fork="true" failonerror="true"
-	      dir="${base.dir}">
-		<classpath refid="project.classpath" />
-		<arg value="--xml-file" />
-		<arg value="tests/sqlparser/tests/SimpleTestSuite.xml" />
-	</java>
+                description="Generate the sqlparser's SQL to VoltXMLELement tests"
+                depends="check_for_sqlparser_VoltXML_tests, create_sqlparser_tools" >
+        <java classname="org.voltdb.sqlparser.tools.VoltXMLElementTestFromSQL" fork="true" failonerror="true"
+              dir="${base.dir}">
+                <classpath refid="project.classpath" />
+                <arg value="--xml-file" />
+                <arg value="tests/sqlparser/tests/SimpleTestSuite.xml" />
+        </java>
     <touch file="${sqlparserVoltXMLTests.touch}" mkdirs="true"/>
 </target>
 
@@ -1556,10 +1560,10 @@ Create the sqlparser's SQL to VoltXMLElement Tests.
     <!-- non-voltcore voltdb code -->
     <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java" />
 
-	<!-- Create the sqlparser VoltXMLElement tests -->
-	<antcall target="create_sqlparser_tests" />
+        <!-- Create the sqlparser VoltXMLElement tests -->
+        <antcall target="create_sqlparser_tests" />
     <!-- compile the individual test directories -->
-	<invoke-javac srcdir="${src.sqlparser.tests.dir}/tests" destdir="${build.test.dir}"/>
+        <invoke-javac srcdir="${src.sqlparser.tests.dir}/tests" destdir="${build.test.dir}"/>
     <invoke-javac srcdir="${src.testproc.dir}" destdir='${build.testproc.dir}'/>
     <invoke-javac srcdir="${src.hsqldb.test.dir}" destdir='${build.test.dir}'/>
     <invoke-javac srcdir="${src.test.dir}" destdir='${build.test.dir}'

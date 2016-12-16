@@ -31,5 +31,8 @@ public interface IType extends ITop {
     boolean isErrorType();
 
     boolean isVoidType();
-
+    
+    boolean isFixedSize();
+    
+    IType makeInstance(long ... param);
 }

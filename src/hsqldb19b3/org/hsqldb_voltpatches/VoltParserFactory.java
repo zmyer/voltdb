@@ -2,24 +2,30 @@ package org.hsqldb_voltpatches;
 
 import java.util.List;
 
+import org.voltdb.sqlparser.semantics.grammar.CompoundSelectQuery;
 import org.voltdb.sqlparser.semantics.grammar.InsertStatement;
-import org.voltdb.sqlparser.semantics.symtab.ExpressionParser;
+import org.voltdb.sqlparser.semantics.symtab.Index;
 import org.voltdb.sqlparser.semantics.symtab.ParserFactory;
 import org.voltdb.sqlparser.semantics.symtab.Semantino;
 import org.voltdb.sqlparser.semantics.symtab.SymbolTable;
-import org.voltdb.sqlparser.semantics.symtab.Type;
 import org.voltdb.sqlparser.semantics.symtab.SymbolTable.TablePair;
+import org.voltdb.sqlparser.semantics.symtab.Table;
+import org.voltdb.sqlparser.semantics.symtab.Type;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
+import org.voltdb.sqlparser.syntax.grammar.IIndex;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
 import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
 import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.grammar.Projection;
+import org.voltdb.sqlparser.syntax.grammar.QuerySetOp;
 import org.voltdb.sqlparser.syntax.symtab.IAST;
-import org.voltdb.sqlparser.syntax.symtab.IExpressionParser;
+import org.voltdb.sqlparser.syntax.symtab.IColumn;
 import org.voltdb.sqlparser.syntax.symtab.IParserFactory;
 import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
+import org.voltdb.sqlparser.syntax.symtab.ITable;
 import org.voltdb.sqlparser.syntax.symtab.IType;
+import org.voltdb.sqlparser.syntax.symtab.IndexType;
 
 /**
  * This is the most derived class of the parser factory hierarchy.  Its
@@ -31,6 +37,9 @@ import org.voltdb.sqlparser.syntax.symtab.IType;
  *
  */
 public class VoltParserFactory extends ParserFactory implements IParserFactory {
+	private static final String PRIMARY_KEY_INDEX_PATTERN = "VOLTDB_PK_%s_INDEX";
+	private static final String UNIQUE_KEY_INDEX_PATTERN = "VOLTDB_UNIQUE_%s_%s_INDEX";
+	private static final String ASSUMED_UNIQUE_KEY_INDEX_PATTERN = "VOLTDB_ASSUMED_UNIQUE_%s_%s_INDEX";
     int m_id = 1;
     public VoltParserFactory(ICatalogAdapter aCatalog) {
         super(aCatalog);
@@ -71,10 +80,6 @@ public class VoltParserFactory extends ParserFactory implements IParserFactory {
         answer.children.add((VoltXMLElement)aLeftoperand.getAST());
         answer.children.add((VoltXMLElement)aRightoperand.getAST());
         return answer;
-    }
-
-    private void unimplementedOperation(String aFuncName) {
-        throw new AssertionError("Unimplemented ParserFactory Method " + aFuncName);
     }
 
     /**
@@ -178,7 +183,10 @@ public class VoltParserFactory extends ParserFactory implements IParserFactory {
         for (TablePair tblpair : tables.getTables()) {
             String tableName = tblpair.getTable().getName();
             String tableAlias = tblpair.getAlias();
-            for (String colName : tblpair.getTable().getColumnNames()) {
+            Table tbl = tblpair.getTable();
+            for (int idx = 0; idx < tbl.getColumnCount(); idx += 1) {
+            	IColumn col = tbl.getColumnByIndex(idx);
+            	String colName = col.getName();
                 addOneColumn(aParent, tableName, tableAlias, colName, colName);
             }
         }
@@ -244,4 +252,36 @@ public class VoltParserFactory extends ParserFactory implements IParserFactory {
 									 	  aQuery.getTables()));
 	}
 
+	@Override
+	public IIndex newIndex(String indexName, 
+						   ITable table, 
+						   IColumn column,
+						   IndexType indexType) {
+		if (indexName == null) {
+			indexName = makeIndexName(table.getName(), column.getName(), indexType);
+		}
+		return new Index(indexName, indexType);
+	}
+
+	private String makeIndexName(String tableName,
+								 String columnName,
+								 IndexType indexType) {
+		switch (indexType) {
+		case PRIMARY_KEY:
+			return String.format(PRIMARY_KEY_INDEX_PATTERN, tableName.toUpperCase());
+		case UNIQUE_KEY:
+			return String.format(UNIQUE_KEY_INDEX_PATTERN, tableName.toUpperCase(), columnName.toUpperCase());
+		case ASSUMED_UNIQUE_KEY:
+			return String.format(ASSUMED_UNIQUE_KEY_INDEX_PATTERN, tableName.toUpperCase(), columnName.toUpperCase());
+		case INVALID:
+		default:
+			assert(false);
+		}
+		return null;
+	}
+
+	@Override
+	public ISelectQuery newCompoundQuery(QuerySetOp op, ISelectQuery left, ISelectQuery right) {
+		return new CompoundSelectQuery(op, left, right);
+	}
 }

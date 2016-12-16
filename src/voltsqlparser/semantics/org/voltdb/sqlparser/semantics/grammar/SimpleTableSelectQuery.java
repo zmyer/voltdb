@@ -29,6 +29,7 @@ import org.voltdb.sqlparser.syntax.grammar.IOperator;
 import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
 import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.grammar.Projection;
+import org.voltdb.sqlparser.syntax.grammar.QuerySetOp;
 import org.voltdb.sqlparser.syntax.symtab.IAST;
 import org.voltdb.sqlparser.syntax.symtab.IExpressionParser;
 import org.voltdb.sqlparser.syntax.symtab.IParserFactory;
@@ -38,7 +39,7 @@ import org.voltdb.sqlparser.syntax.util.ErrorMessageSet;
 
 
 
-public class SelectQuery implements ISelectQuery, IDQLStatement {
+public class SimpleTableSelectQuery implements ISelectQuery, IDQLStatement {
     List<Projection> m_projections = new ArrayList<Projection>();
 
     private ExpressionParser m_expressionParser;
@@ -47,7 +48,7 @@ public class SelectQuery implements ISelectQuery, IDQLStatement {
     private IAST m_ast;
     private ErrorMessageSet m_errorMessages;
 
-    public SelectQuery(SymbolTable aParent,
+    public SimpleTableSelectQuery(SymbolTable aParent,
                        IParserFactory aFactory,
                        ErrorMessageSet aErrorMessages,
                        int aLineNo,
@@ -202,4 +203,23 @@ public class SelectQuery implements ISelectQuery, IDQLStatement {
         m_expressionParser = (ExpressionParser)aExpressionParser;
     }
 
+	@Override
+	public boolean isSimpleTable() {
+		return true;
+	}
+
+	@Override
+	public QuerySetOp getSetOp() throws Exception {
+		return null;
+	}
+
+	@Override
+	public ISelectQuery getLeftQuery() {
+		return null;
+	}
+
+	@Override
+	public ISelectQuery getRightQuery() {
+		return null;
+	}
 }

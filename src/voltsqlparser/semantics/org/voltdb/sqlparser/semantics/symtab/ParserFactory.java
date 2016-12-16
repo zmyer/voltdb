@@ -39,9 +39,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.voltdb.sqlparser.semantics.grammar.InsertStatement;
-import org.voltdb.sqlparser.semantics.grammar.SelectQuery;
-import org.voltdb.sqlparser.syntax.IColumnIdent;
+import org.voltdb.sqlparser.semantics.grammar.SimpleTableSelectQuery;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
+import org.voltdb.sqlparser.syntax.grammar.IColumnIdent;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
 import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
@@ -105,12 +105,12 @@ public abstract class ParserFactory implements IParserFactory {
     }
 
     @Override
-    public ISelectQuery newSelectQuery(ISymbolTable aSymbolTable,
+    public ISelectQuery newSimpleTableSelectQuery(ISymbolTable aSymbolTable,
                                        int aLineNo,
                                        int aColNo) {
         assert (aSymbolTable instanceof SymbolTable);
         SymbolTable symtab = (SymbolTable) aSymbolTable;
-        return new SelectQuery(symtab,
+        return new SimpleTableSelectQuery(symtab,
                                this,
                                getErrorMessages(),
                                aLineNo,
@@ -138,6 +138,9 @@ public abstract class ParserFactory implements IParserFactory {
         return m_operatorMap.get(aText);
     }
 
+    /*
+     * The usual arithmetic conversions.
+     */
     @Override
     public Semantino[] tuac(ISemantino ileft, ISemantino iright, ISymbolTable aSymbolTable) {
         assert aSymbolTable instanceof SymbolTable;

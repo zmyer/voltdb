@@ -18,7 +18,6 @@
 
 import java.util.List;
 
-import org.voltdb.sqlparser.syntax.IColumnIdent;
 import org.voltdb.sqlparser.syntax.symtab.ITable;
 import org.voltdb.sqlparser.syntax.util.ErrorMessageSet;
 

@@ -47,8 +47,49 @@ import org.voltdb.sqlparser.syntax.symtab.IType;
  */
 public interface ISelectQuery {
 
+	/**
+	 * True iff this is a simple table.  Simple tables
+	 * are select statements, with no boolean operations.
+	 * @return
+	 */
+    boolean isSimpleTable();
+
+    /**
+     * If this is a not a simple table, it's the
+     * combination of two other select queries.  Return
+     * the set operation combining them.  It's an error
+     * if this is called on a simple table query.
+     */
+    QuerySetOp getSetOp() throws Exception;
+    
+    /**
+     * Return the left hand query of a compound query.
+     *  
+     * @return
+     */
+    ISelectQuery getLeftQuery();
+    /**
+     * Return the right hand query of a compound query.
+     * @return
+     */
+    ISelectQuery getRightQuery();
+    
+    /**
+     * Add a projection.  This is a select list element.
+     * 
+     * @param aTableName
+     * @param aColumnName
+     * @param aAlias
+     * @param aLineNo
+     * @param aColNo
+     */
     void addProjection(String aTableName, String aColumnName, String aAlias, int aLineNo, int aColNo);
 
+    /**
+     * Add a projection.
+     * @param aLineNo
+     * @param aColNo
+     */
     void addProjection(int aLineNo, int aColNo);
 
     void pushSemantino(ISemantino aColumnSemantino);
@@ -91,5 +132,5 @@ public interface ISelectQuery {
     IExpressionParser getExpressionParser();
 
     void setExpressionParser(IExpressionParser expr);
-
+    
 }

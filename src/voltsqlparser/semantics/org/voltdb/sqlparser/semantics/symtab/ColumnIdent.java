@@ -16,7 +16,7 @@
  */
 package org.voltdb.sqlparser.semantics.symtab;
 
-import org.voltdb.sqlparser.syntax.IColumnIdent;
+import org.voltdb.sqlparser.syntax.grammar.IColumnIdent;
 
 /**
  * Hold the parts needed to define a column in an insert statement.

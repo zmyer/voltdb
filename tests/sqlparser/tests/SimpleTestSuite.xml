@@ -127,6 +127,22 @@
                        testName="testCreateTableTimestamp" 
                        testSQL="create table alpha ( id BiGiNt not null, beta timestamp)"
                        comment="Test TIMESTAMP type"/>
+            <testpoint testKind="ddl"
+                       testName="testCreateTablePrimaryKey"
+                       testSQL="create table alpha ( id BiGiNt not null PRIMARY KEY, beta timestamp)"
+                       comment="Test bigint PRIMARY KEY"/>
+            <testpoint testKind="ddl"
+                       testName="testCreateTableUniqueKey"
+                       testSQL="create table alpha ( id BiGiNt not null UNIQUE, beta timestamp)"
+                       comment="Test bigint UNIQUE KEY"/>
+            <testpoint testKind="ddl"
+                       testName="testCreateTableAssumeUniqueKey"
+                       testSQL="create table alpha ( id BiGiNt not null ASSUMEUNIQUE, beta timestamp)"
+                       comment="Test bigint ASSUMEUNIQUE KEY"/>
+            <testpoint testKind="ddl"
+                       testName="testCreateTableDefaultValue"
+                       testSQL="create table alpha ( id BiGiNt default '100', beta timestamp)"
+                       comment="Test bigint ASSUMEUNIQUE KEY"/>
         </test>
         <test name="TestWhereExpressions" sourcefolder="tests/sqlparser/tests" classname="org.voltdb.sqlparser.TestWhereExpressions">
             <schema>

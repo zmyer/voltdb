@@ -37,9 +37,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import org.voltdb.sqlparser.syntax.symtab.IColumn;
 import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
 import org.voltdb.sqlparser.syntax.symtab.ITop;
-import org.voltdb.sqlparser.syntax.symtab.IType;
 import org.voltdb.sqlparser.syntax.symtab.TypeKind;
 
 /**
@@ -202,7 +202,10 @@ public class SymbolTable implements ISymbolTable {
         answer.define(new FloatingPointType("float", TypeKind.FLOAT));
         answer.define(new StringType("varchar",      TypeKind.VARCHAR));
         answer.define(new StringType("varbinary",    TypeKind.VARBINARY));
-        answer.define(new TimestampType("timestamp"));
+        answer.define(new TimestampType("timestamp", TypeKind.TIMESTAMP));
+        answer.define(new GeographyPointType("geography_point", 
+        		                                     TypeKind.GEOPOINT));
+        answer.define(new GeographyType("geography", TypeKind.GEOGRAPHY));
         answer.define(getErrorType());
         answer.define(getBooleanType());
         answer.define(getVoidType());
@@ -211,7 +214,7 @@ public class SymbolTable implements ISymbolTable {
 
     public String getTableAliasByColumn(String aColName) {
         for (TablePair tp : m_tables) {
-            Column col = tp.getTable().getColumnByName(aColName);
+            IColumn col = tp.getTable().getColumnByName(aColName);
             if (col != null) {
                 if (tp.getAlias() == null) {
                     return tp.getTable().getName();
@@ -224,7 +227,7 @@ public class SymbolTable implements ISymbolTable {
 
     public String getTableNameByColumn(String aColName) {
         for (TablePair tp : m_tables) {
-            Column col = tp.getTable().getColumnByName(aColName);
+            IColumn col = tp.getTable().getColumnByName(aColName);
             if (col != null) {
                 return tp.getTable().getName();
             }

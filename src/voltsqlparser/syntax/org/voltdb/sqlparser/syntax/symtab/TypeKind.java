@@ -32,19 +32,21 @@ package org.voltdb.sqlparser.syntax.symtab;
  *
  */
 public enum TypeKind {
-           /*  bool,   int,   float, str,   u-code, fixed, tmst, error,  void, size */
-    VOID       (false, false, false, false, false, false, false, false,   true,   0),
-    ERROR      (false, false, false, false, false, false, false, true,    false,  0),
-    BOOLEAN    (true,  false, false, false, false, false, false, false,   false,  4),
-    TINYINT    (false, true,  false, false, false, false, false, false,   false,  1),
-    SMALLINT   (false, true , false, false, false, false, false, false,   false,  2),
-    INTEGER    (false, true,  false, false, false, false, false, false,   false,  4),
-    BIGINT     (false, true,  false, false, false, false, false, false,   false,  8),
-    FLOAT      (false, false, true,  false, false, false, false, false,   false,  8),
-    VARCHAR    (false, false, false, true,  true,  false, false, false,   false, -1),
-    VARBINARY  (false, false, false, true,  false, false, false, false,   false, -1),
-    DECIMAL    (false, false, false, false, false, true,  false, false,   false,  8),
-    TIMESTAMP  (false, false, false, false, false, false, true,  false,   false,  8);
+           /*  bool,   int,   float, str,   u-code, fixed, tmst, geo, error,  void, size */
+    VOID       (false, false, false, false, false, false, false, false, false,   true,   0),
+    ERROR      (false, false, false, false, false, false, false, false, true,    false,  0),
+    BOOLEAN    (true,  false, false, false, false, false, false, false, false,   false,  4),
+    TINYINT    (false, true,  false, false, false, false, false, false, false,   false,  1),
+    SMALLINT   (false, true , false, false, false, false, false, false, false,   false,  2),
+    INTEGER    (false, true,  false, false, false, false, false, false, false,   false,  4),
+    BIGINT     (false, true,  false, false, false, false, false, false, false,   false,  8),
+    FLOAT      (false, false, true,  false, false, false, false, false, false,   false,  8),
+    VARCHAR    (false, false, false, true,  true,  false, false, false, false,   false, -1),
+    VARBINARY  (false, false, false, true,  false, false, false, false, false,   false, -1),
+    DECIMAL    (false, false, false, false, false, true,  false, false, false,   false, 16),
+    TIMESTAMP  (false, false, false, false, false, false, true,  false, false,   false,  8),
+    GEOPOINT   (false, false, false, false, false, false, true,  false, false,   false, 16),
+    GEOGRAPHY  (false, false, false, false, false, false, true,  false, false,   false, -1);
     private boolean m_isBoolean;
     private boolean m_isInteger;
     private boolean m_isString;
@@ -52,7 +54,10 @@ public enum TypeKind {
     private boolean m_isFloat;
     private boolean m_isTimeStamp;
     private boolean m_isUnicode;
+    private boolean m_isError;
+    private boolean m_isGeo;
     private boolean m_isVoid;
+    private boolean m_isGeospatial;
     private int m_sizeInBytes;
 
     private TypeKind(boolean aIsBoolean,
@@ -62,6 +67,7 @@ public enum TypeKind {
                      boolean aIsUnicode,
                      boolean aIsFixedPoint,
                      boolean aIsTimestamp,
+                     boolean aIsGeo,
                      boolean aIsError,
                      boolean aIsVoid,
                      int     aSizeInBytes) {
@@ -72,6 +78,8 @@ public enum TypeKind {
         m_isFixedPoint = aIsFixedPoint;
         m_isFloat      = aIsFloat;
         m_isTimeStamp  = aIsTimestamp;
+        m_isError      = aIsError;
+        m_isGeo        = aIsGeo;
         m_isVoid       = aIsVoid;
         m_sizeInBytes  = aSizeInBytes;
     }
@@ -112,6 +120,22 @@ public enum TypeKind {
         return getSizeInBytes() == 0;
     }
 
+    public final boolean isError() {
+    	return m_isError;
+    }
+    
+    public final boolean isGeospatial() {
+    	return m_isGeo;
+    }
+    
+    public final boolean isGeoPoint() {
+    	return isGeospatial() && 0 <= getSizeInBytes();
+    }
+    
+    public final boolean isGeography() {
+    	return isGeospatial() && getSizeInBytes() < 0;
+    }
+    
     public final boolean isVoid() {
         return m_isVoid;
     }

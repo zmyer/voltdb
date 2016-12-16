@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.voltdb.sqlparser.semantics.symtab.Type;
-import org.voltdb.sqlparser.syntax.IColumnIdent;
+import org.voltdb.sqlparser.syntax.grammar.IColumnIdent;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
 import org.voltdb.sqlparser.syntax.symtab.IColumn;
 import org.voltdb.sqlparser.syntax.symtab.ITable;

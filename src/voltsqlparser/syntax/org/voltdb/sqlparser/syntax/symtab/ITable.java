@@ -16,10 +16,9 @@
  */
  package org.voltdb.sqlparser.syntax.symtab;
 
-import java.util.List;
 import java.util.Set;
 
-import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Column_nameContext;
+import org.voltdb.sqlparser.syntax.grammar.IIndex;
 
 public interface ITable extends ITop {
 
@@ -40,21 +39,10 @@ public interface ITable extends ITop {
     public IColumn getColumnByName(String aColumnName);
 
     /**
-     * Return a list of all column names, in declaration order.  The order
-     * of names in this list must be identical to the order of types returned
-     * by ITable.getColumnTypes.
-     *
-     * @return
+     * Given a column index, return the IColumn object. 
      */
-    public abstract List<String> getColumnNames();
-    /**
-     * Return a list of all column types, in declaration order.  The order
-     * of types in this list must be identical to the order of names returned
-     * by ITable.getColumnNames.
-     * @return
-     */
-    public abstract List<IType> getColumnTypes();
-
+    public IColumn getColumnByIndex(int index);
+    
     /**
      * Return a copy of the set of strings which name columns.
      *
@@ -62,4 +50,12 @@ public interface ITable extends ITop {
      */
     public abstract Set<String> getColumnNamesAsSet();
 
+    /**
+     * Add an index to this table.
+     * @param indexName The index's name.
+     * @param index The actual index to add.
+     */
+	public abstract void addIndex(String indexName, IIndex index);
+
+	public abstract int getColumnCount();
 }

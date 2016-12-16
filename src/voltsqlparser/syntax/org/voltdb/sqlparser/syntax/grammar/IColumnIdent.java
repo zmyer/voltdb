@@ -14,22 +14,23 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.voltdb.sqlparser.syntax;
-
-import org.voltdb.sqlparser.syntax.symtab.IType;
+package org.voltdb.sqlparser.syntax.grammar;
 
 /**
- * An IStringType object is some kind of string type.  This could
- * be VARCHAR or VARBINARY.  This type is kind of odd in that we
- * have urtypes named VARCHAR and VARBINARY which have no max
- * size, and other types which do have max size.  The urtypes are
- * in the standard prelude, but they other types are in the ASTs.
+ * An IColumnIdent is a reference to a column in
+ * a table definition.  It's very much like an IProjection,
+ * but slightly more specialized, since there is no alias
+ * and the table is implicit.  Maybe they should be be
+ * merged.
  *
  * @author bwhite
- *
  */
-public interface IStringType extends IType {
+public interface IColumnIdent {
 
-    public abstract IStringType makeInstance(long aSize);
+    public abstract String getColumnName();
+
+    public abstract int getColLineNo();
+
+    public abstract int getColColNo();
 
 }

@@ -26,40 +26,84 @@ import org.antlr.v4.runtime.Recognizer;
 import org.antlr.v4.runtime.atn.ATNConfigSet;
 import org.antlr.v4.runtime.dfa.DFA;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
+import org.voltdb.sqlparser.syntax.grammar.IColumnIdent;
+import org.voltdb.sqlparser.syntax.grammar.IGeographyType;
+import org.voltdb.sqlparser.syntax.grammar.IIndex;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
-import org.voltdb.sqlparser.syntax.grammar.IOperator;
 import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
 import org.voltdb.sqlparser.syntax.grammar.ISemantino;
+import org.voltdb.sqlparser.syntax.grammar.IStringType;
+import org.voltdb.sqlparser.syntax.grammar.QuerySetOp;
 import org.voltdb.sqlparser.syntax.grammar.SQLParserBaseVisitor;
 import org.voltdb.sqlparser.syntax.grammar.SQLParserParser;
-import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Column_nameContext;
+import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.From_clauseContext;
+import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Group_by_clauseContext;
+import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Having_clauseContext;
+import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Query_expression_bodyContext;
+import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Query_intersect_opContext;
+import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Query_primaryContext;
+import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Query_specificationContext;
+import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Query_union_opContext;
+import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Select_listContext;
+import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Simple_tableContext;
+import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Table_expressionContext;
+import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Table_referenceContext;
+import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Where_clauseContext;
 import org.voltdb.sqlparser.syntax.symtab.IColumn;
 import org.voltdb.sqlparser.syntax.symtab.IExpressionParser;
 import org.voltdb.sqlparser.syntax.symtab.IParserFactory;
 import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
 import org.voltdb.sqlparser.syntax.symtab.ITable;
 import org.voltdb.sqlparser.syntax.symtab.IType;
+import org.voltdb.sqlparser.syntax.symtab.IndexType;
 import org.voltdb.sqlparser.syntax.util.ErrorMessage;
 import org.voltdb.sqlparser.syntax.util.ErrorMessageSet;
 
-public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRErrorListener {
+public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRErrorListener {
+
     private static final int DEFAULT_STRING_SIZE = 64;
+    
+    private T m_state;
     private List<IExpressionParser> m_expressionStack = new ArrayList<IExpressionParser>();
-    private ITable m_currentlyCreatedTable = null;
+    
     private ISymbolTable m_symbolTable;
     private IParserFactory m_factory;
     private ICatalogAdapter m_catalog;
     private ErrorMessageSet m_errorMessages;
     private List<ISelectQuery> m_selectQueryStack = new ArrayList<ISelectQuery>();
-    private IInsertStatement m_insertStatement = null;
+    
+    /*
+     * Temporary data needed for table creation
+     * and also for constraint definitions.
+     */
+    private ITable m_currentlyCreatedTable = null;
+    private IColumn m_currentlyCreatedColumn = null;
     private String m_defaultValue;
     private boolean m_hasDefaultValue;
-    private boolean m_isPrimaryKey;
-    private boolean m_isUniqueConstraint;
     private boolean m_isNullable;
     private boolean m_isNull;
+    private IndexType m_indexType;
+	private IType   m_columnType;
 
-    public VoltSQLVisitor(IParserFactory aFactory) {
+	
+	/*
+	 * Temporary data needed for defining types.
+	 */
+	private List<String> m_constantIntegerValues = null;
+
+	/*
+	 * Temporary data needed for defining insert/upsert statements.
+	 */
+	boolean m_isUpsert;
+    private IInsertStatement m_insertStatement = null;
+    
+    /*
+     * Temporary data needed for query statements.
+     */
+    ISelectQuery m_selectQuery = null;
+    
+    public VoltSQLVisitor(IParserFactory aFactory, T aState) {
+    	m_state = aState;
         m_factory = aFactory;
         m_symbolTable = aFactory.getStandardPrelude();
         m_catalog = aFactory.getCatalog();
@@ -101,140 +145,341 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
         return sb.toString();
     }
 
-    /*
     ///**
     // * {@inheritDoc}
     // * /
-    @Override public Void visitColumn_definition(SQLParserParser.Column_definitionContext ctx) {
-        m_defaultValue       = null;
-        m_hasDefaultValue    = false;
-        m_isPrimaryKey       = false;
-        m_isUniqueConstraint = false;
-        m_isNullable         = true;
-        m_isNull             = false;
-        //
-        // Walk the subtree.
-        //
-        String colName = ctx.column_name().IDENTIFIER().getText();
-        String type = ctx.type_expression().type_name().IDENTIFIER().getText();
-        int nparms, p1 = -1, p2 = -1;
-        nparms = ctx.type_expression().NUMBER().size();
-        if (nparms > 0) {
-            p1 = Integer.parseInt(ctx.type_expression().NUMBER().get(0).getText());
-            if (nparms > 1) {
-                p2 = Integer.parseInt(ctx.type_expression().NUMBER().get(1).getText());
-            }
-        }
-        IType colType = m_symbolTable.getType(type);
-        if (colType == null) {
-            addError(ctx.start.getLine(), ctx.start.getCharPositionInLine(), "Type expected");
-            colType = m_factory.getErrorType();
-        } else if (colType.getTypeKind().isFixedPoint()) {
-            //
-            // Warn if we get scale and precision arguments.  We
-            // just ignore them.
-            //
-            if (nparms > 0) {
-                addWarning(ctx.start.getLine(),
-                           ctx.start.getCharPositionInLine(),
-                           "The type %s has a fixed scale and precision.  These arguments will be ignored.",
-                           colType.getName().toUpperCase());
-            }
-        } else if (colType instanceof IStringType) {
-            int size;
-            //
-            // We should get zero or one argument.  It is an
-            // error otherwise.
-            //
-            if (nparms == 0) {
-                size = DEFAULT_STRING_SIZE;
-            } else if (nparms == 1) {
-                size = p1;
-                colType = ((IStringType) colType).makeInstance(size);
-            } else {
-                addError(ctx.start.getLine(),
-                         ctx.start.getCharPositionInLine(),
-                         "The string type %s takes only one size parameter.",
-                         colType.getName().toUpperCase());
-                colType = m_factory.getErrorType();
-            }
-        } else if (nparms > 0) {
-            addError(ctx.start.getLine(),
-                     ctx.start.getCharPositionInLine(),
-                     "The type %s takes no type parameters.",
-                     colType.getName().toUpperCase());
-            colType = m_factory.getErrorType();
-        }
-        IColumn column = m_factory.newColumn(colName, colType);
-        column.setHasDefaultValue(m_hasDefaultValue);
-        column.setDefaultValue(m_defaultValue);
-        column.setIsPrimaryKey(m_isPrimaryKey);
-        column.setIsUniqueConstraint(m_isUniqueConstraint);
-        column.setIsNullable(m_isNullable);
-        column.setIsNull(m_isNull);
-        m_currentlyCreatedTable.addColumn(colName, column);
-        return null;
-    }
-
-    ///**
-    // * {@inheritDoc}
-    // * /
-    @Override public Void visitNullableColumnAttribute(org.voltdb.sqlparser.syntax.grammar.SQLParserParser.NullableColumnAttributeContext ctx) {
-        super.visitNullableColumnAttribute(ctx);
-        m_isNullable = (ctx.NOT() == null);
-        return null;
-    }
-
-    ///**
-    // * {@inheritDoc}
-    // * /
-    @Override public Void visitDefaultValueColumnAttribute(org.voltdb.sqlparser.syntax.grammar.SQLParserParser.DefaultValueColumnAttributeContext ctx) {
-        super.visitDefaultValueColumnAttribute(ctx);
-        m_hasDefaultValue = true;
-        m_defaultValue = ctx.literal_value().getText();
-        return null;
-    };
-
-    ///**
-    // * {@inheritDoc}
-    // * /
-    @Override public Void visitPrimaryKeyColumnAttribute(org.voltdb.sqlparser.syntax.grammar.SQLParserParser.PrimaryKeyColumnAttributeContext ctx) {
-        super.visitPrimaryKeyColumnAttribute(ctx);
-        m_isPrimaryKey = true;
-        return null;
-    };
-
-    ///**
-    // * {@inheritDoc}
-    // * /
-    @Override public Void visitUniqueColumnAttribute(org.voltdb.sqlparser.syntax.grammar.SQLParserParser.UniqueColumnAttributeContext ctx) {
-        super.visitUniqueColumnAttribute(ctx);
-        m_isUniqueConstraint = true;
-        return null;
-    };
-
-    ///**
-    // * {@inheritDoc}
-    // * /
-    @Override public Void visitCreate_table_statement(SQLParserParser.Create_table_statementContext ctx) {
-        String tableName = ctx.table_name().IDENTIFIER().getText();
+	@Override public T visitCreate_table(SQLParserParser.Create_tableContext ctx) {
+        String tableName = ctx.table_primary().table_name().IDENTIFIER().getText();
+        assert(m_currentlyCreatedTable == null);
         m_currentlyCreatedTable = m_factory.newTable(tableName);
         //
         // Walk the subtree.
         //
-        super.visitCreate_table_statement(ctx);
+        super.visitCreate_table(ctx);
         m_catalog.addTable(m_currentlyCreatedTable);
         m_currentlyCreatedTable = null;
-        return null;
+        return m_state;
     }
 
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>Define a column.</p>
+	 */
+	@Override public T visitColumn_definition(SQLParserParser.Column_definitionContext ctx) {
+        m_defaultValue       = null;
+        m_hasDefaultValue    = false;
+        m_isNullable         = true;
+        m_isNull             = false;
+        m_indexType          = IndexType.INVALID;
+        assert(m_currentlyCreatedColumn == null);
+        //
+        // Walk the subtree.
+        //
+        super.visitColumn_definition(ctx);
+        if (m_columnType == null) {
+            addError(ctx.start.getLine(), ctx.start.getCharPositionInLine(), "Type expected");
+            m_columnType = m_factory.getErrorType();
+        }
+        String colName = ctx.column_name().IDENTIFIER().getText();
+        IColumn column = m_factory.newColumn(colName, m_columnType);
+        column.setHasDefaultValue(m_hasDefaultValue);
+        column.setDefaultValue(m_defaultValue);
+        column.setIsPrimaryKey(m_indexType == IndexType.PRIMARY_KEY);
+        column.setIsUniqueConstraint(m_indexType == IndexType.UNIQUE_KEY);
+        column.setIsAssumedUnique(m_indexType == IndexType.ASSUMED_UNIQUE_KEY);
+        column.setIsNullable(m_isNullable);
+        column.setIsNull(m_isNull);
+        m_currentlyCreatedTable.addColumn(colName, column);
+        if (m_indexType != IndexType.INVALID) {
+        	// The factory knows how to compute the
+        	// name of the index since we don't actually
+        	// have a name.
+        	IIndex index = m_factory.newIndex(null,
+        									  m_currentlyCreatedTable,
+        									  column,
+        									  m_indexType);
+        	m_currentlyCreatedTable.addIndex(index.getName(), index);
+        }
+        return m_state;
+	}
+	
+	
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation returns the result of calling
+	 * {@link #visitChildren} on {@code ctx}.</p>
+	 */
+	@Override public T visitColumn_definition_metadata(SQLParserParser.Column_definition_metadataContext ctx) {
+		//
+		// Visit the children.
+		//
+		super.visitColumn_definition_metadata(ctx);
+		return m_state;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override public T visitColumn_default_value(SQLParserParser.Column_default_valueContext ctx) { 
+		super.visitColumn_default_value(ctx);
+		if (m_hasDefaultValue) {
+            addError(ctx.start.getLine(), ctx.start.getCharPositionInLine(), "DEFAULT value specified more than once.");
+		}
+		else {
+			m_hasDefaultValue = true;
+			m_defaultValue = ctx.default_string().getText();
+		}
+		return m_state;
+	}
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override public T visitColumn_not_null(SQLParserParser.Column_not_nullContext ctx) { 
+		visitChildren(ctx);
+		if ( ! m_isNullable) {
+			addError(ctx.start.getLine(), ctx.start.getCharPositionInLine(), "NOT NULL specified more than once.");
+		}
+		else {
+			m_isNullable = false;
+		}
+		return m_state;
+	}
+	
+	private String convertDefaultString(String string) {
+		int startIdx = 0;
+		int endIdx = string.length();
+		boolean changed = false;
+		if (string.startsWith("'")) {
+			startIdx = 1;
+			changed = true;
+		}
+		if (string.endsWith("'")) {
+			endIdx = string.length();
+			changed = true;
+		}
+		if (changed) {
+			string = string.substring(startIdx, endIdx);
+		}
+		return string;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation returns the result of calling
+	 * {@link #visitChildren} on {@code ctx}.</p>
+	 */
+	@Override public T visitIndex_type(SQLParserParser.Index_typeContext ctx) { 
+		super.visitChildren(ctx);
+		if (ctx.PRIMARY() != null && ctx.KEY() != null) {
+			if (m_indexType == IndexType.PRIMARY_KEY) {
+				addError(ctx.start.getLine(), ctx.start.getCharPositionInLine(),
+					     "PRIMARY KEY specified twice.");
+			}
+			else if (m_indexType != IndexType.INVALID) {
+				addError(ctx.start.getLine(), ctx.start.getCharPositionInLine(),
+					     "PRIMARY KEY and %s both specified.",
+					     m_indexType.syntaxName());
+			}
+			else {
+				m_indexType = IndexType.PRIMARY_KEY;
+			}
+		}
+		if (ctx.UNIQUE() != null) {
+			if (m_indexType == IndexType.UNIQUE_KEY) {
+				addError(ctx.start.getLine(), ctx.start.getCharPositionInLine(),
+					     "UNIQUE KEY specified twice.");
+			}
+			else if (m_indexType != IndexType.INVALID) {
+				addError(ctx.start.getLine(), ctx.start.getCharPositionInLine(),
+					     "UNIQUE and %s both specified.",
+					     m_indexType.syntaxName());
+			}
+			m_indexType = IndexType.PRIMARY_KEY;
+			m_indexType = IndexType.UNIQUE_KEY;
+		}
+		if (ctx.ASSUMEUNIQUE() != null) {
+			if (m_indexType != IndexType.INVALID) {
+				addError(ctx.start.getLine(), ctx.start.getCharPositionInLine(),
+					     "ASSUMEUNIQUE and %s both specified.",
+					     m_indexType.syntaxName());
+			}
+			else {
+				m_indexType = IndexType.PRIMARY_KEY;
+			}
+			m_indexType = IndexType.ASSUMED_UNIQUE_KEY;
+		}
+		return m_state;
+	}
+	
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>Parse a data type and leave it in m_type.</p>
+	 */
+	@Override public T visitDatatype(SQLParserParser.DatatypeContext ctx) { 
+		assert(m_constantIntegerValues == null);
+		m_constantIntegerValues = new ArrayList<>();
+		super.visitChildren(ctx);
+		String typeName = ctx.datatype_name().IDENTIFIER().getText();
+		m_columnType = m_symbolTable.getType(typeName);
+		if (m_columnType == null) {
+			addError(ctx.start.getLine(),
+					 ctx.start.getCharPositionInLine(),
+					 "The type name %s is not defined.",
+					 typeName);
+		}
+		if (m_columnType.getTypeKind().isFixedPoint()) {
+			//
+			// Warn that we are ignoring scale and
+			// precision here.
+			//
+			if (m_constantIntegerValues.size() > 0) {
+                addWarning(ctx.start.getLine(),
+                           ctx.start.getCharPositionInLine(),
+                           "The fixed point type %s has a fixed scale and precision.  These arguments will be ignored.",
+                           m_columnType.getName().toUpperCase());
+				
+			}
+		}
+		else if (m_columnType instanceof IStringType
+				 || m_columnType instanceof IGeographyType) {
+            long size;
+            //
+            // We should get zero or one argument.  It is an
+            // error otherwise.
+            //
+            if (m_columnType instanceof IStringType
+            		&& m_constantIntegerValues.size() == 0) {
+                size = DEFAULT_STRING_SIZE;
+            } else if (m_constantIntegerValues.size() == 1) {
+                size = Long.parseLong(m_constantIntegerValues.get(0));
+                m_columnType = m_columnType.makeInstance(size);
+            } else {
+                addError(ctx.start.getLine(),
+                         ctx.start.getCharPositionInLine(),
+                         "The type %s takes only one size parameter.",
+                         m_columnType.getName().toUpperCase());
+                m_columnType = m_factory.getErrorType();
+            }
+        }
+		else if (m_constantIntegerValues.size() > 0) {
+			addError(ctx.start.getLine(),
+					 ctx.start.getCharPositionInLine(),
+					 "The type %s takes no parameters.",
+					 m_columnType.getName());
+		}
+		m_constantIntegerValues = null;
+		return m_state;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override public T visitConstant_integer_value(SQLParserParser.Constant_integer_valueContext ctx) {
+		assert(m_constantIntegerValues != null);
+		m_constantIntegerValues.add(ctx.getText());
+		return m_state;
+	}
+
+	/**
+     * {@inheritDoc}
+     */
+    @Override public T visitInsert_statement(SQLParserParser.Insert_statementContext ctx) {
+        //
+        // Walk the subtree.
+        //
+        m_constantIntegerValues = new ArrayList<>();
+        super.visitInsert_statement(ctx);
+        m_isUpsert = (ctx.UPSERT() != null);
+        try {
+	        String tableName = ctx.table_primary().table_name().IDENTIFIER().getText();
+	        ITable table = m_catalog.getTableByName(tableName);
+	        if (table == null) {
+	            addError(ctx.table_primary().start.getLine(),
+	                     ctx.table_primary().start.getCharPositionInLine(),
+	                     "Undefined table name %s",
+	                     tableName);
+	            return m_state;
+	        }
+	        //
+	        // Calculate names and values.  Don't do any semantic checking here.
+	        // We'll do it all later.
+	        //
+	        if (ctx.insert_values().constant_value_expression() == null
+	        		|| ctx.insert_values().constant_value_expression().size() == 0) {
+	            addError(ctx.start.getLine(),
+	                     ctx.start.getCharPositionInLine(),
+	                     "No values specified.");
+	            return m_state;
+	        }
+	        List<IColumnIdent> columns = new ArrayList<IColumnIdent>();
+	        if (ctx.column_name() != null && ctx.column_name().size() > 0) {
+	            for (SQLParserParser.Column_nameContext cnctx : ctx.column_name()) {
+	                String colName = cnctx.IDENTIFIER().getText();
+	                int colLineNo = cnctx.start.getLine();
+	                int colColNo = cnctx.start.getCharPositionInLine();
+	                columns.add(m_factory.makeColumnRef(colName, colLineNo, colColNo));
+	            }
+	        } else {
+	            for (int colIdx = 0; colIdx < table.getColumnCount(); colIdx += 1) {
+	            	IColumn col = table.getColumnByIndex(colIdx);
+	            	assert(col != null);
+	            	String cname = col.getName();
+	            	assert(cname != null);
+	                columns.add(m_factory.makeColumnRef(cname, -1, -1));
+	            }
+	        }
+	
+	        m_insertStatement = m_factory.newInsertStatement();
+	        m_insertStatement.addTable(table);
+	        int idx = 0;
+	        List<String> colVals = new ArrayList<String>();
+	        for (SQLParserParser.Constant_value_expressionContext val : ctx.insert_values().constant_value_expression()) {
+	            //
+	            // TODO: This is not right.  These are expressions in general.  We
+	            // need to traffic in Semantinos here.
+	            //
+	            String valStr = val.constant_integer_value().NUMBER().getText();
+	            colVals.add(valStr);
+	            idx += 1;
+	        }
+	        m_insertStatement.addColumns(ctx.start.getLine(),
+	                                     ctx.start.getCharPositionInLine(),
+	                                     m_errorMessages,
+	                                     columns,
+	                                     colVals);
+	        return m_state;
+        } finally {
+        	m_constantIntegerValues = null;
+        }
+    }
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override public T visitQuery_expression(SQLParserParser.Query_expressionContext ctx) {
+        //
+        // No with expressions allowed.
+        //
+        visitQuery_expression_body(ctx.query_expression_body());
+        return m_state;
+	}
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override public T visitQuery_expression_body(SQLParserParser.Query_expression_bodyContext ctx) {
+		m_selectQuery = makeQuery(ctx);
+		return m_state;
+	}
+	/*
     ///**
     // * {@inheritDoc}
     // * /
-    @Override public Void visitSelect_statement(SQLParserParser.Select_statementContext ctx) {
-        pushSelectQuery(m_factory.newSelectQuery(m_symbolTable,
-                                                 ctx.stop.getLine(),
-                                                 ctx.stop.getCharPositionInLine()));
+    @Override public T visitSelect_statement(SQLParserParser.Select_statementContext ctx) {
+        pushSelectQuery();
         //
         // Walk the table_clause first.
         //
@@ -249,13 +494,13 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
         ISelectQuery query = popSelectQueryStack();
         ISemantino querySemantino = m_factory.makeQuerySemantino(query);
         getTopExpressionParser().pushSemantino(querySemantino);
-        return null;
+        return m_state;
     }
 
     ///**
     // * {@inheritDoc}
     // * /
-    @Override public Void visitProjection(SQLParserParser.ProjectionContext ctx) {
+    @Override public T visitProjection(SQLParserParser.ProjectionContext ctx) {
         //
         // Walk the subtree.
         //
@@ -280,13 +525,13 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
                                         ctx.start.getLine(),
                                         ctx.start.getCharPositionInLine());
         }
-        return null;
+        return m_state;
     }
     ///**
     // * {@inheritDoc}
     // *
     // * /
-    @Override public Void visitTable_clause(SQLParserParser.Table_clauseContext ctx) {
+    @Override public T visitTable_clause(SQLParserParser.Table_clauseContext ctx) {
         //
         // Walk the subtree.
         //
@@ -308,7 +553,7 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
                 getTopSelectQuery().addTable(table, alias);
             }
         }
-        return null;
+        return m_state;
     }
 
     ///**
@@ -316,7 +561,7 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
     // *
     // * <p>The default implementation does nothing.</p>
     // * /
-    @Override public Void visitWhere_clause(SQLParserParser.Where_clauseContext ctx) {
+    @Override public T visitWhere_clause(SQLParserParser.Where_clauseContext ctx) {
         IExpressionParser expr = m_factory.makeExpressionParser(getTopSelectQuery().getTables());
         m_expressionStack.add(expr);
         getTopSelectQuery().setExpressionParser(expr);
@@ -338,7 +583,7 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
                 getTopSelectQuery().setWhereCondition(ret);
         }
         getTopSelectQuery().setExpressionParser(null);
-        return null;
+        return m_state;
     }
 
     private void binOp(String opString, int lineno, int colno) {
@@ -415,7 +660,7 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
     // *
     // * <p>Combine two Semantinos with a product op.</p>
     // * /
-    @Override public Void visitTimes_expr(SQLParserParser.Times_exprContext ctx) {
+    @Override public T visitTimes_expr(SQLParserParser.Times_exprContext ctx) {
         //
         // Walk the subtree.
         //
@@ -424,14 +669,14 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
         binOp(ctx.op.start.getText(),
               ctx.op.start.getLine(),
               ctx.op.start.getCharPositionInLine());
-        return null;
+        return m_state;
     }
     ///**
     // * {@inheritDoc}
     // *
     // * <p>Combine two Semantinos with an add op.</p>
     // * /
-    @Override public Void visitAdd_expr(SQLParserParser.Add_exprContext ctx) {
+    @Override public T visitAdd_expr(SQLParserParser.Add_exprContext ctx) {
         //
         // Walk the subtree.
         //
@@ -439,14 +684,14 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
         binOp(ctx.op.start.getText(),
               ctx.op.start.getLine(),
               ctx.op.start.getCharPositionInLine());
-        return null;
+        return m_state;
     }
     ///**
     // * {@inheritDoc}
     // *
     // * <p>Combine two Semantinos with a relational op.</p>
     // * /
-    @Override public Void visitRel_expr(SQLParserParser.Rel_exprContext ctx) {
+    @Override public T visitRel_expr(SQLParserParser.Rel_exprContext ctx) {
         //
         // Walk the subtree.
         //
@@ -455,13 +700,13 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
         binOp(ctx.op.start.getText(),
               ctx.op.start.getLine(),
               ctx.op.start.getCharPositionInLine());
-        return null;
+        return m_state;
     }
     ///**
     // * {@inheritDoc}
     // *
     // * /
-    @Override public Void visitDisjunction_expr(SQLParserParser.Disjunction_exprContext ctx) {
+    @Override public T visitDisjunction_expr(SQLParserParser.Disjunction_exprContext ctx) {
         //
         // Walk the subtree.
         //
@@ -470,13 +715,13 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
         binOp(ctx.OR().getSymbol().getText(),
               ctx.OR().getSymbol().getLine(),
               ctx.OR().getSymbol().getCharPositionInLine());
-        return null;
+        return m_state;
     }
     ///**
     // * {@inheritDoc}
     // *
     // * /
-    @Override public Void visitConjunction_expr(SQLParserParser.Conjunction_exprContext ctx) {
+    @Override public T visitConjunction_expr(SQLParserParser.Conjunction_exprContext ctx) {
         //
         // Walk the subtree.
         //
@@ -485,12 +730,12 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
         binOp(ctx.AND().getSymbol().getText(),
               ctx.AND().getSymbol().getLine(),
               ctx.AND().getSymbol().getCharPositionInLine());
-        return null;
+        return m_state;
     }
     ///**
     // * {@inheritDoc}
     // * /
-    @Override public Void visitNot_expr(org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Not_exprContext ctx) {
+    @Override public T visitNot_expr(org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Not_exprContext ctx) {
         //
         // Walk the subtree.
         //
@@ -498,7 +743,7 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
         unaryOp(ctx.NOT().getText(),
                 ctx.NOT().getSymbol().getLine(),
                 ctx.NOT().getSymbol().getCharPositionInLine());
-        return null;
+        return m_state;
     };
 
     ///**
@@ -506,11 +751,11 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
     // *
     // * <p>Push a true semantino</p>
     // * /
-    @Override public Void visitTrue_expr(SQLParserParser.True_exprContext ctx) {
+    @Override public T visitTrue_expr(SQLParserParser.True_exprContext ctx) {
         super.visitTrue_expr(ctx);
         IType boolType = m_factory.getBooleanType();
         getTopExpressionParser().pushSemantino(getTopExpressionParser().getConstantSemantino(Boolean.valueOf(true), boolType));
-        return null;
+        return m_state;
     }
 
     ///**
@@ -518,17 +763,17 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
     // *
     // * <p>Push a False Semantino.</p>
     // * /
-    @Override public Void visitFalse_expr(SQLParserParser.False_exprContext ctx) {
+    @Override public T visitFalse_expr(SQLParserParser.False_exprContext ctx) {
         super.visitFalse_expr(ctx);
         IType boolType = m_factory.getBooleanType();
         getTopSelectQuery().pushSemantino(getTopExpressionParser().getConstantSemantino(Boolean.valueOf(false), boolType));
-        return null;
+        return m_state;
     }
 
     ///**
     // * {@inheritDoc}
     // * /
-    @Override public Void visitColref_expr(SQLParserParser.Colref_exprContext ctx) {
+    @Override public T visitColref_expr(SQLParserParser.Colref_exprContext ctx) {
         //
         // Walk the subtree.
         //
@@ -539,84 +784,163 @@ public class VoltSQLVisitor extends SQLParserBaseVisitor<Void> implements ANTLRE
         String columnName = crctx.column_name().IDENTIFIER().getText();
         ISemantino crefSemantino = getTopExpressionParser().getColumnSemantino(columnName, tableName);
         getTopExpressionParser().pushSemantino(crefSemantino);
-        return null;
+        return m_state;
     }
     ///**
     // * {@inheritDoc}
     // * /
-    @Override public Void visitNumeric_expr(SQLParserParser.Numeric_exprContext ctx) {
+    @Override public T visitNumeric_expr(SQLParserParser.Numeric_exprContext ctx) {
         super.visitNumeric_expr(ctx);
         IType intType = m_symbolTable.getType("integer");
         getTopExpressionParser().pushSemantino(getTopExpressionParser().getConstantSemantino(Integer.valueOf(ctx.NUMBER().getText()),
                                                                      intType));
-        return null;
-    }
-
-    ///**
-    // * {@inheritDoc}
-    // * /
-    @Override public Void visitInsert_statement(SQLParserParser.Insert_statementContext ctx) {
-        //
-        // Walk the subtree.
-        //
-        super.visitInsert_statement(ctx);
-
-        String tableName = ctx.table_name().IDENTIFIER().getText();
-        ITable table = m_catalog.getTableByName(tableName);
-        if (table == null) {
-            addError(ctx.table_name().start.getLine(),
-                     ctx.table_name().start.getCharPositionInLine(),
-                     "Undefined table name %s",
-                     tableName);
-            return null;
-        }
-        //
-        // Calculate names and values.  Don't do any semantic checking here.
-        // We'll do it all later.
-        //
-        if (ctx.values() == null) {
-            addError(ctx.start.getLine(),
-                     ctx.start.getCharPositionInLine(),
-                     "No values specified.");
-        }
-        List<IColumnIdent> columns = new ArrayList<IColumnIdent>();
-        if (ctx.column_name_list() != null) {
-            for (Column_nameContext cnctx : ctx.column_name_list().column_name()) {
-                String colName = cnctx.IDENTIFIER().getText();
-                int colLineNo = cnctx.start.getLine();
-                int colColNo = cnctx.start.getCharPositionInLine();
-                columns.add(m_factory.makeColumnRef(colName, colLineNo, colColNo));
-            }
-        } else {
-            List<String> colNames = table.getColumnNames();
-            for (String cname : colNames) {
-                columns.add(m_factory.makeColumnRef(cname, -1, -1));
-            }
-        }
-
-        m_insertStatement = m_factory.newInsertStatement();
-        m_insertStatement.addTable(table);
-        int idx = 0;
-        List<String> colVals = new ArrayList<String>();
-        for (ValueContext val : ctx.values().value()) {
-            //
-            // TODO: This is not right.  These are expressions in general.  We
-            // need to traffic in Semantinos here.
-            //
-            String valStr = val.NUMBER().getText();
-            colVals.add(valStr);
-            idx += 1;
-        }
-        m_insertStatement.addColumns(ctx.start.getLine(),
-                                     ctx.start.getCharPositionInLine(),
-                                     m_errorMessages,
-                                     columns,
-                                     colVals);
-        return null;
+        return m_state;
     }
     */
 
-    @Override
+    private ISelectQuery makeQuery(Query_expression_bodyContext ctx) {
+		if (ctx.query_primary() != null) {
+			return makeQuery(ctx.query_primary());
+		}
+		QuerySetOp op = QuerySetOp.INVALID_OP;
+		if (ctx.query_intersect_op() != null) {
+			op = makeQueryOp(ctx.query_intersect_op());
+		} else if (ctx.query_union_op() != null) {
+			op = makeQueryOp(ctx.query_union_op());
+		} else {
+			addError(ctx.start.getLine(), ctx.start.getCharPositionInLine(),
+					 "Unknown query set operation.");
+		}
+		ISelectQuery left = makeQuery(ctx.query_expression_body().get(0));
+		ISelectQuery right = makeQuery(ctx.query_expression_body().get(1));
+		return m_factory.newCompoundQuery(op, left, right);
+	}
+
+	private QuerySetOp makeQueryOp(Query_intersect_opContext ctx) {
+		if (ctx.INTERSECT() != null) {
+			return QuerySetOp.INTERSECT_OP;
+		}
+		return QuerySetOp.INVALID_OP;
+	}
+
+	private ISelectQuery makeQuery(Query_primaryContext ctx) {
+		if (ctx.query_expression_body() != null) {
+			return makeQuery(ctx.query_expression_body());
+		}
+		assert(ctx.simple_table() != null);
+		if (ctx.simple_table().explicit_table() != null) {
+			addError(ctx.simple_table().start.getLine(),
+					 ctx.simple_table().start.getCharPositionInLine(),
+					 "Explict tables are not supported");
+		}
+		assert(ctx.simple_table().query_specification() != null);
+		return makeQuery(ctx.simple_table().query_specification());
+	}
+
+	enum SetQuantifier {
+		ALL_QUANTIFIER,
+		DISTINCT_QUANTIFIER
+	}
+
+	private ISelectQuery makeQuery(Query_specificationContext ctx) {
+		ISelectQuery answer = m_factory.newSimpleTableSelectQuery(m_symbolTable, 
+					 									          ctx.start.getLine(),
+														          ctx.start.getCharPositionInLine());
+		SetQuantifier q = null;
+		q = makeSetQuantifier(ctx.set_quantifier());
+		assert(ctx.table_expression() != null);
+		readTableExpression(answer, ctx.table_expression());
+		assert(ctx.select_list() != null);
+		readSelectList(answer, ctx.select_list());
+		return answer;
+	}
+
+	private void readSelectList(ISelectQuery answer, Select_listContext select_list) {
+		
+	}
+
+	private void readTableExpression(ISelectQuery answer, Table_expressionContext ctx) {
+		assert(ctx.from_clause() != null);
+		readFromClause(answer, ctx.from_clause());
+		readWhereClause(answer, ctx.where_clause());
+		readGroupByClause(answer, ctx.group_by_clause());
+		readHavingClause(answer, ctx.having_clause());
+	}
+
+	private void readHavingClause(ISelectQuery answer, Having_clauseContext ctx) {
+		if (ctx == null) {
+			return;
+		}
+		
+	}
+
+	private void readGroupByClause(ISelectQuery answer, Group_by_clauseContext ctx) {
+		if (ctx == null) {
+			return;
+		}
+		
+	}
+
+	private void readWhereClause(ISelectQuery answer, Where_clauseContext ctx) {
+		if (ctx == null) {
+			return;
+		}
+		
+	}
+
+	private void readFromClause(ISelectQuery answer, From_clauseContext ctx) {
+		for (SQLParserParser.Table_referenceContext ref : ctx.table_reference_list().table_reference()) {
+			readTableReference(answer, ref);
+		}
+		
+	}
+
+	private void readTableReference(ISelectQuery answer, Table_referenceContext ctx) {
+		// We only get table refs here, no joins.
+		String tableName = ctx.table_factor(0).table_primary().table_name().IDENTIFIER().getText();
+		String tableAlias;
+		if (ctx.table_factor().size() > 0
+				&& ctx.table_factor(0).table_alias_name() != null) {
+			tableAlias = ctx.table_factor(0).table_alias_name().IDENTIFIER().getText();
+		} else {
+			tableAlias = tableName;
+		}
+		ITable tbl = m_catalog.getTableByName(tableName);
+		if (tbl == null) {
+			addError(ctx.start.getLine(), ctx.start.getCharPositionInLine(),
+					 "Table name %s is undefined.",
+					 tableName);
+			return;
+		}
+		answer.addTable(tbl, tableAlias);
+	}
+
+	private SetQuantifier makeSetQuantifier(SQLParserParser.Set_quantifierContext ctx) {
+		if (ctx == null) {
+			return null;
+		}
+		if (ctx.ALL() != null) {
+			return SetQuantifier.ALL_QUANTIFIER;
+		} 
+		if (ctx.DISTINCT() != null) {
+			return SetQuantifier.DISTINCT_QUANTIFIER;
+		}
+		addError(ctx.start.getLine(), ctx.start.getCharPositionInLine(),
+				"Unknown set quantifier");
+		return null;
+	}
+	
+	private QuerySetOp makeQueryOp(Query_union_opContext ctx) {
+		if (ctx.UNION() != null) {
+			return QuerySetOp.UNION_OP;
+		}
+		if (ctx.EXCEPT() != null) {
+			return QuerySetOp.EXCEPT_OP;
+		}
+		return QuerySetOp.INVALID_OP;
+	}
+
+	@Override
     public void reportAmbiguity(Parser aArg0, DFA aArg1, int aArg2, int aArg3,
                                 boolean aArg4, java.util.BitSet aArg5, ATNConfigSet aArg6) {
         // Nothing to be done here.

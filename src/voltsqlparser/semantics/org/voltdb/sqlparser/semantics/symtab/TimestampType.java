@@ -21,8 +21,8 @@ import org.voltdb.sqlparser.syntax.symtab.TypeKind;
 
 public class TimestampType extends Type implements ITop {
 
-    public TimestampType(String aName) {
-        super(aName, TypeKind.TIMESTAMP);
+    public TimestampType(String aName, TypeKind aKind) {
+        super(aName, aKind);
     }
 
 }

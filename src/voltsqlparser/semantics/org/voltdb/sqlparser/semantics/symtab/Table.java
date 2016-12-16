@@ -33,13 +33,15 @@
  package org.voltdb.sqlparser.semantics.symtab;
 import java.util.*; // Uses arrayList, maybe j.u.* is too much.
 
+import org.voltdb.sqlparser.syntax.grammar.IIndex;
 import org.voltdb.sqlparser.syntax.symtab.IColumn;
 import org.voltdb.sqlparser.syntax.symtab.ITable;
 import org.voltdb.sqlparser.syntax.symtab.IType;
 
 public class Table extends Top implements ITable {
-    Map<String, Column> m_lookup = new TreeMap<String, Column>(String.CASE_INSENSITIVE_ORDER);
-    List<String> m_colNames = new ArrayList<String>();
+    Map<String, Column>   m_lookupByName = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+    Map<Integer, Column > m_lookupByIndex = new HashMap<>();
+    Map<String, IIndex> m_lookupIndexByName = new HashMap<>();
 
     public Table(String aTableName) {
         super(aTableName);
@@ -51,44 +53,58 @@ public class Table extends Top implements ITable {
         @Override
     public void addColumn(String name, IColumn column) {
         assert(column instanceof Column);
-        m_lookup.put(name, (Column)column);
-        m_colNames.add(name);
+        m_lookupByIndex.put(m_lookupByName.size(), (Column)column);
+        m_lookupByName.put(name, (Column)column);
     }
-
 
     /* (non-Javadoc)
      * @see org.voltdb.sqlparser.symtab.ITable#toString()
      */
     public String toString() {
-        String str = "{---Name:" + getName() + "---,";
-        for (String key : m_lookup.keySet()) {
-            IColumn icol = m_lookup.get(key);
-            assert(icol instanceof Column);
-            str += ((Column)icol).toString();
+        StringBuffer str = new StringBuffer();
+		str.append("create table ")
+		   .append(getName())
+		   .append(" (");
+		String sep = " ";
+        for (int idx = 0; idx < m_lookupByName.size(); idx += 1) {
+            Column ic = m_lookupByIndex.get(idx);
+            str.append(sep)
+               .append(ic.getName())
+               .append(" ")
+               .append(ic.getType().toString());
+            if ( ! ic.isNullable()) {
+            	str.append(" NOT NULL ");
+            }
+            if ( ic.hasDefaultValue() ) {
+            	str.append(ic.getDefaultValue());
+            }
+           sep = ", ";
         }
-        str += "}";
-        return str;
+        str.append(");");
+        return str.toString();
     }
 
-    public Column getColumnByName(String aName) {
-        return m_lookup.get(aName);
+    public IColumn getColumnByName(String aName) {
+        return m_lookupByName.get(aName);
     }
 
-    public List<String> getColumnNames() {
-        return m_colNames;
-    }
+	@Override
+	public IColumn getColumnByIndex(int index) {
+		return m_lookupByIndex.get(index);
+	}
 
-    public List<IType> getColumnTypes() {
-        List<IType> colTypes = new ArrayList<IType>();
-        for (String colName : m_colNames) {
-            IType ctype = m_lookup.get(colName).getType();
-            colTypes.add(ctype);
-        }
-        return colTypes;
-    }
+	@Override
+	public Set<String> getColumnNamesAsSet() {
+		return m_lookupByName.keySet();
+	}
 
-    @Override
-    public Set<String> getColumnNamesAsSet() {
-        return m_lookup.keySet();
-    }
+	public int getColumnCount() {
+		return m_lookupByName.size();
+	}
+
+	@Override
+	public void addIndex(String name, IIndex index) {
+		assert(index instanceof Index);
+		m_lookupIndexByName.put(name, (Index)index);
+	}
 }

@@ -47,16 +47,21 @@ import java.util.List;
 import org.voltdb.sqlparser.semantics.symtab.ParserFactory;
 import org.voltdb.sqlparser.semantics.symtab.Semantino;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
+import org.voltdb.sqlparser.syntax.grammar.IIndex;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
 import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
 import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.grammar.Projection;
+import org.voltdb.sqlparser.syntax.grammar.QuerySetOp;
 import org.voltdb.sqlparser.syntax.symtab.IAST;
+import org.voltdb.sqlparser.syntax.symtab.IColumn;
 import org.voltdb.sqlparser.syntax.symtab.IExpressionParser;
 import org.voltdb.sqlparser.syntax.symtab.IParserFactory;
 import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
+import org.voltdb.sqlparser.syntax.symtab.ITable;
 import org.voltdb.sqlparser.syntax.symtab.IType;
+import org.voltdb.sqlparser.syntax.symtab.IndexType;
 
 public class MockParserFactory extends ParserFactory implements
         IParserFactory {
@@ -138,4 +143,14 @@ public class MockParserFactory extends ParserFactory implements
         unimplementedOperation("makeQueryAST");
         return null;
     }
+	@Override
+	public IIndex newIndex(String indexName, ITable table, IColumn column, IndexType it) {
+		unimplementedOperation("newIndex");
+		return null;
+	}
+	@Override
+	public ISelectQuery newCompoundQuery(QuerySetOp op, ISelectQuery left, ISelectQuery right) {
+		unimplementedOperation("newCompoundQuery");
+		return null;
+	}
 }
