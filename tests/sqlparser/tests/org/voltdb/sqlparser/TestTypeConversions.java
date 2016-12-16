@@ -55,6 +55,90 @@ public class TestTypeConversions {
         }
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTINYINT
+    //    //....|....|.column = FTINYINT
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FSMALLINT
+    //    //....|....|.column = FSMALLINT
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FINTEGER
+    //    //....|....|.column = FINTEGER
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FBIGINT
+    //    //....|....|.column = FBIGINT
+    //    //....|....|.id = 4
+    //    //....|....|.index = 3
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FFLOAT
+    //    //....|....|.column = FFLOAT
+    //    //....|....|.id = 5
+    //    //....|....|.index = 4
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FDECIMAL
+    //    //....|....|.column = FDECIMAL
+    //    //....|....|.id = 6
+    //    //....|....|.index = 5
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTIMESTAMP
+    //    //....|....|.column = FTIMESTAMP
+    //    //....|....|.id = 7
+    //    //....|....|.index = 6
+    //    //....|....|.table = ALLTYPES
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALLTYPES
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 12
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 10
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FSMALLINT
+    //    //....|....|....|....|....|..column = FSMALLINT
+    //    //....|....|....|....|....|..id = 8
+    //    //....|....|....|....|....|..index = 1
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FTINYINT
+    //    //....|....|....|....|....|..column = FTINYINT
+    //    //....|....|....|....|....|..id = 9
+    //    //....|....|....|....|....|..index = 0
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 11
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestTISI() throws Exception {
@@ -166,6 +250,90 @@ public class TestTypeConversions {
                                     withAttribute(72, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTINYINT
+    //    //....|....|.column = FTINYINT
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FSMALLINT
+    //    //....|....|.column = FSMALLINT
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FINTEGER
+    //    //....|....|.column = FINTEGER
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FBIGINT
+    //    //....|....|.column = FBIGINT
+    //    //....|....|.id = 4
+    //    //....|....|.index = 3
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FFLOAT
+    //    //....|....|.column = FFLOAT
+    //    //....|....|.id = 5
+    //    //....|....|.index = 4
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FDECIMAL
+    //    //....|....|.column = FDECIMAL
+    //    //....|....|.id = 6
+    //    //....|....|.index = 5
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTIMESTAMP
+    //    //....|....|.column = FTIMESTAMP
+    //    //....|....|.id = 7
+    //    //....|....|.index = 6
+    //    //....|....|.table = ALLTYPES
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALLTYPES
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 12
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 10
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FTINYINT
+    //    //....|....|....|....|....|..column = FTINYINT
+    //    //....|....|....|....|....|..id = 8
+    //    //....|....|....|....|....|..index = 0
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FSMALLINT
+    //    //....|....|....|....|....|..column = FSMALLINT
+    //    //....|....|....|....|....|..id = 9
+    //    //....|....|....|....|....|..index = 1
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 11
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestSITI() throws Exception {
@@ -277,6 +445,90 @@ public class TestTypeConversions {
                                     withAttribute(72, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTINYINT
+    //    //....|....|.column = FTINYINT
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FSMALLINT
+    //    //....|....|.column = FSMALLINT
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FINTEGER
+    //    //....|....|.column = FINTEGER
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FBIGINT
+    //    //....|....|.column = FBIGINT
+    //    //....|....|.id = 4
+    //    //....|....|.index = 3
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FFLOAT
+    //    //....|....|.column = FFLOAT
+    //    //....|....|.id = 5
+    //    //....|....|.index = 4
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FDECIMAL
+    //    //....|....|.column = FDECIMAL
+    //    //....|....|.id = 6
+    //    //....|....|.index = 5
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTIMESTAMP
+    //    //....|....|.column = FTIMESTAMP
+    //    //....|....|.id = 7
+    //    //....|....|.index = 6
+    //    //....|....|.table = ALLTYPES
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALLTYPES
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 12
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 10
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FTINYINT
+    //    //....|....|....|....|....|..column = FTINYINT
+    //    //....|....|....|....|....|..id = 8
+    //    //....|....|....|....|....|..index = 0
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FINTEGER
+    //    //....|....|....|....|....|..column = FINTEGER
+    //    //....|....|....|....|....|..id = 9
+    //    //....|....|....|....|....|..index = 2
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 11
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestTII() throws Exception {
@@ -388,6 +640,90 @@ public class TestTypeConversions {
                                     withAttribute(72, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTINYINT
+    //    //....|....|.column = FTINYINT
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FSMALLINT
+    //    //....|....|.column = FSMALLINT
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FINTEGER
+    //    //....|....|.column = FINTEGER
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FBIGINT
+    //    //....|....|.column = FBIGINT
+    //    //....|....|.id = 4
+    //    //....|....|.index = 3
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FFLOAT
+    //    //....|....|.column = FFLOAT
+    //    //....|....|.id = 5
+    //    //....|....|.index = 4
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FDECIMAL
+    //    //....|....|.column = FDECIMAL
+    //    //....|....|.id = 6
+    //    //....|....|.index = 5
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTIMESTAMP
+    //    //....|....|.column = FTIMESTAMP
+    //    //....|....|.id = 7
+    //    //....|....|.index = 6
+    //    //....|....|.table = ALLTYPES
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALLTYPES
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 12
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 10
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FINTEGER
+    //    //....|....|....|....|....|..column = FINTEGER
+    //    //....|....|....|....|....|..id = 8
+    //    //....|....|....|....|....|..index = 2
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FTINYINT
+    //    //....|....|....|....|....|..column = FTINYINT
+    //    //....|....|....|....|....|..id = 9
+    //    //....|....|....|....|....|..index = 0
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 11
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestITI() throws Exception {
@@ -499,6 +835,90 @@ public class TestTypeConversions {
                                     withAttribute(72, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTINYINT
+    //    //....|....|.column = FTINYINT
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FSMALLINT
+    //    //....|....|.column = FSMALLINT
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FINTEGER
+    //    //....|....|.column = FINTEGER
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FBIGINT
+    //    //....|....|.column = FBIGINT
+    //    //....|....|.id = 4
+    //    //....|....|.index = 3
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FFLOAT
+    //    //....|....|.column = FFLOAT
+    //    //....|....|.id = 5
+    //    //....|....|.index = 4
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FDECIMAL
+    //    //....|....|.column = FDECIMAL
+    //    //....|....|.id = 6
+    //    //....|....|.index = 5
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTIMESTAMP
+    //    //....|....|.column = FTIMESTAMP
+    //    //....|....|.id = 7
+    //    //....|....|.index = 6
+    //    //....|....|.table = ALLTYPES
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALLTYPES
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 12
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 10
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FBIGINT
+    //    //....|....|....|....|....|..column = FBIGINT
+    //    //....|....|....|....|....|..id = 8
+    //    //....|....|....|....|....|..index = 3
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FTINYINT
+    //    //....|....|....|....|....|..column = FTINYINT
+    //    //....|....|....|....|....|..id = 9
+    //    //....|....|....|....|....|..index = 0
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 11
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestTIBI() throws Exception {
@@ -610,6 +1030,90 @@ public class TestTypeConversions {
                                     withAttribute(72, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTINYINT
+    //    //....|....|.column = FTINYINT
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FSMALLINT
+    //    //....|....|.column = FSMALLINT
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FINTEGER
+    //    //....|....|.column = FINTEGER
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FBIGINT
+    //    //....|....|.column = FBIGINT
+    //    //....|....|.id = 4
+    //    //....|....|.index = 3
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FFLOAT
+    //    //....|....|.column = FFLOAT
+    //    //....|....|.id = 5
+    //    //....|....|.index = 4
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FDECIMAL
+    //    //....|....|.column = FDECIMAL
+    //    //....|....|.id = 6
+    //    //....|....|.index = 5
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTIMESTAMP
+    //    //....|....|.column = FTIMESTAMP
+    //    //....|....|.id = 7
+    //    //....|....|.index = 6
+    //    //....|....|.table = ALLTYPES
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALLTYPES
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 12
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 10
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FTINYINT
+    //    //....|....|....|....|....|..column = FTINYINT
+    //    //....|....|....|....|....|..id = 8
+    //    //....|....|....|....|....|..index = 0
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FBIGINT
+    //    //....|....|....|....|....|..column = FBIGINT
+    //    //....|....|....|....|....|..id = 9
+    //    //....|....|....|....|....|..index = 3
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 11
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestBITI() throws Exception {
@@ -721,6 +1225,90 @@ public class TestTypeConversions {
                                     withAttribute(72, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTINYINT
+    //    //....|....|.column = FTINYINT
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FSMALLINT
+    //    //....|....|.column = FSMALLINT
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FINTEGER
+    //    //....|....|.column = FINTEGER
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FBIGINT
+    //    //....|....|.column = FBIGINT
+    //    //....|....|.id = 4
+    //    //....|....|.index = 3
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FFLOAT
+    //    //....|....|.column = FFLOAT
+    //    //....|....|.id = 5
+    //    //....|....|.index = 4
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FDECIMAL
+    //    //....|....|.column = FDECIMAL
+    //    //....|....|.id = 6
+    //    //....|....|.index = 5
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTIMESTAMP
+    //    //....|....|.column = FTIMESTAMP
+    //    //....|....|.id = 7
+    //    //....|....|.index = 6
+    //    //....|....|.table = ALLTYPES
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALLTYPES
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 12
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 10
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FFLOAT
+    //    //....|....|....|....|....|..column = FFLOAT
+    //    //....|....|....|....|....|..id = 8
+    //    //....|....|....|....|....|..index = 4
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FTINYINT
+    //    //....|....|....|....|....|..column = FTINYINT
+    //    //....|....|....|....|....|..id = 9
+    //    //....|....|....|....|....|..index = 0
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 11
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestTIF() throws Exception {
@@ -832,6 +1420,90 @@ public class TestTypeConversions {
                                     withAttribute(72, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTINYINT
+    //    //....|....|.column = FTINYINT
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FSMALLINT
+    //    //....|....|.column = FSMALLINT
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FINTEGER
+    //    //....|....|.column = FINTEGER
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FBIGINT
+    //    //....|....|.column = FBIGINT
+    //    //....|....|.id = 4
+    //    //....|....|.index = 3
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FFLOAT
+    //    //....|....|.column = FFLOAT
+    //    //....|....|.id = 5
+    //    //....|....|.index = 4
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FDECIMAL
+    //    //....|....|.column = FDECIMAL
+    //    //....|....|.id = 6
+    //    //....|....|.index = 5
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTIMESTAMP
+    //    //....|....|.column = FTIMESTAMP
+    //    //....|....|.id = 7
+    //    //....|....|.index = 6
+    //    //....|....|.table = ALLTYPES
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALLTYPES
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 12
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 10
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FTINYINT
+    //    //....|....|....|....|....|..column = FTINYINT
+    //    //....|....|....|....|....|..id = 8
+    //    //....|....|....|....|....|..index = 0
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FFLOAT
+    //    //....|....|....|....|....|..column = FFLOAT
+    //    //....|....|....|....|....|..id = 9
+    //    //....|....|....|....|....|..index = 4
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 11
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestFTI() throws Exception {
@@ -943,6 +1615,90 @@ public class TestTypeConversions {
                                     withAttribute(72, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTINYINT
+    //    //....|....|.column = FTINYINT
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FSMALLINT
+    //    //....|....|.column = FSMALLINT
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FINTEGER
+    //    //....|....|.column = FINTEGER
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FBIGINT
+    //    //....|....|.column = FBIGINT
+    //    //....|....|.id = 4
+    //    //....|....|.index = 3
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FFLOAT
+    //    //....|....|.column = FFLOAT
+    //    //....|....|.id = 5
+    //    //....|....|.index = 4
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FDECIMAL
+    //    //....|....|.column = FDECIMAL
+    //    //....|....|.id = 6
+    //    //....|....|.index = 5
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTIMESTAMP
+    //    //....|....|.column = FTIMESTAMP
+    //    //....|....|.id = 7
+    //    //....|....|.index = 6
+    //    //....|....|.table = ALLTYPES
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALLTYPES
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 12
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 10
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FDECIMAL
+    //    //....|....|....|....|....|..column = FDECIMAL
+    //    //....|....|....|....|....|..id = 8
+    //    //....|....|....|....|....|..index = 5
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FTINYINT
+    //    //....|....|....|....|....|..column = FTINYINT
+    //    //....|....|....|....|....|..id = 9
+    //    //....|....|....|....|....|..index = 0
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 11
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestTID() throws Exception {
@@ -1054,6 +1810,90 @@ public class TestTypeConversions {
                                     withAttribute(72, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTINYINT
+    //    //....|....|.column = FTINYINT
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FSMALLINT
+    //    //....|....|.column = FSMALLINT
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FINTEGER
+    //    //....|....|.column = FINTEGER
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FBIGINT
+    //    //....|....|.column = FBIGINT
+    //    //....|....|.id = 4
+    //    //....|....|.index = 3
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FFLOAT
+    //    //....|....|.column = FFLOAT
+    //    //....|....|.id = 5
+    //    //....|....|.index = 4
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FDECIMAL
+    //    //....|....|.column = FDECIMAL
+    //    //....|....|.id = 6
+    //    //....|....|.index = 5
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTIMESTAMP
+    //    //....|....|.column = FTIMESTAMP
+    //    //....|....|.id = 7
+    //    //....|....|.index = 6
+    //    //....|....|.table = ALLTYPES
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALLTYPES
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 12
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 10
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FTINYINT
+    //    //....|....|....|....|....|..column = FTINYINT
+    //    //....|....|....|....|....|..id = 8
+    //    //....|....|....|....|....|..index = 0
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FDECIMAL
+    //    //....|....|....|....|....|..column = FDECIMAL
+    //    //....|....|....|....|....|..id = 9
+    //    //....|....|....|....|....|..index = 5
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 11
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestDTI() throws Exception {
@@ -1165,6 +2005,90 @@ public class TestTypeConversions {
                                     withAttribute(72, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTINYINT
+    //    //....|....|.column = FTINYINT
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FSMALLINT
+    //    //....|....|.column = FSMALLINT
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FINTEGER
+    //    //....|....|.column = FINTEGER
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FBIGINT
+    //    //....|....|.column = FBIGINT
+    //    //....|....|.id = 4
+    //    //....|....|.index = 3
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FFLOAT
+    //    //....|....|.column = FFLOAT
+    //    //....|....|.id = 5
+    //    //....|....|.index = 4
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FDECIMAL
+    //    //....|....|.column = FDECIMAL
+    //    //....|....|.id = 6
+    //    //....|....|.index = 5
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTIMESTAMP
+    //    //....|....|.column = FTIMESTAMP
+    //    //....|....|.id = 7
+    //    //....|....|.index = 6
+    //    //....|....|.table = ALLTYPES
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALLTYPES
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 12
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 10
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FSMALLINT
+    //    //....|....|....|....|....|..column = FSMALLINT
+    //    //....|....|....|....|....|..id = 8
+    //    //....|....|....|....|....|..index = 1
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FINTEGER
+    //    //....|....|....|....|....|..column = FINTEGER
+    //    //....|....|....|....|....|..id = 9
+    //    //....|....|....|....|....|..index = 2
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 11
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestSII() throws Exception {
@@ -1276,6 +2200,90 @@ public class TestTypeConversions {
                                     withAttribute(72, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTINYINT
+    //    //....|....|.column = FTINYINT
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FSMALLINT
+    //    //....|....|.column = FSMALLINT
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FINTEGER
+    //    //....|....|.column = FINTEGER
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FBIGINT
+    //    //....|....|.column = FBIGINT
+    //    //....|....|.id = 4
+    //    //....|....|.index = 3
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FFLOAT
+    //    //....|....|.column = FFLOAT
+    //    //....|....|.id = 5
+    //    //....|....|.index = 4
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FDECIMAL
+    //    //....|....|.column = FDECIMAL
+    //    //....|....|.id = 6
+    //    //....|....|.index = 5
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTIMESTAMP
+    //    //....|....|.column = FTIMESTAMP
+    //    //....|....|.id = 7
+    //    //....|....|.index = 6
+    //    //....|....|.table = ALLTYPES
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALLTYPES
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 12
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 10
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FINTEGER
+    //    //....|....|....|....|....|..column = FINTEGER
+    //    //....|....|....|....|....|..id = 8
+    //    //....|....|....|....|....|..index = 2
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FSMALLINT
+    //    //....|....|....|....|....|..column = FSMALLINT
+    //    //....|....|....|....|....|..id = 9
+    //    //....|....|....|....|....|..index = 1
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 11
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestISI() throws Exception {
@@ -1387,6 +2395,90 @@ public class TestTypeConversions {
                                     withAttribute(72, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTINYINT
+    //    //....|....|.column = FTINYINT
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FSMALLINT
+    //    //....|....|.column = FSMALLINT
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FINTEGER
+    //    //....|....|.column = FINTEGER
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FBIGINT
+    //    //....|....|.column = FBIGINT
+    //    //....|....|.id = 4
+    //    //....|....|.index = 3
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FFLOAT
+    //    //....|....|.column = FFLOAT
+    //    //....|....|.id = 5
+    //    //....|....|.index = 4
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FDECIMAL
+    //    //....|....|.column = FDECIMAL
+    //    //....|....|.id = 6
+    //    //....|....|.index = 5
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTIMESTAMP
+    //    //....|....|.column = FTIMESTAMP
+    //    //....|....|.id = 7
+    //    //....|....|.index = 6
+    //    //....|....|.table = ALLTYPES
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALLTYPES
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 12
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 10
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FBIGINT
+    //    //....|....|....|....|....|..column = FBIGINT
+    //    //....|....|....|....|....|..id = 8
+    //    //....|....|....|....|....|..index = 3
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FSMALLINT
+    //    //....|....|....|....|....|..column = FSMALLINT
+    //    //....|....|....|....|....|..id = 9
+    //    //....|....|....|....|....|..index = 1
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 11
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestSIBI() throws Exception {
@@ -1498,6 +2590,90 @@ public class TestTypeConversions {
                                     withAttribute(72, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTINYINT
+    //    //....|....|.column = FTINYINT
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FSMALLINT
+    //    //....|....|.column = FSMALLINT
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FINTEGER
+    //    //....|....|.column = FINTEGER
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FBIGINT
+    //    //....|....|.column = FBIGINT
+    //    //....|....|.id = 4
+    //    //....|....|.index = 3
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FFLOAT
+    //    //....|....|.column = FFLOAT
+    //    //....|....|.id = 5
+    //    //....|....|.index = 4
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FDECIMAL
+    //    //....|....|.column = FDECIMAL
+    //    //....|....|.id = 6
+    //    //....|....|.index = 5
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTIMESTAMP
+    //    //....|....|.column = FTIMESTAMP
+    //    //....|....|.id = 7
+    //    //....|....|.index = 6
+    //    //....|....|.table = ALLTYPES
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALLTYPES
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 12
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 10
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FSMALLINT
+    //    //....|....|....|....|....|..column = FSMALLINT
+    //    //....|....|....|....|....|..id = 8
+    //    //....|....|....|....|....|..index = 1
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FBIGINT
+    //    //....|....|....|....|....|..column = FBIGINT
+    //    //....|....|....|....|....|..id = 9
+    //    //....|....|....|....|....|..index = 3
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 11
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestBISI() throws Exception {
@@ -1609,6 +2785,90 @@ public class TestTypeConversions {
                                     withAttribute(72, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTINYINT
+    //    //....|....|.column = FTINYINT
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FSMALLINT
+    //    //....|....|.column = FSMALLINT
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FINTEGER
+    //    //....|....|.column = FINTEGER
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FBIGINT
+    //    //....|....|.column = FBIGINT
+    //    //....|....|.id = 4
+    //    //....|....|.index = 3
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FFLOAT
+    //    //....|....|.column = FFLOAT
+    //    //....|....|.id = 5
+    //    //....|....|.index = 4
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FDECIMAL
+    //    //....|....|.column = FDECIMAL
+    //    //....|....|.id = 6
+    //    //....|....|.index = 5
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTIMESTAMP
+    //    //....|....|.column = FTIMESTAMP
+    //    //....|....|.id = 7
+    //    //....|....|.index = 6
+    //    //....|....|.table = ALLTYPES
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALLTYPES
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 12
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 10
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FFLOAT
+    //    //....|....|....|....|....|..column = FFLOAT
+    //    //....|....|....|....|....|..id = 8
+    //    //....|....|....|....|....|..index = 4
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FSMALLINT
+    //    //....|....|....|....|....|..column = FSMALLINT
+    //    //....|....|....|....|....|..id = 9
+    //    //....|....|....|....|....|..index = 1
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 11
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestSIF() throws Exception {
@@ -1720,6 +2980,90 @@ public class TestTypeConversions {
                                     withAttribute(72, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTINYINT
+    //    //....|....|.column = FTINYINT
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FSMALLINT
+    //    //....|....|.column = FSMALLINT
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FINTEGER
+    //    //....|....|.column = FINTEGER
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FBIGINT
+    //    //....|....|.column = FBIGINT
+    //    //....|....|.id = 4
+    //    //....|....|.index = 3
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FFLOAT
+    //    //....|....|.column = FFLOAT
+    //    //....|....|.id = 5
+    //    //....|....|.index = 4
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FDECIMAL
+    //    //....|....|.column = FDECIMAL
+    //    //....|....|.id = 6
+    //    //....|....|.index = 5
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTIMESTAMP
+    //    //....|....|.column = FTIMESTAMP
+    //    //....|....|.id = 7
+    //    //....|....|.index = 6
+    //    //....|....|.table = ALLTYPES
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALLTYPES
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 12
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 10
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FSMALLINT
+    //    //....|....|....|....|....|..column = FSMALLINT
+    //    //....|....|....|....|....|..id = 8
+    //    //....|....|....|....|....|..index = 1
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FFLOAT
+    //    //....|....|....|....|....|..column = FFLOAT
+    //    //....|....|....|....|....|..id = 9
+    //    //....|....|....|....|....|..index = 4
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 11
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestFSI() throws Exception {
@@ -1831,6 +3175,90 @@ public class TestTypeConversions {
                                     withAttribute(72, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTINYINT
+    //    //....|....|.column = FTINYINT
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FSMALLINT
+    //    //....|....|.column = FSMALLINT
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FINTEGER
+    //    //....|....|.column = FINTEGER
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FBIGINT
+    //    //....|....|.column = FBIGINT
+    //    //....|....|.id = 4
+    //    //....|....|.index = 3
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FFLOAT
+    //    //....|....|.column = FFLOAT
+    //    //....|....|.id = 5
+    //    //....|....|.index = 4
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FDECIMAL
+    //    //....|....|.column = FDECIMAL
+    //    //....|....|.id = 6
+    //    //....|....|.index = 5
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTIMESTAMP
+    //    //....|....|.column = FTIMESTAMP
+    //    //....|....|.id = 7
+    //    //....|....|.index = 6
+    //    //....|....|.table = ALLTYPES
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALLTYPES
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 12
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 10
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FDECIMAL
+    //    //....|....|....|....|....|..column = FDECIMAL
+    //    //....|....|....|....|....|..id = 8
+    //    //....|....|....|....|....|..index = 5
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FSMALLINT
+    //    //....|....|....|....|....|..column = FSMALLINT
+    //    //....|....|....|....|....|..id = 9
+    //    //....|....|....|....|....|..index = 1
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 11
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestSID() throws Exception {
@@ -1942,6 +3370,90 @@ public class TestTypeConversions {
                                     withAttribute(72, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTINYINT
+    //    //....|....|.column = FTINYINT
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FSMALLINT
+    //    //....|....|.column = FSMALLINT
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FINTEGER
+    //    //....|....|.column = FINTEGER
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FBIGINT
+    //    //....|....|.column = FBIGINT
+    //    //....|....|.id = 4
+    //    //....|....|.index = 3
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FFLOAT
+    //    //....|....|.column = FFLOAT
+    //    //....|....|.id = 5
+    //    //....|....|.index = 4
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FDECIMAL
+    //    //....|....|.column = FDECIMAL
+    //    //....|....|.id = 6
+    //    //....|....|.index = 5
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTIMESTAMP
+    //    //....|....|.column = FTIMESTAMP
+    //    //....|....|.id = 7
+    //    //....|....|.index = 6
+    //    //....|....|.table = ALLTYPES
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALLTYPES
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 12
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 10
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FSMALLINT
+    //    //....|....|....|....|....|..column = FSMALLINT
+    //    //....|....|....|....|....|..id = 8
+    //    //....|....|....|....|....|..index = 1
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FDECIMAL
+    //    //....|....|....|....|....|..column = FDECIMAL
+    //    //....|....|....|....|....|..id = 9
+    //    //....|....|....|....|....|..index = 5
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 11
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestDSI() throws Exception {
@@ -2053,6 +3565,90 @@ public class TestTypeConversions {
                                     withAttribute(72, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTINYINT
+    //    //....|....|.column = FTINYINT
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FSMALLINT
+    //    //....|....|.column = FSMALLINT
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FINTEGER
+    //    //....|....|.column = FINTEGER
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FBIGINT
+    //    //....|....|.column = FBIGINT
+    //    //....|....|.id = 4
+    //    //....|....|.index = 3
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FFLOAT
+    //    //....|....|.column = FFLOAT
+    //    //....|....|.id = 5
+    //    //....|....|.index = 4
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FDECIMAL
+    //    //....|....|.column = FDECIMAL
+    //    //....|....|.id = 6
+    //    //....|....|.index = 5
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTIMESTAMP
+    //    //....|....|.column = FTIMESTAMP
+    //    //....|....|.id = 7
+    //    //....|....|.index = 6
+    //    //....|....|.table = ALLTYPES
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALLTYPES
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 12
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 10
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FBIGINT
+    //    //....|....|....|....|....|..column = FBIGINT
+    //    //....|....|....|....|....|..id = 8
+    //    //....|....|....|....|....|..index = 3
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FINTEGER
+    //    //....|....|....|....|....|..column = FINTEGER
+    //    //....|....|....|....|....|..id = 9
+    //    //....|....|....|....|....|..index = 2
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 11
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestIBI() throws Exception {
@@ -2164,6 +3760,90 @@ public class TestTypeConversions {
                                     withAttribute(72, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTINYINT
+    //    //....|....|.column = FTINYINT
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FSMALLINT
+    //    //....|....|.column = FSMALLINT
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FINTEGER
+    //    //....|....|.column = FINTEGER
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FBIGINT
+    //    //....|....|.column = FBIGINT
+    //    //....|....|.id = 4
+    //    //....|....|.index = 3
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FFLOAT
+    //    //....|....|.column = FFLOAT
+    //    //....|....|.id = 5
+    //    //....|....|.index = 4
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FDECIMAL
+    //    //....|....|.column = FDECIMAL
+    //    //....|....|.id = 6
+    //    //....|....|.index = 5
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTIMESTAMP
+    //    //....|....|.column = FTIMESTAMP
+    //    //....|....|.id = 7
+    //    //....|....|.index = 6
+    //    //....|....|.table = ALLTYPES
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALLTYPES
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 12
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 10
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FINTEGER
+    //    //....|....|....|....|....|..column = FINTEGER
+    //    //....|....|....|....|....|..id = 8
+    //    //....|....|....|....|....|..index = 2
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FBIGINT
+    //    //....|....|....|....|....|..column = FBIGINT
+    //    //....|....|....|....|....|..id = 9
+    //    //....|....|....|....|....|..index = 3
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 11
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestBII() throws Exception {
@@ -2275,6 +3955,90 @@ public class TestTypeConversions {
                                     withAttribute(72, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTINYINT
+    //    //....|....|.column = FTINYINT
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FSMALLINT
+    //    //....|....|.column = FSMALLINT
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FINTEGER
+    //    //....|....|.column = FINTEGER
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FBIGINT
+    //    //....|....|.column = FBIGINT
+    //    //....|....|.id = 4
+    //    //....|....|.index = 3
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FFLOAT
+    //    //....|....|.column = FFLOAT
+    //    //....|....|.id = 5
+    //    //....|....|.index = 4
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FDECIMAL
+    //    //....|....|.column = FDECIMAL
+    //    //....|....|.id = 6
+    //    //....|....|.index = 5
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTIMESTAMP
+    //    //....|....|.column = FTIMESTAMP
+    //    //....|....|.id = 7
+    //    //....|....|.index = 6
+    //    //....|....|.table = ALLTYPES
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALLTYPES
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 12
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 10
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FFLOAT
+    //    //....|....|....|....|....|..column = FFLOAT
+    //    //....|....|....|....|....|..id = 8
+    //    //....|....|....|....|....|..index = 4
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FINTEGER
+    //    //....|....|....|....|....|..column = FINTEGER
+    //    //....|....|....|....|....|..id = 9
+    //    //....|....|....|....|....|..index = 2
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 11
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestIF() throws Exception {
@@ -2386,6 +4150,90 @@ public class TestTypeConversions {
                                     withAttribute(72, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTINYINT
+    //    //....|....|.column = FTINYINT
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FSMALLINT
+    //    //....|....|.column = FSMALLINT
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FINTEGER
+    //    //....|....|.column = FINTEGER
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FBIGINT
+    //    //....|....|.column = FBIGINT
+    //    //....|....|.id = 4
+    //    //....|....|.index = 3
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FFLOAT
+    //    //....|....|.column = FFLOAT
+    //    //....|....|.id = 5
+    //    //....|....|.index = 4
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FDECIMAL
+    //    //....|....|.column = FDECIMAL
+    //    //....|....|.id = 6
+    //    //....|....|.index = 5
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTIMESTAMP
+    //    //....|....|.column = FTIMESTAMP
+    //    //....|....|.id = 7
+    //    //....|....|.index = 6
+    //    //....|....|.table = ALLTYPES
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALLTYPES
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 12
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 10
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FINTEGER
+    //    //....|....|....|....|....|..column = FINTEGER
+    //    //....|....|....|....|....|..id = 8
+    //    //....|....|....|....|....|..index = 2
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FFLOAT
+    //    //....|....|....|....|....|..column = FFLOAT
+    //    //....|....|....|....|....|..id = 9
+    //    //....|....|....|....|....|..index = 4
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 11
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestFI() throws Exception {
@@ -2497,6 +4345,90 @@ public class TestTypeConversions {
                                     withAttribute(72, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTINYINT
+    //    //....|....|.column = FTINYINT
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FSMALLINT
+    //    //....|....|.column = FSMALLINT
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FINTEGER
+    //    //....|....|.column = FINTEGER
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FBIGINT
+    //    //....|....|.column = FBIGINT
+    //    //....|....|.id = 4
+    //    //....|....|.index = 3
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FFLOAT
+    //    //....|....|.column = FFLOAT
+    //    //....|....|.id = 5
+    //    //....|....|.index = 4
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FDECIMAL
+    //    //....|....|.column = FDECIMAL
+    //    //....|....|.id = 6
+    //    //....|....|.index = 5
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTIMESTAMP
+    //    //....|....|.column = FTIMESTAMP
+    //    //....|....|.id = 7
+    //    //....|....|.index = 6
+    //    //....|....|.table = ALLTYPES
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALLTYPES
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 12
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 10
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FDECIMAL
+    //    //....|....|....|....|....|..column = FDECIMAL
+    //    //....|....|....|....|....|..id = 8
+    //    //....|....|....|....|....|..index = 5
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FINTEGER
+    //    //....|....|....|....|....|..column = FINTEGER
+    //    //....|....|....|....|....|..id = 9
+    //    //....|....|....|....|....|..index = 2
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 11
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestID() throws Exception {
@@ -2608,6 +4540,90 @@ public class TestTypeConversions {
                                     withAttribute(72, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTINYINT
+    //    //....|....|.column = FTINYINT
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FSMALLINT
+    //    //....|....|.column = FSMALLINT
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FINTEGER
+    //    //....|....|.column = FINTEGER
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FBIGINT
+    //    //....|....|.column = FBIGINT
+    //    //....|....|.id = 4
+    //    //....|....|.index = 3
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FFLOAT
+    //    //....|....|.column = FFLOAT
+    //    //....|....|.id = 5
+    //    //....|....|.index = 4
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FDECIMAL
+    //    //....|....|.column = FDECIMAL
+    //    //....|....|.id = 6
+    //    //....|....|.index = 5
+    //    //....|....|.table = ALLTYPES
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = FTIMESTAMP
+    //    //....|....|.column = FTIMESTAMP
+    //    //....|....|.id = 7
+    //    //....|....|.index = 6
+    //    //....|....|.table = ALLTYPES
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALLTYPES
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 12
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 10
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FINTEGER
+    //    //....|....|....|....|....|..column = FINTEGER
+    //    //....|....|....|....|....|..id = 8
+    //    //....|....|....|....|....|..index = 2
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = FDECIMAL
+    //    //....|....|....|....|....|..column = FDECIMAL
+    //    //....|....|....|....|....|..id = 9
+    //    //....|....|....|....|....|..index = 5
+    //    //....|....|....|....|....|..table = ALLTYPES
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 11
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestDI() throws Exception {

@@ -1411,6 +1411,7 @@ Create the sqlparser's SQL to VoltXMLElement Tests.
         <java classname="org.voltdb.sqlparser.tools.VoltXMLElementTestFromSQL" fork="true" failonerror="true"
               dir="${base.dir}">
                 <classpath refid="project.classpath" />
+        	    <arg value="--show-pattern-xml" />
                 <arg value="--xml-file" />
                 <arg value="tests/sqlparser/tests/SimpleTestSuite.xml" />
         </java>

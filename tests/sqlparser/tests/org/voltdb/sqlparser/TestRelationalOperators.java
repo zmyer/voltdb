@@ -55,6 +55,50 @@ public class TestRelationalOperators {
         }
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 5
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: columnref
+    //    //....|....|....|....|...alias = ID
+    //    //....|....|....|....|...column = ID
+    //    //....|....|....|....|...id = 3
+    //    //....|....|....|....|...index = 0
+    //    //....|....|....|....|...table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 4
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestEq() throws Exception {
@@ -108,6 +152,50 @@ public class TestRelationalOperators {
                                     withAttribute(33, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 5
+    //    //....|....|....|....optype = notequal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: columnref
+    //    //....|....|....|....|...alias = ID
+    //    //....|....|....|....|...column = ID
+    //    //....|....|....|....|...id = 3
+    //    //....|....|....|....|...index = 0
+    //    //....|....|....|....|...table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 4
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestNotEq() throws Exception {
@@ -161,6 +249,50 @@ public class TestRelationalOperators {
                                     withAttribute(33, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 5
+    //    //....|....|....|....optype = lessthan
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: columnref
+    //    //....|....|....|....|...alias = ID
+    //    //....|....|....|....|...column = ID
+    //    //....|....|....|....|...id = 3
+    //    //....|....|....|....|...index = 0
+    //    //....|....|....|....|...table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 4
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestLessThan() throws Exception {
@@ -214,6 +346,50 @@ public class TestRelationalOperators {
                                     withAttribute(33, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 5
+    //    //....|....|....|....optype = lessthanorequalto
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: columnref
+    //    //....|....|....|....|...alias = ID
+    //    //....|....|....|....|...column = ID
+    //    //....|....|....|....|...id = 3
+    //    //....|....|....|....|...index = 0
+    //    //....|....|....|....|...table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 4
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestLessEqual() throws Exception {
@@ -267,6 +443,50 @@ public class TestRelationalOperators {
                                     withAttribute(33, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 5
+    //    //....|....|....|....optype = greaterthan
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: columnref
+    //    //....|....|....|....|...alias = ID
+    //    //....|....|....|....|...column = ID
+    //    //....|....|....|....|...id = 3
+    //    //....|....|....|....|...index = 0
+    //    //....|....|....|....|...table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 4
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestGreaterThan() throws Exception {
@@ -320,6 +540,50 @@ public class TestRelationalOperators {
                                     withAttribute(33, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 5
+    //    //....|....|....|....optype = greaterthanorequalto
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: columnref
+    //    //....|....|....|....|...alias = ID
+    //    //....|....|....|....|...column = ID
+    //    //....|....|....|....|...id = 3
+    //    //....|....|....|....|...index = 0
+    //    //....|....|....|....|...table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 4
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestGreaterEqual() throws Exception {

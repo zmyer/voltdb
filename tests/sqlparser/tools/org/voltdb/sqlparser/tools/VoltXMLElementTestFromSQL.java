@@ -77,6 +77,7 @@ public class VoltXMLElementTestFromSQL {
     private List<String> m_testComments = new ArrayList<String>();
 
     String m_sqlSourceFolder = "~/src/voltdb/tests/sqlparser";
+    boolean m_showPatternXML = false;
     String m_fullyQualifiedClassName = null;
     String m_className = null;
     List<String> m_ddl = new ArrayList<String>();
@@ -163,12 +164,14 @@ public class VoltXMLElementTestFromSQL {
         String sqlComment;
         /*
          * This is actually goofy.  We should just traffic in
-         * the model elements.
+         * the model elements, which is what --xml-file does.
          */
         for (idx = 0; idx < args.length; idx += 1) {
             sqlComment = null;
             if ("--source-folder".equals(args[idx]) || "-o".equals(args[idx])) {
                 m_sqlSourceFolder = args[++idx];
+            } else if ("--show-pattern-xml".equals(args[idx])) {
+            	m_showPatternXML = true;
             } else if ("--ddl".equals(args[idx])) {
                 addToSchema(args[++idx]);
             } else if ("--ddl-file".equals(args[idx])) {
@@ -329,6 +332,7 @@ public class VoltXMLElementTestFromSQL {
                                               + "  --ddl-file fileName            Use the ddl in the given named file.  This ddl\n"
                                               + "                                 will not be checked, but the checked sql can\n"
                                               + "                                 depend on it being processed.\n"
+                                              + "  --show-pattern-xml             Show the HSQL xml in the test file.\n"
                                               + "  --                             This marks the end of the options.\n"
                                               + "The options are followed by a sequence of pairs.  The first of the pairs\n"
                                               + "Is a test name, and the second is a sql string.  For example,\n"
@@ -422,6 +426,16 @@ public class VoltXMLElementTestFromSQL {
             List<String> initialContext = new ArrayList<String>();
             initialContext.add(elem.name);
             sb.append("\n");
+            sb.append("    //\n");
+            sb.append(String.format("    // SQL: %s\n", aSql));
+            sb.append("    //\n");
+            if (m_showPatternXML) {
+            	String patternComment = makeComment(elem.toString()); 
+            	sb.append("    //\n");
+            	sb.append("    // Pattern XML:\n");
+            	sb.append(patternComment);
+            	sb.append("    //\n");
+            }
             sb.append("    @SuppressWarnings(\"unchecked\")\n");
             sb.append("    @Test\n");
             sb.append(String.format("    public void %s() throws Exception {\n", aTestName));
@@ -446,7 +460,14 @@ public class VoltXMLElementTestFromSQL {
 
     }
 
-    private void writeDMLTestBody(String aSQL, String aTestName, VoltXMLElement aElem, String comment) {
+    private String makeComment(String string) {
+    	if (! string.endsWith("\n")) {
+    		string = string + "\n";
+    	}
+    	return "    //" + string.replace("\n", "\n    //") + "\n    //\n";
+	}
+
+	private void writeDMLTestBody(String aSQL, String aTestName, VoltXMLElement aElem, String comment) {
         writeSQLTestBody(aSQL, aTestName, aElem, SQLKind.DML, comment);
     }
 
@@ -462,6 +483,11 @@ public class VoltXMLElementTestFromSQL {
         }
         List<String> initialContext = new ArrayList<String>();
         initialContext.add(aElem.name);
+        if (m_showPatternXML) {
+        	sb.append("    // Pattern XML:\n");
+        	String patternComment = makeComment(aElem.toString());
+        	sb.append(makeComment(patternComment));
+        }
         sb.append("    @SuppressWarnings(\"unchecked\")\n");
         sb.append("    @Test\n");
         sb.append(String.format("    public void %s() throws Exception {\n", aTestName));

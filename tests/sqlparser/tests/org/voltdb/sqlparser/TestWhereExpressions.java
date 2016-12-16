@@ -55,6 +55,50 @@ public class TestWhereExpressions {
         }
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 5
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: columnref
+    //    //....|....|....|....|...alias = ID
+    //    //....|....|....|....|...column = ID
+    //    //....|....|....|....|...id = 3
+    //    //....|....|....|....|...index = 0
+    //    //....|....|....|....|...table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 4
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestColumnRef1() throws Exception {
@@ -108,6 +152,57 @@ public class TestWhereExpressions {
                                     withAttribute(33, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....|.tablealias = ALEF
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //....|....|.tablealias = ALEF
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....|.tablealias = ALEF
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 5
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: columnref
+    //    //....|....|....|....|...alias = ID
+    //    //....|....|....|....|...column = ID
+    //    //....|....|....|....|...id = 3
+    //    //....|....|....|....|...index = 0
+    //    //....|....|....|....|...table = ALPHA
+    //    //....|....|....|....|...tablealias = ALEF
+    //    //....|....|....|....|.ELEMENT: columnref
+    //    //....|....|....|....|...alias = BETA
+    //    //....|....|....|....|...column = BETA
+    //    //....|....|....|....|...id = 4
+    //    //....|....|....|....|...index = 1
+    //    //....|....|....|....|...table = ALPHA
+    //    //....|....|....|....|...tablealias = ALEF
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestColumnRefAliases() throws Exception {

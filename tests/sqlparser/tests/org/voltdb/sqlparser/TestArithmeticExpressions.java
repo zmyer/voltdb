@@ -55,6 +55,66 @@ public class TestArithmeticExpressions {
         }
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = GAMMA
+    //    //....|....|.column = GAMMA
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 8
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 6
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = ID
+    //    //....|....|....|....|....|..column = ID
+    //    //....|....|....|....|....|..id = 4
+    //    //....|....|....|....|....|..index = 0
+    //    //....|....|....|....|....|..table = ALPHA
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = ID
+    //    //....|....|....|....|....|..column = ID
+    //    //....|....|....|....|....|..id = 5
+    //    //....|....|....|....|....|..index = 0
+    //    //....|....|....|....|....|..table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 7
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestSum() throws Exception {
@@ -130,6 +190,66 @@ public class TestArithmeticExpressions {
                                     withAttribute(48, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = GAMMA
+    //    //....|....|.column = GAMMA
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 8
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 6
+    //    //....|....|....|....|...optype = subtract
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = ID
+    //    //....|....|....|....|....|..column = ID
+    //    //....|....|....|....|....|..id = 4
+    //    //....|....|....|....|....|..index = 0
+    //    //....|....|....|....|....|..table = ALPHA
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = ID
+    //    //....|....|....|....|....|..column = ID
+    //    //....|....|....|....|....|..id = 5
+    //    //....|....|....|....|....|..index = 0
+    //    //....|....|....|....|....|..table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 7
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestDiff() throws Exception {
@@ -205,6 +325,66 @@ public class TestArithmeticExpressions {
                                     withAttribute(48, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = GAMMA
+    //    //....|....|.column = GAMMA
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 8
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 6
+    //    //....|....|....|....|...optype = multiply
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = ID
+    //    //....|....|....|....|....|..column = ID
+    //    //....|....|....|....|....|..id = 4
+    //    //....|....|....|....|....|..index = 0
+    //    //....|....|....|....|....|..table = ALPHA
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = ID
+    //    //....|....|....|....|....|..column = ID
+    //    //....|....|....|....|....|..id = 5
+    //    //....|....|....|....|....|..index = 0
+    //    //....|....|....|....|....|..table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 7
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestProd() throws Exception {
@@ -280,6 +460,66 @@ public class TestArithmeticExpressions {
                                     withAttribute(48, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = GAMMA
+    //    //....|....|.column = GAMMA
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 8
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 6
+    //    //....|....|....|....|...optype = divide
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = ID
+    //    //....|....|....|....|....|..column = ID
+    //    //....|....|....|....|....|..id = 4
+    //    //....|....|....|....|....|..index = 0
+    //    //....|....|....|....|....|..table = ALPHA
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = ID
+    //    //....|....|....|....|....|..column = ID
+    //    //....|....|....|....|....|..id = 5
+    //    //....|....|....|....|....|..index = 0
+    //    //....|....|....|....|....|..table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 7
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestDiv() throws Exception {
@@ -355,6 +595,76 @@ public class TestArithmeticExpressions {
                                     withAttribute(48, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = GAMMA
+    //    //....|....|.column = GAMMA
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 10
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 8
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = ID
+    //    //....|....|....|....|....|..column = ID
+    //    //....|....|....|....|....|..id = 4
+    //    //....|....|....|....|....|..index = 0
+    //    //....|....|....|....|....|..table = ALPHA
+    //    //....|....|....|....|.....ELEMENT: operation
+    //    //....|....|....|....|....|..id = 7
+    //    //....|....|....|....|....|..optype = multiply
+    //    //....|....|....|....|.....[
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = BETA
+    //    //....|....|....|....|....|....|.column = BETA
+    //    //....|....|....|....|....|....|.id = 5
+    //    //....|....|....|....|....|....|.index = 1
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = GAMMA
+    //    //....|....|....|....|....|....|.column = GAMMA
+    //    //....|....|....|....|....|....|.id = 6
+    //    //....|....|....|....|....|....|.index = 2
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 9
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestSumProd() throws Exception {
@@ -443,6 +753,76 @@ public class TestArithmeticExpressions {
                                     withAttribute(57, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = GAMMA
+    //    //....|....|.column = GAMMA
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 10
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 8
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: operation
+    //    //....|....|....|....|....|..id = 6
+    //    //....|....|....|....|....|..optype = multiply
+    //    //....|....|....|....|.....[
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = ID
+    //    //....|....|....|....|....|....|.column = ID
+    //    //....|....|....|....|....|....|.id = 4
+    //    //....|....|....|....|....|....|.index = 0
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = BETA
+    //    //....|....|....|....|....|....|.column = BETA
+    //    //....|....|....|....|....|....|.id = 5
+    //    //....|....|....|....|....|....|.index = 1
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = GAMMA
+    //    //....|....|....|....|....|..column = GAMMA
+    //    //....|....|....|....|....|..id = 7
+    //    //....|....|....|....|....|..index = 2
+    //    //....|....|....|....|....|..table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 9
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestProdSum() throws Exception {
@@ -531,6 +911,76 @@ public class TestArithmeticExpressions {
                                     withAttribute(57, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = GAMMA
+    //    //....|....|.column = GAMMA
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 10
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 8
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = ID
+    //    //....|....|....|....|....|..column = ID
+    //    //....|....|....|....|....|..id = 4
+    //    //....|....|....|....|....|..index = 0
+    //    //....|....|....|....|....|..table = ALPHA
+    //    //....|....|....|....|.....ELEMENT: operation
+    //    //....|....|....|....|....|..id = 7
+    //    //....|....|....|....|....|..optype = divide
+    //    //....|....|....|....|.....[
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = BETA
+    //    //....|....|....|....|....|....|.column = BETA
+    //    //....|....|....|....|....|....|.id = 5
+    //    //....|....|....|....|....|....|.index = 1
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = GAMMA
+    //    //....|....|....|....|....|....|.column = GAMMA
+    //    //....|....|....|....|....|....|.id = 6
+    //    //....|....|....|....|....|....|.index = 2
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 9
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestSumDiv() throws Exception {
@@ -619,6 +1069,76 @@ public class TestArithmeticExpressions {
                                     withAttribute(57, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = GAMMA
+    //    //....|....|.column = GAMMA
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 10
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 8
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: operation
+    //    //....|....|....|....|....|..id = 6
+    //    //....|....|....|....|....|..optype = divide
+    //    //....|....|....|....|.....[
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = ID
+    //    //....|....|....|....|....|....|.column = ID
+    //    //....|....|....|....|....|....|.id = 4
+    //    //....|....|....|....|....|....|.index = 0
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = BETA
+    //    //....|....|....|....|....|....|.column = BETA
+    //    //....|....|....|....|....|....|.id = 5
+    //    //....|....|....|....|....|....|.index = 1
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = GAMMA
+    //    //....|....|....|....|....|..column = GAMMA
+    //    //....|....|....|....|....|..id = 7
+    //    //....|....|....|....|....|..index = 2
+    //    //....|....|....|....|....|..table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 9
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestDivSum() throws Exception {
@@ -707,6 +1227,76 @@ public class TestArithmeticExpressions {
                                     withAttribute(57, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = GAMMA
+    //    //....|....|.column = GAMMA
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 10
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 8
+    //    //....|....|....|....|...optype = subtract
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = ID
+    //    //....|....|....|....|....|..column = ID
+    //    //....|....|....|....|....|..id = 4
+    //    //....|....|....|....|....|..index = 0
+    //    //....|....|....|....|....|..table = ALPHA
+    //    //....|....|....|....|.....ELEMENT: operation
+    //    //....|....|....|....|....|..id = 7
+    //    //....|....|....|....|....|..optype = multiply
+    //    //....|....|....|....|.....[
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = BETA
+    //    //....|....|....|....|....|....|.column = BETA
+    //    //....|....|....|....|....|....|.id = 5
+    //    //....|....|....|....|....|....|.index = 1
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = GAMMA
+    //    //....|....|....|....|....|....|.column = GAMMA
+    //    //....|....|....|....|....|....|.id = 6
+    //    //....|....|....|....|....|....|.index = 2
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 9
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestDiffProd() throws Exception {
@@ -795,6 +1385,76 @@ public class TestArithmeticExpressions {
                                     withAttribute(57, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = GAMMA
+    //    //....|....|.column = GAMMA
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 10
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 8
+    //    //....|....|....|....|...optype = subtract
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: operation
+    //    //....|....|....|....|....|..id = 6
+    //    //....|....|....|....|....|..optype = multiply
+    //    //....|....|....|....|.....[
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = ID
+    //    //....|....|....|....|....|....|.column = ID
+    //    //....|....|....|....|....|....|.id = 4
+    //    //....|....|....|....|....|....|.index = 0
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = BETA
+    //    //....|....|....|....|....|....|.column = BETA
+    //    //....|....|....|....|....|....|.id = 5
+    //    //....|....|....|....|....|....|.index = 1
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = GAMMA
+    //    //....|....|....|....|....|..column = GAMMA
+    //    //....|....|....|....|....|..id = 7
+    //    //....|....|....|....|....|..index = 2
+    //    //....|....|....|....|....|..table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 9
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestProdDiff() throws Exception {
@@ -883,6 +1543,76 @@ public class TestArithmeticExpressions {
                                     withAttribute(57, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = GAMMA
+    //    //....|....|.column = GAMMA
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 10
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 8
+    //    //....|....|....|....|...optype = subtract
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = ID
+    //    //....|....|....|....|....|..column = ID
+    //    //....|....|....|....|....|..id = 4
+    //    //....|....|....|....|....|..index = 0
+    //    //....|....|....|....|....|..table = ALPHA
+    //    //....|....|....|....|.....ELEMENT: operation
+    //    //....|....|....|....|....|..id = 7
+    //    //....|....|....|....|....|..optype = divide
+    //    //....|....|....|....|.....[
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = BETA
+    //    //....|....|....|....|....|....|.column = BETA
+    //    //....|....|....|....|....|....|.id = 5
+    //    //....|....|....|....|....|....|.index = 1
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = GAMMA
+    //    //....|....|....|....|....|....|.column = GAMMA
+    //    //....|....|....|....|....|....|.id = 6
+    //    //....|....|....|....|....|....|.index = 2
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 9
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestDiffDiv() throws Exception {
@@ -971,6 +1701,76 @@ public class TestArithmeticExpressions {
                                     withAttribute(57, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = GAMMA
+    //    //....|....|.column = GAMMA
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 10
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 8
+    //    //....|....|....|....|...optype = subtract
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: operation
+    //    //....|....|....|....|....|..id = 6
+    //    //....|....|....|....|....|..optype = divide
+    //    //....|....|....|....|.....[
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = ID
+    //    //....|....|....|....|....|....|.column = ID
+    //    //....|....|....|....|....|....|.id = 4
+    //    //....|....|....|....|....|....|.index = 0
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = BETA
+    //    //....|....|....|....|....|....|.column = BETA
+    //    //....|....|....|....|....|....|.id = 5
+    //    //....|....|....|....|....|....|.index = 1
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = GAMMA
+    //    //....|....|....|....|....|..column = GAMMA
+    //    //....|....|....|....|....|..id = 7
+    //    //....|....|....|....|....|..index = 2
+    //    //....|....|....|....|....|..table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 9
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestDivDiff() throws Exception {
@@ -1059,6 +1859,76 @@ public class TestArithmeticExpressions {
                                     withAttribute(57, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = GAMMA
+    //    //....|....|.column = GAMMA
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 10
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 8
+    //    //....|....|....|....|...optype = subtract
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: operation
+    //    //....|....|....|....|....|..id = 6
+    //    //....|....|....|....|....|..optype = add
+    //    //....|....|....|....|.....[
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = ID
+    //    //....|....|....|....|....|....|.column = ID
+    //    //....|....|....|....|....|....|.id = 4
+    //    //....|....|....|....|....|....|.index = 0
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = BETA
+    //    //....|....|....|....|....|....|.column = BETA
+    //    //....|....|....|....|....|....|.id = 5
+    //    //....|....|....|....|....|....|.index = 1
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = GAMMA
+    //    //....|....|....|....|....|..column = GAMMA
+    //    //....|....|....|....|....|..id = 7
+    //    //....|....|....|....|....|..index = 2
+    //    //....|....|....|....|....|..table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 9
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestSumDiff() throws Exception {
@@ -1147,6 +2017,76 @@ public class TestArithmeticExpressions {
                                     withAttribute(57, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = GAMMA
+    //    //....|....|.column = GAMMA
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 10
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 8
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: operation
+    //    //....|....|....|....|....|..id = 6
+    //    //....|....|....|....|....|..optype = subtract
+    //    //....|....|....|....|.....[
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = ID
+    //    //....|....|....|....|....|....|.column = ID
+    //    //....|....|....|....|....|....|.id = 4
+    //    //....|....|....|....|....|....|.index = 0
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = BETA
+    //    //....|....|....|....|....|....|.column = BETA
+    //    //....|....|....|....|....|....|.id = 5
+    //    //....|....|....|....|....|....|.index = 1
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = GAMMA
+    //    //....|....|....|....|....|..column = GAMMA
+    //    //....|....|....|....|....|..id = 7
+    //    //....|....|....|....|....|..index = 2
+    //    //....|....|....|....|....|..table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 9
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestDiffSum() throws Exception {
@@ -1235,6 +2175,76 @@ public class TestArithmeticExpressions {
                                     withAttribute(57, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = GAMMA
+    //    //....|....|.column = GAMMA
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 10
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 8
+    //    //....|....|....|....|...optype = divide
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: operation
+    //    //....|....|....|....|....|..id = 6
+    //    //....|....|....|....|....|..optype = multiply
+    //    //....|....|....|....|.....[
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = ID
+    //    //....|....|....|....|....|....|.column = ID
+    //    //....|....|....|....|....|....|.id = 4
+    //    //....|....|....|....|....|....|.index = 0
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = BETA
+    //    //....|....|....|....|....|....|.column = BETA
+    //    //....|....|....|....|....|....|.id = 5
+    //    //....|....|....|....|....|....|.index = 1
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = GAMMA
+    //    //....|....|....|....|....|..column = GAMMA
+    //    //....|....|....|....|....|..id = 7
+    //    //....|....|....|....|....|..index = 2
+    //    //....|....|....|....|....|..table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 9
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestProdDiv() throws Exception {
@@ -1323,6 +2333,76 @@ public class TestArithmeticExpressions {
                                     withAttribute(57, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = GAMMA
+    //    //....|....|.column = GAMMA
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 10
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 8
+    //    //....|....|....|....|...optype = multiply
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: operation
+    //    //....|....|....|....|....|..id = 6
+    //    //....|....|....|....|....|..optype = divide
+    //    //....|....|....|....|.....[
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = ID
+    //    //....|....|....|....|....|....|.column = ID
+    //    //....|....|....|....|....|....|.id = 4
+    //    //....|....|....|....|....|....|.index = 0
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = BETA
+    //    //....|....|....|....|....|....|.column = BETA
+    //    //....|....|....|....|....|....|.id = 5
+    //    //....|....|....|....|....|....|.index = 1
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = GAMMA
+    //    //....|....|....|....|....|..column = GAMMA
+    //    //....|....|....|....|....|..id = 7
+    //    //....|....|....|....|....|..index = 2
+    //    //....|....|....|....|....|..table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 9
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestDivProd() throws Exception {
@@ -1411,6 +2491,76 @@ public class TestArithmeticExpressions {
                                     withAttribute(57, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = GAMMA
+    //    //....|....|.column = GAMMA
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 10
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 8
+    //    //....|....|....|....|...optype = add
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: operation
+    //    //....|....|....|....|....|..id = 6
+    //    //....|....|....|....|....|..optype = add
+    //    //....|....|....|....|.....[
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = ID
+    //    //....|....|....|....|....|....|.column = ID
+    //    //....|....|....|....|....|....|.id = 4
+    //    //....|....|....|....|....|....|.index = 0
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = BETA
+    //    //....|....|....|....|....|....|.column = BETA
+    //    //....|....|....|....|....|....|.id = 5
+    //    //....|....|....|....|....|....|.index = 1
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = GAMMA
+    //    //....|....|....|....|....|..column = GAMMA
+    //    //....|....|....|....|....|..id = 7
+    //    //....|....|....|....|....|..index = 2
+    //    //....|....|....|....|....|..table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 9
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestSumSum() throws Exception {
@@ -1499,6 +2649,76 @@ public class TestArithmeticExpressions {
                                     withAttribute(57, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = GAMMA
+    //    //....|....|.column = GAMMA
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 10
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 8
+    //    //....|....|....|....|...optype = subtract
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: operation
+    //    //....|....|....|....|....|..id = 6
+    //    //....|....|....|....|....|..optype = subtract
+    //    //....|....|....|....|.....[
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = ID
+    //    //....|....|....|....|....|....|.column = ID
+    //    //....|....|....|....|....|....|.id = 4
+    //    //....|....|....|....|....|....|.index = 0
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = BETA
+    //    //....|....|....|....|....|....|.column = BETA
+    //    //....|....|....|....|....|....|.id = 5
+    //    //....|....|....|....|....|....|.index = 1
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = GAMMA
+    //    //....|....|....|....|....|..column = GAMMA
+    //    //....|....|....|....|....|..id = 7
+    //    //....|....|....|....|....|..index = 2
+    //    //....|....|....|....|....|..table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 9
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestDiffDiff() throws Exception {
@@ -1587,6 +2807,76 @@ public class TestArithmeticExpressions {
                                     withAttribute(57, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = GAMMA
+    //    //....|....|.column = GAMMA
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 10
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 8
+    //    //....|....|....|....|...optype = multiply
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: operation
+    //    //....|....|....|....|....|..id = 6
+    //    //....|....|....|....|....|..optype = multiply
+    //    //....|....|....|....|.....[
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = ID
+    //    //....|....|....|....|....|....|.column = ID
+    //    //....|....|....|....|....|....|.id = 4
+    //    //....|....|....|....|....|....|.index = 0
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = BETA
+    //    //....|....|....|....|....|....|.column = BETA
+    //    //....|....|....|....|....|....|.id = 5
+    //    //....|....|....|....|....|....|.index = 1
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = GAMMA
+    //    //....|....|....|....|....|..column = GAMMA
+    //    //....|....|....|....|....|..id = 7
+    //    //....|....|....|....|....|..index = 2
+    //    //....|....|....|....|....|..table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 9
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestProdProd() throws Exception {
@@ -1675,6 +2965,76 @@ public class TestArithmeticExpressions {
                                     withAttribute(57, "valuetype", "INTEGER")))))));
     }
 
+    // Pattern XML:
+    //    //.ELEMENT: select
+    //    //.[
+    //    //.....ELEMENT: columns
+    //    //.....[
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = ID
+    //    //....|....|.column = ID
+    //    //....|....|.id = 1
+    //    //....|....|.index = 0
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = BETA
+    //    //....|....|.column = BETA
+    //    //....|....|.id = 2
+    //    //....|....|.index = 1
+    //    //....|....|.table = ALPHA
+    //    //....|....ELEMENT: columnref
+    //    //....|....|.alias = GAMMA
+    //    //....|....|.column = GAMMA
+    //    //....|....|.id = 3
+    //    //....|....|.index = 2
+    //    //....|....|.table = ALPHA
+    //    //.....ELEMENT: parameters
+    //    //.....ELEMENT: tablescans
+    //    //.....[
+    //    //....|....ELEMENT: tablescan
+    //    //....|....|.jointype = inner
+    //    //....|....|.table = ALPHA
+    //    //....|....[
+    //    //....|....|...ELEMENT: joincond
+    //    //....|....|...[
+    //    //....|....|....|..ELEMENT: operation
+    //    //....|....|....|....id = 10
+    //    //....|....|....|....optype = equal
+    //    //....|....|....|..[
+    //    //....|....|....|....|.ELEMENT: operation
+    //    //....|....|....|....|...id = 8
+    //    //....|....|....|....|...optype = divide
+    //    //....|....|....|....|.[
+    //    //....|....|....|....|.....ELEMENT: operation
+    //    //....|....|....|....|....|..id = 6
+    //    //....|....|....|....|....|..optype = divide
+    //    //....|....|....|....|.....[
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = ID
+    //    //....|....|....|....|....|....|.column = ID
+    //    //....|....|....|....|....|....|.id = 4
+    //    //....|....|....|....|....|....|.index = 0
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|....|....ELEMENT: columnref
+    //    //....|....|....|....|....|....|.alias = BETA
+    //    //....|....|....|....|....|....|.column = BETA
+    //    //....|....|....|....|....|....|.id = 5
+    //    //....|....|....|....|....|....|.index = 1
+    //    //....|....|....|....|....|....|.table = ALPHA
+    //    //....|....|....|....|.....ELEMENT: columnref
+    //    //....|....|....|....|....|..alias = GAMMA
+    //    //....|....|....|....|....|..column = GAMMA
+    //    //....|....|....|....|....|..id = 7
+    //    //....|....|....|....|....|..index = 2
+    //    //....|....|....|....|....|..table = ALPHA
+    //    //....|....|....|....|.ELEMENT: value
+    //    //....|....|....|....|...id = 9
+    //    //....|....|....|....|...value = 0
+    //    //....|....|....|....|...valuetype = INTEGER
+    //    //
+    //    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void TestDivDiv() throws Exception {

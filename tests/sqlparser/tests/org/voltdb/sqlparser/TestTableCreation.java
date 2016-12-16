@@ -54,6 +54,51 @@ public class TestTableCreation {
      * Throws: Exception
      */
 
+    //
+    // SQL: create table alpha ( id TiNyInT not null, beta TINYINT)
+    //
+    //
+    // Pattern XML:
+    //.ELEMENT: databaseschema
+    //...name = databaseschema
+    //.[
+    //.....ELEMENT: table
+    //....|..name = ALPHA
+    //.....[
+    //....|....ELEMENT: columns
+    //....|....|.name = columns
+    //....|....[
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 0
+    //....|....|.....name = ID
+    //....|....|.....nullable = false
+    //....|....|.....size = 3
+    //....|....|.....valuetype = TINYINT
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 1
+    //....|....|.....name = BETA
+    //....|....|.....nullable = true
+    //....|....|.....size = 3
+    //....|....|.....valuetype = TINYINT
+    //....|....ELEMENT: indexes
+    //....|....|.name = indexes
+    //....|....[
+    //....|....|...ELEMENT: index
+    //....|....|.....assumeunique = false
+    //....|....|.....columns = 
+    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....unique = true
+    //....|....ELEMENT: constraints
+    //....|....|.name = constraints
+    //....|....[
+    //....|....|...ELEMENT: constraint
+    //....|....|.....assumeunique = false
+    //....|....|.....constrainttype = NOT_NULL
+    //....|....|.....name = SYS_CT_10001
+    //....|....|.....rowslimit = 2147483647
+    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void testCreateTableTinyInt() throws Exception {
@@ -95,6 +140,51 @@ public class TestTableCreation {
      * Throws: Exception
      */
 
+    //
+    // SQL: create table alpha ( id SmallInt not null, beta SMALLINT)
+    //
+    //
+    // Pattern XML:
+    //.ELEMENT: databaseschema
+    //...name = databaseschema
+    //.[
+    //.....ELEMENT: table
+    //....|..name = ALPHA
+    //.....[
+    //....|....ELEMENT: columns
+    //....|....|.name = columns
+    //....|....[
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 0
+    //....|....|.....name = ID
+    //....|....|.....nullable = false
+    //....|....|.....size = 5
+    //....|....|.....valuetype = SMALLINT
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 1
+    //....|....|.....name = BETA
+    //....|....|.....nullable = true
+    //....|....|.....size = 5
+    //....|....|.....valuetype = SMALLINT
+    //....|....ELEMENT: indexes
+    //....|....|.name = indexes
+    //....|....[
+    //....|....|...ELEMENT: index
+    //....|....|.....assumeunique = false
+    //....|....|.....columns = 
+    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....unique = true
+    //....|....ELEMENT: constraints
+    //....|....|.name = constraints
+    //....|....[
+    //....|....|...ELEMENT: constraint
+    //....|....|.....assumeunique = false
+    //....|....|.....constrainttype = NOT_NULL
+    //....|....|.....name = SYS_CT_10001
+    //....|....|.....rowslimit = 2147483647
+    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void testCreateTableSmallInt() throws Exception {
@@ -136,6 +226,51 @@ public class TestTableCreation {
      * Throws: Exception
      */
 
+    //
+    // SQL: create table alpha ( id integer not null, beta integer)
+    //
+    //
+    // Pattern XML:
+    //.ELEMENT: databaseschema
+    //...name = databaseschema
+    //.[
+    //.....ELEMENT: table
+    //....|..name = ALPHA
+    //.....[
+    //....|....ELEMENT: columns
+    //....|....|.name = columns
+    //....|....[
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 0
+    //....|....|.....name = ID
+    //....|....|.....nullable = false
+    //....|....|.....size = 10
+    //....|....|.....valuetype = INTEGER
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 1
+    //....|....|.....name = BETA
+    //....|....|.....nullable = true
+    //....|....|.....size = 10
+    //....|....|.....valuetype = INTEGER
+    //....|....ELEMENT: indexes
+    //....|....|.name = indexes
+    //....|....[
+    //....|....|...ELEMENT: index
+    //....|....|.....assumeunique = false
+    //....|....|.....columns = 
+    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....unique = true
+    //....|....ELEMENT: constraints
+    //....|....|.name = constraints
+    //....|....[
+    //....|....|...ELEMENT: constraint
+    //....|....|.....assumeunique = false
+    //....|....|.....constrainttype = NOT_NULL
+    //....|....|.....name = SYS_CT_10001
+    //....|....|.....rowslimit = 2147483647
+    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void testCreateTableInteger() throws Exception {
@@ -177,6 +312,51 @@ public class TestTableCreation {
      * Throws: Exception
      */
 
+    //
+    // SQL: create table alpha ( id BiGiNt not null, beta bIgInT)
+    //
+    //
+    // Pattern XML:
+    //.ELEMENT: databaseschema
+    //...name = databaseschema
+    //.[
+    //.....ELEMENT: table
+    //....|..name = ALPHA
+    //.....[
+    //....|....ELEMENT: columns
+    //....|....|.name = columns
+    //....|....[
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 0
+    //....|....|.....name = ID
+    //....|....|.....nullable = false
+    //....|....|.....size = 19
+    //....|....|.....valuetype = BIGINT
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 1
+    //....|....|.....name = BETA
+    //....|....|.....nullable = true
+    //....|....|.....size = 19
+    //....|....|.....valuetype = BIGINT
+    //....|....ELEMENT: indexes
+    //....|....|.name = indexes
+    //....|....[
+    //....|....|...ELEMENT: index
+    //....|....|.....assumeunique = false
+    //....|....|.....columns = 
+    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....unique = true
+    //....|....ELEMENT: constraints
+    //....|....|.name = constraints
+    //....|....[
+    //....|....|...ELEMENT: constraint
+    //....|....|.....assumeunique = false
+    //....|....|.....constrainttype = NOT_NULL
+    //....|....|.....name = SYS_CT_10001
+    //....|....|.....rowslimit = 2147483647
+    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void testCreateTableBigInt() throws Exception {
@@ -218,6 +398,56 @@ public class TestTableCreation {
      * Throws: Exception
      */
 
+    //
+    // SQL: create table alpha ( id integer not null, beta Decimal                 not null)
+    //
+    //
+    // Pattern XML:
+    //.ELEMENT: databaseschema
+    //...name = databaseschema
+    //.[
+    //.....ELEMENT: table
+    //....|..name = ALPHA
+    //.....[
+    //....|....ELEMENT: columns
+    //....|....|.name = columns
+    //....|....[
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 0
+    //....|....|.....name = ID
+    //....|....|.....nullable = false
+    //....|....|.....size = 10
+    //....|....|.....valuetype = INTEGER
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 1
+    //....|....|.....name = BETA
+    //....|....|.....nullable = false
+    //....|....|.....size = 100
+    //....|....|.....valuetype = DECIMAL
+    //....|....ELEMENT: indexes
+    //....|....|.name = indexes
+    //....|....[
+    //....|....|...ELEMENT: index
+    //....|....|.....assumeunique = false
+    //....|....|.....columns = 
+    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....unique = true
+    //....|....ELEMENT: constraints
+    //....|....|.name = constraints
+    //....|....[
+    //....|....|...ELEMENT: constraint
+    //....|....|.....assumeunique = false
+    //....|....|.....constrainttype = NOT_NULL
+    //....|....|.....name = SYS_CT_10001
+    //....|....|.....rowslimit = 2147483647
+    //....|....|...ELEMENT: constraint
+    //....|....|.....assumeunique = false
+    //....|....|.....constrainttype = NOT_NULL
+    //....|....|.....name = SYS_CT_10002
+    //....|....|.....rowslimit = 2147483647
+    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void testCreateTableWithDecimal() throws Exception {
@@ -259,6 +489,56 @@ public class TestTableCreation {
      * Throws: Exception
      */
 
+    //
+    // SQL: create table alpha ( id integer not null, beta Decimal (10, 100) not null)
+    //
+    //
+    // Pattern XML:
+    //.ELEMENT: databaseschema
+    //...name = databaseschema
+    //.[
+    //.....ELEMENT: table
+    //....|..name = ALPHA
+    //.....[
+    //....|....ELEMENT: columns
+    //....|....|.name = columns
+    //....|....[
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 0
+    //....|....|.....name = ID
+    //....|....|.....nullable = false
+    //....|....|.....size = 10
+    //....|....|.....valuetype = INTEGER
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 1
+    //....|....|.....name = BETA
+    //....|....|.....nullable = false
+    //....|....|.....size = 10
+    //....|....|.....valuetype = DECIMAL
+    //....|....ELEMENT: indexes
+    //....|....|.name = indexes
+    //....|....[
+    //....|....|...ELEMENT: index
+    //....|....|.....assumeunique = false
+    //....|....|.....columns = 
+    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....unique = true
+    //....|....ELEMENT: constraints
+    //....|....|.name = constraints
+    //....|....[
+    //....|....|...ELEMENT: constraint
+    //....|....|.....assumeunique = false
+    //....|....|.....constrainttype = NOT_NULL
+    //....|....|.....name = SYS_CT_10001
+    //....|....|.....rowslimit = 2147483647
+    //....|....|...ELEMENT: constraint
+    //....|....|.....assumeunique = false
+    //....|....|.....constrainttype = NOT_NULL
+    //....|....|.....name = SYS_CT_10002
+    //....|....|.....rowslimit = 2147483647
+    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void testCreateTableWithDecimalScalePrecision() throws Exception {
@@ -300,6 +580,51 @@ public class TestTableCreation {
      * Throws: Exception
      */
 
+    //
+    // SQL: create table alpha ( id BiGiNt not null, beta FlOaT)
+    //
+    //
+    // Pattern XML:
+    //.ELEMENT: databaseschema
+    //...name = databaseschema
+    //.[
+    //.....ELEMENT: table
+    //....|..name = ALPHA
+    //.....[
+    //....|....ELEMENT: columns
+    //....|....|.name = columns
+    //....|....[
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 0
+    //....|....|.....name = ID
+    //....|....|.....nullable = false
+    //....|....|.....size = 19
+    //....|....|.....valuetype = BIGINT
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 1
+    //....|....|.....name = BETA
+    //....|....|.....nullable = true
+    //....|....|.....size = 0
+    //....|....|.....valuetype = FLOAT
+    //....|....ELEMENT: indexes
+    //....|....|.name = indexes
+    //....|....[
+    //....|....|...ELEMENT: index
+    //....|....|.....assumeunique = false
+    //....|....|.....columns = 
+    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....unique = true
+    //....|....ELEMENT: constraints
+    //....|....|.name = constraints
+    //....|....[
+    //....|....|...ELEMENT: constraint
+    //....|....|.....assumeunique = false
+    //....|....|.....constrainttype = NOT_NULL
+    //....|....|.....name = SYS_CT_10001
+    //....|....|.....rowslimit = 2147483647
+    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void testCreateTableFloat() throws Exception {
@@ -341,6 +666,52 @@ public class TestTableCreation {
      * Throws: Exception
      */
 
+    //
+    // SQL: create table alpha ( id BiGiNt not null, beta varchar(100))
+    //
+    //
+    // Pattern XML:
+    //.ELEMENT: databaseschema
+    //...name = databaseschema
+    //.[
+    //.....ELEMENT: table
+    //....|..name = ALPHA
+    //.....[
+    //....|....ELEMENT: columns
+    //....|....|.name = columns
+    //....|....[
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 0
+    //....|....|.....name = ID
+    //....|....|.....nullable = false
+    //....|....|.....size = 19
+    //....|....|.....valuetype = BIGINT
+    //....|....|...ELEMENT: column
+    //....|....|.....bytes = false
+    //....|....|.....index = 1
+    //....|....|.....name = BETA
+    //....|....|.....nullable = true
+    //....|....|.....size = 100
+    //....|....|.....valuetype = VARCHAR
+    //....|....ELEMENT: indexes
+    //....|....|.name = indexes
+    //....|....[
+    //....|....|...ELEMENT: index
+    //....|....|.....assumeunique = false
+    //....|....|.....columns = 
+    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....unique = true
+    //....|....ELEMENT: constraints
+    //....|....|.name = constraints
+    //....|....[
+    //....|....|...ELEMENT: constraint
+    //....|....|.....assumeunique = false
+    //....|....|.....constrainttype = NOT_NULL
+    //....|....|.....name = SYS_CT_10001
+    //....|....|.....rowslimit = 2147483647
+    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void testCreateTableVarchar() throws Exception {
@@ -383,6 +754,51 @@ public class TestTableCreation {
      * Throws: Exception
      */
 
+    //
+    // SQL: create table alpha ( id BiGiNt not null, beta varbinary(100))
+    //
+    //
+    // Pattern XML:
+    //.ELEMENT: databaseschema
+    //...name = databaseschema
+    //.[
+    //.....ELEMENT: table
+    //....|..name = ALPHA
+    //.....[
+    //....|....ELEMENT: columns
+    //....|....|.name = columns
+    //....|....[
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 0
+    //....|....|.....name = ID
+    //....|....|.....nullable = false
+    //....|....|.....size = 19
+    //....|....|.....valuetype = BIGINT
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 1
+    //....|....|.....name = BETA
+    //....|....|.....nullable = true
+    //....|....|.....size = 100
+    //....|....|.....valuetype = VARBINARY
+    //....|....ELEMENT: indexes
+    //....|....|.name = indexes
+    //....|....[
+    //....|....|...ELEMENT: index
+    //....|....|.....assumeunique = false
+    //....|....|.....columns = 
+    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....unique = true
+    //....|....ELEMENT: constraints
+    //....|....|.name = constraints
+    //....|....[
+    //....|....|...ELEMENT: constraint
+    //....|....|.....assumeunique = false
+    //....|....|.....constrainttype = NOT_NULL
+    //....|....|.....name = SYS_CT_10001
+    //....|....|.....rowslimit = 2147483647
+    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void testCreateTableVarbinary() throws Exception {
@@ -424,6 +840,51 @@ public class TestTableCreation {
      * Throws: Exception
      */
 
+    //
+    // SQL: create table alpha ( id BiGiNt not null, beta timestamp)
+    //
+    //
+    // Pattern XML:
+    //.ELEMENT: databaseschema
+    //...name = databaseschema
+    //.[
+    //.....ELEMENT: table
+    //....|..name = ALPHA
+    //.....[
+    //....|....ELEMENT: columns
+    //....|....|.name = columns
+    //....|....[
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 0
+    //....|....|.....name = ID
+    //....|....|.....nullable = false
+    //....|....|.....size = 19
+    //....|....|.....valuetype = BIGINT
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 1
+    //....|....|.....name = BETA
+    //....|....|.....nullable = true
+    //....|....|.....size = 8
+    //....|....|.....valuetype = TIMESTAMP
+    //....|....ELEMENT: indexes
+    //....|....|.name = indexes
+    //....|....[
+    //....|....|...ELEMENT: index
+    //....|....|.....assumeunique = false
+    //....|....|.....columns = 
+    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....unique = true
+    //....|....ELEMENT: constraints
+    //....|....|.name = constraints
+    //....|....[
+    //....|....|...ELEMENT: constraint
+    //....|....|.....assumeunique = false
+    //....|....|.....constrainttype = NOT_NULL
+    //....|....|.....name = SYS_CT_10001
+    //....|....|.....rowslimit = 2147483647
+    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void testCreateTableTimestamp() throws Exception {
@@ -465,6 +926,57 @@ public class TestTableCreation {
      * Throws: Exception
      */
 
+    //
+    // SQL: create table alpha ( id BiGiNt not null PRIMARY KEY, beta timestamp)
+    //
+    //
+    // Pattern XML:
+    //.ELEMENT: databaseschema
+    //...name = databaseschema
+    //.[
+    //.....ELEMENT: table
+    //....|..name = ALPHA
+    //.....[
+    //....|....ELEMENT: columns
+    //....|....|.name = columns
+    //....|....[
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 0
+    //....|....|.....name = ID
+    //....|....|.....nullable = false
+    //....|....|.....size = 19
+    //....|....|.....valuetype = BIGINT
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 1
+    //....|....|.....name = BETA
+    //....|....|.....nullable = true
+    //....|....|.....size = 8
+    //....|....|.....valuetype = TIMESTAMP
+    //....|....ELEMENT: indexes
+    //....|....|.name = indexes
+    //....|....[
+    //....|....|...ELEMENT: index
+    //....|....|.....assumeunique = false
+    //....|....|.....columns = ID
+    //....|....|.....name = VOLTDB_AUTOGEN_IDX_PK_ALPHA_ID
+    //....|....|.....unique = true
+    //....|....ELEMENT: constraints
+    //....|....|.name = constraints
+    //....|....[
+    //....|....|...ELEMENT: constraint
+    //....|....|.....assumeunique = false
+    //....|....|.....constrainttype = PRIMARY_KEY
+    //....|....|.....index = VOLTDB_AUTOGEN_IDX_PK_ALPHA_ID
+    //....|....|.....name = VOLTDB_AUTOGEN_IDX_PK_ALPHA_ID
+    //....|....|.....rowslimit = 2147483647
+    //....|....|...ELEMENT: constraint
+    //....|....|.....assumeunique = false
+    //....|....|.....constrainttype = NOT_NULL
+    //....|....|.....name = SYS_CT_10001
+    //....|....|.....rowslimit = 2147483647
+    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void testCreateTablePrimaryKey() throws Exception {
@@ -506,6 +1018,62 @@ public class TestTableCreation {
      * Throws: Exception
      */
 
+    //
+    // SQL: create table alpha ( id BiGiNt not null UNIQUE, beta timestamp)
+    //
+    //
+    // Pattern XML:
+    //.ELEMENT: databaseschema
+    //...name = databaseschema
+    //.[
+    //.....ELEMENT: table
+    //....|..name = ALPHA
+    //.....[
+    //....|....ELEMENT: columns
+    //....|....|.name = columns
+    //....|....[
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 0
+    //....|....|.....name = ID
+    //....|....|.....nullable = false
+    //....|....|.....size = 19
+    //....|....|.....valuetype = BIGINT
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 1
+    //....|....|.....name = BETA
+    //....|....|.....nullable = true
+    //....|....|.....size = 8
+    //....|....|.....valuetype = TIMESTAMP
+    //....|....ELEMENT: indexes
+    //....|....|.name = indexes
+    //....|....[
+    //....|....|...ELEMENT: index
+    //....|....|.....assumeunique = false
+    //....|....|.....columns = 
+    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....unique = true
+    //....|....|...ELEMENT: index
+    //....|....|.....assumeunique = false
+    //....|....|.....columns = ID
+    //....|....|.....name = VOLTDB_AUTOGEN_IDX_CT_ALPHA_ID
+    //....|....|.....unique = true
+    //....|....ELEMENT: constraints
+    //....|....|.name = constraints
+    //....|....[
+    //....|....|...ELEMENT: constraint
+    //....|....|.....assumeunique = false
+    //....|....|.....constrainttype = NOT_NULL
+    //....|....|.....name = SYS_CT_10001
+    //....|....|.....rowslimit = 2147483647
+    //....|....|...ELEMENT: constraint
+    //....|....|.....assumeunique = false
+    //....|....|.....constrainttype = UNIQUE
+    //....|....|.....index = VOLTDB_AUTOGEN_IDX_CT_ALPHA_ID
+    //....|....|.....name = VOLTDB_AUTOGEN_IDX_CT_ALPHA_ID
+    //....|....|.....rowslimit = 2147483647
+    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void testCreateTableUniqueKey() throws Exception {
@@ -547,6 +1115,62 @@ public class TestTableCreation {
      * Throws: Exception
      */
 
+    //
+    // SQL: create table alpha ( id BiGiNt not null ASSUMEUNIQUE, beta timestamp)
+    //
+    //
+    // Pattern XML:
+    //.ELEMENT: databaseschema
+    //...name = databaseschema
+    //.[
+    //.....ELEMENT: table
+    //....|..name = ALPHA
+    //.....[
+    //....|....ELEMENT: columns
+    //....|....|.name = columns
+    //....|....[
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 0
+    //....|....|.....name = ID
+    //....|....|.....nullable = false
+    //....|....|.....size = 19
+    //....|....|.....valuetype = BIGINT
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 1
+    //....|....|.....name = BETA
+    //....|....|.....nullable = true
+    //....|....|.....size = 8
+    //....|....|.....valuetype = TIMESTAMP
+    //....|....ELEMENT: indexes
+    //....|....|.name = indexes
+    //....|....[
+    //....|....|...ELEMENT: index
+    //....|....|.....assumeunique = false
+    //....|....|.....columns = 
+    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....unique = true
+    //....|....|...ELEMENT: index
+    //....|....|.....assumeunique = true
+    //....|....|.....columns = ID
+    //....|....|.....name = VOLTDB_AUTOGEN_IDX_CT_ALPHA_ID
+    //....|....|.....unique = true
+    //....|....ELEMENT: constraints
+    //....|....|.name = constraints
+    //....|....[
+    //....|....|...ELEMENT: constraint
+    //....|....|.....assumeunique = false
+    //....|....|.....constrainttype = NOT_NULL
+    //....|....|.....name = SYS_CT_10001
+    //....|....|.....rowslimit = 2147483647
+    //....|....|...ELEMENT: constraint
+    //....|....|.....assumeunique = true
+    //....|....|.....constrainttype = UNIQUE
+    //....|....|.....index = VOLTDB_AUTOGEN_IDX_CT_ALPHA_ID
+    //....|....|.....name = VOLTDB_AUTOGEN_IDX_CT_ALPHA_ID
+    //....|....|.....rowslimit = 2147483647
+    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void testCreateTableAssumeUniqueKey() throws Exception {
@@ -588,6 +1212,52 @@ public class TestTableCreation {
      * Throws: Exception
      */
 
+    //
+    // SQL: create table alpha ( id BiGiNt default '100', beta timestamp)
+    //
+    //
+    // Pattern XML:
+    //.ELEMENT: databaseschema
+    //...name = databaseschema
+    //.[
+    //.....ELEMENT: table
+    //....|..name = ALPHA
+    //.....[
+    //....|....ELEMENT: columns
+    //....|....|.name = columns
+    //....|....[
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 0
+    //....|....|.....name = ID
+    //....|....|.....nullable = true
+    //....|....|.....size = 19
+    //....|....|.....valuetype = BIGINT
+    //....|....|...[
+    //....|....|....|..ELEMENT: default
+    //....|....|....|..[
+    //....|....|....|....|.ELEMENT: value
+    //....|....|....|....|...id = 1
+    //....|....|....|....|...value = 100
+    //....|....|....|....|...valuetype = BIGINT
+    //....|....|...ELEMENT: column
+    //....|....|.....index = 1
+    //....|....|.....name = BETA
+    //....|....|.....nullable = true
+    //....|....|.....size = 8
+    //....|....|.....valuetype = TIMESTAMP
+    //....|....ELEMENT: indexes
+    //....|....|.name = indexes
+    //....|....[
+    //....|....|...ELEMENT: index
+    //....|....|.....assumeunique = false
+    //....|....|.....columns = 
+    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....unique = true
+    //....|....ELEMENT: constraints
+    //....|....|.name = constraints
+    //
+    //
+    //
     @SuppressWarnings("unchecked")
     @Test
     public void testCreateTableDefaultValue() throws Exception {
