@@ -1,4 +1,20 @@
 /* This file is part of VoltDB.
+ * Copyright (C) 2008-2016 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+/* This file is part of VoltDB.
  * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -47,11 +63,11 @@ import org.voltdb.sqlparser.syntax.symtab.IType;
  */
 public interface ISelectQuery {
 
-	/**
-	 * True iff this is a simple table.  Simple tables
-	 * are select statements, with no boolean operations.
-	 * @return
-	 */
+    /**
+     * True iff this is a simple table.  Simple tables
+     * are select statements, with no boolean operations.
+     * @return
+     */
     boolean isSimpleTable();
 
     /**
@@ -61,10 +77,10 @@ public interface ISelectQuery {
      * if this is called on a simple table query.
      */
     QuerySetOp getSetOp() throws Exception;
-    
+
     /**
      * Return the left hand query of a compound query.
-     *  
+     *
      * @return
      */
     ISelectQuery getLeftQuery();
@@ -73,10 +89,10 @@ public interface ISelectQuery {
      * @return
      */
     ISelectQuery getRightQuery();
-    
+
     /**
      * Add a projection.  This is a select list element.
-     * 
+     *
      * @param aTableName
      * @param aColumnName
      * @param aAlias
@@ -132,5 +148,10 @@ public interface ISelectQuery {
     IExpressionParser getExpressionParser();
 
     void setExpressionParser(IExpressionParser expr);
-    
+
+    /**
+     * Add a join condition to the select query.
+     * @param joinTree
+     */
+    void addJoinTree(IJoinTree joinTree);
 }

@@ -13,20 +13,16 @@ package org.voltdb.sqlparser.syntax.grammar;
 }
 
 dml_statement_list:
-       ( dml_statement ( ';' dml_statement )* )
+       dml_statement ';' ( dml_statement ';' )* EOF
     ;       
 ddl_statement_list:
-        ( ddl_statement ( ';' ddl_statement )* )
+       ddl_statement ';' ( ddl_statement ';' )* EOF
     ;
     
 dql_statement_list:
-        ( dql_statement ( ';' dql_statement )* )
+        dql_statement ';' ( dql_statement ';' )* EOF
     ;
     
-meta_statement_list:
-        ( meta_statement ( ';' meta_statement )* )
-    ;
-
 dml_statement:
         insert_statement
     |   
@@ -59,15 +55,14 @@ ddl_statement:
         partition_statement
     |
         truncate_table_statement
+    |
+    	set_statement
     ;
 
 dql_statement:
         cursor_specification
     ;
 
-meta_statement:
-        set_statement
-    ;
 
 /*************************************************************************
  * DDL Statements.
@@ -76,7 +71,7 @@ meta_statement:
  * Alter Table.
  */
 alter_table:
-        ALTER TABLE table_primary
+        ALTER TABLE table_name
         (
             alter_table_drop
         |
@@ -174,7 +169,7 @@ index_type:
  */
 create_index:
         CREATE (UNIQUE | ASSUMEUNIQUE )? INDEX index_name
-        ON ( table_primary | view_name )
+        ON ( table_name | view_name )
         '(' index_column ( ',' index_column )* ')'
         WHERE where_boolean_expression
     ;
@@ -192,7 +187,7 @@ index_column:
  */
 create_procedure:
         CREATE PROCEDURE procedure_name
-        ( PARTITION ON TABLE table_primary COLUMN column_name ( PARAMETER position )? )?
+        ( PARTITION ON TABLE table_name COLUMN column_name ( PARAMETER position )? )?
         ( ALLOW role_name ( ',' role_name )* )?
         (
             from_class_procedure
@@ -242,7 +237,7 @@ create_stream:
  * Create Table.
  */
 create_table:
-        CREATE TABLE table_primary '(' 
+        CREATE TABLE table_name '(' 
             ( column_definition ( ',' column_definition )* )?
             (',' constraint_definition ( ',' constraint_definition )* )?
         ')'
@@ -297,19 +292,19 @@ partition_statement:
 
 partition_procedure_statement:
         PARTITION PROCEDURE procedure_name
-        ON TABLE table_primary
+        ON TABLE table_name
         COLUMN column_name
         ( PARAMETER position )?
     ;
 partition_table_statement:
-        PARTITION TABLE table_primary ON COLUMN column_name
+        PARTITION TABLE table_name ON COLUMN column_name
     ;
 
 /*
  * DR Statement.
  */
 dr_statement:
-        DR TABLE table_primary ( DISABLE )?
+        DR TABLE table_name ( DISABLE )?
     ;
 
 /*************************************************************************
@@ -319,7 +314,7 @@ dr_statement:
  * Delete statement.
  */
 delete_statement:
-        DELETE FROM table_primary
+        DELETE FROM table_name
         ( WHERE where_boolean_expression )?
         ( ORDER BY ( delete_sort_specification ( ',' delete_sort_specification ) )? )
     ;
@@ -337,7 +332,7 @@ delete_sort_specification:
  * Insert statement.
  */
 insert_statement:
-        ( INSERT | UPSERT ) INTO table_primary
+        ( INSERT | UPSERT ) INTO table_name
         ( '(' column_name (',' column_name)* ')' )?
         (
             insert_values
@@ -429,6 +424,10 @@ query_specification:
         SELECT ( set_quantifier )? select_list table_expression
     ;
 
+set_quantifier:
+        ALL | DISTINCT
+    ;
+
 select_list:
         ASTERISK
     |
@@ -496,10 +495,6 @@ table_reference:
     ;
 
 table_factor:
-		table_primary ( AS table_alias_name )?
-	;
-
-table_primary:
 		table_name ( AS table_alias_name )?
 	| 
 		derived_table AS table_alias_name
@@ -536,7 +531,7 @@ scalar_subquery:
     ;
     
 subquery:
-        '(' query_expression ')'
+        '(' query_specification ')'
     ;
 
 where_clause:
@@ -591,7 +586,7 @@ offset_value:
  *
  */
 update_statement:
-        UPDATE table_primary
+        UPDATE table_name
         SET assign (',' assign )*
         ( WHERE boolean_expression )?
     ;
@@ -601,16 +596,9 @@ assign:
     ;
 
 truncate_table_statement:
-        TRUNCATE TABLE table_primary
+        TRUNCATE TABLE table_name
     ;
 
-set_quantifier:
-        ALL | DISTINCT
-    ;
-
-/*************************************************************************
- * Meta statements
- *************************************************************************/
 set_statement:
         SET assign
     ;
@@ -619,7 +607,7 @@ set_statement:
  * Export and Import Statements
  */
 export_statement:
-        EXPORT TABLE table_primary TO STREAM stream_name
+        EXPORT TABLE table_name TO STREAM stream_name
     ;
 
 import_statement:

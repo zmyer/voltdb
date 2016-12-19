@@ -1,4 +1,20 @@
 /* This file is part of VoltDB.
+ * Copyright (C) 2008-2016 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+/* This file is part of VoltDB.
  * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -23,9 +39,11 @@ import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
 import org.voltdb.sqlparser.syntax.grammar.IColumnIdent;
 import org.voltdb.sqlparser.syntax.grammar.IIndex;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
+import org.voltdb.sqlparser.syntax.grammar.IJoinTree;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
 import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
 import org.voltdb.sqlparser.syntax.grammar.ISemantino;
+import org.voltdb.sqlparser.syntax.grammar.JoinOperator;
 import org.voltdb.sqlparser.syntax.grammar.Projection;
 import org.voltdb.sqlparser.syntax.grammar.QuerySetOp;
 import org.voltdb.sqlparser.syntax.util.ErrorMessageSet;
@@ -276,11 +294,11 @@ public interface IParserFactory {
      * @return
      */
     ISemantino makeQuerySemantino(ISelectQuery query);
-    
+
     /**
      * Make a new index with the given name, on the given
      * table, column and index type.
-     * 
+     *
      * @param table The table of the index.
      * @param column The column of the index
      * @param m_isUniqueConstraint UNIQUE is specified.
@@ -288,8 +306,33 @@ public interface IParserFactory {
      * @param m_isPrimaryKey PRIMARY KEY is specified.
      * @return A new index.
      */
-	IIndex newIndex(String indexName,
-				    ITable table,
-					IColumn column,
-					IndexType it);
+    IIndex newIndex(String indexName,
+                    ITable table,
+                    IColumn column,
+                    IndexType it);
+    /**
+     * Combine two join trees with a join operation and a join condition.
+     *
+     * @param op The operation.
+     * @param left The left subtree.
+     * @param right The right subtree.
+     * @param condition The join condition.
+     * @return
+     */
+    IJoinTree newJoinTree(JoinOperator op, IJoinTree joinTree, IJoinTree right, ISemantino condition);
+
+    /**
+     * Make a new table reference.
+     *
+     * @param aTableName The table name.
+     * @param aTableAlias The table alias.
+     */
+    IJoinTree newTableReference(String aTableName, String aTableAlias);
+    /**
+     * Make a new derived table from a select query.
+     * @param derivedTable
+     * @param text
+     * @return
+     */
+    IJoinTree newDerivedJoinTree(ISelectQuery derivedTable, String tableName);
 }

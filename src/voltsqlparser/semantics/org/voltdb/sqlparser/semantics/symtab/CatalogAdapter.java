@@ -1,4 +1,20 @@
 /* This file is part of VoltDB.
+ * Copyright (C) 2008-2016 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+/* This file is part of VoltDB.
  * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -43,10 +59,10 @@ public class CatalogAdapter implements ICatalogAdapter {
     private TreeMap<String, Index> m_indexes = new TreeMap<String, Index>(String.CASE_INSENSITIVE_ORDER);
 
     public void addTable (ITable aTable) {
-    	assert(aTable instanceof Table);
-    	Table table = (Table)aTable;
-    	String name = table.getName();
-    	m_tables.put(name, table);
+        assert(aTable instanceof Table);
+        Table table = (Table)aTable;
+        String name = table.getName();
+        m_tables.put(name, table);
      }
 
    /**
@@ -64,12 +80,12 @@ public class CatalogAdapter implements ICatalogAdapter {
     }
 
     public Index getIndexByName(String indexName) {
-    	return m_indexes.get(indexName);
+        return m_indexes.get(indexName);
     }
-	@Override
-	public void addIndex(IIndex idx) {
-		assert(idx instanceof Index);
-		m_indexes.put(idx.getName(), (Index)idx);
-	}
+    @Override
+    public void addIndex(IIndex idx) {
+        assert(idx instanceof Index);
+        m_indexes.put(idx.getName(), (Index)idx);
+    }
 
 }

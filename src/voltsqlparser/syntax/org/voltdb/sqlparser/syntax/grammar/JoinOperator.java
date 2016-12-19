@@ -16,9 +16,11 @@
  */
 package org.voltdb.sqlparser.syntax.grammar;
 
-public enum QuerySetOp {
-    INVALID_OP,
-    UNION_OP,
-    EXCEPT_OP,
-    INTERSECT_OP
+public enum JoinOperator {
+    INVALID_JOIN,
+    CROSS_JOIN,
+    INNER_JOIN,
+    LEFT_OUTER_JOIN,
+    RIGHT_OUTER_JOIN,
+    FULL_OUTER_JOIN
 }
