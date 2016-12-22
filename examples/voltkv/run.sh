@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+gia#!/usr/bin/env bash
 
 # find voltdb binaries
 if [ -e ../../bin/voltdb ]; then
@@ -21,7 +21,7 @@ source $VOLTDB_BIN/voltenv
 # (once running, all nodes are the same -- no leaders)
 STARTUPLEADERHOST="localhost"
 # list of cluster nodes separated by commas in host:[port] format
-SERVERS="localhost"
+#SERVERS="localhost"
 
 # remove binaries, logs, runtime artifacts, etc... but keep the client jar
 function clean() {
@@ -89,6 +89,7 @@ function async-benchmark() {
         --displayinterval=5 \
         --duration=120 \
         --servers=$SERVERS \
+        --keyminvalue=0 \
         --poolsize=100000 \
         --preload=true \
         --getputratio=0.90 \
@@ -100,6 +101,70 @@ function async-benchmark() {
 #        --latencyreport=true \
 #        --ratelimit=100000
 }
+
+function async-benchmark1() {
+    jars-ifneeded
+    java -classpath voltkv-client.jar:$CLIENTCLASSPATH voltkv.AsyncBenchmark \
+        --displayinterval=5 \
+        --duration=1200 \
+        --servers=$SERVERS \
+        --keyminvalue=0 \
+        --preload=false \
+        --warmup=0 \
+        --mpspratio=0.50 \
+        --poolsize=1000000 \
+        --getputratio=0.90 \
+        --keysize=32 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
+        --entropy=127 \
+        --usecompression=false
+#        --latencyreport=true \
+#        --ratelimit=100000
+}
+
+function async-benchmark2() {
+    jars-ifneeded
+    java -classpath voltkv-client.jar:$CLIENTCLASSPATH voltkv.AsyncBenchmark \
+        --displayinterval=5 \
+        --duration=600 \
+        --servers=$SERVERS \
+        --keyminvalue=1000000 \
+        --preload=false \
+        --warmup=0 \
+        --mpspratio=0.50 \
+        --poolsize=1000000 \
+        --getputratio=0.90 \
+        --keysize=32 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
+        --entropy=127 \
+        --usecompression=false
+#        --latencyreport=true \
+#        --ratelimit=100000
+}
+
+function async-benchmark3() {
+    jars-ifneeded
+    java -classpath voltkv-client.jar:$CLIENTCLASSPATH voltkv.AsyncBenchmark \
+        --displayinterval=5 \
+        --duration=300 \
+        --servers=$SERVERS \
+        --keyminvalue=2000000 \
+        --preload=false \
+        --warmup=0 \
+        --mpspratio=0.50 \
+        --poolsize=1000000 \
+        --getputratio=0.90 \
+        --keysize=32 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
+        --entropy=127 \
+        --usecompression=false
+#        --latencyreport=true \
+#        --ratelimit=100000
+}
+
 
 # Multi-threaded synchronous benchmark sample
 # Use this target for argument help
@@ -148,7 +213,7 @@ function jdbc-benchmark() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|cleanall|jars|server|init|client|async-benchmark|aysnc-benchmark-help|...}"
+    echo "Usage: ./run.sh {clean|cleanall|jars|server|init|client|async-benchmark|async-benchmark-help|...}"
     echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help}"
 }
 
@@ -160,4 +225,3 @@ do
     echo "${0}: Performing $arg..."
     $arg
 done
-
