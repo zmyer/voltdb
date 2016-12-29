@@ -863,10 +863,6 @@ public class ParserRoutine extends ParserDML {
                 cs = compileDeleteStatement(rangeVariables);
                 break;
 
-            case Tokens.MERGE :
-                cs = compileMergeStatement(rangeVariables);
-                break;
-
             case Tokens.SET :
                 cs = compileSetStatement(rangeVariables);
                 break;

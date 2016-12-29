@@ -1347,12 +1347,12 @@ public class ParserDQL extends ParserBase {
         return sortAndSlice;
     }
 
-    protected RangeVariable readSimpleRangeVariable(int operation) {
+    protected RangeVariable readSimpleRangeVariable(boolean isDelete) {
 
         Table      table = readTableName();
         SimpleName alias = null;
 
-        if (operation != StatementTypes.DELETE_WHERE) {
+        if (isDelete) {
             if (token.tokenType == Tokens.AS) {
                 read();
                 checkIsNonCoreReservedIdentifier();
@@ -1367,27 +1367,6 @@ public class ParserDQL extends ParserBase {
         }
 
         if (table.isView) {
-            switch (operation) {
-
-                case StatementTypes.MERGE :
-                    if (!table.isUpdatable() || !table.isInsertable()) {
-                        throw Error.error(ErrorCode.X_42545);
-                    }
-                    break;
-
-                case StatementTypes.UPDATE_WHERE :
-                case StatementTypes.DELETE_WHERE :
-                    /* A VoltDB Extension.
-                     * Views from Streams are now updatable.
-                     * Comment out this guard and check if it is a view
-                     * from Stream or PersistentTable in planner.
-                    if (!table.isUpdatable()) {
-                        throw Error.error(ErrorCode.X_42545);
-                    }
-                    A VoltDB Extension */
-                    break;
-            }
-
             SubQuery sq = getViewSubquery((View) table);
 
             table = sq.getTable();
@@ -2129,8 +2108,8 @@ public class ParserDQL extends ParserBase {
             case Tokens.COLLATE : {
                 read();
 
-                SchemaObject collation =
-                    database.schemaManager.getSchemaObject(token.namePrefix,
+                // unused // SchemaObject collation =
+                database.schemaManager.getSchemaObject(token.namePrefix,
                         token.tokenString, SchemaObject.COLLATION);
             }
         }
@@ -2214,11 +2193,9 @@ public class ParserDQL extends ParserBase {
 
             read();
 
-            Expression a = e;
-
-            e = XreadAllTypesTerm(boole);
-            e = boole ? new ExpressionLogical(type, a, e)
-                      : new ExpressionArithmetic(type, a, e);
+            Expression rightExpr = XreadAllTypesTerm(boole);
+            e = boole ? new ExpressionLogical(type, e, rightExpr)
+                      : new ExpressionArithmetic(type, e, rightExpr);
         }
 
         return e;
@@ -2262,16 +2239,14 @@ public class ParserDQL extends ParserBase {
 
             read();
 
-            Expression a = e;
+            Expression rightExpr = XreadAllTypesFactor(boole);
 
-            e = XreadAllTypesFactor(boole);
-
-            if (e == null) {
+            if (rightExpr == null) {
                 throw unexpectedToken();
             }
 
-            e = boole ? new ExpressionLogical(type, a, e)
-                      : new ExpressionArithmetic(type, a, e);
+            e = boole ? new ExpressionLogical(type, e, rightExpr)
+                      : new ExpressionArithmetic(type, e, rightExpr);
         }
 
         return e;
@@ -2355,16 +2330,16 @@ public class ParserDQL extends ParserBase {
     Expression XreadCharacterValueExpression() {
 
         Expression   e         = XreadCharacterPrimary();
-        SchemaObject collation = readCollateClauseOrNull();
+        // unused // SchemaObject collation =
+        readCollateClauseOrNull();
 
         while (token.tokenType == Tokens.CONCAT) {
             read();
 
-            Expression a = e;
-
-            e         = XreadCharacterPrimary();
-            collation = readCollateClauseOrNull();
-            e         = new ExpressionArithmetic(OpTypes.CONCAT, a, e);
+            Expression rightExpr = XreadCharacterPrimary();
+            // unused // collation =
+            readCollateClauseOrNull();
+            e = new ExpressionArithmetic(OpTypes.CONCAT, e, rightExpr);
         }
 
         return e;
@@ -2454,10 +2429,8 @@ public class ParserDQL extends ParserBase {
 
             read();
 
-            Expression a = e;
-
-            e = XreadTerm();
-            e = new ExpressionArithmetic(type, a, e);
+            Expression rightExpr = XreadTerm();
+            e = new ExpressionArithmetic(type, e, rightExpr);
         }
 
         return e;
@@ -2479,15 +2452,13 @@ public class ParserDQL extends ParserBase {
 
             read();
 
-            Expression a = e;
+            Expression rightExpr = XreadFactor();
 
-            e = XreadFactor();
-
-            if (e == null) {
+            if (rightExpr == null) {
                 throw unexpectedToken();
             }
 
-            e = new ExpressionArithmetic(type, a, e);
+            e = new ExpressionArithmetic(type, e, rightExpr);
         }
 
         return e;
@@ -2536,10 +2507,8 @@ public class ParserDQL extends ParserBase {
 
             read();
 
-            Expression a = e;
-
-            e = XreadDateTimeIntervalTerm();
-            e = new ExpressionArithmetic(type, a, e);
+            Expression rightExpr = XreadDateTimeIntervalTerm();
+            e = new ExpressionArithmetic(type, e, rightExpr);
         }
 
         return e;
@@ -2562,10 +2531,8 @@ public class ParserDQL extends ParserBase {
 
             read();
 
-            Expression a = e;
-
-            e = XreadDateTimeIntervalTerm();
-            e = new ExpressionArithmetic(type, a, e);
+            Expression rightExpr = XreadDateTimeIntervalTerm();
+            e = new ExpressionArithmetic(type, e, rightExpr);
         }
 
         return e;
@@ -2652,10 +2619,8 @@ public class ParserDQL extends ParserBase {
 
                 read();
 
-                Expression a = e;
-
-                e = XreadBooleanTermOrNull();
-                e = new ExpressionLogical(type, a, e);
+                Expression rightExpr = XreadBooleanTermOrNull();
+                e = new ExpressionLogical(type, e, rightExpr);
             }
 
             if (e == null) {
@@ -2688,10 +2653,8 @@ public class ParserDQL extends ParserBase {
 
             read();
 
-            Expression a = e;
-
-            e = XreadBooleanFactorOrNull();
-            e = new ExpressionLogical(type, a, e);
+            Expression rightExpr = XreadBooleanFactorOrNull();
+            e = new ExpressionLogical(type, e, rightExpr);
         }
 
         return e;
@@ -2864,11 +2827,9 @@ public class ParserDQL extends ParserBase {
         }
     }
 
-    Expression XreadPredicateRightPart(final Expression l) {
-
-        boolean           hasNot = false;
-        ExpressionLogical e      = null;
-        Expression        r;
+    Expression XreadPredicateRightPart(final Expression leftExpr) {
+        boolean hasNot = false;
+        ExpressionLogical e = null;
 
         if (token.tokenType == Tokens.NOT) {
             read();
@@ -2895,8 +2856,9 @@ public class ParserDQL extends ParserBase {
                     read();
                     readThis(Tokens.FROM);
 
-                    r      = XreadRowValuePredicand();
-                    e      = new ExpressionLogical(OpTypes.NOT_DISTINCT, l, r);
+                    Expression rightExpr = XreadRowValuePredicand();
+                    e = new ExpressionLogical(OpTypes.NOT_DISTINCT,
+                            leftExpr, rightExpr);
                     hasNot = !hasNot;
 
                     break;
@@ -2906,7 +2868,7 @@ public class ParserDQL extends ParserBase {
                         || token.tokenType == Tokens.UNKNOWN) {
                     read();
 
-                    e = new ExpressionLogical(OpTypes.IS_NULL, l);
+                    e = new ExpressionLogical(OpTypes.IS_NULL, leftExpr);
 
                     break;
                 }
@@ -2914,18 +2876,18 @@ public class ParserDQL extends ParserBase {
                 throw unexpectedToken();
             }
             case Tokens.LIKE : {
-                e                = XreadLikePredicateRightPart(l);
+                e = XreadLikePredicateRightPart(leftExpr);
                 e.noOptimisation = isCheckOrTriggerCondition;
 
                 break;
             }
             case Tokens.BETWEEN : {
-                e = XreadBetweenPredicateRightPart(l);
+                e = XreadBetweenPredicateRightPart(leftExpr);
 
                 break;
             }
             case Tokens.IN : {
-                e                = XreadInPredicateRightPart(l);
+                e = XreadInPredicateRightPart(leftExpr);
                 e.noOptimisation = isCheckOrTriggerCondition;
 
                 break;
@@ -2935,7 +2897,7 @@ public class ParserDQL extends ParserBase {
                     throw unexpectedToken();
                 }
 
-                e = XreadOverlapsPredicateRightPart(l);
+                e = XreadOverlapsPredicateRightPart(leftExpr);
 
                 break;
             }
@@ -2958,13 +2920,13 @@ public class ParserDQL extends ParserBase {
                     case Tokens.ANY :
                     case Tokens.SOME :
                     case Tokens.ALL :
-                        e = XreadQuantifiedComparisonRightPart(type, l);
+                        e = XreadQuantifiedComparisonRightPart(type, leftExpr);
                         break;
 
                     default : {
                         Expression row = XreadRowValuePredicand();
 
-                        e = new ExpressionLogical(type, l, row);
+                        e = new ExpressionLogical(type, leftExpr, row);
 
                         break;
                     }
@@ -2973,7 +2935,7 @@ public class ParserDQL extends ParserBase {
                 break;
             }
             case Tokens.MATCH : {
-                e = XreadMatchPredicateRightPart(l);
+                e = XreadMatchPredicateRightPart(leftExpr);
 
                 break;
             }
@@ -2982,7 +2944,7 @@ public class ParserDQL extends ParserBase {
                     throw unexpectedToken();
                 }
 
-                return l;
+                return leftExpr;
             }
         }
 
@@ -3022,25 +2984,25 @@ public class ParserDQL extends ParserBase {
             throw Error.error(ErrorCode.X_42567);
         }
 
-        Expression l = new ExpressionLogical(OpTypes.GREATER_EQUAL, a, left);
-        Expression r = new ExpressionLogical(OpTypes.SMALLER_EQUAL, a, right);
-        ExpressionLogical leftToRight = new ExpressionLogical(OpTypes.AND, l,
-            r);
+        Expression leftComp = new ExpressionLogical(OpTypes.GREATER_EQUAL, a, left);
+        Expression rightComp = new ExpressionLogical(OpTypes.SMALLER_EQUAL, a, right);
+        ExpressionLogical leftToRight = new ExpressionLogical(OpTypes.AND,
+                leftComp, rightComp);
 
         if (symmetric) {
-            l = new ExpressionLogical(OpTypes.SMALLER_EQUAL, a, left);
-            r = new ExpressionLogical(OpTypes.GREATER_EQUAL, a, right);
+            leftComp = new ExpressionLogical(OpTypes.SMALLER_EQUAL, a, left);
+            rightComp = new ExpressionLogical(OpTypes.GREATER_EQUAL, a, right);
 
-            Expression rightToLeft = new ExpressionLogical(OpTypes.AND, l, r);
+            Expression rightToLeft = new ExpressionLogical(OpTypes.AND, leftComp, rightComp);
 
             return new ExpressionLogical(OpTypes.OR, leftToRight, rightToLeft);
-        } else {
-            return leftToRight;
         }
+
+        return leftToRight;
     }
 
     private ExpressionLogical XreadQuantifiedComparisonRightPart(int exprType,
-            Expression l) {
+            Expression leftExpr) {
 
         int        tokenT      = token.tokenType;
         int        exprSubType = 0;
@@ -3094,73 +3056,59 @@ public class ParserDQL extends ParserBase {
                 readThis(Tokens.CLOSEBRACKET);
         }
 
-        ExpressionLogical r = new ExpressionLogical(exprType, l, e);
+        ExpressionLogical r = new ExpressionLogical(exprType, leftExpr, e);
 
         r.exprSubType = exprSubType;
 
         return r;
     }
 
-    private ExpressionLogical XreadInPredicateRightPart(Expression l) {
-
-        int        degree = l.getDegree();
-        Expression e      = null;
+    private ExpressionLogical XreadInPredicateRightPart(Expression leftExpr) {
+        int degree = leftExpr.getDegree();
+        Expression rightExpr;
 
         read();
+
         // A VoltDB extension to add support for x IN ?
         if (token.tokenType == Tokens.QUESTION &&
             ! isCheckOrTriggerCondition) {
             read();
-            e = new ExpressionColumn(OpTypes.DYNAMIC_PARAM);
-            compileContext.parameters.add(e);
-            e.nodeDataTypes = new Type[degree];
-            ExpressionLogical r = new ExpressionLogical(OpTypes.EQUAL, l, e);
-            r.exprSubType = OpTypes.ANY_QUANTIFIED;
-            return r;
+            rightExpr = new ExpressionColumn(OpTypes.DYNAMIC_PARAM);
+            compileContext.parameters.add(rightExpr);
+            rightExpr.nodeDataTypes = new Type[degree];
         }
-        // End of VoltDB extension
-        readThis(Tokens.OPENBRACKET);
+        else {
+            readThis(Tokens.OPENBRACKET);
+            int position = getPosition();
+            readOpenBrackets();
+            rewind(position);
 
-        int position = getPosition();
-
-        readOpenBrackets();
-
-        switch (token.tokenType) {
-
+            switch (token.tokenType) {
             case Tokens.TABLE :
             case Tokens.VALUES :
-            case Tokens.SELECT : {
-                rewind(position);
-
+            case Tokens.SELECT :
                 SubQuery sq = XreadSubqueryBody(false, OpTypes.IN);
-
-                e = new Expression(OpTypes.TABLE_SUBQUERY, sq);
-
-                readThis(Tokens.CLOSEBRACKET);
-
+                rightExpr = new Expression(OpTypes.TABLE_SUBQUERY, sq);
                 break;
+
+            default :
+                rightExpr = XreadInValueListConstructor(degree);
             }
-            default : {
-                rewind(position);
 
-                e = XreadInValueListConstructor(degree);
-
-                readThis(Tokens.CLOSEBRACKET);
-
-                break;
-            }
+            readThis(Tokens.CLOSEBRACKET);
         }
 
-        ExpressionLogical r;
+        ExpressionLogical result;
 
         if (isCheckOrTriggerCondition) {
-            r = new ExpressionLogical(OpTypes.IN, l, e);
-        } else {
-            r             = new ExpressionLogical(OpTypes.EQUAL, l, e);
-            r.exprSubType = OpTypes.ANY_QUANTIFIED;
+            result = new ExpressionLogical(OpTypes.IN, leftExpr, rightExpr);
+        }
+        else {
+            result = new ExpressionLogical(OpTypes.EQUAL, leftExpr, rightExpr);
+            result.exprSubType = OpTypes.ANY_QUANTIFIED;
         }
 
-        return r;
+        return result;
     }
 
     Expression XreadInValueList(int degree) {
@@ -3219,8 +3167,7 @@ public class ParserDQL extends ParserBase {
                                   this.isCheckOrTriggerCondition);
     }
 
-    private ExpressionLogical XreadMatchPredicateRightPart(Expression a) {
-
+    private ExpressionLogical XreadMatchPredicateRightPart(Expression leftExpr) {
         boolean isUnique  = false;
         int     matchType = OpTypes.MATCH_SIMPLE;
 
@@ -3249,20 +3196,19 @@ public class ParserDQL extends ParserBase {
                                  : OpTypes.MATCH_FULL;
         }
 
-        int        mode = isUnique ? OpTypes.TABLE_SUBQUERY
-                                   : OpTypes.IN;
-        Expression s    = XreadTableSubqueryForPredicate(mode);
+        int mode = isUnique ? OpTypes.TABLE_SUBQUERY : OpTypes.IN;
+        Expression rightExpr = XreadTableSubqueryForPredicate(mode);
 
-        return new ExpressionLogical(matchType, a, s);
+        return new ExpressionLogical(matchType, leftExpr, rightExpr);
     }
 
-    private ExpressionLogical XreadOverlapsPredicateRightPart(Expression l) {
+    private ExpressionLogical XreadOverlapsPredicateRightPart(Expression leftExpr) {
 
-        if (l.getType() != OpTypes.ROW) {
+        if (leftExpr.getType() != OpTypes.ROW) {
             throw Error.error(ErrorCode.X_42564);
         }
 
-        if (l.nodes.length != 2) {
+        if (leftExpr.nodes.length != 2) {
             throw Error.error(ErrorCode.X_42564);
         }
 
@@ -3272,13 +3218,13 @@ public class ParserDQL extends ParserBase {
             throw unexpectedToken();
         }
 
-        Expression r = XreadRowValuePredicand();
+        Expression rightExpr = XreadRowValuePredicand();
 
-        if (r.nodes.length != 2) {
+        if (rightExpr.nodes.length != 2) {
             throw Error.error(ErrorCode.X_42564);
         }
 
-        return new ExpressionLogical(OpTypes.OVERLAPS, l, r);
+        return new ExpressionLogical(OpTypes.OVERLAPS, leftExpr, rightExpr);
     }
 
     Expression XreadRowValueExpression() {
@@ -3823,21 +3769,21 @@ public class ParserDQL extends ParserBase {
     /**
      * Reads part of a CASE .. WHEN  expression
      */
-    private Expression readCaseWhen(final Expression l) {
+    private Expression readCaseWhen(final Expression leftExpr) {
 
         readThis(Tokens.WHEN);
 
         Expression condition = null;
 
-        if (l == null) {
+        if (leftExpr == null) {
             condition = XreadBooleanValueExpression();
         } else {
             while (true) {
-                Expression newCondition = XreadPredicateRightPart(l);
+                Expression newCondition = XreadPredicateRightPart(leftExpr);
 
-                if (l == newCondition) {
+                if (leftExpr == newCondition) {
                     newCondition =
-                        new ExpressionLogical(l, XreadRowValuePredicand());
+                        new ExpressionLogical(leftExpr, XreadRowValuePredicand());
                 }
 
                 if (condition == null) {
@@ -3861,7 +3807,7 @@ public class ParserDQL extends ParserBase {
         Expression elseExpr = null;
 
         if (token.tokenType == Tokens.WHEN) {
-            elseExpr = readCaseWhen(l);
+            elseExpr = readCaseWhen(leftExpr);
         } else if (token.tokenType == Tokens.ELSE) {
             read();
 
@@ -3889,12 +3835,12 @@ public class ParserDQL extends ParserBase {
      */
     private Expression readCaseWhenExpression() {
 
-        Expression l = null;
+        Expression leftExpr = null;
 
         read();
         readThis(Tokens.OPENBRACKET);
 
-        l = XreadBooleanValueExpression();
+        leftExpr = XreadBooleanValueExpression();
 
         readThis(Tokens.COMMA);
 
@@ -3904,11 +3850,11 @@ public class ParserDQL extends ParserBase {
 
         thenelse = new ExpressionOp(OpTypes.ALTERNATIVE, thenelse,
                                     XreadValueExpression());
-        l = new ExpressionOp(OpTypes.CASEWHEN, l, thenelse);
+        leftExpr = new ExpressionOp(OpTypes.CASEWHEN, leftExpr, thenelse);
 
         readThis(Tokens.CLOSEBRACKET);
 
-        return l;
+        return leftExpr;
     }
 
     /**
@@ -3921,7 +3867,7 @@ public class ParserDQL extends ParserBase {
         read();
         readThis(Tokens.OPENBRACKET);
 
-        Expression l = this.XreadValueExpressionOrNull();
+        Expression leftExpr = XreadValueExpressionOrNull();
 
         if (isConvert) {
             readThis(Tokens.COMMA);
@@ -3931,15 +3877,15 @@ public class ParserDQL extends ParserBase {
 
         Type typeObject = readTypeDefinition(true);
 
-        if (l.isParam()) {
-            l.setDataType(session, typeObject);
+        if (leftExpr.isParam()) {
+            leftExpr.setDataType(session, typeObject);
         }
 
-        l = new ExpressionOp(l, typeObject);
+        leftExpr = new ExpressionOp(leftExpr, typeObject);
 
         readThis(Tokens.CLOSEBRACKET);
 
-        return l;
+        return leftExpr;
     }
 
     /**

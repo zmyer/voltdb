@@ -31,12 +31,17 @@
 
 package org.hsqldb_voltpatches;
 
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.RangeVariable.RangeIteratorBase;
+import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.navigator.RowSetNavigator;
 import org.hsqldb_voltpatches.navigator.RowSetNavigatorClient;
 import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.result.Result;
+import org.hsqldb_voltpatches.result.ResultMetaData;
+import org.hsqldb_voltpatches.rights.GrantConstants;
+import org.hsqldb_voltpatches.rights.Grantee;
 import org.hsqldb_voltpatches.types.Type;
 
 /**
@@ -48,46 +53,112 @@ import org.hsqldb_voltpatches.types.Type;
  */
 public class StatementInsert extends StatementDML {
 
+    /** column map for INSERT operation */
+    private int[] insertColumnMap;
+
+    /** INSERT_VALUES */
+    Expression insertExpression;
+
+    /**
+     * Flags indicating which columns' values will/will not be
+     * explicitly set.
+     */
+    boolean[] insertCheckColumns;
+
     /**
      * Instantiate this as an INSERT_VALUES statement.
      */
-    StatementInsert(Session session, Table targetTable, int[] columnMap,
-                    Expression insertExpression, boolean[] checkColumns,
-                    CompileContext compileContext) {
+    StatementInsert(Session session, Table target, int[] columnMap,
+            Expression insertExpr, boolean[] checkColumns,
+            CompileContext compileContext) {
+        super(session);
+        targetTable            = target;
+        baseTable              = target.getBaseTable();
+        insertColumnMap        = columnMap;
+        insertCheckColumns     = checkColumns;
+        insertExpression       = insertExpr;
+        isTransactionStatement = true;
 
-        super(StatementTypes.INSERT, StatementTypes.X_SQL_DATA_CHANGE,
-              session.currentSchema);
-
-        this.targetTable            = targetTable;
-        this.baseTable              = targetTable.getBaseTable();
-        this.insertColumnMap        = columnMap;
-        this.insertCheckColumns     = checkColumns;
-        this.insertExpression       = insertExpression;
-        this.isTransactionStatement = true;
-
-        setDatabseObjects(compileContext);
+        setDatabaseObjects(compileContext);
         checkAccessRights(session);
     }
 
     /**
      * Instantiate this as an INSERT_SELECT statement.
      */
-    StatementInsert(Session session, Table targetTable, int[] columnMap,
-                    boolean[] checkColumns, QueryExpression queryExpression,
-                    CompileContext compileContext) {
+    StatementInsert(Session session, Table target, int[] columnMap,
+            boolean[] checkColumns, QueryExpression queryExpr,
+            CompileContext compileContext) {
+        super(session);
+        targetTable            = target;
+        baseTable              = target.getBaseTable();
+        insertColumnMap        = columnMap;
+        insertCheckColumns     = checkColumns;
+        queryExpression        = queryExpr;
+        isTransactionStatement = true;
 
-        super(StatementTypes.INSERT, StatementTypes.X_SQL_DATA_CHANGE,
-              session.currentSchema);
-
-        this.targetTable            = targetTable;
-        this.baseTable              = targetTable.getBaseTable();
-        this.insertColumnMap        = columnMap;
-        this.insertCheckColumns     = checkColumns;
-        this.queryExpression        = queryExpression;
-        this.isTransactionStatement = true;
-
-        setDatabseObjects(compileContext);
+        setDatabaseObjects(compileContext);
         checkAccessRights(session);
+    }
+
+    @Override
+    public void clearVariables() {
+        super.clearVariables();
+        insertColumnMap = null;
+        insertExpression = null;
+        insertCheckColumns = null;
+    }
+
+    @Override
+    void getTriggerTableNames(OrderedHashSet set, boolean write) {
+        for (TriggerDef td : baseTable.triggerList) {
+            if (td.getPrivilegeType() != GrantConstants.INSERT) {
+                continue;
+            }
+            for (Statement statement : td.statements) {
+                set.addAll(statement.getTableNamesForRead());
+            }
+        }
+    }
+
+    @Override
+    void checkSpecificAccessRights(Grantee grantee) {
+        grantee.checkInsert(targetTable, insertCheckColumns);
+    }
+
+    @Override
+    boolean[] getInsertOrUpdateColumnCheckList() {
+        return insertCheckColumns;
+    }
+
+    /**
+     * Returns the metadata, which is empty if the CompiledStatement does not
+     * generate a Result.
+     */
+    @Override
+    public ResultMetaData getResultMetaData() {
+        return ResultMetaData.emptyResultMetaData;
+    }
+
+    @Override
+    String describeImpl(Session session) throws Exception {
+        StringBuffer sb = new StringBuffer();
+        if (queryExpression == null) {
+            sb.append("INSERT VALUES");
+            sb.append('[').append('\n');
+            appendTable(sb).append('\n');
+        }
+        else {
+            sb.append("INSERT SELECT");
+            sb.append('[').append('\n');
+            appendTable(sb).append('\n');
+            sb.append(queryExpression.describe(session)).append('\n');
+        }
+
+        appendParams(sb).append('\n');
+        appendSubqueries(session, sb).append(']');
+
+        return sb.toString();
     }
 
     /**
@@ -96,6 +167,7 @@ public class StatementInsert extends StatementDML {
      *
      * @return the result of executing the statement
      */
+    @Override
     Result getResult(Session session) {
 
         Table           table              = baseTable;
@@ -176,7 +248,7 @@ public class StatementInsert extends StatementDML {
 
         while (nav.hasNext()) {
             Object[] data       = baseTable.getNewRowData(session);
-            Object[] sourceData = (Object[]) nav.getNext();
+            Object[] sourceData = nav.getNext();
 
             for (int i = 0; i < columnMap.length; i++) {
                 int  j          = columnMap[i];
@@ -231,4 +303,40 @@ public class StatementInsert extends StatementDML {
 
         return newData;
     }
+
+    /**
+     * VoltDB added method to get a non-catalog-dependent
+     * representation of this HSQLDB object.
+     * @param session The current Session object may be needed to resolve
+     * some names.
+     * @return XML, correctly indented, representing this object.
+     * @throws HSQLParseException
+     */
+    @Override
+    VoltXMLElement voltGetStatementXML(Session session)
+            throws HSQLParseException {
+        VoltXMLElement xml = new VoltXMLElement("insert");
+
+        assert(insertExpression != null || queryExpression != null);
+
+        if (queryExpression == null) {
+            if (insertExpression.nodes.length > 1) {
+                throw new HSQLParseException(
+                        "VoltDB does not support multiple rows in the INSERT statement VALUES clause. Use separate INSERT statements.");
+            }
+            voltAppendTargetColumns(session, insertColumnMap,
+                    insertExpression.nodes[0].nodes, xml);
+        }
+        else {
+            voltAppendTargetColumns(session, insertColumnMap, null, xml);
+            VoltXMLElement child = voltGetXMLExpression(
+                    queryExpression, parameters, session);
+            xml.children.add(child);
+        }
+
+        voltAppendParameters(session, xml, parameters);
+        xml.attributes.put("table", targetTable.getName().name);
+        return xml;
+    }
+
 }

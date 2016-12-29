@@ -31,27 +31,17 @@
 
 package org.hsqldb_voltpatches;
 
-import java.util.List;
-
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
-import org.hsqldb_voltpatches.RangeVariable.RangeIteratorBase;
 import org.hsqldb_voltpatches.index.Index;
 import org.hsqldb_voltpatches.index.IndexAVL;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.lib.HashSet;
-import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
-import org.hsqldb_voltpatches.navigator.RangeIterator;
 import org.hsqldb_voltpatches.navigator.RowIterator;
-import org.hsqldb_voltpatches.navigator.RowSetNavigator;
-import org.hsqldb_voltpatches.navigator.RowSetNavigatorClient;
-import org.hsqldb_voltpatches.navigator.RowSetNavigatorLinkedList;
-import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.result.Result;
-import org.hsqldb_voltpatches.rights.GrantConstants;
 import org.hsqldb_voltpatches.types.Type;
 
 /**
@@ -63,104 +53,52 @@ import org.hsqldb_voltpatches.types.Type;
  */
 
 // support for ON UPDATE CASCADE etc. | ON DELETE SET NULL etc. by Sebastian Kloska (kloska@users dot ...)
-// support for MERGE statement by Justin Spadea (jzs9783@users dot sourceforge.net)
 public class StatementDML extends StatementDMQL {
 
-    StatementDML(int type, int group, HsqlName schemaName) {
-        super(type, group, schemaName);
+    /**
+     * Instantiate this as an INSERT statement
+     */
+    StatementDML(Session session) {
+        super(StatementTypes.INSERT, StatementTypes.X_SQL_DATA_CHANGE,
+                session.currentSchema);
     }
 
     /**
      * Instantiate this as a DELETE statement
      */
-    StatementDML(Session session, Table targetTable,
-                 RangeVariable[] rangeVars, CompileContext compileContext,
-                 boolean restartIdentity) {
-
+    StatementDML(Session session, Table target,
+                 RangeVariable[] rangeVars, CompileContext compileContext) {
         super(StatementTypes.DELETE_WHERE, StatementTypes.X_SQL_DATA_CHANGE,
               session.currentSchema);
+        targetTable            = target;
+        baseTable              = target.getBaseTable();
+        targetRangeVariables   = rangeVars;
+        isTransactionStatement = true;
 
-        this.targetTable            = targetTable;
-        this.baseTable              = targetTable.getBaseTable();
-        this.targetRangeVariables   = rangeVars;
-        this.restartIdentity        = restartIdentity;
-        this.isTransactionStatement = true;
-
-        setDatabseObjects(compileContext);
+        setDatabaseObjects(compileContext);
         checkAccessRights(session);
     }
 
     /**
      * Instantiate this as an UPDATE statement.
      */
-    StatementDML(Session session, Table targetTable,
-                 RangeVariable rangeVars[], int[] updateColumnMap,
+    StatementDML(Session session, Table target,
+                 RangeVariable rangeVars[], int[] columnMap,
                  Expression[] colExpressions, boolean[] checkColumns,
                  CompileContext compileContext) {
 
         super(StatementTypes.UPDATE_WHERE, StatementTypes.X_SQL_DATA_CHANGE,
               session.currentSchema);
 
-        this.targetTable            = targetTable;
-        this.baseTable              = targetTable.getBaseTable();
-        this.updateColumnMap        = updateColumnMap;
-        this.updateExpressions      = colExpressions;
-        this.updateCheckColumns     = checkColumns;
-        this.targetRangeVariables   = rangeVars;
-        this.isTransactionStatement = true;
+        targetTable            = target;
+        baseTable              = target.getBaseTable();
+        updateColumnMap        = columnMap;
+        updateExpressions      = colExpressions;
+        updateCheckColumns     = checkColumns;
+        targetRangeVariables   = rangeVars;
+        isTransactionStatement = true;
 
-        setDatabseObjects(compileContext);
-        checkAccessRights(session);
-    }
-
-    /**
-     * Instantiate this as a MERGE statement.
-     */
-    StatementDML(Session session, RangeVariable[] targetRangeVars,
-                 int[] insertColMap, int[] updateColMap,
-                 boolean[] checkColumns, Expression mergeCondition,
-                 Expression insertExpr, Expression[] updateExpr,
-                 CompileContext compileContext) {
-
-        super(StatementTypes.MERGE, StatementTypes.X_SQL_DATA_CHANGE,
-              session.currentSchema);
-
-        this.sourceTable          = targetRangeVars[0].rangeTable;
-        this.targetTable          = targetRangeVars[1].rangeTable;
-        this.baseTable            = targetTable.getBaseTable();
-        this.insertCheckColumns   = checkColumns;
-        this.insertColumnMap      = insertColMap;
-        this.updateColumnMap      = updateColMap;
-        this.insertExpression     = insertExpr;
-        this.updateExpressions    = updateExpr;
-        this.targetRangeVariables = targetRangeVars;
-        this.condition            = mergeCondition;
-        isTransactionStatement    = true;
-
-        setDatabseObjects(compileContext);
-        checkAccessRights(session);
-    }
-
-    /**
-     * Instantiate this as a SET statement.
-     */
-    StatementDML(Session session, Table table, RangeVariable rangeVars[],
-                 int[] updateColumnMap, Expression[] colExpressions,
-                 CompileContext compileContext) {
-
-        super(StatementTypes.ASSIGNMENT, StatementTypes.X_SQL_DATA_CHANGE,
-              session.currentSchema);
-
-        this.targetTable       = table;
-        this.baseTable         = targetTable.getBaseTable();
-        this.updateColumnMap   = updateColumnMap;
-        this.updateExpressions = colExpressions;
-        this.updateCheckColumns =
-            targetTable.getColumnCheckList(updateColumnMap);
-        this.targetRangeVariables = rangeVars;
-        isTransactionStatement    = false;
-
-        setDatabseObjects(compileContext);
+        setDatabaseObjects(compileContext);
         checkAccessRights(session);
     }
 
@@ -174,34 +112,8 @@ public class StatementDML extends StatementDMQL {
 
     @Override
     Result getResult(Session session) {
-
-        Result result = null;
-
-        switch (type) {
-
-            case StatementTypes.UPDATE_WHERE :
-                result = executeUpdateStatement(session);
-                break;
-
-            case StatementTypes.MERGE :
-                result = executeMergeStatement(session);
-                break;
-
-            case StatementTypes.DELETE_WHERE :
-                result = executeDeleteStatement(session);
-                break;
-
-            case StatementTypes.ASSIGNMENT :
-                result = executeSetStatement(session);
-                break;
-
-            default :
-                throw Error.runtimeError(
-                    ErrorCode.U_S0500,
-                    "CompiledStatementExecutor.executeImpl()");
-        }
-
-        return result;
+        throw Error.runtimeError(ErrorCode.U_S0500,
+                "CompiledStatementExecutor.executeImpl()");
     }
 
     // this fk references -> other  :  other read lock
@@ -262,110 +174,9 @@ public class StatementDML extends StatementDMQL {
     }
 
     void getTriggerTableNames(OrderedHashSet set, boolean write) {
-
-        for (int i = 0; i < baseTable.triggerList.length; i++) {
-            TriggerDef td = baseTable.triggerList[i];
-
-            switch (type) {
-
-                case StatementTypes.INSERT :
-                    if (td.getPrivilegeType() == GrantConstants.INSERT) {
-                        break;
-                    }
-
-                    continue;
-                case StatementTypes.UPDATE_WHERE :
-                    if (td.getPrivilegeType() == GrantConstants.UPDATE) {
-                        break;
-                    }
-
-                    continue;
-                case StatementTypes.DELETE_WHERE :
-                    if (td.getPrivilegeType() == GrantConstants.DELETE) {
-                        break;
-                    }
-
-                    continue;
-                case StatementTypes.MERGE :
-                    if (td.getPrivilegeType() == GrantConstants.INSERT
-                            || td.getPrivilegeType()
-                               == GrantConstants.UPDATE) {
-                        break;
-                    }
-
-                    continue;
-                default :
-                    throw Error.runtimeError(ErrorCode.U_S0500,
-                                             "StatementDML");
-            }
-
-            for (int j = 0; j < td.statements.length; j++) {
-                if (write) {
-                    set.addAll(td.statements[j].getTableNamesForRead());
-                } else {
-                    set.addAll(td.statements[j].getTableNamesForRead());
-                }
-            }
+        if (baseTable.triggerList.length > 0) {
+            throw Error.runtimeError(ErrorCode.U_S0500, "StatementDML");
         }
-    }
-
-    /**
-     * Executes an UPDATE statement.  It is assumed that the argument
-     * is of the correct type.
-     *
-     * @return the result of executing the statement
-     */
-    Result executeUpdateStatement(Session session) {
-
-        int            count          = 0;
-        Expression[]   colExpressions = updateExpressions;
-        HashMappedList rowset         = new HashMappedList();
-        Type[]         colTypes       = baseTable.getColumnTypes();
-        RangeIteratorBase it = RangeVariable.getIterator(session,
-            targetRangeVariables);
-        Expression checkCondition = null;
-
-        if (targetTable != baseTable) {
-            checkCondition =
-                ((TableDerived) targetTable).getQueryExpression()
-                    .getMainSelect().checkQueryCondition;
-        }
-
-        while (it.next()) {
-            session.sessionData.startRowProcessing();
-
-            Row      row  = it.getCurrentRow();
-            Object[] data = row.getData();
-            Object[] newData = getUpdatedData(session, baseTable,
-                                              updateColumnMap, colExpressions,
-                                              colTypes, data);
-
-            if (checkCondition != null) {
-                it.currentData = newData;
-
-                boolean check = checkCondition.testCondition(session);
-
-                if (!check) {
-                    throw Error.error(ErrorCode.X_44000);
-                }
-            }
-
-            rowset.add(row, newData);
-        }
-
-/* debug 190
-        if (rowset.size() == 0) {
-            System.out.println(targetTable.getName().name + " zero update: session "
-                               + session.getId());
-        } else if (rowset.size() >1) {
-           System.out.println("multiple update: session "
-                              + session.getId() + ", " + rowset.size());
-       }
-
-//* debug 190 */
-        count = update(session, baseTable, rowset);
-
-        return Result.getUpdateCountResult(count);
     }
 
     Object[] getUpdatedData(Session session, Table targetTable,
@@ -466,113 +277,6 @@ public class StatementDML extends StatementDMQL {
         return Result.updateOneResult;
     }
 
-    /**
-     * Executes a MERGE statement.  It is assumed that the argument
-     * is of the correct type.
-     *
-     * @return Result object
-     */
-    Result executeMergeStatement(Session session) {
-
-        Result          resultOut          = null;
-        RowSetNavigator generatedNavigator = null;
-        PersistentStore store = session.sessionData.getRowStore(baseTable);
-
-        if (generatedIndexes != null) {
-            resultOut = Result.newUpdateCountResult(generatedResultMetaData,
-                    0);
-            generatedNavigator = resultOut.getChainedResult().getNavigator();
-        }
-
-        int count = 0;
-
-        // data generated for non-matching rows
-        RowSetNavigatorClient newData = new RowSetNavigatorClient(8);
-
-        // rowset for update operation
-        HashMappedList  updateRowSet       = new HashMappedList();
-        RangeVariable[] joinRangeIterators = targetRangeVariables;
-
-        // populate insert and update lists
-        RangeIterator[] rangeIterators =
-            new RangeIterator[joinRangeIterators.length];
-
-        for (int i = 0; i < joinRangeIterators.length; i++) {
-            rangeIterators[i] = joinRangeIterators[i].getIterator(session);
-        }
-
-        for (int currentIndex = 0; 0 <= currentIndex; ) {
-            RangeIterator it          = rangeIterators[currentIndex];
-            boolean       beforeFirst = it.isBeforeFirst();
-
-            if (it.next()) {
-                if (currentIndex < joinRangeIterators.length - 1) {
-                    currentIndex++;
-
-                    continue;
-                }
-            } else {
-                if (currentIndex == 1 && beforeFirst) {
-                    Object[] data = getMergeInsertData(session);
-
-                    if (data != null) {
-                        newData.add(data);
-                    }
-                }
-
-                it.reset();
-
-                currentIndex--;
-
-                continue;
-            }
-
-            // row matches!
-            if (updateExpressions != null) {
-                Row row = it.getCurrentRow();    // this is always the second iterator
-                Object[] data = getUpdatedData(session, baseTable,
-                                               updateColumnMap,
-                                               updateExpressions,
-                                               baseTable.getColumnTypes(),
-                                               row.getData());
-
-                updateRowSet.add(row, data);
-            }
-        }
-
-        // run the transaction as a whole, updating and inserting where needed
-        // update any matched rows
-        if (updateRowSet.size() > 0) {
-            count = update(session, baseTable, updateRowSet);
-        }
-
-        // insert any non-matched rows
-        newData.beforeFirst();
-
-        while (newData.hasNext()) {
-            Object[] data = newData.getNext();
-
-            baseTable.insertRow(session, store, data);
-
-            if (generatedNavigator != null) {
-                Object[] generatedValues = getGeneratedColumns(data);
-
-                generatedNavigator.add(generatedValues);
-            }
-        }
-
-        baseTable.fireAfterTriggers(session, Trigger.INSERT_AFTER, newData);
-
-        count += newData.getSize();
-
-        if (resultOut == null) {
-            return Result.getUpdateCountResult(count);
-        } else {
-            resultOut.setUpdateCount(count);
-
-            return resultOut;
-        }
-    }
 
     /**
      * Highest level multiple row update method. Corresponds to an SQL UPDATE.
@@ -669,134 +373,6 @@ public class StatementDML extends StatementDMQL {
         path.clear();
 
         return updateList.size();
-    }
-
-    // fredt - currently deletes that fail due to referential constraints are caught
-    // prior to actual delete operation
-
-    /**
-     * Executes a DELETE statement.  It is assumed that the argument is
-     * of the correct type.
-     *
-     * @return the result of executing the statement
-     */
-    Result executeDeleteStatement(Session session) {
-
-        int                       count   = 0;
-        RowSetNavigatorLinkedList oldRows = new RowSetNavigatorLinkedList();
-        RangeIterator it = RangeVariable.getIterator(session,
-            targetRangeVariables);
-
-        while (it.next()) {
-            Row currentRow = it.getCurrentRow();
-
-            oldRows.add(currentRow);
-        }
-
-        count = delete(session, baseTable, oldRows);
-
-        if (restartIdentity && targetTable.identitySequence != null) {
-            targetTable.identitySequence.reset();
-        }
-
-        return Result.getUpdateCountResult(count);
-    }
-
-    /**
-     *  Highest level multiple row delete method. Corresponds to an SQL
-     *  DELETE.
-     */
-    int delete(Session session, Table table, RowSetNavigator oldRows) {
-
-        if (table.fkMainConstraints.length == 0) {
-            deleteRows(session, table, oldRows);
-            oldRows.beforeFirst();
-
-            if (table.hasTrigger(Trigger.DELETE_AFTER)) {
-                table.fireAfterTriggers(session, Trigger.DELETE_AFTER,
-                                        oldRows);
-            }
-
-            return oldRows.getSize();
-        }
-
-        HashSet path = session.sessionContext.getConstraintPath();
-        HashMappedList tableUpdateList =
-            session.sessionContext.getTableUpdateList();
-
-        if (session.database.isReferentialIntegrity()) {
-            oldRows.beforeFirst();
-
-            while (oldRows.hasNext()) {
-                oldRows.next();
-
-                Row row = oldRows.getCurrentRow();
-
-                path.clear();
-                checkCascadeDelete(session, table, tableUpdateList, row,
-                                   false, path);
-            }
-        }
-
-        if (session.database.isReferentialIntegrity()) {
-            oldRows.beforeFirst();
-
-            while (oldRows.hasNext()) {
-                oldRows.next();
-
-                Row row = oldRows.getCurrentRow();
-
-                path.clear();
-                checkCascadeDelete(session, table, tableUpdateList, row, true,
-                                   path);
-            }
-        }
-
-        oldRows.beforeFirst();
-
-        while (oldRows.hasNext()) {
-            oldRows.next();
-
-            Row row = oldRows.getCurrentRow();
-
-            if (!row.isDeleted(session)) {
-                table.deleteNoRefCheck(session, row);
-            }
-        }
-
-        for (int i = 0; i < tableUpdateList.size(); i++) {
-            Table targetTable = (Table) tableUpdateList.getKey(i);
-            HashMappedList updateList =
-                (HashMappedList) tableUpdateList.get(i);
-
-            if (updateList.size() > 0) {
-                targetTable.updateRowSet(session, updateList, null, true);
-                updateList.clear();
-            }
-        }
-
-        oldRows.beforeFirst();
-
-        if (table.hasTrigger(Trigger.DELETE_AFTER)) {
-            table.fireAfterTriggers(session, Trigger.DELETE_AFTER, oldRows);
-        }
-
-        path.clear();
-
-        return oldRows.getSize();
-    }
-
-    void deleteRows(Session session, Table table, RowSetNavigator oldRows) {
-
-        while (oldRows.hasNext()) {
-            oldRows.next();
-
-            Row row = oldRows.getCurrentRow();
-
-            if (!row.isDeleted(session)) {
-                table.deleteNoRefCheck(session, row);
-            }
-        }
     }
 
     // fredt@users 20020225 - patch 1.7.0 - CASCADING DELETES
@@ -974,47 +550,6 @@ public class StatementDML extends StatementDMQL {
         }
     }
 
-    Object[] getMergeInsertData(Session session) {
-
-        if (insertExpression == null) {
-            return null;
-        }
-
-        session.sessionData.startRowProcessing();
-
-        Object[]     data     = targetTable.getNewRowData(session);
-        Type[]       colTypes = targetTable.getColumnTypes();
-        Expression[] rowArgs  = insertExpression.nodes[0].nodes;
-
-        for (int i = 0; i < rowArgs.length; i++) {
-            Expression e        = rowArgs[i];
-            int        colIndex = insertColumnMap[i];
-
-            // transitional - still supporting null for identity generation
-            if (targetTable.identityColumn == colIndex) {
-                if (e.getType() == OpTypes.VALUE && e.valueData == null) {
-                    continue;
-                }
-            }
-
-            if (e.getType() == OpTypes.DEFAULT) {
-                if (targetTable.identityColumn == colIndex) {
-                    continue;
-                }
-
-                data[colIndex] =
-                    targetTable.colDefaults[colIndex].getValue(session);
-
-                continue;
-            }
-
-            data[colIndex] = colTypes[colIndex].convertToType(session,
-                    e.getValue(session), e.getDataType());
-        }
-
-        return data;
-    }
-
     /**
      * Check or perform an update cascade operation on a single row. Check or
      * cascade an update (delete/insert) operation. The method takes a pair of
@@ -1134,9 +669,6 @@ public class StatementDML extends StatementDMQL {
 
             Table reftable = c.getRef();
 
-            // -- unused shortcut when update table has no imported constraint
-            boolean hasref =
-                reftable.getNextConstraintIndex(0, Constraint.MAIN) != -1;
             Index refindex = c.getRefIndex();
 
             // -- walk the index for all the nodes that reference update node
@@ -1258,21 +790,13 @@ public class StatementDML extends StatementDMQL {
     }
 
     /************************* Volt DB Extensions *************************/
-
-    private SortAndSlice m_sortAndSlice = null;
-
-    public void setSortAndSlice(SortAndSlice sas) {
-        m_sortAndSlice = sas;
-    }
-
-    private void voltAppendTargetColumns(Session session, int[] columnMap, Expression[] expressions, VoltXMLElement xml)
-    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
-    {
+    void voltAppendTargetColumns(Session session, int[] columnMap,
+            Expression[] expressions, VoltXMLElement xml)
+            throws HSQLParseException {
         VoltXMLElement columns = new VoltXMLElement("columns");
         xml.children.add(columns);
 
-        for (int i = 0; i < columnMap.length; i++)
-        {
+        for (int i = 0; i < columnMap.length; i++) {
             VoltXMLElement column = new VoltXMLElement("column");
             columns.children.add(column);
             column.attributes.put("name", targetTable.getColumn(columnMap[i]).getName().name);
@@ -1282,9 +806,8 @@ public class StatementDML extends StatementDMQL {
         }
     }
 
-    private void voltAppendCondition(Session session, VoltXMLElement xml)
-    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
-    {
+    void voltAppendCondition(Session session, VoltXMLElement xml)
+            throws HSQLParseException {
         assert(targetRangeVariables.length > 0);
         RangeVariable rv = targetRangeVariables[0];
 
@@ -1302,54 +825,8 @@ public class StatementDML extends StatementDMQL {
         }
     }
 
-    /**
-     * Appends XML for ORDER BY/LIMIT/OFFSET to this statement's XML.
-     * */
-    private void voltAppendSortAndSlice(Session session, VoltXMLElement xml) throws HSQLParseException {
-        if (m_sortAndSlice == null || m_sortAndSlice == SortAndSlice.noSort) {
-            return;
-        }
-
-        // Is target a view?
-        if (targetTable.getBaseTable() != targetTable) {
-            // This check is unreachable, but if writable views are ever supported there
-            // will be some more work to do to resolve columns in ORDER BY properly.
-            throw new HSQLParseException("DELETE with ORDER BY, LIMIT or OFFSET is currently unsupported on views.");
-        }
-
-        if (m_sortAndSlice.hasLimit() && !m_sortAndSlice.hasOrder()) {
-            throw new HSQLParseException("DELETE statement with LIMIT or OFFSET but no ORDER BY would produce "
-                    + "non-deterministic results.  Please use an ORDER BY clause.");
-        }
-        else if (m_sortAndSlice.hasOrder() && !m_sortAndSlice.hasLimit()) {
-            // This is harmless, but the order by is meaningless in this case.  Should
-            // we let this slide?
-            throw new HSQLParseException("DELETE statement with ORDER BY but no LIMIT or OFFSET is not allowed.  "
-                    + "Consider removing the ORDER BY clause, as it has no effect here.");
-        }
-
-        List<VoltXMLElement> newElements = voltGetLimitOffsetXMLFromSortAndSlice(session, m_sortAndSlice);
-
-        // This code isn't shared with how SELECT's ORDER BY clauses are serialized since there's
-        // some extra work that goes on there to handle references to SELECT clauses aliases, etc.
-        HsqlArrayList exprList = m_sortAndSlice.exprList;
-        if (exprList != null) {
-            VoltXMLElement orderColumnsXml = new VoltXMLElement("ordercolumns");
-            for (int i = 0; i < exprList.size(); ++i) {
-                Expression e = (Expression)exprList.get(i);
-                VoltXMLElement elem = e.voltGetXML(session);
-                orderColumnsXml.children.add(elem);
-            }
-
-            newElements.add(orderColumnsXml);
-        }
-
-        xml.children.addAll(newElements);
-    }
-
-    private void voltAppendChildScans(Session session, VoltXMLElement xml)
-    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
-    {
+    void voltAppendChildScans(Session session, VoltXMLElement xml)
+            throws HSQLParseException {
         // Joins in DML statements are not yet supported, so, for now,
         // just represent the one (target) table scan.
         VoltXMLElement child = rangeVariables[0].voltGetRangeVariableXML(session);
@@ -1367,54 +844,9 @@ public class StatementDML extends StatementDMQL {
      */
     @Override
     VoltXMLElement voltGetStatementXML(Session session)
-    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
-    {
-        VoltXMLElement xml;
-        switch (type) {
-
-        case StatementTypes.INSERT :
-            xml = new VoltXMLElement("insert");
-
-            assert(insertExpression != null || queryExpression != null);
-
-            if (queryExpression == null) {
-            if (insertExpression.nodes.length > 1) {
-                throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
-                    "VoltDB does not support multiple rows in the INSERT statement VALUES clause. Use separate INSERT statements.");
-            }
-                voltAppendTargetColumns(session, insertColumnMap, insertExpression.nodes[0].nodes, xml);
-            } else {
-                voltAppendTargetColumns(session, insertColumnMap, null, xml);
-                VoltXMLElement child = voltGetXMLExpression(queryExpression, parameters, session);
-                xml.children.add(child);
-            }
-            break;
-
-        case StatementTypes.UPDATE_CURSOR :
-        case StatementTypes.UPDATE_WHERE :
-            xml = new VoltXMLElement("update");
-            voltAppendTargetColumns(session, updateColumnMap, updateExpressions, xml);
-            voltAppendChildScans(session, xml);
-            voltAppendCondition(session, xml);
-            break;
-
-        case StatementTypes.DELETE_CURSOR :
-        case StatementTypes.DELETE_WHERE :
-            xml = new VoltXMLElement("delete");
-            // DELETE has no target columns
-            voltAppendChildScans(session, xml);
-            voltAppendCondition(session, xml);
-            voltAppendSortAndSlice(session, xml);
-            break;
-
-        default:
-            throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
+            throws HSQLParseException {
+        throw new HSQLParseException(
                 "VoltDB does not support DML statements of type " + type);
-        }
-
-        voltAppendParameters(session, xml, parameters);
-        xml.attributes.put("table", targetTable.getName().name);
-        return xml;
     }
     /**********************************************************************/
 }
