@@ -38,7 +38,6 @@ import org.hsqldb_voltpatches.Expression.SimpleColumnContext;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
-import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.lib.HashSet;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.persist.HsqlDatabaseProperties;
@@ -68,44 +67,40 @@ public abstract class StatementDMQL extends Statement {
     public static final String PCOL_PREFIX        = "@p";
     static final String        RETURN_COLUMN_NAME = "@p0";
 
-    /** target table for INSERT_XXX, UPDATE and DELETE and MERGE */
+    /** target table for INSERT_XXX, UPDATE and DELETE */
     Table targetTable;
     Table baseTable;
 
-    /** column map of query expression */
-    int[]           baseColumnMap;
     RangeVariable[] targetRangeVariables;
 
-    /** source table for MERGE */
-    Table sourceTable;
-
-    /** condition expression for UPDATE, MERGE and DELETE */
+    /** condition expression for UPDATE and DELETE */
     Expression condition;
 
     /** for TRUNCATE variation of DELETE */
     boolean restartIdentity;
 
-    /** column map for INSERT operation direct or via MERGE */
+    /** column map for INSERT statement */
     int[] insertColumnMap;
 
-    /** column map for UPDATE operation direct or via MERGE */
+    /** column map for UPDATE statement */
     int[] updateColumnMap;
-    int[] baseUpdateColumnMap;
 
-    /** Column value Expressions for UPDATE and MERGE. */
+    /** Column value Expressions for UPDATE statement */
     Expression[] updateExpressions;
-
-    /** Column value Expressions for MERGE */
-    Expression[][] multiColumnValues;
 
     /** INSERT_VALUES */
     Expression insertExpression;
 
     /**
      * Flags indicating which columns' values will/will not be
-     * explicitly set.
+     * explicitly set in an INSERT statement.
      */
     boolean[] insertCheckColumns;
+
+    /**
+     * Flags indicating which columns' values will/will not be
+     * explicitly set in an UPDATE statement.
+     */
     boolean[] updateCheckColumns;
 
     /**
@@ -154,7 +149,6 @@ public abstract class StatementDMQL extends Statement {
      *  <li>DELETE
      *  <li>SELECT
      *  <li>CALL
-     *  <li>MERGE
      *  <li>DDL
      * </ol>
      */
@@ -171,19 +165,10 @@ public abstract class StatementDMQL extends Statement {
     Routine[]        routines;
     RangeVariable[]  rangeVariables;
 
-    StatementDMQL(int type, int group, HsqlName schemaName) {
-
+    StatementDMQL(int type, int group, HsqlName schema) {
         super(type, group);
-
-        this.schemaName             = schemaName;
-        this.isTransactionStatement = true;
-    }
-
-    void setBaseIndexColumnMap() {
-
-        if (targetTable != baseTable) {
-            baseColumnMap = targetTable.getBaseTableColumnMap();
-        }
+        schemaName = schema;
+        isTransactionStatement = true;
     }
 
     @Override
@@ -198,12 +183,6 @@ public abstract class StatementDMQL extends Statement {
         if (this.isExplain) {
             return Result.newSingleColumnStringResult("OPERATION",
                     describe(session));
-        }
-
-        if (session.sessionContext.dynamicArguments.length
-                != parameters.length) {
-
-//            return Result.newErrorResult(Error.error(ErrorCode.X_42575));
         }
 
         try {
@@ -327,14 +306,6 @@ public abstract class StatementDMQL extends Statement {
 
             case StatementTypes.UPDATE_WHERE :
                 return updateCheckColumns;
-
-            case StatementTypes.MERGE :
-                boolean[] check =
-                    (boolean[]) ArrayUtil.duplicateArray(insertCheckColumns);
-
-                ArrayUtil.orBooleanArray(updateCheckColumns, check);
-
-                return check;
         }
 
         return null;
@@ -381,13 +352,11 @@ public abstract class StatementDMQL extends Statement {
         updateExpressions  = null;
         insertExpression   = null;
         insertCheckColumns = null;
-
-//        expression         = null;
         parameters = null;
         subqueries = null;
     }
 
-    void setDatabseObjects(CompileContext compileContext) {
+    void setDatabaseObjects(CompileContext compileContext) {
 
         parameters = compileContext.getParameters();
 
@@ -469,19 +438,12 @@ public abstract class StatementDMQL extends Statement {
         }
 
         switch (type) {
-
-            case StatementTypes.CALL : {
-                break;
-            }
             case StatementTypes.INSERT : {
                 session.getGrantee().checkInsert(targetTable,
                                                  insertCheckColumns);
 
                 break;
             }
-            case StatementTypes.SELECT_CURSOR :
-                break;
-
             case StatementTypes.DELETE_WHERE : {
                 session.getGrantee().checkDelete(targetTable);
 
@@ -493,27 +455,17 @@ public abstract class StatementDMQL extends Statement {
 
                 break;
             }
-            case StatementTypes.MERGE : {
-                session.getGrantee().checkInsert(targetTable,
-                                                 insertCheckColumns);
-                session.getGrantee().checkUpdate(targetTable,
-                                                 updateCheckColumns);
-
-                break;
-            }
         }
     }
 
     Result getAccessRightsResult(Session session) {
-
         try {
             checkAccessRights(session);
+            return null;
         }
         catch (HsqlException e) {
             return Result.newErrorResult(e);
         }
-
-        return null;
     }
 
     /**
@@ -551,7 +503,6 @@ public abstract class StatementDMQL extends Statement {
 
         int     offset;
         int     idx;
-        boolean hasReturnValue;
 
         offset = 0;
 
@@ -561,28 +512,9 @@ public abstract class StatementDMQL extends Statement {
             return;
         }
 
-// NO:  Not yet
-//        hasReturnValue = (type == CALL && !expression.isProcedureCall());
-//
-//        if (hasReturnValue) {
-//            outlen++;
-//            offset = 1;
-//        }
         parameterMetaData =
             ResultMetaData.newParameterMetaData(parameters.length);
 
-// NO: Not yet
-//        if (hasReturnValue) {
-//            e = expression;
-//            out.sName[0]       = DIProcedureInfo.RETURN_COLUMN_NAME;
-//            out.sClassName[0]  = e.getValueClassName();
-//            out.colType[0]     = e.getDataType();
-//            out.colSize[0]     = e.getColumnSize();
-//            out.colScale[0]    = e.getColumnScale();
-//            out.nullability[0] = e.nullability;
-//            out.isIdentity[0]  = false;
-//            out.paramMode[0]   = expression.PARAM_OUT;
-//        }
         for (int i = 0; i < parameters.length; i++) {
             idx = i + offset;
 
@@ -628,16 +560,11 @@ public abstract class StatementDMQL extends Statement {
      * Provides the toString() implementation.
      */
     private String describeImpl(Session session) throws Exception {
-
-        StringBuffer sb;
-
-        sb = new StringBuffer();
-
+        StringBuffer sb = new StringBuffer();
         switch (type) {
-
             case StatementTypes.SELECT_CURSOR : {
                 sb.append(queryExpression.describe(session));
-                appendParms(sb).append('\n');
+                appendParams(sb).append('\n');
                 appendSubqueries(session, sb);
 
                 return sb.toString();
@@ -646,7 +573,6 @@ public abstract class StatementDMQL extends Statement {
                 if (queryExpression == null) {
                     sb.append("INSERT VALUES");
                     sb.append('[').append('\n');
-                    appendMultiColumns(sb, insertColumnMap).append('\n');
                     appendTable(sb).append('\n');
                 }
                 else {
@@ -656,7 +582,7 @@ public abstract class StatementDMQL extends Statement {
                     appendTable(sb).append('\n');
                     sb.append(queryExpression.describe(session)).append('\n');
                 }
-                appendParms(sb).append('\n');
+                appendParams(sb).append('\n');
                 appendSubqueries(session, sb).append(']');
 
                 return sb.toString();
@@ -670,7 +596,7 @@ public abstract class StatementDMQL extends Statement {
                 for (RangeVariable trv : targetRangeVariables) {
                     sb.append(trv.describe(session)).append('\n');
                 }
-                appendParms(sb).append('\n');
+                appendParams(sb).append('\n');
                 appendSubqueries(session, sb).append(']');
 
                 return sb.toString();
@@ -683,7 +609,7 @@ public abstract class StatementDMQL extends Statement {
                 for (RangeVariable trv : targetRangeVariables) {
                     sb.append(trv.describe(session)).append('\n');
                 }
-                appendParms(sb).append('\n');
+                appendParams(sb).append('\n');
                 appendSubqueries(session, sb).append(']');
 
                 return sb.toString();
@@ -691,21 +617,6 @@ public abstract class StatementDMQL extends Statement {
             case StatementTypes.CALL : {
                 sb.append("CALL");
                 sb.append('[').append(']');
-
-                return sb.toString();
-            }
-            case StatementTypes.MERGE : {
-                sb.append("MERGE");
-                sb.append('[').append('\n');
-                appendMultiColumns(sb, insertColumnMap).append('\n');
-                appendColumns(sb, updateColumnMap).append('\n');
-                appendTable(sb).append('\n');
-                appendCondition(session, sb);
-                for (RangeVariable trv : targetRangeVariables) {
-                    sb.append(trv.describe(session)).append('\n');
-                }
-                appendParms(sb).append('\n');
-                appendSubqueries(session, sb).append(']');
 
                 return sb.toString();
             }
@@ -741,14 +652,6 @@ public abstract class StatementDMQL extends Statement {
         return sb;
     }
 
-    private StringBuffer appendSourceTable(StringBuffer sb) {
-
-        sb.append("SOURCE TABLE[").append(sourceTable.getName().name).append(
-            ']');
-
-        return sb;
-    }
-
     private StringBuffer appendColumns(StringBuffer sb, int[] columnMap) {
 
         if (columnMap == null || updateExpressions == null) {
@@ -769,29 +672,7 @@ public abstract class StatementDMQL extends Statement {
         return sb;
     }
 
-    private StringBuffer appendMultiColumns(StringBuffer sb, int[] columnMap) {
-
-        if (columnMap == null || multiColumnValues == null) {
-            return sb;
-        }
-
-        sb.append("COLUMNS=[");
-
-        for (int j = 0; j < multiColumnValues.length; j++) {
-            for (int i = 0; i < columnMap.length; i++) {
-                sb.append('\n').append(columnMap[i]).append(':').append(
-                    ' ').append(
-                    targetTable.getColumn(columnMap[i]).getName().name).append(
-                    '[').append(multiColumnValues[j][i]).append(']');
-            }
-        }
-
-        sb.append(']');
-
-        return sb;
-    }
-
-    private StringBuffer appendParms(StringBuffer sb) {
+    private StringBuffer appendParams(StringBuffer sb) {
 
         sb.append("PARAMETERS=[");
 
@@ -854,6 +735,7 @@ public abstract class StatementDMQL extends Statement {
             return new Pair<>(x, y);
         }
     }
+
     /**
      * Returns true if the specified exprColumn index is in the list of column indices specified by groupIndex
      * @return true/false

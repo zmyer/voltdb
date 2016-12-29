@@ -921,8 +921,6 @@ public class ParserDDL extends ParserRoutine {
                 switch (token.tokenType) {
 
                     case Tokens.PRIMARY : {
-                        boolean cascade = false;
-
                         read();
                         readThis(Tokens.KEY);
 
@@ -1420,8 +1418,6 @@ public class ParserDDL extends ParserRoutine {
     }
 
     StatementSchema readTableAsSubqueryDefinition(Table table) {
-
-        HsqlName   readName    = null;
         boolean    withData    = true;
         HsqlName[] columnNames = null;
         Statement  statement   = null;
@@ -2573,35 +2569,6 @@ public class ParserDDL extends ParserRoutine {
                     }
                     break;
 
-                case Tokens.MERGE :
-                    if (beforeOrAfterType == Tokens.BEFORE) {
-                        throw unexpectedToken();
-                    }
-
-                    cs = compileMergeStatement(rangeVars);
-
-                    compiledStatements.add(cs);
-
-                    if (isBlock) {
-                        readThis(Tokens.SEMICOLON);
-                    }
-                    break;
-
-                case Tokens.SET :
-                    if (beforeOrAfterType != Tokens.BEFORE
-                            || operationType == Tokens.DELETE) {
-                        throw unexpectedToken();
-                    }
-
-                    cs = compileTriggerSetStatement(table, rangeVars);
-
-                    compiledStatements.add(cs);
-
-                    if (isBlock) {
-                        readThis(Tokens.SEMICOLON);
-                    }
-                    break;
-
                 case Tokens.END :
                     break;
 
@@ -2652,37 +2619,6 @@ public class ParserDDL extends ParserRoutine {
     }
 
     /**
-     * Creates SET Statement for a trigger row from this parse context.
-     */
-    StatementDMQL compileTriggerSetStatement(Table table,
-            RangeVariable[] rangeVars) {
-
-        read();
-
-        Expression[]   updateExpressions;
-        int[]          columnMap;
-        OrderedHashSet colNames = new OrderedHashSet();
-        HsqlArrayList  exprList = new HsqlArrayList();
-        RangeVariable[] targetRangeVars = new RangeVariable[]{
-            rangeVars[TriggerDef.NEW_ROW] };
-
-        readSetClauseList(targetRangeVars, colNames, exprList);
-
-        columnMap         = table.getColumnIndexes(colNames);
-        updateExpressions = new Expression[exprList.size()];
-
-        exprList.toArray(updateExpressions);
-        resolveUpdateExpressions(table, rangeVars, columnMap,
-                                 updateExpressions, RangeVariable.emptyArray);
-
-        StatementDMQL cs = new StatementDML(session, table, rangeVars,
-                                            columnMap, updateExpressions,
-                                            compileContext);
-
-        return cs;
-    }
-
-    /**
      * Responsible for handling the creation of table columns during the process
      * of executing CREATE TABLE or ADD COLUMN etc. statements.
      *
@@ -2697,7 +2633,6 @@ public class ParserDDL extends ParserRoutine {
         boolean        isIdentity     = false;
         boolean        isPKIdentity   = false;
         boolean        identityAlways = false;
-        Expression     generateExpr   = null;
         boolean        isNullable     = true;
         Expression     defaultExpr    = null;
         Type           typeObject;
@@ -2753,7 +2688,8 @@ public class ParserDDL extends ParserRoutine {
             } else if (token.tokenType == Tokens.OPENBRACKET) {
                 read();
 
-                generateExpr = XreadValueExpression();
+                // unused // Expression generateExpr =
+                XreadValueExpression(); // Is this required?
 
                 readThis(Tokens.CLOSEBRACKET);
             }
@@ -4249,12 +4185,13 @@ public class ParserDDL extends ParserRoutine {
     private Statement compileAlterColumnDataType(Table table,
             ColumnSchema column) {
 
-        HsqlName writeName  = null;
-        Type     typeObject = readTypeDefinition(false);
-        String   sql        = getLastPart();
-        Object[] args       = new Object[] {
-            table, column, typeObject
-        };
+        HsqlName writeName = null;
+        // unused // Type typeObject =
+        readTypeDefinition(false);
+        // unused // Object[] args = new Object[] {
+        // unused //    table, column, typeObject
+        // unused // };
+        String sql = getLastPart();
 
         if (!table.isTemp()) {
             writeName = table.getName();

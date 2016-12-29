@@ -57,7 +57,6 @@ public interface StatementTypes {
     int CONNECT                          = 13;
     int DEALLOCATE_DESCRIPTOR            = 15;
     int DEALLOCATE_PREPARE               = 16;
-    int DELETE_CURSOR                    = 18;
     int DELETE_WHERE                     = 19;
     int DESCRIBE                         = 20;
     int SELECT_DIRECT_SINGLE             = 21;    // identifier is SELECT
@@ -95,7 +94,6 @@ public interface StatementTypes {
     int GRANT                            = 48;
     int GRANT_ROLE                       = 49;
     int INSERT                           = 50;
-    int MERGE                            = 128;
     int OPEN                             = 53;
     int PREPARABLE_DYNAMIC_DELETE_CURSOR = 54;
     int PREPARABLE_DYNAMIC_UPDATE_CURSOR = 55;

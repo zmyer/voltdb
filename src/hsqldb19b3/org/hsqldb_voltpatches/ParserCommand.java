@@ -38,7 +38,6 @@ import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.persist.HsqlDatabaseProperties;
 import org.hsqldb_voltpatches.scriptio.ScriptWriterBase;
-import org.hsqldb_voltpatches.store.ValuePool;
 import org.hsqldb_voltpatches.types.Type;
 
 /**
@@ -85,11 +84,7 @@ public class ParserCommand extends ParserDDL {
 
             cs = compilePart();
 
-            if (cs == null) {
-                list.add(cs);
-            } else {
-                list.add(cs);
-            }
+            list.add(cs);
         }
 
         if (returnType != StatementTypes.RETURN_ANY) {
@@ -138,11 +133,6 @@ public class ParserCommand extends ParserDDL {
             }
             case Tokens.UPDATE : {
                 cs = compileUpdateStatement(RangeVariable.emptyArray);
-
-                break;
-            }
-            case Tokens.MERGE : {
-                cs = compileMergeStatement(RangeVariable.emptyArray);
 
                 break;
             }
@@ -1114,7 +1104,8 @@ public class ParserCommand extends ParserDDL {
             readThis(Tokens.CHAIN);
         }
 
-        String    sql  = getLastPart();
+        // unused // String sql =
+        getLastPart(); // is this required?
         Object[]  args = new Object[]{ Boolean.valueOf(chain) };
         Statement cs = new StatementSession(StatementTypes.COMMIT_WORK, args);
 
@@ -1189,6 +1180,7 @@ public class ParserCommand extends ParserDDL {
 
         boolean chain     = false;
         String  savepoint = null;
+        Statement cs;
 
         read();
 
@@ -1201,13 +1193,12 @@ public class ParserCommand extends ParserDDL {
 
             read();
 
-            String   sql  = getLastPart();
+            // unused // String sql =
+            getLastPart(); // is this required?
             Object[] args = new Object[]{ savepoint };
-            Statement cs =
-                new StatementSession(StatementTypes.ROLLBACK_SAVEPOINT, args);
-
-            return cs;
-        } else {
+            cs = new StatementSession(StatementTypes.ROLLBACK_SAVEPOINT, args);
+        }
+        else {
             if (token.tokenType == Tokens.WORK) {
                 read();
             }
@@ -1223,12 +1214,12 @@ public class ParserCommand extends ParserDDL {
 
                 readThis(Tokens.CHAIN);
             }
-        }
 
-        String   sql  = getLastPart();
-        Object[] args = new Object[]{ Boolean.valueOf(chain) };
-        Statement cs = new StatementSession(StatementTypes.ROLLBACK_WORK,
-                                            args);
+            // unused // String sql =
+            getLastPart(); // is this required?
+            Object[] args = new Object[]{ Boolean.valueOf(chain) };
+            cs = new StatementSession(StatementTypes.ROLLBACK_WORK, args);
+        }
 
         return cs;
     }
@@ -1244,7 +1235,8 @@ public class ParserCommand extends ParserDDL {
 
         read();
 
-        String   sql  = getLastPart();
+        // unused // String sql =
+        getLastPart(); // is this required?
         Object[] args = new Object[]{ name };
 
         return new StatementSession(StatementTypes.SAVEPOINT, args);
@@ -1259,7 +1251,8 @@ public class ParserCommand extends ParserDDL {
 
         read();
 
-        String   sql  = getLastPart();
+        // unused // String sql =
+        getLastPart(); // is this required?
         Object[] args = new Object[]{ name };
 
         return new StatementSession(StatementTypes.RELEASE_SAVEPOINT, args);
@@ -1331,8 +1324,8 @@ public class ParserCommand extends ParserDDL {
             }
         }
 
-        String sql = getLastPart();
-
+        // unused // String sql =
+        getLastPart(); // is this required?
         return new StatementSession(StatementTypes.SET_ROLE,
                                     new Expression[]{ e });
     }
@@ -1365,8 +1358,8 @@ public class ParserCommand extends ParserDDL {
             }
         }
 
-        String sql = getLastPart();
-
+        // unused // String sql =
+        getLastPart(); // is this required?
         return new StatementSession(StatementTypes.SET_TIME_ZONE,
                                     new Expression[]{ e });
     }
@@ -1412,7 +1405,8 @@ public class ParserCommand extends ParserDDL {
             throw unexpectedToken();
         }
 
-        String   sql  = getLastPart();
+        // unused // String sql =
+        getLastPart(); // is this required?
         Object[] args = new Object[]{ new Integer(closemode) };
         Statement cs = new StatementCommand(StatementTypes.DATABASE_SHUTDOWN,
                                             args, null, null);
@@ -1539,7 +1533,8 @@ public class ParserCommand extends ParserDDL {
             throw unexpectedToken();
         }
 
-        String   sql       = getLastPart();
+        // unused // String sql =
+        getLastPart(); // is this required?
         Object[] args      = new Object[]{ Boolean.valueOf(defrag) };
         HsqlName writeName = defrag ? database.getCatalogName()
                                     : null;
@@ -1554,7 +1549,6 @@ public class ParserCommand extends ParserDDL {
 
         read();
 
-        String sql = Tokens.T_DISCONNECT;
         Statement cs = new StatementSession(StatementTypes.DISCONNECT,
                                             (Object[]) null);
 
@@ -1587,16 +1581,12 @@ public class ParserCommand extends ParserDDL {
 
         args[0] = t.tableName;
 
-        if (!t.isText()) {
-            Exception e = Error.error(ErrorCode.X_S0522);
-        }
-
         // SET TABLE <table> SOURCE ON
         if (token.tokenType == Tokens.ON) {
             read();
 
-            String sql = getLastPart();
-
+            // unused // String sql =
+            getLastPart(); // is this required?
             args[1] = Boolean.TRUE;
 
             return new StatementCommand(StatementTypes.SET_TABLE_SOURCE, args,
@@ -1604,8 +1594,8 @@ public class ParserCommand extends ParserDDL {
         } else if (token.tokenType == Tokens.OFF) {
             read();
 
-            String sql = getLastPart();
-
+            // unused // String sql =
+            getLastPart(); // is this required?
             args[1] = Boolean.FALSE;
 
             return new StatementCommand(StatementTypes.SET_TABLE_SOURCE, args,
@@ -1632,8 +1622,8 @@ public class ParserCommand extends ParserDDL {
             read();
         }
 
-        String sql = getLastPart();
-
+        // unused // String sql =
+        getLastPart(); // is this required?
         args[2] = source;
         args[3] = Boolean.valueOf(isDesc);
         args[4] = Boolean.valueOf(isSourceHeader);

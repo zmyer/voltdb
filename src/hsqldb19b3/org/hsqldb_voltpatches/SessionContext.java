@@ -158,8 +158,7 @@ public class SessionContext {
     void clearStructures(StatementDMQL cs) {
 
         if (cs.type == StatementTypes.UPDATE_WHERE
-                || cs.type == StatementTypes.DELETE_WHERE
-                || cs.type == StatementTypes.MERGE) {
+                || cs.type == StatementTypes.DELETE_WHERE) {
             if (constraintPath != null) {
                 constraintPath.clear();
             }
@@ -172,11 +171,6 @@ public class SessionContext {
                     updateList.clear();
                 }
             }
-        }
-
-        if (cs.type == StatementTypes.INSERT) {
-
-            //
         }
 
         int count = cs.rangeIteratorCount;

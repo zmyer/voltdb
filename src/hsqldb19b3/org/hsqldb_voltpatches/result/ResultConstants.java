@@ -31,8 +31,6 @@
 
 package org.hsqldb_voltpatches.result;
 
-import org.hsqldb_voltpatches.StatementTypes;
-
 /**
  * An enumeration of the request and response mode values used to communicate
  * between the client and the engine when sending Result objects back
@@ -644,11 +642,6 @@ public interface ResultConstants {
     int TX_COMMIT_AND_CHAIN        = 6;
     int TX_ROLLBACK_AND_CHAIN      = 7;
 
-/* StatementType codes duplicated for cursor operations */
-
-    int UPDATE_CURSOR = StatementTypes.UPDATE_CURSOR;
-    int DELETE_CURSOR = StatementTypes.DELETE_CURSOR;
-    int INSERT_CURSOR = StatementTypes.INSERT;
 /* Environment attributes */
 
 //#define SQL_ATTR_OUTPUT_NTS 10001
