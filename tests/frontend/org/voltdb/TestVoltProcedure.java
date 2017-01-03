@@ -51,17 +51,19 @@
 package org.voltdb;
 
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+
+import org.voltcore.utils.CoreUtils;
+
+import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.types.TimestampType;
+import org.voltdb.types.VoltDecimalHelper;
 
 import java.math.BigDecimal;
 import java.util.Date;
 
-import org.voltcore.utils.CoreUtils;
-import org.voltdb.VoltTable.ColumnInfo;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.types.TimestampType;
-
 import junit.framework.TestCase;
-import static org.mockito.Mockito.mock;
 
 public class TestVoltProcedure extends TestCase {
     static class DateProcedure extends NullProcedureWrapper {
@@ -190,6 +192,15 @@ public class TestVoltProcedure extends TestCase {
         public static Double arg;
     }
 
+    static class VoltProcWithVoltTableArg extends NullProcedureWrapper {
+        public static VoltTable[] run(VoltTable arg1) {
+            arg = arg1;
+            return new VoltTable[0];
+        }
+
+        public static VoltTable arg;
+    }
+
     static class LongArrayProcedure extends NullProcedureWrapper {
         public static VoltTable[] run(long[] arg1) {
             arg = arg1;
@@ -304,6 +315,7 @@ public class TestVoltProcedure extends TestCase {
         manager.addProcedureForTest(LargeNumberOfTablesProc.class.getName());
         manager.addProcedureForTest(UnexpectedFailureFourProcedure.class.getName());
         manager.addProcedureForTest(GetClusterIdProcedure.class.getName());
+        manager.addProcedureForTest(VoltProcWithVoltTableArg.class.getName());
         site = mock(SiteProcedureConnection.class);
         doReturn(42).when(site).getCorrespondingPartitionId();
         doReturn(executionSiteId).when(site).getCorrespondingSiteId();
@@ -408,6 +420,54 @@ public class TestVoltProcedure extends TestCase {
         ClientResponse r = call(LongArrayProcedure.class);
         assertEquals(null, LongArrayProcedure.arg);
         assertEquals(ClientResponse.SUCCESS, r.getStatus());
+    }
+
+    public void testNullVoltTableArgType() {
+        ClientResponse response = call(VoltProcWithVoltTableArg.class);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(null, VoltProcWithVoltTableArg.arg);
+    }
+
+    public void testVoltTableArgTypeWithMixedTypes() {
+        Byte byteparam = new Byte((byte) 2);
+        Short shortparam = new Short(Short.MAX_VALUE);
+        Integer intparam = new Integer(Integer.MIN_VALUE);
+        Long longparam = new Long(Long.MAX_VALUE -1);
+        Double doubleparam = new Double(Double.MAX_VALUE -1);
+        String stringparam = new String("ABCDE");
+        TimestampType dateparam = new TimestampType(); // current time
+        BigDecimal bigdecimalparam = new BigDecimal(7654321).setScale(VoltDecimalHelper.kDefaultScale);
+
+        ClientResponse response;
+        int colIndex = 0;
+        VoltTable arg = new VoltTable(new VoltTable.ColumnInfo("c"+ ++colIndex, VoltType.TINYINT),
+                new VoltTable.ColumnInfo("c"+ ++colIndex, VoltType.SMALLINT),
+                new VoltTable.ColumnInfo("c"+ ++colIndex, VoltType.INTEGER),
+                new VoltTable.ColumnInfo("c"+ ++colIndex, VoltType.BIGINT),
+                new VoltTable.ColumnInfo("c"+ ++colIndex, VoltType.FLOAT),
+                new VoltTable.ColumnInfo("c"+ ++colIndex, VoltType.DECIMAL),
+                new VoltTable.ColumnInfo("c"+ ++colIndex, VoltType.STRING),
+                new VoltTable.ColumnInfo("c"+ ++colIndex, VoltType.TIMESTAMP));
+        arg.addRow(byteparam, shortparam, intparam, longparam, doubleparam, bigdecimalparam, stringparam, dateparam);
+
+        response = callWithArgs(VoltProcWithVoltTableArg.class, arg);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(arg, VoltProcWithVoltTableArg.arg);
+
+        arg.clearRowData();
+
+        arg.addRow(VoltType.NULL_TINYINT,
+                VoltType.NULL_SMALLINT,
+                VoltType.NULL_INTEGER,
+                VoltType.NULL_BIGINT,
+                VoltType.NULL_FLOAT,
+                VoltType.NULL_DECIMAL,
+                VoltType.NULL_STRING_OR_VARBINARY,
+                VoltType.NULL_TIMESTAMP);
+        response = callWithArgs(VoltProcWithVoltTableArg.class, arg);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        assertEquals(arg, VoltProcWithVoltTableArg.arg);
+
     }
 
     public void testNullPointerException() {
