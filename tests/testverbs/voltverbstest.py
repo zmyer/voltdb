@@ -38,14 +38,18 @@ volt_verbs = {'create': 1,
               'rejoin': 1,
               'add': 1,
               'init': 2,
-              'start': 2}
+              'start': 2,
+              'get deployment': 2,
+             }
 
 volt_verbs_mapping = {'create': 'create',
                       'recover': 'recover',
                       'rejoin': 'live rejoin',
                       'add': 'add',
                       'init': 'initialize',
-                      'start': 'probe'}
+                      'start': 'probe',
+                      'get deployment': 'get deployment',
+                      }
 
 
 # create all the options
@@ -84,6 +88,8 @@ config = Opt('config', 'deployment', str, 2)
 voltdbroot = Opt('dir', 'voltdbroot', str, 2)
 hostcount = Opt('count', 'hostcount', int, 2)
 add = Opt('add', 'enableadd', None, 2)
+out = Opt('out', 'file', str, 2)
+# getvoltdbroot = Opt('
 
 # negative opt
 unknown = Opt('unknown', None, None, 0)
@@ -167,7 +173,8 @@ volt_opts = {'create': [admin,
                        licensefile,
                        pause,
                        replica,
-                       add]
+                       add],
+             'get deployment': [out],
              }
 
 volt_opts_mandatory = {'create': [],
@@ -175,7 +182,8 @@ volt_opts_mandatory = {'create': [],
                        'rejoin': [host],
                        'add': [host],
                        'init': [],
-                       'start': []
+                       'start': [],
+                       'get deployment': [],
                        }
 
 volt_opts_negative = [unknown]
@@ -255,7 +263,7 @@ def compare_result(stdout, stderr, verb, opts, reportout, expectedOut=None, expe
     if expectedOut:
         haddiff = False
         if expectedOut != stdout:
-            description = "Generate stdout:\n" + stdout + "\n" + "doest not match expected:\n" + expectedOut + + "\nTest Failed!\n\n"
+            description = "Generate stdout:\n" + stdout + "\n" + "does not match expected:\n" + expectedOut + + "\nTest Failed!\n\n"
             haddiff = True
         else:
             description = "Generate expected stdout:\n" + stdout + "Test Passed!\n\n"
