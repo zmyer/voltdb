@@ -37,6 +37,7 @@ import org.hsqldb_voltpatches.navigator.RowSetNavigator;
 import org.hsqldb_voltpatches.navigator.RowSetNavigatorClient;
 import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.result.Result;
+import org.hsqldb_voltpatches.result.ResultMetaData;
 import org.hsqldb_voltpatches.types.Type;
 
 /**
@@ -91,11 +92,21 @@ public class StatementInsert extends StatementDML {
     }
 
     /**
+     * Returns the metadata, which is empty if the CompiledStatement does not
+     * generate a Result.
+     */
+    @Override
+    public ResultMetaData getResultMetaData() {
+        return ResultMetaData.emptyResultMetaData;
+    }
+
+    /**
      * Executes an INSERT_SELECT statement.  It is assumed that the argument
      * is of the correct type.
      *
      * @return the result of executing the statement
      */
+    @Override
     Result getResult(Session session) {
 
         Table           table              = baseTable;
@@ -176,7 +187,7 @@ public class StatementInsert extends StatementDML {
 
         while (nav.hasNext()) {
             Object[] data       = baseTable.getNewRowData(session);
-            Object[] sourceData = (Object[]) nav.getNext();
+            Object[] sourceData = nav.getNext();
 
             for (int i = 0; i < columnMap.length; i++) {
                 int  j          = columnMap[i];

@@ -66,6 +66,9 @@ import org.hsqldb_voltpatches.types.Type;
 // support for MERGE statement by Justin Spadea (jzs9783@users dot sourceforge.net)
 public class StatementDML extends StatementDMQL {
 
+    /**
+     * Instantiate this as an INSERT or SWAP statement
+     */
     StatementDML(int type, int group, HsqlName schemaName) {
         super(type, group, schemaName);
     }

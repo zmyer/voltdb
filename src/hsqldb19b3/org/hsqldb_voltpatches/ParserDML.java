@@ -352,10 +352,11 @@ public class ParserDML extends ParserDQL {
             }
         }
 
-        RangeVariable[] rangeVariables = {
-            readSimpleRangeVariable(StatementTypes.DELETE_WHERE) };
-        Table table     = rangeVariables[0].getTable();
+        RangeVariable targetRangeVar =
+                readSimpleRangeVariable(StatementTypes.DELETE_WHERE);
+        Table table = targetRangeVar.getTable();
         Table baseTable = table.getBaseTable();
+        RangeVariable[] rangeVariables = { targetRangeVar };
 
         /* A VoltDB Extension.
          * Views from Streams are now updatable.
@@ -428,7 +429,7 @@ public class ParserDML extends ParserDQL {
 
             if (condition != null) {
                 condition =
-                    condition.replaceColumnReferences(rangeVariables[0],
+                    condition.replaceColumnReferences(targetRangeVar,
                                                       select.exprColumns);
             }
 
@@ -460,6 +461,37 @@ public class ParserDML extends ParserDQL {
         voltAppendDeleteSortAndSlice((StatementDML)cs, sas);
 
         return cs;
+    }
+
+    /**
+     * Creates a SWAP-type Statement from this parse context.
+     */
+    StatementDMQL compileSwapStatement(RangeVariable[] outerRanges) {
+        read(); // consume SWAP command keyword
+        readThis(Tokens.TABLE);
+
+        Table table1 = readTableName();
+
+        // Range variables register themselves in the compileContext.
+        // So, there's no need for a reference to it, here.
+        new RangeVariable(table1, null, null, null, compileContext);
+
+        // Skip any syntactic sugar, allowing:
+        // "swap table t0 WITH TABLE t1;"
+        // "swap table t0 WITH t1;"
+        // "swap table t0 t1;"
+        if (readIfThis(Tokens.WITH)) {
+            readIfThis(Tokens.TABLE);
+        }
+
+
+        Table table2 = readTableName();
+
+        // Range variables register themselves in the compileContext.
+        // So, there's no need for a reference to it, here.
+        new RangeVariable(table2, null, null, null, compileContext);
+
+        return new StatementSwap(session, compileContext);
     }
 
     /**

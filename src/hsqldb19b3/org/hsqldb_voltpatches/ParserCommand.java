@@ -38,7 +38,6 @@ import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.persist.HsqlDatabaseProperties;
 import org.hsqldb_voltpatches.scriptio.ScriptWriterBase;
-import org.hsqldb_voltpatches.store.ValuePool;
 import org.hsqldb_voltpatches.types.Type;
 
 /**
@@ -153,6 +152,11 @@ public class ParserCommand extends ParserDDL {
             }
             case Tokens.TRUNCATE : {
                 cs = compileDeleteStatement(RangeVariable.emptyArray);
+
+                break;
+            }
+            case Tokens.SWAP : {
+                cs = compileSwapStatement(RangeVariable.emptyArray);
 
                 break;
             }

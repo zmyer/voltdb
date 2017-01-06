@@ -52,13 +52,12 @@ public class Tokens {
     public static final String T_ALTER            = "ALTER";
     static final String        T_AND              = "AND";
     static final String        T_ANY              = "ANY";
-    // A VoltDB extension APPROX_COUNT_DISTINCT
-    static final String        T_APPROX_COUNT_DISTINCT = "APPROX_COUNT_DISTINCT";
-    // End of VoltDB extension
+    static final String        T_APPROX_COUNT_DISTINCT = "APPROX_COUNT_DISTINCT"; // For VoltDB
     static final String        T_ARE              = "ARE";
     static final String        T_ARRAY            = "ARRAY";
     public static final String T_AS               = "AS";
     static final String        T_ASENSITIVE       = "ASENSITIVE";
+    static final String        T_ASSUMEUNIQUE      = "ASSUMEUNIQUE"; // For VoltDB
     static final String        T_ASYMMETRIC       = "ASYMMETRIC";
     static final String        T_AT               = "AT";
     static final String        T_ATOMIC           = "ATOMIC";
@@ -69,9 +68,8 @@ public class Tokens {
     public static final String T_BIGINT           = "BIGINT";
     public static final String T_BINARY           = "BINARY";
     static final String        T_BIT_LENGTH       = "BIT_LENGTH";
-    // A VoltDB extension to support varchar column in bytes.
+    // VoltDB supports varchars sized in bytes.
     static final String        T_BYTES            = "BYTES"; // For VoltDB
-    // End of VoltDB extension
     public static final String T_BLOB             = "BLOB";
     public static final String T_BOOLEAN          = "BOOLEAN";
     static final String        T_BOTH             = "BOTH";
@@ -327,16 +325,15 @@ public class Tokens {
     static final String        T_STATIC            = "STATIC";
     static final String        T_STDDEV_POP        = "STDDEV_POP";
     static final String        T_STDDEV_SAMP       = "STDDEV_SAMP";
+    static final String        T_STREAM            = "STREAM"; // For VoltDB
     static final String        T_SUBMULTISET       = "SUBMULTISET";
     static final String        T_SUBSTRING         = "SUBSTRING";
     static final String        T_SUBSTRING_REGEX   = "SUBSTRING_REGEX";
     static final String        T_SUM               = "SUM";
+    static final String        T_SWAP              = "SWAP"; // For VoltDB
     static final String        T_SYMMETRIC         = "SYMMETRIC";
     static final String        T_SYSTEM            = "SYSTEM";
     static final String        T_SYSTEM_USER       = "SYSTEM_USER";
-    // A VoltDB extension STREAM
-    static final String        T_STREAM = "STREAM";
-    // End of VoltDB extension
     static final String        T_TABLE             = "TABLE";
     static final String        T_TABLESAMPLE       = "TABLESAMPLE";
     static final String        T_THEN              = "THEN";
@@ -357,9 +354,6 @@ public class Tokens {
     static final String        T_TRUNCATE          = "TRUNCATE";
     static final String        T_UESCAPE           = "UESCAPE";
     static final String        T_UNION             = "UNION";
-    // A VoltDB extension to support the assume unique index attribute
-    static final String        T_ASSUMEUNIQUE      = "ASSUMEUNIQUE";     // For VoltDB
-    // End of VoltDB extension
     public static final String T_UNIQUE            = "UNIQUE";
     static final String        T_UNKNOWN           = "UNKNOWN";
     static final String        T_UNNEST            = "UNNEST";
@@ -825,10 +819,12 @@ public class Tokens {
     public static final int ALTER                            = 4;
     public static final int AND                              = 5;
     public static final int ANY                              = 6;
+    public static final int APPROX_COUNT_DISTINCT            = 1304; // For VoltDB
     public static final int ARE                              = 7;
     public static final int ARRAY                            = 8;
     public static final int AS                               = 9;
     public static final int ASENSITIVE                       = 10;
+    public static final int ASSUMEUNIQUE                     = 1303; // For VoltDB
     public static final int ASYMMETRIC                       = 11;
     public static final int AT                               = 12;
     public static final int ATOMIC                           = 13;
@@ -870,9 +866,6 @@ public class Tokens {
     public static final int CORR                             = 49;
     public static final int CORRESPONDING                    = 50;
     public static final int COUNT                            = 51;
-    // A VoltDB extension APPROX_COUNT_DISTINCT
-    public static final int APPROX_COUNT_DISTINCT            = 1304;
-    // End of VoltDB extension
     public static final int COVAR_POP                        = 52;
     public static final int COVAR_SAMP                       = 53;
     public static final int CREATE                           = 54;
@@ -1090,16 +1083,15 @@ public class Tokens {
     public static final int STATIC                           = 266;
     public static final int STDDEV_POP                       = 267;
     public static final int STDDEV_SAMP                      = 268;
+    public static final int STREAM                           = 1305; // For VoltDB
     public static final int SUBMULTISET                      = 269;
     public static final int SUBSTRING                        = 270;
     public static final int SUBSTRING_REGEX                  = 271;
     public static final int SUM                              = 272;
+    public static final int SWAP                             = 1306; // For VoltDB
     public static final int SYMMETRIC                        = 273;
     public static final int SYSTEM                           = 274;
     public static final int SYSTEM_USER                      = 275;
-    // A VoltDB extension STREAM
-    public static final int STREAM                           = 1305;
-    // End of VoltDB extension
     public static final int TABLE                            = 276;
     public static final int TABLESAMPLE                      = 277;
     public static final int THEN                             = 278;
@@ -1122,9 +1114,6 @@ public class Tokens {
     public static final int UNDO                             = 295;
     public static final int UNION                            = 296;
     public static final int UNIQUE                           = 297;
-    // A VoltDB extension to support the assume unique index attribute
-    public static final int ASSUMEUNIQUE                     = 1303;    // For VoltDB
-    // End of VoltDB extension
     public static final int UNKNOWN                          = 298;
     public static final int UNNEST                           = 299;
     public static final int UNTIL                            = 300;
@@ -1450,12 +1439,10 @@ public class Tokens {
     static final int        DAYOFMONTH              = 614;
     static final int        DAYOFWEEK               = 615;
     static final int        DAYOFYEAR               = 616;
-    // A VoltDB extension to make WEEK public
     public static final int WEEK                    = 617;
-    /* disable 1 line ...
-    static final int WEEK                           = 617;
-    ... disabled 1 line */
-    // End of VoltDB extension
+    public static final int WEEKOFYEAR              = 740; // for VoltDB's MySQL compatibility
+    public static final int WEEKDAY                 = 741; // for VoltDB's MySQL compatibility
+
     static final int        OCTETLENGTH             = 618;
     static final int        BITLENGTH               = 619;
 
@@ -1598,10 +1585,6 @@ public class Tokens {
     public static final int X_MALFORMED_COMMENT        = 737;
     public static final int X_MALFORMED_IDENTIFIER     = 738;
     public static final int X_MALFORMED_UNICODE_ESCAPE = 739;
-    // A VoltDB extension to support WEEKOFYEAR, WEEKDAY
-    public static final int WEEKOFYEAR                 = 740; // for compliant with MySQL
-    public static final int WEEKDAY                    = 741; // for compliant with MySQL
-    // End of VoltDB extension
 
     //
     public static final int X_UNKNOWN_TOKEN = -1;
@@ -1615,13 +1598,12 @@ public class Tokens {
         reservedKeys.put(Tokens.T_ALTER, ALTER);
         reservedKeys.put(Tokens.T_AND, AND);
         reservedKeys.put(Tokens.T_ANY, ANY);
-        // A VoltDB extension APPROX_COUNT_DISTINCT
-        reservedKeys.put(Tokens.T_APPROX_COUNT_DISTINCT, APPROX_COUNT_DISTINCT);
-        // End of VoltDB extension
+        reservedKeys.put(Tokens.T_APPROX_COUNT_DISTINCT, APPROX_COUNT_DISTINCT); // For VoltDB
         reservedKeys.put(Tokens.T_ARE, ARE);
         reservedKeys.put(Tokens.T_ARRAY, ARRAY);
         reservedKeys.put(Tokens.T_AS, AS);
         reservedKeys.put(Tokens.T_ASENSITIVE, ASENSITIVE);
+        reservedKeys.put(Tokens.T_ASSUMEUNIQUE, ASSUMEUNIQUE); // For VoltDB
         reservedKeys.put(Tokens.T_ASYMMETRIC, ASYMMETRIC);
         reservedKeys.put(Tokens.T_AT, AT);
         reservedKeys.put(Tokens.T_ATOMIC, ATOMIC);
@@ -1632,9 +1614,8 @@ public class Tokens {
         reservedKeys.put(Tokens.T_BIGINT, BIGINT);
         reservedKeys.put(Tokens.T_BINARY, BINARY);
         reservedKeys.put(Tokens.T_BIT_LENGTH, BIT_LENGTH);
-        // A VoltDB extension to support varchar column in bytes.
+        // VoltDB supports varchars sized in bytes.
         reservedKeys.put(Tokens.T_BYTES, BYTES); // For VoltDB
-        // End of VoltDB extension
         reservedKeys.put(Tokens.T_BLOB, BLOB);
         reservedKeys.put(Tokens.T_BOOLEAN, BOOLEAN);
         reservedKeys.put(Tokens.T_BOTH, BOTH);
@@ -1661,8 +1642,7 @@ public class Tokens {
         reservedKeys.put(Tokens.T_COMMIT, COMMIT);
         reservedKeys.put(Tokens.T_COMPARABLE, COMPARABLE);
         // A VoltDB extension -- mysterious
-        reservedKeys.put(Tokens.T_CONCAT, CONCAT);
-        // End of VoltDB extension
+        reservedKeys.put(Tokens.T_CONCAT, CONCAT); // For VoltDB
         reservedKeys.put(Tokens.T_CONDITION, CONDITION);
         reservedKeys.put(Tokens.T_CONNECT, CONNECT);
         reservedKeys.put(Tokens.T_CONSTRAINT, CONSTRAINT);
@@ -1877,9 +1857,8 @@ public class Tokens {
         reservedKeys.put(Tokens.T_SIMILAR, SIMILAR);
         reservedKeys.put(Tokens.T_SMALLINT, SMALLINT);
         reservedKeys.put(Tokens.T_SOME, SOME);
-        // A VoltDB extension to augment the set of SQL functions supported
-        reservedKeys.put(Tokens.T_SPACE, SPACE);
-        // End of VoltDB extension
+        // VoltDB augments the set of SQL functions supported
+        reservedKeys.put(Tokens.T_SPACE, SPACE); // For VoltDB
         reservedKeys.put(Tokens.T_SPECIFIC, SPECIFIC);
         reservedKeys.put(Tokens.T_SPECIFICTYPE, SPECIFICTYPE);
         reservedKeys.put(Tokens.T_SQL, SQL);
@@ -1892,6 +1871,7 @@ public class Tokens {
         reservedKeys.put(Tokens.T_STATIC, STATIC);
         reservedKeys.put(Tokens.T_STDDEV_POP, STDDEV_POP);
         reservedKeys.put(Tokens.T_STDDEV_SAMP, STDDEV_SAMP);
+        reservedKeys.put(Tokens.T_STREAM, STREAM); // ForVoltDB
         reservedKeys.put(Tokens.T_SUBMULTISET, SUBMULTISET);
         reservedKeys.put(Tokens.T_SUBSTRING, SUBSTRING);
         reservedKeys.put(Tokens.T_SUBSTRING_REGEX, SUBSTRING_REGEX);
@@ -1899,9 +1879,7 @@ public class Tokens {
         reservedKeys.put(Tokens.T_SYMMETRIC, SYMMETRIC);
         reservedKeys.put(Tokens.T_SYSTEM, SYSTEM);
         reservedKeys.put(Tokens.T_SYSTEM_USER, SYSTEM_USER);
-        // A VoltDB extension STREAM
-        reservedKeys.put(Tokens.T_STREAM, STREAM);
-        // End of VoltDB extension
+        reservedKeys.put(Tokens.T_SWAP, SWAP); // ForVoltDB
         reservedKeys.put(Tokens.T_TABLE, TABLE);
         reservedKeys.put(Tokens.T_TABLESAMPLE, TABLESAMPLE);
         reservedKeys.put(Tokens.T_THEN, THEN);
@@ -1924,9 +1902,6 @@ public class Tokens {
         reservedKeys.put(Tokens.T_UNDO, UNDO);
         reservedKeys.put(Tokens.T_UNION, UNION);
         reservedKeys.put(Tokens.T_UNIQUE, UNIQUE);
-        // A VoltDB extension to support the assume unique index attribute
-        reservedKeys.put(Tokens.T_ASSUMEUNIQUE, ASSUMEUNIQUE);    // For VoltDB
-        // End of VoltDB extension
         reservedKeys.put(Tokens.T_UNKNOWN, UNKNOWN);
         reservedKeys.put(Tokens.T_UNNEST, UNNEST);
         reservedKeys.put(Tokens.T_UNTIL, UNTIL);

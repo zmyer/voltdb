@@ -44,32 +44,37 @@
  */
 #include "abstractplannode.h"
 
-#include "common/TupleSchema.h"
-#include "executors/abstractexecutor.h"
 #include "plannodeutil.h"
+
+#include "common/debuglog.h"
+#include "common/TupleSchema.h"
+
+#include "executors/abstractexecutor.h"
+
 #include "storage/persistenttable.h"
 #include "storage/TableCatalogDelegate.hpp"
+#include "storage/temptable.h"
+
+#include "boost/foreach.hpp"
 
 #include <sstream>
-#include <vector>
-
-using namespace std;
 
 namespace voltdb {
 
 AbstractPlanNode::AbstractPlanNode()
-    : m_planNodeId(-1),
-      m_isInline(false),
-      m_validOutputColumnCount(0) { }
+    : m_planNodeId(-1)
+    , m_isInline(false)
+    , m_validOutputColumnCount(0)
+{ }
 
 AbstractPlanNode::~AbstractPlanNode()
 {
-    map<PlanNodeType, AbstractPlanNode*>::iterator iter;
+    std::map<PlanNodeType, AbstractPlanNode*>::iterator iter;
     for (iter = m_inlineNodes.begin(); iter != m_inlineNodes.end(); iter++) {
         delete (*iter).second;
     }
-    for (int i = 0; i < m_outputSchema.size(); i++) {
-        delete m_outputSchema[i];
+    BOOST_FOREACH (auto outputSchema, m_outputSchema) {
+        delete outputSchema;
     }
 }
 
@@ -84,7 +89,7 @@ void AbstractPlanNode::addInlinePlanNode(AbstractPlanNode* inline_node)
 
 AbstractPlanNode* AbstractPlanNode::getInlinePlanNode(PlanNodeType type) const
 {
-    map<PlanNodeType, AbstractPlanNode*>::const_iterator lookup =
+    std::map<PlanNodeType, AbstractPlanNode*>::const_iterator lookup =
         m_inlineNodes.find(type);
     AbstractPlanNode* ret = NULL;
     if (lookup != m_inlineNodes.end()) {
@@ -101,20 +106,24 @@ AbstractPlanNode* AbstractPlanNode::getInlinePlanNode(PlanNodeType type) const
 // ------------------------------------------------------------------
 // DATA MEMBER METHODS
 // ------------------------------------------------------------------
-void AbstractPlanNode::setExecutor(AbstractExecutor* executor) { m_executor.reset(executor); }
-
-void AbstractPlanNode::setInputTables(const vector<Table*>& val)
+void AbstractPlanNode::setExecutor(AbstractExecutor* executor)
 {
+    m_executor.reset(executor);
+}
+
+void AbstractPlanNode::setInputTables(std::vector<Table*> const& val)
+{
+    VoltDBEngine* engine = ExecutorContext::getEngine();
+    assert(engine);
     size_t ii = val.size();
     m_inputTables.resize(ii);
     while (ii--) {
         PersistentTable* persistentTable = dynamic_cast<PersistentTable*>(val[ii]);
         if (persistentTable) {
-            VoltDBEngine* engine = ExecutorContext::getEngine();
-            assert(engine);
             TableCatalogDelegate* tcd = engine->getTableDelegate(persistentTable->name());
             m_inputTables[ii].setTable(tcd);
-        } else {
+        }
+        else {
             TempTable* tempTable = dynamic_cast<TempTable*>(val[ii]);
             assert(tempTable);
             m_inputTables[ii].setTable(tempTable);
@@ -129,14 +138,15 @@ void AbstractPlanNode::setOutputTable(Table* table)
         VoltDBEngine* engine = ExecutorContext::getEngine();
         TableCatalogDelegate* tcd = engine->getTableDelegate(persistentTable->name());
         m_outputTable.setTable(tcd);
-    } else {
+    }
+    else {
         TempTable* tempTable = dynamic_cast<TempTable*>(table);
         assert(tempTable);
         m_outputTable.setTable(tempTable);
     }
 }
 
-const vector<SchemaColumn*>& AbstractPlanNode::getOutputSchema() const
+std::vector<SchemaColumn*> const& AbstractPlanNode::getOutputSchema() const
 {
     // Test for a valid output schema defined at this plan node.
     // 1-or-more column output schemas are always valid.
@@ -158,8 +168,8 @@ const vector<SchemaColumn*>& AbstractPlanNode::getOutputSchema() const
     // Best practice is probably to access them only in the executor's init method
     // and cache any details pertinent to execute.
 
-    const AbstractPlanNode* parent = this;
-    const AbstractPlanNode* schema_definer = NULL;
+    AbstractPlanNode const* parent = this;
+    AbstractPlanNode const* schema_definer = NULL;
     while (true) {
         // An inline child projection is an excellent place to find an output schema.
         if (parent->m_validOutputColumnCount == SCHEMA_UNDEFINED_SO_GET_FROM_INLINE_PROJECTION) {
@@ -203,26 +213,24 @@ TupleSchema* AbstractPlanNode::generateTupleSchema() const
 {
     // Get the effective output schema.
     // In general, this may require a search.
-    const vector<SchemaColumn*>& outputSchema = getOutputSchema();
+    std::vector<SchemaColumn*> const& outputSchema = getOutputSchema();
     return generateTupleSchema(outputSchema);
 }
 
-TupleSchema* AbstractPlanNode::generateTupleSchema(const std::vector<SchemaColumn*>& outputSchema)
+TupleSchema* AbstractPlanNode::generateTupleSchema(std::vector<SchemaColumn*> const& outputSchema)
 {
     int schema_size = static_cast<int>(outputSchema.size());
-    vector<voltdb::ValueType> columnTypes;
-    vector<int32_t> columnSizes;
-    vector<bool> columnAllowNull(schema_size, true);
-    vector<bool> columnInBytes;
+    std::vector<voltdb::ValueType> columnTypes;
+    std::vector<int32_t> columnSizes;
+    std::vector<bool> columnAllowNull(schema_size, true);
+    std::vector<bool> columnInBytes;
 
-    for (int i = 0; i < schema_size; i++)
-    {
-        //TODO: SchemaColumn is a sad little class that holds an expression pointer,
-        // a column name that only really comes in handy in one quirky special case,
-        // (see UpdateExecutor::p_init) and a bunch of other stuff that doesn't get used.
-        // Someone should put that class out of our misery.
-        SchemaColumn* col = outputSchema[i];
-        AbstractExpression * expr = col->getExpression();
+    //TODO: SchemaColumn is a sad little class that holds an expression pointer,
+    // a column name that only really comes in handy in one quirky special case,
+    // (see UpdateExecutor::p_init) and a bunch of other stuff that doesn't get used.
+    // Someone should put that class out of our misery.
+    BOOST_FOREACH (SchemaColumn* col, outputSchema) {
+        AbstractExpression* expr = col->getExpression();
         columnTypes.push_back(expr->getValueType());
         columnSizes.push_back(expr->getValueSize());
         columnInBytes.push_back(expr->getInBytes());
@@ -237,10 +245,10 @@ TupleSchema* AbstractPlanNode::generateTupleSchema(const std::vector<SchemaColum
 TupleSchema* AbstractPlanNode::generateDMLCountTupleSchema()
 {
     // Assuming the expected output schema here saves the expense of hard-coding it into each DML plan.
-    vector<voltdb::ValueType> columnTypes(1, VALUE_TYPE_BIGINT);
-    vector<int32_t> columnSizes(1, sizeof(int64_t));
-    vector<bool> columnAllowNull(1, false);
-    vector<bool> columnInBytes(1, false);
+    std::vector<voltdb::ValueType> columnTypes(1, VALUE_TYPE_BIGINT);
+    std::vector<int32_t> columnSizes(1, sizeof(int64_t));
+    std::vector<bool> columnAllowNull(1, false);
+    std::vector<bool> columnInBytes(1, false);
     TupleSchema* schema = TupleSchema::createTupleSchema(columnTypes, columnSizes,
             columnAllowNull, columnInBytes);
     return schema;
@@ -252,18 +260,13 @@ TupleSchema* AbstractPlanNode::generateDMLCountTupleSchema()
 // ----------------------------------------------------
 AbstractPlanNode* AbstractPlanNode::fromJSONObject(PlannerDomValue obj)
 {
+    std::string typeString = obj.valueForKey("PLAN_NODE_TYPE").asStr();
 
-    string typeString = obj.valueForKey("PLAN_NODE_TYPE").asStr();
-
-    //FIXME: EVEN if this leak guard is warranted --
-    // like we EXPECT to be catching plan deserialization exceptions
-    // and our biggest concern will be the memory this may leak? --
-    // we don't need to be mediating all the node
-    // pointer dereferences through the smart pointer.
-    // Why not just get() it and forget it until .release() time?
-    // As is, it just makes single-step debugging awkward.
-    auto_ptr<AbstractPlanNode> node(
-        plannodeutil::getEmptyPlanNode(stringToPlanNode(typeString)));
+    AbstractPlanNode* node =
+        plannodeutil::getEmptyPlanNode(stringToPlanNode(typeString));
+    assert(node);
+    // Be prepared to free node on any uncaught exception.
+    std::auto_ptr<AbstractPlanNode> nodeGuard(node);
 
     node->m_planNodeId = obj.valueForKey("ID").asInt();
 
@@ -271,7 +274,7 @@ AbstractPlanNode* AbstractPlanNode::fromJSONObject(PlannerDomValue obj)
         PlannerDomValue inlineNodesValue = obj.valueForKey("INLINE_NODES");
         for (int i = 0; i < inlineNodesValue.arrayLen(); i++) {
             PlannerDomValue inlineNodeObj = inlineNodesValue.valueAtIndex(i);
-            AbstractPlanNode *newNode = AbstractPlanNode::fromJSONObject(inlineNodeObj);
+            AbstractPlanNode* newNode = AbstractPlanNode::fromJSONObject(inlineNodeObj);
 
             // todo: if this throws, new Node can be leaked.
             // As long as newNode is not NULL, this will not throw.
@@ -309,14 +312,11 @@ AbstractPlanNode* AbstractPlanNode::fromJSONObject(PlannerDomValue obj)
     }
 
     node->loadFromJSONObject(obj);
-
-    AbstractPlanNode* retval = node.get();
-    node.release();
-    assert(retval);
-    return retval;
+    nodeGuard.release();
+    return node;
 }
 
-void AbstractPlanNode::loadIntArrayFromJSONObject(const char* label,
+void AbstractPlanNode::loadIntArrayFromJSONObject(char const* label,
         PlannerDomValue obj, std::vector<int>& result)
 {
     if (obj.hasNonNullKey(label)) {
@@ -328,7 +328,7 @@ void AbstractPlanNode::loadIntArrayFromJSONObject(const char* label,
     }
 }
 
-void AbstractPlanNode::loadStringArrayFromJSONObject(const char* label,
+void AbstractPlanNode::loadStringArrayFromJSONObject(char const* label,
                                                      PlannerDomValue obj,
                                                      std::vector<std::string>& result)
 {
@@ -341,7 +341,7 @@ void AbstractPlanNode::loadStringArrayFromJSONObject(const char* label,
     }
 }
 
-AbstractExpression* AbstractPlanNode::loadExpressionFromJSONObject(const char* label,
+AbstractExpression* AbstractPlanNode::loadExpressionFromJSONObject(char const* label,
                                                                    PlannerDomValue obj)
 {
     if (obj.hasNonNullKey(label)) {
@@ -355,17 +355,17 @@ AbstractExpression* AbstractPlanNode::loadExpressionFromJSONObject(const char* l
 // ------------------------------------------------------------------
 string AbstractPlanNode::debug() const
 {
-    ostringstream buffer;
+    std::ostringstream buffer;
     buffer << planNodeToString(getPlanNodeType())
            << "[" << getPlanNodeId() << "]";
     return buffer.str();
 }
 
-string AbstractPlanNode::debug(const string& spacer) const
+string AbstractPlanNode::debug(std::string const& spacer) const
 {
-    ostringstream buffer;
+    std::ostringstream buffer;
     buffer << spacer << "* " << debug() << "\n";
-    string info_spacer = spacer + "  |";
+    std::string info_spacer = spacer + "  |";
     buffer << debugInfo(info_spacer);
     //
     // Inline PlanNodes
@@ -373,8 +373,8 @@ string AbstractPlanNode::debug(const string& spacer) const
     if (!m_inlineNodes.empty()) {
         buffer << info_spacer << "Inline Plannodes: "
                << m_inlineNodes.size() << "\n";
-        string internal_spacer = info_spacer + "  ";
-        map<PlanNodeType, AbstractPlanNode*>::const_iterator it;
+        std::string internal_spacer = info_spacer + "  ";
+        std::map<PlanNodeType, AbstractPlanNode*>::const_iterator it;
         for (it = m_inlineNodes.begin(); it != m_inlineNodes.end(); it++) {
             buffer << info_spacer << "Inline "
                    << planNodeToString(it->second->getPlanNodeType())
@@ -385,10 +385,9 @@ string AbstractPlanNode::debug(const string& spacer) const
     //
     // Traverse the tree
     //
-    string child_spacer = spacer + "  ";
-    for (int ctr = 0, cnt = static_cast<int>(m_children.size()); ctr < cnt; ctr++) {
-        buffer << child_spacer << m_children[ctr]->getPlanNodeType() << "\n";
-        buffer << m_children[ctr]->debug(child_spacer);
+    std::string child_spacer = spacer + "  ";
+    BOOST_FOREACH (auto childNode, m_children) {
+        buffer << childNode->debug(child_spacer);
     }
     return (buffer.str());
 }
@@ -413,7 +412,7 @@ AbstractPlanNode::OwningExpressionVector::~OwningExpressionVector()
     }
 }
 
-void AbstractPlanNode::OwningExpressionVector::loadExpressionArrayFromJSONObject(const char* label,
+void AbstractPlanNode::OwningExpressionVector::loadExpressionArrayFromJSONObject(char const* label,
                                                                                  PlannerDomValue obj)
 {
     clear();
@@ -422,19 +421,20 @@ void AbstractPlanNode::OwningExpressionVector::loadExpressionArrayFromJSONObject
     }
     PlannerDomValue arrayObj = obj.valueForKey(label);
     for (int i = 0; i < arrayObj.arrayLen(); i++) {
-        AbstractExpression *expr = AbstractExpression::buildExpressionTree(arrayObj.valueAtIndex(i));
+        AbstractExpression* expr = AbstractExpression::buildExpressionTree(arrayObj.valueAtIndex(i));
         push_back(expr);
     }
 }
 
 void AbstractPlanNode::loadSortListFromJSONObject(PlannerDomValue obj,
-                                                      std::vector<AbstractExpression*> *sortExprs,
-                                                      std::vector<SortDirectionType>   *sortDirs) {
+                                                  std::vector<AbstractExpression*>* sortExprs,
+                                                  std::vector<SortDirectionType>* sortDirs) {
     PlannerDomValue sortColumnsArray = obj.valueForKey("SORT_COLUMNS");
 
     for (int i = 0; i < sortColumnsArray.arrayLen(); i++) {
         PlannerDomValue sortColumn = sortColumnsArray.valueAtIndex(i);
-        bool hasDirection = (sortDirs == NULL), hasExpression = (sortExprs == NULL);
+        bool hasDirection = (sortDirs == NULL);
+        bool hasExpression = (sortExprs == NULL);
 
         if (sortDirs && sortColumn.hasNonNullKey("SORT_DIRECTION")) {
             hasDirection = true;
@@ -454,4 +454,5 @@ void AbstractPlanNode::loadSortListFromJSONObject(PlannerDomValue obj,
         }
     }
 }
-} // namespace voltdb
+
+}// namespace voltdb

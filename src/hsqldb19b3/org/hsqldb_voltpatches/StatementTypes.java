@@ -126,6 +126,7 @@ public interface StatementTypes {
     int SET_TRANSFORM_GROUP              = 118;
     int SET_TRANSACTION                  = 75;
     int START_TRANSACTION                = 111;
+    int SWAP                             = 200; // For VoltDB
     int CREATE_TABLE                     = 77;
     int CREATE_TRANSFORM                 = 117;
     int CREATE_TRANSLATION               = 79;
