@@ -1,0 +1,10 @@
+package uac;
+
+public class Extra$num {
+
+$static_data
+
+    public long getValue() {
+        return $value;
+    }
+}
