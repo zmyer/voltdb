@@ -4,7 +4,15 @@ public class Extra$num {
 
 $static_data
 
+    public long method1() {
+        long retval = 0;
+$random_churn1
+        return retval;
+    }
+
     public long getValue() {
-        return $value;
+        long retval = $value;
+$random_churn2
+        return retval;
     }
 }

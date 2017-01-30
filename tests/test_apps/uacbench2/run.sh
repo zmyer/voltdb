@@ -73,7 +73,7 @@ function voltinit-ifneeded() {
 function server() {
     jars-ifneeded
     voltinit-ifneeded
-    export VOLTDB_OPTS="-XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+PrintGCDateStamps -verbose:gc -Xloggc:/Users/jhugg/Documents/workspace/voltdb/tests/test_apps/uacbench/voltdbroot/log/gc.log"
+    export VOLTDB_OPTS="-XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+PrintGCDateStamps -verbose:gc -Xloggc:/Users/jhugg/Documents/workspace/voltdb/tests/test_apps/uacbench2/voltdbroot/log/gc.log"
     echo $VOLTDB_OPTS
     voltdb start -H $STARTUPLEADERHOST
 }
@@ -85,9 +85,9 @@ function prepare() {
     touch ben.config
     # write a config file
     echo "TABLE_COUNT=500" >> ben.config
-    echo "PROCEDURE_COUNT=2" >> ben.config
+    echo "PROCEDURE_COUNT=20" >> ben.config
     echo "CLASS_COUNT=1000" >> ben.config
-    echo "STEPS=10" >> ben.config
+    echo "STEPS=15" >> ben.config
 
     source ben.config
     python uacbench.py -t ${TABLE_COUNT} -p ${PROCEDURE_COUNT} -c ${CLASS_COUNT} -s ${STEPS}

@@ -78,31 +78,49 @@ def procedure_stmts(pattern, pfrom, pto, filename):
         stmts_file.write(stmts)
     return
 
+def generateDataStmts():
+    data_template = Template('    public$viz String data$n = "$str";\n')
+    some_data = ''
+    for j in range(0, 30):
+        the_str = ''
+        for k in range(0, 100):
+            the_str += str(random.choice(string.letters))
+        isStatic = "";
+        if random.choice([True, False]):
+            isStatic = " static"
+        some_data += data_template.substitute(viz=isStatic, n=j, str=the_str)
+    return some_data
+
+def generateOpStmts():
+    op_template = Template('        retval += data$num.$op("$findchar");\n')
+    some_ops = ''
+    for j in range(0, 20):
+        the_str = ''
+        which_data = random.randint(0, 29)
+        which_char = random.choice(string.letters)
+        which_op = "indexOf";
+        if random.choice([True, False]):
+            which_op = " lastIndexOf"
+        some_ops += op_template.substitute(num=which_data, op=which_op, findchar=which_char)
+    return some_ops
+
 def generate_supporting_class(ithClass, filename1, filename2):
     with open('template_supportingclass.txt', 'r') as template_file:
         template = Template(template_file.read())
 
-    static_data_template = Template('    public static String data$n = "$str";\n')
-    
-    some_static_data = ''
-    for j in range(0, 30):
-        the_str = ''
-        for k in range(0, 100):
-            the_str += str(random.choice(string.letters))
-        some_static_data += static_data_template.substitute(n=j, str=the_str)
-    curValue = random.randint(-9223372036854775807, 9223372036854775807);
-    java_str = template.substitute(num=ithClass, static_data=some_static_data, value=str(curValue)+"L")
+    java_str = template.substitute(num=ithClass,
+                                   static_data=generateDataStmts(),
+                                   random_churn1=generateOpStmts(),
+                                   random_churn2=generateOpStmts(),
+                                   value=str(random.randint(-9223372036854775807, 9223372036854775807))+"L")
     with open(filename1, "w") as java_file:
         java_file.write(java_str)
 
-    some_static_data = ''
-    for j in range(0, 30):
-        the_str = ''
-        for k in range(0, 100):
-            the_str += str(random.choice(string.letters))
-        some_static_data += static_data_template.substitute(n=j, str=the_str)
-    curValue = random.randint(-9223372036854775807, 9223372036854775807);
-    java_str = template.substitute(num=ithClass, static_data=some_static_data, value=str(curValue)+"L")
+    java_str = template.substitute(num=ithClass,
+                                   static_data=generateDataStmts(),
+                                   random_churn1=generateOpStmts(),
+                                   random_churn2=generateOpStmts(),
+                                   value=str(random.randint(-9223372036854775807, 9223372036854775807))+"L")
     with open(filename2, "w") as java_file:
         java_file.write(java_str)
 
@@ -112,24 +130,17 @@ def generate_procedure_class(ithProc, classcount, filename):
     with open('template_procedure.txt', 'r') as template_file:
         template = Template(template_file.read())
 
-    stmt_template = Template('    static final SQLStmt stmt$stmtnum = new SQLStmt("SELECT * FROM T$t0, T$t1, T$t2");\n')
+    stmt_template = Template('    static final SQLStmt stmt$stmtnum = new SQLStmt("SELECT * FROM T$t0, T$t1, T$t2 order by T$t0.a, T$t0.b;");\n')
     call_template = Template('        value += new Extra$num().getValue();\n')
 
-    static_data_template = Template('    public static String data$n = "$str";\n')
-    some_static_data = ''
-    for j in range(0, 30):
-        the_str = ''
-        for k in range(0, 100):
-            the_str += str(random.choice(string.letters))
-        some_static_data += static_data_template.substitute(n=j, str=the_str)
-
+    some_static_data = generateDataStmts()
     some_stmts = ''
     for j in range(0, 2):
         some_stmts += stmt_template.substitute(
             stmtnum=j,
-            t0=random.randint(0, 5),
-            t1=random.randint(5, 10),
-            t2=random.randint(10, 15))
+            t0=random.randint(0, 9),
+            t1=random.randint(10, 19),
+            t2=random.randint(20, 29))
 
     some_calls = ''
     for j in range(0, classcount):

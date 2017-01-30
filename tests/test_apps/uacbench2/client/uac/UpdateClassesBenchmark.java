@@ -85,13 +85,13 @@ public class UpdateClassesBenchmark {
         String servers = "localhost";
 
         @Option(desc = "Number of invocations.")
-        int steps = 10;
+        int steps = 15;
 
         @Option(desc = "Number of tables")
         int tablecount = 1000;
 
         @Option(desc = "Stored procedure count")
-        int procedurecount = 2;
+        int procedurecount = 20;
 
         @Option(desc = "Extra class procedure count")
         int classcount = 1000;
@@ -262,6 +262,7 @@ public class UpdateClassesBenchmark {
                 if (duration > res.max) res.max = duration;
                 if (duration < res.min) res.min = duration;
                 System.out.printf("Moved to step %d in %dms\n", i, duration / 1000000);
+                Thread.sleep(5 * 60 * 1000);
             }
             for (int i = config.steps - 2; i > 0; i--) {
                 String path = jarPath + "uac_" + String.valueOf(i) + ".jar";
@@ -271,6 +272,7 @@ public class UpdateClassesBenchmark {
                 if (duration > res.max) res.max = duration;
                 if (duration < res.min) res.min = duration;
                 System.out.printf("Moved to step %d in %dms\n", i, duration / 1000000);
+                Thread.sleep(5 * 60 * 1000);
             }
         }
         //return res;
