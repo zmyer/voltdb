@@ -405,6 +405,18 @@ public final class InvocationDispatcher {
                 // FUTURE: When we get rid of the legacy hashinator, this should go away
                 return dispatchLoadSinglepartitionTable(catProc, task, handler, ccxn);
             }
+            else if ("@CatalogPayload".equals(procName)) {
+                VoltTable[] ret = new VoltTable[1];
+                ret[0] = new VoltTable(new VoltTable.ColumnInfo("PAYLOAD", VoltType.STRING));
+                try {
+                    ret[0].addRow(VoltDB.instance().getCatalogContext().catalog.serialize());
+                }
+                catch (Exception e) {
+                    return unexpectedFailureResponse(e.getMessage(), task.clientHandle);
+                }
+                return new ClientResponseImpl(ClientResponseImpl.SUCCESS, ret, "", task.clientHandle);
+
+            }
 
             // ERROR MESSAGE FOR PRO SYSPROC USE IN COMMUNITY
 
