@@ -39,8 +39,22 @@ volt_verbs = {'create': 1,
               'add': 1,
               'init': 2,
               'start': 2,
-              'get deployment': 2,
              }
+
+# voltdb get and others use positional arguments so their
+# tests can't use the same pattern as "voltdb start|init|..."
+volt_irregular_verbs = { "get": 2,}
+
+# for the irregulars, keep it simple: compare input fragment & expected Java
+volt_fragments = {
+     "get": {
+        "get deployment" :                          'get deployment getvoltdbroot voltdbroot file ""',
+        "get deployment voltdbroot" :               'get deployment getvoltdbroot voltdbroot file ""',
+        "get deployment abc" :                      'get deployment getvoltdbroot abc file ""',
+        "get deployment voltdbroot abc -o def" :    'get deployment getvoltdbroot abc file def',
+        "get deployment voltdbroot abc --out def" : 'get deployment getvoltdbroot abc file def',
+    }
+}
 
 volt_verbs_mapping = {'create': 'create',
                       'recover': 'recover',
@@ -48,7 +62,8 @@ volt_verbs_mapping = {'create': 'create',
                       'add': 'add',
                       'init': 'initialize',
                       'start': 'probe',
-                      'get deployment': 'get deployment',
+                      'get': 'get',
+                      # 'get deployment': 'get deployment',
                       }
 
 
@@ -89,10 +104,20 @@ voltdbroot = Opt('dir', 'voltdbroot', str, 2)
 hostcount = Opt('count', 'hostcount', int, 2)
 add = Opt('add', 'enableadd', None, 2)
 out = Opt('out', 'file', str, 2)
-# getvoltdbroot = Opt('
+verbose = Opt('verbose', 'verbose', None, 2)
+# version = Opt('version', 'version', None, 2)
+get_deployment = Opt("deployment", "deployment", str, 2)
+get_voltdbroot = Opt("voltdbroot", "getvoltdbroot", str, 2)
 
 # negative opt
 unknown = Opt('unknown', None, None, 0)
+
+# Only "get" has arguments in addition to options
+# That's why it's in the irregular verb list
+volt_arguments = {"get": [get_deployment, # to differentiate from deployment used below as a option
+                          get_voltdbroot,
+                         ]
+                 }
 
 volt_opts = {'create': [admin,
                         client,
@@ -174,7 +199,7 @@ volt_opts = {'create': [admin,
                        pause,
                        replica,
                        add],
-             'get deployment': [out],
+             'get': [out, ],
              }
 
 volt_opts_mandatory = {'create': [],
@@ -183,7 +208,8 @@ volt_opts_mandatory = {'create': [],
                        'add': [host],
                        'init': [],
                        'start': [],
-                       'get deployment': [],
+                       'get': [],
+                       # 'get deployment': [],
                        }
 
 volt_opts_negative = [unknown]
@@ -203,6 +229,8 @@ volt_opts_default = {
     'rejoin': {placementgroup.javaname: '0'},
     'add': {placementgroup.javaname: '0'},
     'init': {},
+    'get': {out.javaname: '""', voltdbroot.javaname: 'getvoltdbroot'},
+    # 'get deployment': {},
     'start': {placementgroup.javaname: '0', mesh.javaname: "\"\""}
 }
 
@@ -231,14 +259,30 @@ def make_test_function(haddiff, description):
     def test(self):
         self.assertFalse(haddiff, description)
 
+    print "make_test_function: " + description
+
     return test
 
 
 def run_unit_test(verb, opts, expected_opts, reportout, expectedOut=None, expectedErr=None):
+    print "run_unit_test.expected_opts: " + str(expected_opts)
+    print "run_unit_test.opts: " + str(opts)
+    if verb == "get":
+        opts = ["deployment"] + opts
+        """
+        if len(expected_opts) > 0 and verb in expected_opts:
+            print "expected_opts[verb]: " + str(expected_opts[verb])
+            expected_opts[verb]  = ["deployment", "getvoltdbroot", "voltdbroot",] + expected_opts[verb]
+        else:
+            expected_opts[verb] = ["deployment", "getvoltdbroot", "voltdbroot",]
+        """
+        print "run_unit_test.opts: " + str(opts)
+
     stdout, stderr = run_voltcli(verb, opts, reportout)
     haddiff, description = compare_result(stdout, stderr, volt_verbs_mapping[verb], expected_opts, reportout,
                                           expectedOut, expectedErr)
     setattr(TestsContainer, 'test: {0}'.format(verb + " " + " ".join(opts)), make_test_function(haddiff, description))
+    print "run_unit_test: " + str(description)
     return haddiff
 
 
@@ -254,6 +298,7 @@ def run_voltcli(verb, opts, reportout=None, cmd=['../../bin/voltdb'], mode=['--d
                             cwd=cwd,
                             env=environ)
     stdout, stderr = proc.communicate()
+    print "run_voltcli: " + str(command)
     return stdout, stderr
 
 
@@ -283,7 +328,8 @@ def compare_result(stdout, stderr, verb, opts, reportout, expectedOut=None, expe
 
 
     # match the verbs
-    if output_str.find(verb) != 0:
+    # if output_str.find(verb) == -1:
+    if output_str.find(verb) == -1:
         description = "Generate java command line:\n\t" + output_str + "\n" + "does not contain expected verb:\n" + verb + "\nTest Failed!\n\n"
         reportout.write(description)
         return True, description
@@ -296,9 +342,10 @@ def compare_result(stdout, stderr, verb, opts, reportout, expectedOut=None, expe
             expected_tokens.extend([k, v])
         else:
             expected_tokens.append(k)
+    print "expected_tokens: " + str(expected_tokens)
+    print "output_tokens: " + str(output_tokens)
     if set(output_tokens) != set(expected_tokens):
-        description = "Generate java command line:\n\t" + output_str + "\n" + "does not match expected options:\n" + " ".join(
-            expected_tokens) + "\nTest Failed!\n\n"
+        description = "Generate java command line:\n\t" + output_str + "\n" + "does not match expected options:\n" + " ".join(expected_tokens) + "\nTest Failed!\n\n"
         reportout.write(description)
         return True, description
 
@@ -379,21 +426,41 @@ def test_java_opts_override(verb = 'start', reportout = None):
             haddiffs = True
     return haddiffs
 
+def test_irregular_verbs(reportout = None):
+    haddiffs = False
+    for verb, version in volt_irregular_verbs.items():
+        print "Testing verb: " + verb
+
 def do_main():
     parser = OptionParser()
     parser.add_option("-o", "--report_file", dest="report_file",
                       default="./voltverbstest.report",
                       help="report output file")
+    """
+    parser.add_option("-v", "--verb", dest="single_verb",
+                      default="all",
+                      help="test a single verb")
+    """
     (options, args) = parser.parse_args()
 
     # generate output report: plain text
     reportout = open(options.report_file, 'w+')
 
+    # haddiffs = test_irregular_verbs(reportout=reportout)
     # test override of environment
     haddiffs = test_java_opts_override(reportout=reportout)
 
     try:
         for verb, version in volt_verbs.items():
+            if verb != "get":
+                continue
+            print "do_main: " + verb
+            """
+            if options.single_verb != "all" and verb != options.single_verb:
+                print "Looking for single verb. " + verb + " != " + options.single_verb
+                continue
+            """
+
             if not (version in volt_support_version):
                 continue
 
@@ -403,6 +470,9 @@ def do_main():
             available_opts = option_name_re.findall(stdout)
             covered_opts = [opt.pyname for opt in volt_opts_mandatory[verb] + volt_opts[verb]]
             untested_opts = set(available_opts) - set(option_ignore) - set(covered_opts)
+            print "available_opts: " + str(available_opts)
+            print "covered_opts: " + str(covered_opts)
+            print "untested_opts: " + str(untested_opts)
             if untested_opts:
                 description = "Uncovered option(s) for " + verb + " : [" + " ".join(untested_opts) + "]\n"
                 reportout.write(description)
@@ -412,6 +482,9 @@ def do_main():
             ## generate minimal config
             opts, expected_opts = gen_config(volt_opts_mandatory[verb], volt_opts[verb], 0,
                                              volt_opts_default[verb].copy())
+            print "opts: " + str(opts)
+            print "expected_opts: " + str(expected_opts)
+
             haddiffs = run_unit_test(verb, opts, expected_opts, reportout) or haddiffs
 
             ## generate config that contain a single opt
