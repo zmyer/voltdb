@@ -18,6 +18,7 @@
 package org.voltdb.messaging;
 
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
 
 import java.io.IOException;
@@ -26,6 +27,7 @@ import java.nio.ByteBuffer;
 public class Dr2MultipartResponseMessage extends VoltMessage {
 
     private boolean m_drain;
+    private Pair<Boolean,Boolean> m_reset;
     private byte m_producerClusterId;
     private int m_producerPID;
     private ClientResponseImpl m_response;
@@ -39,6 +41,7 @@ public class Dr2MultipartResponseMessage extends VoltMessage {
         m_producerClusterId = producerClusterId;
         m_producerPID = producerPID;
         m_response = response;
+        m_reset = Pair.of(false, false);
     }
 
     public static Dr2MultipartResponseMessage createDrainMessage(byte producerClusterId, int producerPID) {
@@ -47,6 +50,15 @@ public class Dr2MultipartResponseMessage extends VoltMessage {
         msg.m_producerClusterId = producerClusterId;
         msg.m_producerPID = producerPID;
         msg.m_response = null;
+        return msg;
+    }
+
+    public static Dr2MultipartResponseMessage createResetMessage(byte producerClusterId, boolean safe) {
+        final Dr2MultipartResponseMessage msg = new Dr2MultipartResponseMessage();
+        msg.m_drain = true;
+        msg.m_producerClusterId = producerClusterId;
+        msg.m_response = null;
+        msg.m_reset = Pair.of(true, safe);
         return msg;
     }
 
@@ -64,6 +76,14 @@ public class Dr2MultipartResponseMessage extends VoltMessage {
 
     public boolean isDrain() {
         return m_drain;
+    }
+
+    public boolean isReset() {
+        return m_reset.getFirst();
+    }
+
+    public boolean isResetSafe() {
+        return m_reset.getSecond();
     }
 
     @Override

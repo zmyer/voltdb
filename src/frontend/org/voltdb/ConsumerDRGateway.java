@@ -64,5 +64,9 @@ public interface ConsumerDRGateway extends Promotable {
 
     void startConsumerDispatcher(final MeshMemberInfo member);
 
+    void stopConsumerDispatcher(byte clusterId);
+
     void addLocallyLedPartition(int partitionId);
+
+    boolean isSafeForReset(byte clusterId);
 }

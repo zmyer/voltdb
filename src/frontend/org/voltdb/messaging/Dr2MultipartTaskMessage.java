@@ -18,6 +18,7 @@
 package org.voltdb.messaging;
 
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.Pair;
 import org.voltdb.StoredProcedureInvocation;
 
 import java.io.IOException;
@@ -27,6 +28,7 @@ public class Dr2MultipartTaskMessage extends VoltMessage {
 
     private int m_producerPID;
     private boolean m_drain;
+    private Pair<Boolean,Boolean> m_reset;
     private byte m_producerClusterId;
     private short m_producerPartitionCnt;
 
@@ -46,6 +48,7 @@ public class Dr2MultipartTaskMessage extends VoltMessage {
         m_lastExecutedMPUniqueID = lastExecutedMPUniqueID;
         m_producerPID = -1;
         m_drain = false;
+        m_reset = Pair.of(false, false);
     }
 
     public static Dr2MultipartTaskMessage createDrainMessage(byte producerClusterId, int producerPID) {
@@ -59,6 +62,17 @@ public class Dr2MultipartTaskMessage extends VoltMessage {
         return msg;
     }
 
+    public static Dr2MultipartTaskMessage createResetMessage(byte producerClusterId, boolean safe) {
+        final Dr2MultipartTaskMessage msg = new Dr2MultipartTaskMessage();
+        msg.m_producerClusterId = producerClusterId;
+        msg.m_producerPartitionCnt = -1;
+        msg.m_drain = true;                 // reset also need drain first
+        msg.m_invocation = null;
+        msg.m_lastExecutedMPUniqueID = Long.MIN_VALUE;
+        msg.m_reset = Pair.of(true, safe);
+        return msg;
+    }
+
     public StoredProcedureInvocation getSpi() {
         return m_invocation;
     }
@@ -69,6 +83,14 @@ public class Dr2MultipartTaskMessage extends VoltMessage {
 
     public boolean isDrain() {
         return m_drain;
+    }
+
+    public boolean isReset() {
+        return m_reset.getFirst();
+    }
+
+    public boolean isResetSafe() {
+        return m_reset.getSecond();
     }
 
     public byte getProducerClusterId() {

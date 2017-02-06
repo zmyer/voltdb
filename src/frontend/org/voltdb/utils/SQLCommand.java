@@ -990,6 +990,8 @@ public class SQLCommand
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
         Procedures.put("@SwapTables",
                 ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "varchar")).build());
+        Procedures.put("@ResetDRSingle",
+                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("tinyint")).build());
     }
 
     private static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
