@@ -48,11 +48,11 @@ volt_irregular_verbs = { "get": 2,}
 # for the irregulars, keep it simple: compare input fragment & expected Java
 volt_fragments = {
      "get": {
-        "get deployment" :                          'get deployment getvoltdbroot voltdbroot file ""',
-        "get deployment voltdbroot" :               'get deployment getvoltdbroot voltdbroot file ""',
-        "get deployment abc" :                      'get deployment getvoltdbroot abc file ""',
-        "get deployment voltdbroot abc -o def" :    'get deployment getvoltdbroot abc file def',
-        "get deployment voltdbroot abc --out def" : 'get deployment getvoltdbroot abc file def',
+        "deployment" :                          'deployment getvoltdbroot voltdbroot file ""',
+        "deployment voltdbroot" :               'deployment getvoltdbroot voltdbroot file ""',
+        "deployment abc" :                      'deployment getvoltdbroot abc file ""',
+        "deployment abc -o def" :    'deployment getvoltdbroot abc file def',
+        "deployment abc --out def" : 'deployment getvoltdbroot abc file def',
     }
 }
 
@@ -267,18 +267,19 @@ def make_test_function(haddiff, description):
 def run_unit_test(verb, opts, expected_opts, reportout, expectedOut=None, expectedErr=None):
     print "run_unit_test.expected_opts: " + str(expected_opts)
     print "run_unit_test.opts: " + str(opts)
+    """
     if verb == "get":
         opts = ["deployment"] + opts
-        """
         if len(expected_opts) > 0 and verb in expected_opts:
             print "expected_opts[verb]: " + str(expected_opts[verb])
             expected_opts[verb]  = ["deployment", "getvoltdbroot", "voltdbroot",] + expected_opts[verb]
         else:
             expected_opts[verb] = ["deployment", "getvoltdbroot", "voltdbroot",]
-        """
         print "run_unit_test.opts: " + str(opts)
+    """
 
     stdout, stderr = run_voltcli(verb, opts, reportout)
+    print "run_unit_test: " + stdout
     haddiff, description = compare_result(stdout, stderr, volt_verbs_mapping[verb], expected_opts, reportout,
                                           expectedOut, expectedErr)
     setattr(TestsContainer, 'test: {0}'.format(verb + " " + " ".join(opts)), make_test_function(haddiff, description))
@@ -428,8 +429,17 @@ def test_java_opts_override(verb = 'start', reportout = None):
 
 def test_irregular_verbs(reportout = None):
     haddiffs = False
-    for verb, version in volt_irregular_verbs.items():
-        print "Testing verb: " + verb
+    # for verb, version in volt_irregular_verbs.items():
+    for v in volt_fragments:
+        print "Testing verb: " + v
+        for p in volt_fragments[v]:
+           print p
+           expected_opts = volt_fragments[v][p]
+           print expected_opts
+           haddiffs = run_unit_test(v, [p], [expected_opts], reportout) or haddiffs
+
+
+
 
 def do_main():
     parser = OptionParser()
@@ -446,7 +456,7 @@ def do_main():
     # generate output report: plain text
     reportout = open(options.report_file, 'w+')
 
-    # haddiffs = test_irregular_verbs(reportout=reportout)
+    haddiffs = test_irregular_verbs(reportout=reportout)
     # test override of environment
     haddiffs = test_java_opts_override(reportout=reportout)
 
