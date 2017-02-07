@@ -19,6 +19,11 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
+
+# How are the tests generated for the Python unittest framework?
+#  See http://blog.kevinastone.com/generate-your-tests.html for
+#  a detailed walkthrough the process of dynamic unittest generation
+
 import os
 import random
 import re
@@ -257,21 +262,21 @@ class TestsContainer(unittest.TestCase):
     longMessage = True
 
 
-def make_test_function(haddiff, description):
+def make_test_function(haddiffs, description):
     def test(self):
-        self.assertFalse(haddiff, description)
+        self.assertFalse(haddiffs, description)
 
-    print "make_test_function: " + description
+    # print "make_test_function: " + description
 
     return test
 
 
 def run_unit_test(verb, opts, expected_opts, reportout, expectedOut=None, expectedErr=None):
+    """
     print "++++++++++++++++++\nrun_unit_test: " + "verb=" + verb + "\n\topts="+str(opts) + "\n\texpected_opts=" + str(expected_opts) +\
         "\n\texpectedOut=" + str(expectedOut) + "\n\texpectedErr=" + str(expectedErr)
     print "run_unit_test.expected_opts: " + str(expected_opts)
     print "run_unit_test.opts: " + str(opts)
-    """
     if verb == "get":
         opts = ["deployment"] + opts
         if len(expected_opts) > 0 and verb in expected_opts:
@@ -283,19 +288,19 @@ def run_unit_test(verb, opts, expected_opts, reportout, expectedOut=None, expect
     """
 
     stdout, stderr = run_voltcli(verb, opts, reportout)
-    print "run_unit_test: " + stdout
-    haddiff, description = compare_result(stdout, stderr, volt_verbs_mapping[verb], expected_opts, reportout,
+    # print "run_unit_test: " + stdout
+    haddiffs, description = compare_result(stdout, stderr, volt_verbs_mapping[verb], expected_opts, reportout,
                                           expectedOut, expectedErr)
-    setattr(TestsContainer, 'test: {0}'.format(verb + " " + " ".join(opts)), make_test_function(haddiff, description))
+    setattr(TestsContainer, 'test: {0}'.format(verb + " " + " ".join(opts)), make_test_function(haddiffs, description))
     print "run_unit_test: " + str(description)
-    return haddiff
+    return haddiffs
 
 
 # Execute the command.
 # def run_voltcli(verb, opts, reportout=None, cmd=['../../bin/voltdb'], mode=['--dry-run'], environ=None, cwd=None):
 def run_voltcli(verb, opts, reportout=None, cmd=['voltdb'], mode=['--dry-run'], environ=None, cwd=None):
     command = cmd + [verb] + mode + opts
-    print "run_voltcli.command: " + str(command)
+    # print "run_voltcli.command: " + str(command)
     if reportout:
         reportout.write("Test python cli:\n\t" + " ".join([verb] + opts) + "\n")
     proc = subprocess.Popen(command,
@@ -313,24 +318,24 @@ def compare_result(stdout, stderr, verb, opts, reportout, expectedOut=None, expe
     output_str = sanitize(stdout).strip()
     description = "Generate java command line:\n\t" + output_str + "\nTest Passed!\n\n"
     if expectedOut:
-        haddiff = False
+        haddiffs = False
         if expectedOut != stdout:
             description = "Generate stdout:\n" + stdout + "\n" + "does not match expected:\n" + expectedOut + + "\nTest Failed!\n\n"
-            haddiff = True
+            haddiffs = True
         else:
             description = "Generate expected stdout:\n" + stdout + "Test Passed!\n\n"
         reportout.write(description)
-        return haddiff, description
+        return haddiffs, description
 
     if expectedErr:
-        haddiff = False
+        haddiffs = False
         if stderr != expectedErr:
-            haddiff = True
+            haddiffs = True
             description = "Generate stderr:\n" + stderr + "\n" + "doest not match expected:\n" + expectedErr + "\nTest Failed!\n\n"
         else:
             description = "Generate expected stderr:\n" + stderr + "Test Passed!\n\n"
         reportout.write(description)
-        return haddiff, description
+        return haddiffs, description
 
 
 
@@ -349,8 +354,8 @@ def compare_result(stdout, stderr, verb, opts, reportout, expectedOut=None, expe
             expected_tokens.extend([k, v])
         else:
             expected_tokens.append(k)
-    print "expected_tokens: " + str(expected_tokens)
-    print "output_tokens: " + str(output_tokens)
+    # print "expected_tokens: " + str(expected_tokens)
+    # print "output_tokens: " + str(output_tokens)
     if set(output_tokens) != set(expected_tokens):
         description = "Generate java command line:\n\t" + output_str + "\n" + "does not match expected options:\n" + " ".join(expected_tokens) + "\nTest Failed!\n\n"
         reportout.write(description)
@@ -443,46 +448,101 @@ def test_irregular_verbs(reportout = None):
     voltdbroot = Opt("voltdbroot", "getvoltdbroot voltdbroot", str, 2)
     otheroot = Opt("abc", "getvoltdbroot abc", str, 2)
     defaultroot = Opt("", "getvoltdbroot voltdbroot",  str, 2)
+    noverb = Opt("", "no verb: put some help text here", str, 2)
+    noobj = Opt("", "no obj: put some help text here", str, 2)
+    noout = Opt("", "file \"\"", str, 2)
     somefile = "abc"
     out = Opt("out", "file"+" "+somefile, str, 2)
 
-    verbs = [ get, ]
-    objects = [ deployment, procedures, ddl, ]  # required
+    verbs = [ get, noverb ]
+    objects = [ noobj, deployment, procedures, ddl, ]  # required
     positional = [ voltdbroot, otheroot, defaultroot ]       # provide voltdbroot location or blank to default
-    sub_options = [ out, ]
+    sub_options = [ noout, out, ]
 
     for v in verbs:
         for obj in objects:
             for pos in positional:
                 for o in sub_options:
                     expected_opts = [v.javaname, obj.javaname, pos.javaname, o.javaname]
-                    print "Command: %s %s %s %s abc" % (v.pyname, obj.pyname, pos.pyname, "--"+o.pyname)
+                    # print "Command: %s %s %s %s abc" % (v.pyname, obj.pyname, pos.pyname, "--"+o.pyname)
                     # print "Java: %s %s %s --%s abc" % (v.javaname, obj.javaname, pos.javaname, o.javaname)
+
+                    """
                     if len(pos.pyname) == 0:
-                        stdout, stderr = run_voltcli(v.pyname, [ obj.pyname, "--"+o.pyname, somefile], reportout)
+                        args = [obj.pyname, "--" + o.pyname, somefile]
                     else:
-                        stdout, stderr = run_voltcli(v.pyname, [ obj.pyname, pos.pyname, "--"+o.pyname, somefile], reportout)
-                    print stdout
-                    print "Expected Java: " + str(expected_opts)
+                        args = [obj.pyname, pos.pyname, "--" + o.pyname, somefile]
+                    """
+                    args = [obj.pyname, pos.pyname, "--" + o.pyname, somefile]
+                    clean_args = [a for a in args if len(a) > 0]
+                    print "+++++ args: " + str(args) + "\clean_args: " + str(clean_args)
+                    stdout, stderr = run_voltcli(v.pyname, args, reportout)
+                    # reportout.write("Test python cli:\n\t" + " ".join([v.pyname] + args) + "\n")
+
+                    # print stdout
+                    # print "Expected Java: " + str(expected_opts)
                     javaout = sanitize(stdout)
-                    print "javaout (sanitized): " + javaout
-                    ok = compare_irregular(javaout, expected_opts)
+                    # print "javaout (sanitized): " + javaout
+                    haddiffs, description = compare_irregular(javaout, expected_opts, reportout)
                     # haddiffs = run_unit_test(v.pyname, [ obj.pyname, pos.pyname, o.pyname], expected_opts, reportout) or haddiffs
-                    print "\n============= try unit test ============"
+                    # print "\n============= try unit test ============"
                     # run_unit_test(v.pyname, [ obj.pyname, pos.pyname, o.pyname], expected_opts, reportout)
-                    description = "Generate Java command line:\n\t" + javaout + "\nTest Passed!\n\n"
-                    setattr(TestsContainer, 'test: {0}'.format(v.pyname + " " + " ".join([ obj.pyname, pos.pyname, "--"+o.pyname, somefile])), make_test_function(ok, description))
+                    # if haddiffs:
+                    #     description = "Generate Java command line:\n\t" + javaout + "\nTest Failed!\n\n"
+                    # else:
+                    #     description = "Generate Java command line:\n\t" + javaout + "\nTest Passed!\n\n"
+
+                    setattr(TestsContainer, 'test: {0}'.format(v.pyname + " " + " ".join([ obj.pyname, pos.pyname, "--" + o.pyname, somefile])), make_test_function(haddiffs, description))
                     print "run_unit_test: " + str(description)
 
+"""
+def run_irregular_test(expected_opts,
+                    expected_opts = [v.javaname, obj.javaname, pos.javaname, o.javaname]
+                    # print "Command: %s %s %s %s abc" % (v.pyname, obj.pyname, pos.pyname, "--"+o.pyname)
+                    # print "Java: %s %s %s --%s abc" % (v.javaname, obj.javaname, pos.javaname, o.javaname)
+
+                    if len(pos.pyname) == 0:
+                        args = [obj.pyname, "--" + o.pyname, somefile]
+                    else:
+                        args = [obj.pyname, pos.pyname, "--" + o.pyname, somefile]
+                    stdout, stderr = run_voltcli(v.pyname, args, reportout)
+                    # reportout.write("Test python cli:\n\t" + " ".join([v.pyname] + args) + "\n")
+
+                    # print stdout
+                    # print "Expected Java: " + str(expected_opts)
+                    javaout = sanitize(stdout)
+                    # print "javaout (sanitized): " + javaout
+                    haddiffs, description = compare_irregular(javaout, expected_opts, reportout)
+                    # haddiffs = run_unit_test(v.pyname, [ obj.pyname, pos.pyname, o.pyname], expected_opts, reportout) or haddiffs
+                    # print "\n============= try unit test ============"
+                    # run_unit_test(v.pyname, [ obj.pyname, pos.pyname, o.pyname], expected_opts, reportout)
+                    # if haddiffs:
+                    #     description = "Generate Java command line:\n\t" + javaout + "\nTest Failed!\n\n"
+                    # else:
+                    #     description = "Generate Java command line:\n\t" + javaout + "\nTest Passed!\n\n"
+
+                    setattr(TestsContainer, 'test: {0}'.format(v.pyname + " " + " ".join([ obj.pyname, pos.pyname, "--" + o.pyname, somefile])), make_test_function(haddiffs, description))
+                    print "run_unit_test: " + str(description)
+"""
 
 
-def compare_irregular(actual, expected):
-    print "actual: " + str(actual)
-    print "expected: " + str(expected)
+def compare_irregular(actual, expected, reportout):
+    """
+        Follows the model already in place:
+        False means "no differences", aka match
+        True means "differences", aka doesn't match
+    """
+    # print "actual: " + str(actual)
+    # print "expected: " + str(expected)
+    description = "Generate java command line:\n\t" + actual
     if actual.strip() == " ".join(expected).strip():
-        print "+++++++ matches +++++++"
-        return True
-    return False
+        description += "\nTest Passed!\n\n"
+        haddiffs = False
+    else:
+       	description += "\nTest Failed!\n\n"
+        haddiffs = True
+    reportout.write(description)
+    return haddiffs, description
 
 def do_main():
     parser = OptionParser()
@@ -499,16 +559,16 @@ def do_main():
     # generate output report: plain text
     reportout = open(options.report_file, 'w+')
 
-    haddiffs = False
+    # haddiffs = False
     haddiffs = test_irregular_verbs(reportout=reportout)
     # test override of environment
-    # haddiffs = test_java_opts_override(reportout=reportout)
+    haddiffs = test_java_opts_override(reportout=reportout)
 
     try:
         for verb, version in volt_verbs.items():
             if verb != "start":
                 continue
-            print "do_main: " + verb
+            # print "do_main: " + verb
             """
             if options.single_verb != "all" and verb != options.single_verb:
                 print "Looking for single verb. " + verb + " != " + options.single_verb
@@ -524,9 +584,9 @@ def do_main():
             available_opts = option_name_re.findall(stdout)
             covered_opts = [opt.pyname for opt in volt_opts_mandatory[verb] + volt_opts[verb]]
             untested_opts = set(available_opts) - set(option_ignore) - set(covered_opts)
-            print "available_opts: " + str(available_opts)
-            print "covered_opts: " + str(covered_opts)
-            print "untested_opts: " + str(untested_opts)
+            # print "available_opts: " + str(available_opts)
+            # print "covered_opts: " + str(covered_opts)
+            # print "untested_opts: " + str(untested_opts)
             if untested_opts:
                 description = "Uncovered option(s) for " + verb + " : [" + " ".join(untested_opts) + "]\n"
                 reportout.write(description)
