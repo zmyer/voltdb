@@ -498,6 +498,7 @@ create table t496 (a bigint not null, b varchar(10), c integer,d smallint, e int
 create table t497 (a bigint not null, b varchar(10), c integer,d smallint, e integer, primary key(a, b));create index t497_idx1 on t497(a,c);create index t497_idx2 on t497(a,d);partition table t497 on column a;
 create table t498 (a bigint not null, b varchar(10), c integer,d smallint, e integer, primary key(a, b));create index t498_idx1 on t498(a,c);create index t498_idx2 on t498(a,d);partition table t498 on column a;
 create table t499 (a bigint not null, b varchar(10), c integer,d smallint, e integer, primary key(a, b));create index t499_idx1 on t499(a,c);create index t499_idx2 on t499(a,d);partition table t499 on column a;
+CREATE PROCEDURE PARTITION ON TABLE T0 COLUMN a FROM CLASS uac.StmtProc;
 CREATE PROCEDURE PARTITION ON TABLE T0 COLUMN a FROM CLASS uac.Proc0;
 CREATE PROCEDURE PARTITION ON TABLE T0 COLUMN a FROM CLASS uac.Proc1;
 CREATE PROCEDURE PARTITION ON TABLE T0 COLUMN a FROM CLASS uac.Proc2;

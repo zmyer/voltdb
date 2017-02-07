@@ -2,18 +2,26 @@ package uac;
 
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 
 public class Proc$procnum extends VoltProcedure {
 
-$stmts
-
 $static_data
 
-    public long run(long partitionCol) {
-        long value = 0;
+    public VoltTable run(long partitionCol) {
+        VoltTable result = new VoltTable(new VoltTable.ColumnInfo[] {
+            new VoltTable.ColumnInfo("a", VoltType.BIGINT),
+            new VoltTable.ColumnInfo("b", VoltType.STRING),
+            new VoltTable.ColumnInfo("c", VoltType.INTEGER),
+            new VoltTable.ColumnInfo("d", VoltType.SMALLINT),
+            new VoltTable.ColumnInfo("e", VoltType.INTEGER)
+        });
+
+        Object[] out = new Object[$numcalls];
 
 $call_extras
 
-        return value;
+        return result;
     }
 }

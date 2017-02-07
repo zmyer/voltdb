@@ -1,6 +1,11 @@
 package uac;
 
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+
 public class Extra$num {
+
+$stmts
 
 $static_data
 
@@ -10,9 +15,15 @@ $random_churn1
         return retval;
     }
 
-    public long getValue() {
+    public Object getValue(VoltProcedure proc) {
         long retval = $value;
 $random_churn2
-        return retval;
+        if (retval % 2 == 0) {
+            proc.voltQueueSQL(stmt$idxa);
+        }
+        else {
+            proc.voltQueueSQL(stmt$idxb);
+        }
+        return proc.voltExecuteSQL();
     }
 }

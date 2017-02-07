@@ -56,6 +56,9 @@ def generate_ddl(tables, procedurecount, ddlname):
     for i in range(tables):
         ddl += tb.format(i, i, i, i, i, i, i) + "\n"
 
+    # stmt proc
+    ddl += "CREATE PROCEDURE PARTITION ON TABLE T0 COLUMN a FROM CLASS uac.StmtProc;\n"
+
     # all the procedures
     for i in range(0, procedurecount):
         ddl += "CREATE PROCEDURE PARTITION ON TABLE T0 COLUMN a FROM CLASS uac.Proc%d;" % (i) + "\n"
@@ -64,18 +67,6 @@ def generate_ddl(tables, procedurecount, ddlname):
 
     with open(ddlname, "w") as java_file:
         java_file.write(ddl)
-    return
-
-def procedure_stmts(pattern, pfrom, pto, filename):
-    stmts = ""
-    for i in range(pfrom, pto):
-        stmts += pattern.format(i) + "\n"
-
-    if len(stmts.strip(' \t\n\r')) == 0:
-        sys.exit("stmts not generated from " + str(pfrom) + " to " + str(pto) + " for file: " + filename)
-
-    with open(filename, "w") as stmts_file:
-        stmts_file.write(stmts)
     return
 
 def generateDataStmts():
@@ -104,67 +95,105 @@ def generateOpStmts():
         some_ops += op_template.substitute(num=which_data, op=which_op, findchar=which_char)
     return some_ops
 
-def generate_supporting_class(ithClass, filename1, filename2):
+def generateSQLStmts(tablecount):
+    stmt_template1 = Template('    static final SQLStmt stmt$stmtnum = new SQLStmt("SELECT * FROM T$t0 order by T$t0.a, T$t0.b;");\n')
+    stmt_template2 = Template('    static final SQLStmt stmt$stmtnum = new SQLStmt("SELECT * FROM T$t0 order by T$t0.b, T$t0.a;");\n')
+    stmts = []
+    for i in range(tablecount):
+        stmts.append(stmt_template1.substitute(stmtnum=i*2,   t0=i))
+        stmts.append(stmt_template2.substitute(stmtnum=i*2+1, t0=i))
+    return stmts
+
+def generate_supporting_class(ithClass, stmts, filename1, filename2):
     with open('template_supportingclass.txt', 'r') as template_file:
         template = Template(template_file.read())
 
-    java_str = template.substitute(num=ithClass,
-                                   static_data=generateDataStmts(),
-                                   random_churn1=generateOpStmts(),
-                                   random_churn2=generateOpStmts(),
-                                   value=str(random.randint(-9223372036854775807, 9223372036854775807))+"L")
+    chosenstmtidxs = random.sample(range(1000), 2)
+    some_stmts = ''
+    for idx in chosenstmtidxs:
+        some_stmts += stmts[idx];
+    java_str = template.substitute(num=ithClass, 
+                                   stmts=some_stmts, 
+                                   static_data=generateDataStmts(), 
+                                   random_churn1=generateOpStmts(), 
+                                   random_churn2=generateOpStmts(), 
+                                   value=str(random.randint(-9223372036854775807, 9223372036854775807))+"L",
+                                   idxa=chosenstmtidxs[0],
+                                   idxb=chosenstmtidxs[1])
     with open(filename1, "w") as java_file:
         java_file.write(java_str)
 
-    java_str = template.substitute(num=ithClass,
-                                   static_data=generateDataStmts(),
-                                   random_churn1=generateOpStmts(),
-                                   random_churn2=generateOpStmts(),
-                                   value=str(random.randint(-9223372036854775807, 9223372036854775807))+"L")
+    chosenstmtidxs = random.sample(range(1000), 2)
+    some_stmts = ''
+    for idx in chosenstmtidxs:
+        some_stmts += stmts[idx];
+    java_str = template.substitute(num=ithClass, 
+                                   stmts=some_stmts, 
+                                   static_data=generateDataStmts(), 
+                                   random_churn1=generateOpStmts(), 
+                                   random_churn2=generateOpStmts(), 
+                                   value=str(random.randint(-9223372036854775807, 9223372036854775807))+"L",
+                                   idxa=chosenstmtidxs[0],
+                                   idxb=chosenstmtidxs[1])
     with open(filename2, "w") as java_file:
         java_file.write(java_str)
 
-    return
-
-def generate_procedure_class(ithProc, classcount, filename):
-    with open('template_procedure.txt', 'r') as template_file:
+def generate_stmt_class(stmts, filename):
+    with open('template_stmtproc.txt', 'r') as template_file:
         template = Template(template_file.read())
 
-    stmt_template = Template('    static final SQLStmt stmt$stmtnum = new SQLStmt("SELECT * FROM T$t0, T$t1, T$t2 order by T$t0.a, T$t0.b;");\n')
-    call_template = Template('        value += new Extra$num().getValue();\n')
+    some_stmts = ''
+    for stmt in stmts:
+        some_stmts += stmt;
+
+    java_str = template.substitute(stmts=some_stmts)
+    with open(filename, "w") as java_file:
+        java_file.write(java_str)
+
+def generate_procedure_class(ithProc, classcount, stmts, filename):
+    with open('template_procedure.txt', 'r') as template_file:
+        template = Template(template_file.read())
+    
+    call_template = Template('        out[$num] = new Extra$num().getValue(this); result.addRow(out[$num]);\n')
 
     some_static_data = generateDataStmts()
+
+    chosenstmts = random.sample(stmts, 2)
     some_stmts = ''
-    for j in range(0, 2):
-        some_stmts += stmt_template.substitute(
-            stmtnum=j,
-            t0=random.randint(0, 9),
-            t1=random.randint(10, 19),
-            t2=random.randint(20, 29))
+    for stmt in chosenstmts:
+        some_stmts += stmt;
 
     some_calls = ''
     for j in range(0, classcount):
         some_calls += call_template.substitute(num=j)
 
-    java_str = template.substitute(procnum=ithProc, stmts=some_stmts, static_data=some_static_data, call_extras=some_calls)
+    java_str = template.substitute(procnum=ithProc, static_data=some_static_data, numcalls=classcount, call_extras=some_calls)
     with open(filename, "w") as java_file:
         java_file.write(java_str)
 
     return
 
-def create_jars(procedurecount, classcount, steps):
+def create_jars(tablecount, procedurecount, classcount, steps):
+    print "Creating SQL statements"
+    stmts = generateSQLStmts(tablecount)
+
+    # make the stmt proc
+    print "Creating stmt proc"
+    filename = "%s/StmtProc.java" % (PROCEDURE_CLASSES_DIR)
+    generate_stmt_class(stmts, filename)
+
     # make some procedures
     print "Creating procedures"
     for i in range(0, procedurecount):
         filename = "%s/Proc%d.java" % (PROCEDURE_CLASSES_DIR, i)
-        generate_procedure_class(i, classcount, filename)
+        generate_procedure_class(i, classcount, stmts, filename)
 
     # make some supporting classes
     print "Creating supporting classes"
     for i in range(0, classcount):
         filename1 = "%s/Extra%d.java" % (SUPPORTING1_CLASSES_DIR, i)
         filename2 = "%s/Extra%d.java" % (SUPPORTING2_CLASSES_DIR, i)
-        generate_supporting_class(i, filename1, filename2)
+        generate_supporting_class(i, stmts, filename1, filename2)
 
     # generate a random walk of classes in a giant matrix
     stepPlans = []
@@ -183,6 +212,9 @@ def create_jars(procedurecount, classcount, steps):
     for i in range(0, steps):
         # empty the source for jars
         clean_dirpath(DEFAULT_CLASSES_DIR)
+
+        cmd = "cp %s/StmtProc.java %s" % (PROCEDURE_CLASSES_DIR, DEFAULT_CLASSES_DIR)
+        subprocess.call(shlex.split(cmd))
 
         for j in range(0, procedurecount):
             cmd = "cp %s/Proc%d.java %s" % (PROCEDURE_CLASSES_DIR, j, DEFAULT_CLASSES_DIR)
@@ -238,5 +270,5 @@ if __name__ == "__main__":
     clean()
 
     # create all the classes and jars
-    create_jars(options.procedurecount, options.classcount, options.steps)
+    create_jars(options.tablecount, options.procedurecount, options.classcount, options.steps)
 

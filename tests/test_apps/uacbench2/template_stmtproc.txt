@@ -1,0 +1,14 @@
+package uac;
+
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+
+public class StmtProc extends VoltProcedure {
+
+$stmts
+
+    public VoltTable run(long partitionCol) {
+        return null;
+    }
+}
