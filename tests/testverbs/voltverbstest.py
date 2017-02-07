@@ -45,6 +45,7 @@ volt_verbs = {'create': 1,
 # tests can't use the same pattern as "voltdb start|init|..."
 volt_irregular_verbs = { "get": 2,}
 
+"""
 # for the irregulars, keep it simple: compare input fragment & expected Java
 volt_fragments = {
      "get": {
@@ -55,6 +56,7 @@ volt_fragments = {
         "deployment abc --out def" : 'deployment getvoltdbroot abc file def',
     }
 }
+"""
 
 volt_verbs_mapping = {'create': 'create',
                       'recover': 'recover',
@@ -86,7 +88,7 @@ internalinterface = Opt('internalinterface', 'internalinterface', str, 1)
 publicinterface = Opt('publicinterface', 'publicinterface', str, 1)
 replication = Opt('replication', 'replicationport', str, 1)
 zookeeper = Opt('zookeeper', 'zkport', str, 1)
-deployment = Opt('deployment', 'deployment', str, 1)
+deployment = Opt('deployment', 'getvoltdbroot', str, 1)
 force = Opt('force', 'force', None, 1)
 placementgroup = Opt('placement-group', 'placementgroup', str, 1)
 host = Opt('host', 'host', str, 1)
@@ -265,6 +267,8 @@ def make_test_function(haddiff, description):
 
 
 def run_unit_test(verb, opts, expected_opts, reportout, expectedOut=None, expectedErr=None):
+    print "++++++++++++++++++\nrun_unit_test: " + "verb=" + verb + "\n\topts="+str(opts) + "\n\texpected_opts=" + str(expected_opts) +\
+        "\n\texpectedOut=" + str(expectedOut) + "\n\texpectedErr=" + str(expectedErr)
     print "run_unit_test.expected_opts: " + str(expected_opts)
     print "run_unit_test.opts: " + str(opts)
     """
@@ -288,8 +292,10 @@ def run_unit_test(verb, opts, expected_opts, reportout, expectedOut=None, expect
 
 
 # Execute the command.
-def run_voltcli(verb, opts, reportout=None, cmd=['../../bin/voltdb'], mode=['--dry-run'], environ=None, cwd=None):
+# def run_voltcli(verb, opts, reportout=None, cmd=['../../bin/voltdb'], mode=['--dry-run'], environ=None, cwd=None):
+def run_voltcli(verb, opts, reportout=None, cmd=['voltdb'], mode=['--dry-run'], environ=None, cwd=None):
     command = cmd + [verb] + mode + opts
+    print "run_voltcli.command: " + str(command)
     if reportout:
         reportout.write("Test python cli:\n\t" + " ".join([verb] + opts) + "\n")
     proc = subprocess.Popen(command,
@@ -299,7 +305,7 @@ def run_voltcli(verb, opts, reportout=None, cmd=['../../bin/voltdb'], mode=['--d
                             cwd=cwd,
                             env=environ)
     stdout, stderr = proc.communicate()
-    print "run_voltcli: " + str(command)
+    # print "run_voltcli: " + str(command)
     return stdout, stderr
 
 
@@ -430,16 +436,53 @@ def test_java_opts_override(verb = 'start', reportout = None):
 def test_irregular_verbs(reportout = None):
     haddiffs = False
     # for verb, version in volt_irregular_verbs.items():
-    for v in volt_fragments:
-        print "Testing verb: " + v
-        for p in volt_fragments[v]:
-           print p
-           expected_opts = volt_fragments[v][p]
-           print expected_opts
-           haddiffs = run_unit_test(v, [p], [expected_opts], reportout) or haddiffs
+    get = Opt("get", "get", str, 2)
+    deployment = Opt("deployment", "deployment", str, 2)
+    procedures = Opt("procedures", "procedures", str, 2)
+    ddl = Opt("ddl", "ddl", str, 2)
+    voltdbroot = Opt("voltdbroot", "getvoltdbroot voltdbroot", str, 2)
+    otheroot = Opt("abc", "getvoltdbroot abc", str, 2)
+    defaultroot = Opt("", "getvoltdbroot voltdbroot",  str, 2)
+    somefile = "abc"
+    out = Opt("out", "file"+" "+somefile, str, 2)
+
+    verbs = [ get, ]
+    objects = [ deployment, procedures, ddl, ]  # required
+    positional = [ voltdbroot, otheroot, defaultroot ]       # provide voltdbroot location or blank to default
+    sub_options = [ out, ]
+
+    for v in verbs:
+        for obj in objects:
+            for pos in positional:
+                for o in sub_options:
+                    expected_opts = [v.javaname, obj.javaname, pos.javaname, o.javaname]
+                    print "Command: %s %s %s %s abc" % (v.pyname, obj.pyname, pos.pyname, "--"+o.pyname)
+                    # print "Java: %s %s %s --%s abc" % (v.javaname, obj.javaname, pos.javaname, o.javaname)
+                    if len(pos.pyname) == 0:
+                        stdout, stderr = run_voltcli(v.pyname, [ obj.pyname, "--"+o.pyname, somefile], reportout)
+                    else:
+                        stdout, stderr = run_voltcli(v.pyname, [ obj.pyname, pos.pyname, "--"+o.pyname, somefile], reportout)
+                    print stdout
+                    print "Expected Java: " + str(expected_opts)
+                    javaout = sanitize(stdout)
+                    print "javaout (sanitized): " + javaout
+                    ok = compare_irregular(javaout, expected_opts)
+                    # haddiffs = run_unit_test(v.pyname, [ obj.pyname, pos.pyname, o.pyname], expected_opts, reportout) or haddiffs
+                    print "\n============= try unit test ============"
+                    # run_unit_test(v.pyname, [ obj.pyname, pos.pyname, o.pyname], expected_opts, reportout)
+                    description = "Generate Java command line:\n\t" + javaout + "\nTest Passed!\n\n"
+                    setattr(TestsContainer, 'test: {0}'.format(v.pyname + " " + " ".join([ obj.pyname, pos.pyname, "--"+o.pyname, somefile])), make_test_function(ok, description))
+                    print "run_unit_test: " + str(description)
 
 
 
+def compare_irregular(actual, expected):
+    print "actual: " + str(actual)
+    print "expected: " + str(expected)
+    if actual.strip() == " ".join(expected).strip():
+        print "+++++++ matches +++++++"
+        return True
+    return False
 
 def do_main():
     parser = OptionParser()
@@ -456,13 +499,14 @@ def do_main():
     # generate output report: plain text
     reportout = open(options.report_file, 'w+')
 
+    haddiffs = False
     haddiffs = test_irregular_verbs(reportout=reportout)
     # test override of environment
-    haddiffs = test_java_opts_override(reportout=reportout)
+    # haddiffs = test_java_opts_override(reportout=reportout)
 
     try:
         for verb, version in volt_verbs.items():
-            if verb != "get":
+            if verb != "start":
                 continue
             print "do_main: " + verb
             """
