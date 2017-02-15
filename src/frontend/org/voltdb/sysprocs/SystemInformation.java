@@ -526,25 +526,11 @@ public class SystemInformation extends VoltSystemProcedure
         if (cluster.getNetworkpartition())
         {
             partition_detect_enabled = "true";
-            String partition_detect_snapshot_path = VoltDB.instance().getSnapshotPath();
-            String partition_detect_snapshot_prefix =
-                cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPrefix();
-            results.addRow("snapshotpath",
-                           partition_detect_snapshot_path);
-            results.addRow("partitiondetectionsnapshotprefix",
-                           partition_detect_snapshot_prefix);
         }
         results.addRow("partitiondetection", partition_detect_enabled);
 
         results.addRow("heartbeattimeout", Integer.toString(cluster.getHeartbeattimeout()));
-
         results.addRow("adminport", Integer.toString(VoltDB.instance().getConfig().m_adminPort));
-        String adminstartup = "false";
-        if (cluster.getAdminstartup())
-        {
-            adminstartup = "true";
-        }
-        results.addRow("adminstartup", adminstartup);
 
         String command_log_enabled = "false";
         // log name is MAGIC, you knoooow

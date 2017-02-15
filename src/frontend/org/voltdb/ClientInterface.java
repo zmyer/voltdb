@@ -92,6 +92,8 @@ import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import org.voltcore.logging.Level;
+import org.voltcore.utils.RateLimitedLogger;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -143,8 +145,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private static final VoltLogger authLog = new VoltLogger("AUTH");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
-    @SuppressWarnings("unused")
-    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
+    private static final RateLimitedLogger m_rateLimitedLogger =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(60), authLog, Level.WARN);
 
 
     /** Ad hoc async work is either regular planning, ad hoc explain, or default proc explain. */
@@ -598,6 +599,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     socket.close();
                     return null;
                 }
+            }
+            //SHA1 is deprecated log it.
+            if (hashScheme == ClientAuthScheme.HASH_SHA1) {
+                m_rateLimitedLogger.log(EstTime.currentTimeMillis(), Level.WARN, null,
+                        "Client connected using deprecated SHA1 hashing. SHA2 is strongly recommended for all client connections. Client IP: %s", socket.socket().getRemoteSocketAddress().toString());
             }
             FastDeserializer fds = new FastDeserializer(message);
             final String service = fds.readString();
@@ -1355,11 +1361,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return InvocationDispatcher.getProcedureFromName(procName, catalogContext);
     }
 
-    public void dispatchUpdateApplicationCatalog(StoredProcedureInvocation task,
-            boolean useDdlSchema, Connection ccxn, AuthSystem.AuthUser user, boolean isAdmin) {
-        m_dispatcher.dispatchUpdateApplicationCatalog(task, useDdlSchema, ccxn, user, isAdmin);
-    }
-
     private ScheduledFuture<?> m_deadConnectionFuture;
     private ScheduledFuture<?> m_topologyCheckFuture;
     public void schedulePeriodicWorks() {
@@ -1867,23 +1868,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @throws IOException
      * @throws InterruptedException
      */
-    public ClientResponse callExecuteTask(long timeoutMS, byte[] params ) throws IOException, InterruptedException {
-        final String procedureName = "@ExecuteTask";
-        Config procedureConfig = SystemProcedureCatalog.listing.get(procedureName);
-        Procedure proc = procedureConfig.asCatalogProcedure();
-        StoredProcedureInvocation spi = new StoredProcedureInvocation();
-        spi.setProcName(procedureName);
-        spi.setParams(params);
+    public ClientResponse callExecuteTask(long timeoutMS, byte[] params) throws IOException, InterruptedException {
         SimpleClientResponseAdapter.SyncCallback syncCb = new SimpleClientResponseAdapter.SyncCallback();
-        spi.setClientHandle(m_executeTaskAdpater.registerCallback(syncCb));
-        if (spi.getSerializedParams() == null) {
-            spi = MiscUtils.roundTripForCL(spi);
-        }
-        createTransaction(m_executeTaskAdpater.connectionId(), spi,
-                proc.getReadonly(), proc.getSinglepartition(), proc.getEverysite(),
-                0 /* Can provide anything for multi-part */,
-                spi.getSerializedSize(), System.nanoTime());
-
+        callExecuteTaskAsync(syncCb, params);
         return syncCb.getResponse(timeoutMS);
     }
 
@@ -1907,11 +1894,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (spi.getSerializedParams() == null) {
             spi = MiscUtils.roundTripForCL(spi);
         }
-        createTransaction(m_executeTaskAdpater.connectionId(), spi,
-                proc.getReadonly(), proc.getSinglepartition(), proc.getEverysite(),
-                0 /* Can provide anything for multi-part */,
-                spi.getSerializedSize(), System.nanoTime());
-
+        synchronized (m_executeTaskAdpater) {
+            createTransaction(m_executeTaskAdpater.connectionId(), spi,
+                    proc.getReadonly(), proc.getSinglepartition(), proc.getEverysite(),
+                    0 /* Can provide anything for multi-part */,
+                    spi.getSerializedSize(), System.nanoTime());
+        }
     }
 
     /**

@@ -215,6 +215,15 @@ public class SocketJoiner {
                     // exponential back off with a salt to avoid collision. Max is 5 minutes.
                     retryInterval = (Math.min(retryInterval * 2, TimeUnit.MINUTES.toSeconds(5)) +
                                      salt.nextInt(RETRY_INTERVAL_SALT));
+
+                    //Over waiting may occur in some cases.
+                    //For example, there are 4 rejoining nodes. Node 1 may take over 5 min to be completed.
+                    //Nodes 2 to 4 continue to wait after they detect that node 1 is still rejoining right before its rejoining is completed
+                    //They will wait 5 min + salt before sending another rejoining request. All the following rejoining requests are sent
+                    //after 5 min + salt. Reset waiting time to avoid over waiting.
+                    if (retryInterval > TimeUnit.MINUTES.toSeconds(5)) {
+                        retryInterval = RETRY_INTERVAL;
+                    }
                 } catch (Exception e) {
                     hostLog.error("Failed to establish socket mesh.", e);
                     throw new RuntimeException("Failed to establish socket mesh with " + m_coordIp, e);
@@ -621,13 +630,17 @@ public class SocketJoiner {
         int connectAttempts = 0;
         while (socket == null) {
             try {
-                socket = SocketChannel.open(hostAddr);
+                socket = SocketChannel.open();
+                socket.socket().connect(hostAddr, 5000);
             }
             catch (java.net.ConnectException
                   |java.nio.channels.UnresolvedAddressException
                   |java.net.NoRouteToHostException
                   |java.net.PortUnreachableException e)
             {
+                // reset the socket to null for loop purposes
+                socket = null;
+
                 if (mode == ConnectStrategy.PROBE) {
                     return null;
                 }

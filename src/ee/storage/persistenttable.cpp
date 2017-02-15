@@ -389,7 +389,7 @@ template<class T> static inline PersistentTable* constructEmptyDestTable(
         catalog::Table* catalogViewTable,
         T* viewHandler) {
     TableCatalogDelegate* destTcd = engine->getTableDelegate(destTable->name());
-    destTcd->init(*engine->getDatabase(), *catalogViewTable);
+    destTcd->init(*engine->getDatabase(), *catalogViewTable, engine->getIsActiveActiveDREnabled());
     PersistentTable* destEmptyTable = destTcd->getPersistentTable();
     assert(destEmptyTable);
     return destEmptyTable;
@@ -473,7 +473,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     assert(tcd);
 
     catalog::Table* catalogTable = engine->getCatalogTable(m_name);
-    tcd->init(*engine->getDatabase(), *catalogTable);
+    tcd->init(*engine->getDatabase(), *catalogTable, engine->getIsActiveActiveDREnabled());
 
     PersistentTable* emptyTable = tcd->getPersistentTable();
     assert(emptyTable);
@@ -1853,8 +1853,8 @@ bool PersistentTable::doForcedCompaction() {
     assert(!compactionPredicate());
     boost::posix_time::ptime endTime(boost::posix_time::microsec_clock::universal_time());
     boost::posix_time::time_duration duration = endTime - startTime;
-    snprintf(msg, sizeof(msg), "Finished forced compaction of %zd non-snapshot blocks and %zd snapshot blocks with allocated tuple count %zd in %zd ms",
-            ((intmax_t)notPendingCompactions), ((intmax_t)pendingCompactions), ((intmax_t)allocatedTupleCount()), ((intmax_t)duration.total_milliseconds()));
+    snprintf(msg, sizeof(msg), "Finished forced compaction of %zd non-snapshot blocks and %zd snapshot blocks with allocated tuple count %zd in %zd ms on table %s",
+            ((intmax_t)notPendingCompactions), ((intmax_t)pendingCompactions), ((intmax_t)allocatedTupleCount()), ((intmax_t)duration.total_milliseconds()), m_name.c_str());
     LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
     return (notPendingCompactions + pendingCompactions) > 0;
 }

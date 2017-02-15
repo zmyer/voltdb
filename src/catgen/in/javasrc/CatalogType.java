@@ -49,9 +49,9 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         }
 
         @SuppressWarnings("unchecked")
-        T resolve() {
+        synchronized T resolve() {
             if (m_unresolvedPath != null) {
-                m_value = (T) getCatalog().getItemForRef(m_unresolvedPath);
+                m_value = (T) getCatalog().getItemForPath(m_unresolvedPath);
                 m_unresolvedPath = null;
             }
             return m_value;
@@ -357,4 +357,3 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         }
     }
 }
-

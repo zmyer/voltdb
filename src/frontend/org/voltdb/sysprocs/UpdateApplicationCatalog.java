@@ -35,6 +35,7 @@ import org.voltdb.DependencyPair;
 import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
+import org.voltdb.ReplicationRole;
 import org.voltdb.StatsSelector;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
@@ -361,6 +362,13 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                         catalogStuff.deploymentBytes,
                         catalogStuff.getDeploymentHash());
 
+                // If the cluster is in master role only (not replica or XDCR), reset trackers.
+                // The producer would have been turned off by the code above already.
+                if (VoltDB.instance().getReplicationRole() == ReplicationRole.NONE &&
+                    !VoltDB.instance().getReplicationActive()) {
+                    context.resetDrAppliedTracker();
+                }
+
                 // update the local catalog.  Safe to do this thanks to the check to get into here.
                 long uniqueId = m_runner.getUniqueId();
                 long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
@@ -407,7 +415,6 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
     }
 
     private final void performCatalogVerifyWork(
-            String catalogDiffCommands,
             int expectedCatalogVersion,
             String[] tablesThatMustBeEmpty,
             String[] reasonsForEmptyTables,
@@ -548,7 +555,6 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
 
         try {
             performCatalogVerifyWork(
-                    catalogDiffCommands,
                     expectedCatalogVersion,
                     tablesThatMustBeEmpty,
                     reasonsForEmptyTables,

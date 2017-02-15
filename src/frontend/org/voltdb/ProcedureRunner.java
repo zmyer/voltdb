@@ -208,14 +208,15 @@ public class ProcedureRunner {
 
         m_procedure.init(this);
 
-        m_statsCollector = new ProcedureStatsCollector(
-                m_site.getCorrespondingSiteId(),
-                m_site.getCorrespondingPartitionId(),
-                m_catProc);
-        VoltDB.instance().getStatsAgent().registerStatsSource(
-                StatsSelector.PROCEDURE,
+        // Normally m_statsCollector is returned as it is and there is no affect to assign it to itself.
+        // Sometimes when this procedure statistics needs to reuse the existing one, the old stats gets returned.
+        m_statsCollector = VoltDB.instance().getStatsAgent().registerProcedureStatsSource(
                 site.getCorrespondingSiteId(),
-                m_statsCollector);
+                new ProcedureStatsCollector(
+                        m_site.getCorrespondingSiteId(),
+                        m_site.getCorrespondingPartitionId(),
+                        m_catProc)
+                );
 
         reflect();
     }
@@ -273,7 +274,7 @@ public class ProcedureRunner {
         assert(m_batch.size() == 0);
 
         try {
-            m_statsCollector.beginProcedure();
+            m_statsCollector.beginProcedure(isSystemProcedure());
 
             VoltTable[] results = null;
 
@@ -450,6 +451,11 @@ public class ProcedureRunner {
      */
     public boolean checkPartition(TransactionState txnState, TheHashinator hashinator) {
         if (m_isSinglePartition) {
+            // can happen when a proc changes from multi-to-single after it's routed
+            if (hashinator == null) {
+                return false; // this will kick it back to CI for re-routing
+            }
+
             TheHashinator.HashinatorType hashinatorType = hashinator.getConfigurationType();
             if (hashinatorType == TheHashinator.HashinatorType.LEGACY) {
                 // Legacy hashinator is not used for elastic, no need to check partitioning. In fact,
