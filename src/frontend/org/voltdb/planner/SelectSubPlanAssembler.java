@@ -360,8 +360,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             return;
         }
         // This is a select from a single table
-        joinNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(joinNode.getTableScan(),
-                joinNode.m_joinInnerList, joinNode.m_whereInnerList, null));
+        getRelevantAccessPathsForTable(joinNode.m_accessPaths, joinNode.getTableScan(),
+                joinNode.m_joinInnerList, joinNode.m_whereInnerList, null);
     }
 
     /**
@@ -396,9 +396,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         if (joinType != JoinType.FULL) {
             parentWhereList = parentNode.m_whereOuterList;
         }
-        outerChildNode.m_accessPaths.addAll(
-                getRelevantAccessPathsForTable(outerChildNode.getTableScan(),
-                        joinOuterList, parentWhereList, null));
+
+        getRelevantAccessPathsForTable(outerChildNode.m_accessPaths,
+                outerChildNode.getTableScan(),
+                joinOuterList, parentWhereList, null);
     }
 
     /**
@@ -444,9 +445,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         }
         StmtTableScan innerTable = innerChildNode.getTableScan();
         assert(innerTable != null);
-        innerChildNode.m_accessPaths.addAll(
-                getRelevantAccessPathsForTable(innerTable,
-                        parentNode.m_joinInnerOuterList, filterExprs, postExprs));
+        getRelevantAccessPathsForTable(innerChildNode.m_accessPaths, innerTable,
+                        parentNode.m_joinInnerOuterList, filterExprs, postExprs);
 
         // If there are inner expressions AND inner-outer expressions, it could be that there
         // are indexed access paths that use elements of both in the indexing expressions,
@@ -503,12 +503,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 postExprs = new ArrayList<>(parentNode.m_joinInnerList);
                 postExprs.addAll(parentNode.m_joinInnerOuterList);
             }
-            Collection<AccessPath>
-            nljAccessPaths = getRelevantAccessPathsForTable(
-                    innerTable, null, filterExprs, postExprs);
-
             innerChildNode.m_accessPaths.clear();
-            innerChildNode.m_accessPaths.addAll(nljAccessPaths);
+            getRelevantAccessPathsForTable(innerChildNode.m_accessPaths,
+                    innerTable, null, filterExprs, postExprs);
             innerChildNode.m_accessPaths.addAll(innerOuterAccessPaths);
         }
 

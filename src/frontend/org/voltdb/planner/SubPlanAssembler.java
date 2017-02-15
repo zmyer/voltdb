@@ -46,10 +46,10 @@ import org.voltdb.expressions.WindowFunctionExpression;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
-import org.voltdb.plannodes.IndexSortablePlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.IndexSortablePlanNode;
 import org.voltdb.plannodes.IndexUseForOrderBy;
 import org.voltdb.plannodes.MaterializedScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
@@ -100,8 +100,8 @@ public abstract class SubPlanAssembler {
     /// to eventually be applied as a post-filter.
     private final static boolean KEEP_IN_POST_FILTERS = false;
 
-    SubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, StatementPartitioning partitioning)
-    {
+    SubPlanAssembler(Database db, AbstractParsedStmt parsedStmt,
+            StatementPartitioning partitioning) {
         m_db = db;
         m_parsedStmt = parsedStmt;
         m_partitioning = partitioning;
@@ -126,11 +126,12 @@ public abstract class SubPlanAssembler {
      * @param postExprs post expressions this table is part of
      * @return List of valid access paths
      */
-    protected ArrayList<AccessPath> getRelevantAccessPathsForTable(StmtTableScan tableScan,
+    protected void getRelevantAccessPathsForTable(
+            List<AccessPath> paths,
+            StmtTableScan tableScan,
             List<AbstractExpression> joinExprs,
             List<AbstractExpression> filterExprs,
             List<AbstractExpression> postExprs) {
-        ArrayList<AccessPath> paths = new ArrayList<>();
         List<AbstractExpression> allJoinExprs = new ArrayList<>();
         List<AbstractExpression> allExprs = new ArrayList<>();
         // add the empty seq-scan access path
@@ -220,8 +221,6 @@ public abstract class SubPlanAssembler {
             }
             paths.add(path);
         }
-
-        return paths;
     }
 
     /**
@@ -251,8 +250,7 @@ public abstract class SubPlanAssembler {
      * The "fashion" may be in an equality or range comparison opposite something that can be
      * treated as a (sub)scan-time constant.
      */
-    private static class IndexableExpression
-    {
+    private static class IndexableExpression {
         // The matched expression, in its original form and
         // normalized so that its LHS is the part that matched the indexed expression.
         private final AbstractExpression m_originalFilter;
@@ -263,8 +261,7 @@ public abstract class SubPlanAssembler {
         private final List<AbstractExpression> m_bindings;
 
         public IndexableExpression(AbstractExpression originalExpr, ComparisonExpression normalizedExpr,
-                                   List<AbstractExpression> bindings)
-        {
+                                   List<AbstractExpression> bindings) {
             m_originalFilter = originalExpr;
             m_filter = normalizedExpr;
             m_bindings = bindings;
@@ -356,8 +353,8 @@ public abstract class SubPlanAssembler {
      * @param index The index we want to use to access the data.
      * @return A valid access path using the data or null if none found.
      */
-    protected AccessPath getRelevantAccessPathForIndex(StmtTableScan tableScan, List<AbstractExpression> exprs, Index index)
-    {
+    protected AccessPath getRelevantAccessPathForIndex(StmtTableScan tableScan,
+            List<AbstractExpression> exprs, Index index) {
         if (tableScan instanceof StmtTargetTableScan == false) {
             return null;
         }
@@ -1101,22 +1098,17 @@ public abstract class SubPlanAssembler {
      */
     private static class ExpressionOrColumn {
         // Exactly one of these can be null.
-        AbstractExpression m_expr;
-        ColumnRef          m_colRef;
+        final AbstractExpression m_expr;
+        final ColumnRef m_colRef;
         // If m_colRef is non-null, then m_tableScan must
         // be non-null and name the table scan.
-        StmtTableScan      m_tableScan;
+        final StmtTableScan m_tableScan;
         // This is the expression or column position of this expression or
         // ColumnRef in the candidate index.
-        int                m_indexKeyComponentPosition;
+        final int m_indexKeyComponentPosition;
         // This is the sort direction of a statement level
         // order by.  If there is no statement level order
         // by clause this will be SortDirectionType.INVALID.
-        public SortDirectionType m_sortDirection;
-
-        ExpressionOrColumn(int indexEntryNumber, AbstractExpression expr, SortDirectionType sortDir) {
-            this(indexEntryNumber, null, expr, sortDir, null);
-        }
 
         ExpressionOrColumn(int aIndexEntryNumber,
                            StmtTableScan tableScan,
@@ -1130,50 +1122,7 @@ public abstract class SubPlanAssembler {
             m_colRef = colRef;
             m_indexKeyComponentPosition = aIndexEntryNumber;
             m_tableScan = tableScan;
-            m_sortDirection = sortDir;
         }
-
-        @Override
-        public boolean equals(Object otherObj) {
-            if ( ! ( otherObj instanceof ExpressionOrColumn) ) {
-                return false;
-            }
-            ExpressionOrColumn other = (ExpressionOrColumn)otherObj;
-            //
-            // The function findBindingsForOneIndexedExpression is almost
-            // like equality, but it matches parameters specially.  It's
-            // exactly what we want here, but we have to make sure the
-            // ExpressionOrColumn from the index is the second parameter.
-            //
-            // If both are from the same place, then we reduce this to
-            // equals.  I'm not sure this is possible, but better safe
-            // than sorry.
-            //
-            if ((other.m_indexKeyComponentPosition < 0 && m_indexKeyComponentPosition < 0)
-                    || (0 <= other.m_indexKeyComponentPosition && 0 <= m_indexKeyComponentPosition)) {
-                // If they are both expressions, they must be equal.
-                if ((other.m_expr != null) && (m_expr != null)) {
-                    return m_expr.equals(other.m_expr);
-                }
-                // If they are both column references they must be equal.
-                if ((other.m_colRef != null) && (m_colRef != null)) {
-                    return m_colRef.equals(other.m_colRef);
-                }
-                // If they are mixed, sort out which is the column
-                // reference and which is the expression.
-                AbstractExpression expr = (m_expr != null) ? m_expr : other.m_expr;
-                ColumnRef cref = (m_colRef != null) ? m_colRef : other.m_colRef;
-                StmtTableScan tscan = (m_tableScan != null) ? m_tableScan : other.m_tableScan;
-                assert(expr != null && cref != null);
-                // Use the same matcher that findBindingsForOneIndexedExpression
-                // uses.
-                return matchExpressionAndColumnRef(expr, cref, tscan);
-            }
-            ExpressionOrColumn fromStmt = (m_indexKeyComponentPosition < 0) ? this : other;
-            ExpressionOrColumn fromIndx = (m_indexKeyComponentPosition < 0) ? other : this;
-            return (findBindingsForOneIndexedExpression(fromStmt, fromIndx) != null);
-        }
-
     }
 
     /**
@@ -1206,8 +1155,6 @@ public abstract class SubPlanAssembler {
      * order by expressions.
      */
     static class WindowFunctionScore {
-        private static final int MAX_LIST_REMOVAL = 1000000;
-
         /**
          * A constructor for creating a score from a
          * WindowFunctionExpression.
@@ -1219,12 +1166,13 @@ public abstract class SubPlanAssembler {
                                    int winFuncNum) {
             for (int idx = 0; idx < winfunc.getPartitionbySize(); idx += 1) {
                 AbstractExpression ae = winfunc.getPartitionByExpressions().get(idx);
-                m_partitionByExprs.add(new ExpressionOrColumn(-1, ae, SortDirectionType.INVALID));
+                m_partitionByExprs.add(ae);
             }
             for (int idx = 0; idx < winfunc.getOrderbySize(); idx += 1) {
                 AbstractExpression ae = winfunc.getOrderByExpressions().get(idx);
                 SortDirectionType sd = winfunc.getOrderByDirections().get(idx);
-                m_unmatchedOrderByExprs.add(new ExpressionOrColumn(-1, ae, sd));
+                m_unmatchedOrderByExprs.add(ae);
+                m_unmatchedOrderByDirections.add(sd);
             }
             assert(0 <= winFuncNum);
             m_windowFunctionNumber = winFuncNum;
@@ -1240,7 +1188,8 @@ public abstract class SubPlanAssembler {
         public WindowFunctionScore(List<ParsedColInfo> orderByExpressions) {
             for (ParsedColInfo pci : orderByExpressions) {
                 SortDirectionType sortDir = pci.ascending ? SortDirectionType.ASC : SortDirectionType.DESC;
-                m_unmatchedOrderByExprs.add(new ExpressionOrColumn(-1, pci.expression, sortDir));
+                m_unmatchedOrderByExprs.add(pci.expression);
+                m_unmatchedOrderByDirections.add(sortDir);
             }
             // Statement level order by expressions are number STATEMENT_LEVEL_ORDER_BY_INDEX.
             m_windowFunctionNumber = STATEMENT_LEVEL_ORDER_BY_INDEX;
@@ -1249,7 +1198,7 @@ public abstract class SubPlanAssembler {
 
         // Set of active partition by expressions
         // for this window function.
-        List<ExpressionOrColumn> m_partitionByExprs = new ArrayList<>();
+        final List<AbstractExpression> m_partitionByExprs = new ArrayList<>();
         // Sequence of expressions which
         // either match index expression or which have
         // single values.   These are from the partition
@@ -1260,7 +1209,9 @@ public abstract class SubPlanAssembler {
         // List of order by expressions, originally from the
         // WindowFunctionExpression.  These migrate to
         // m_orderedMatchingExpressions as they match.
-        final List<ExpressionOrColumn> m_unmatchedOrderByExprs = new ArrayList<>();
+        final List<AbstractExpression> m_unmatchedOrderByExprs = new ArrayList<>();
+        final List<SortDirectionType> m_unmatchedOrderByDirections = new ArrayList<>();
+
         // This is the index of the unmatched expression
         // we will be working on.
         int m_unmatchedOrderByCursor = 0;
@@ -1311,7 +1262,6 @@ public abstract class SubPlanAssembler {
         }
 
         public MatchResults matchIndexEntry(ExpressionOrColumn indexEntry) {
-            int idx;
             // Don't bother to do anything if
             // we are dead or done.
             if (isDead() || isDone()) {
@@ -1321,9 +1271,9 @@ public abstract class SubPlanAssembler {
             // find one which matches the indexEntry and move it
             // to the end of the ordered  matching expressions.
             if ( ! m_partitionByExprs.isEmpty() ) {
-                List<AbstractExpression> moreBindings = null;
-                for (ExpressionOrColumn eorc : m_partitionByExprs) {
-                    moreBindings = findBindingsForOneIndexedExpression(eorc, indexEntry);
+                for (AbstractExpression expr : m_partitionByExprs) {
+                    List<AbstractExpression> moreBindings =
+                            findBindingsForOneIndexedExpression(expr, indexEntry);
                     if (moreBindings != null) {
                         // Good.  We matched.  Add the bindings.
                         // But we can't set the sort direction
@@ -1334,7 +1284,7 @@ public abstract class SubPlanAssembler {
                         // might match a column reference in
                         // indexEntry, or eorc may have parameters
                         // which need to match expressions in indexEntry.
-                        m_orderedMatchingExpressions.add(eorc.m_expr);
+                        m_orderedMatchingExpressions.add(expr);
                         // If there are expressions later on in the
                         // m_partitionByExprs or m_unmatchedOrderByExprs
                         // which match this expression we need to
@@ -1344,10 +1294,10 @@ public abstract class SubPlanAssembler {
                         // an expression, say with "PARTITION BY A, A",
                         // we need to remove them all.  But guard against
                         // an infinite loop here;
-                        for (idx = 0; m_partitionByExprs.remove(eorc) && idx < MAX_LIST_REMOVAL; idx += 1) {
+                        m_partitionByExprs.remove(0);
+                        while (m_partitionByExprs.remove(expr)) {
                             ;
                         }
-                        assert(idx < MAX_LIST_REMOVAL);
                         m_bindings.addAll(moreBindings);
                         return MatchResults.MATCHED;
                     }
@@ -1361,13 +1311,13 @@ public abstract class SubPlanAssembler {
             // we need to look at the unmatched order by expressions.
             // These need to be AbstractExpressions.  But we may
             // match with a ColumnRef in the index.
-            ExpressionOrColumn nextStatementEOC = m_unmatchedOrderByExprs.get(0);
+            AbstractExpression nextStatementExpr = m_unmatchedOrderByExprs.get(0);
             // If we have not settled on a sort direction
             // yet, we have to decide now.
             if (m_sortDirection == SortDirectionType.INVALID) {
-                m_sortDirection = nextStatementEOC.m_sortDirection;
+                m_sortDirection = m_unmatchedOrderByDirections.get(0);
             }
-            if (nextStatementEOC.m_sortDirection != m_sortDirection) {
+            else if (m_unmatchedOrderByDirections.get(0) != m_sortDirection) {
                 // If the sort directions are not all
                 // equal we can't use this index for this
                 // candidate.  So just declare it dead.
@@ -1377,20 +1327,22 @@ public abstract class SubPlanAssembler {
             // NOTABENE: This is really the important part of
             //           this function.
             List<AbstractExpression> moreBindings
-                = findBindingsForOneIndexedExpression(nextStatementEOC, indexEntry);
+                = findBindingsForOneIndexedExpression(nextStatementExpr, indexEntry);
             if ( moreBindings != null ) {
                 // We matched, because moreBindings != null, and
                 // the sort direction matched as well.  So
                 // add nextEOC to the order matching expressions
                 // list and add the bindings to the bindings list.
-                m_orderedMatchingExpressions.add(nextStatementEOC.m_expr);
+                m_orderedMatchingExpressions.add(nextStatementExpr);
                 m_bindings.addAll(moreBindings);
-                // Remove the next statement EOC from the unmatched OrderByExpressions
-                // list since we matched it.  We need to remove all of them,
-                for (idx = 0; m_unmatchedOrderByExprs.remove(nextStatementEOC) && idx < MAX_LIST_REMOVAL; idx += 1) {
-                    ;
+                // Remove the expression from the unmatched OrderByExpressions
+                // list since we matched it.  We need to remove all matches.
+                int pos = 0;
+                while (pos != -1) {
+                    m_unmatchedOrderByExprs.remove(pos);
+                    m_unmatchedOrderByDirections.remove(pos);
+                    pos = m_unmatchedOrderByExprs.indexOf(nextStatementExpr);
                 }
-                assert(idx < MAX_LIST_REMOVAL);
                 return MatchResults.MATCHED;
             }
             // No Bindings were found.  Mark this as a
@@ -1431,7 +1383,7 @@ public abstract class SubPlanAssembler {
      * If so we pull out the window function or statement level order by
      * which match.
      */
-    class WindowFunctionScoreboard {
+    private class WindowFunctionScoreboard {
         public WindowFunctionScoreboard(AbstractParsedStmt stmt, StmtTableScan tableScan) {
             m_numWinScores = stmt.getWindowFunctionExpressionCount();
             m_numOrderByScores = stmt.hasOrderByColumns() ? 1 : 0;
@@ -1453,26 +1405,9 @@ public abstract class SubPlanAssembler {
         private int m_numOrderByScores;
         private Set<Integer> m_orderSpoilers = new TreeSet<>();
 
-        /*
-         * Unfortunately the sort direction must be the
-         * same for all the expressions or columns.
-         */
-        SortDirectionType m_sortDirection = SortDirectionType.INVALID;
         public boolean isDone() {
             for (WindowFunctionScore score : m_winFunctions) {
                 if (!score.isDone()) {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        public boolean isDead(boolean windowFunctionsOnly) {
-            for (WindowFunctionScore score : m_winFunctions) {
-                if (windowFunctionsOnly && ( ! score.isWindowFunction())) {
-                    continue;
-                }
-                if (!score.isDead()) {
                     return false;
                 }
             }
@@ -1505,7 +1440,7 @@ public abstract class SubPlanAssembler {
          *
          * @return The number of order spoilers in the candidate we choose.
          */
-        public int getResult(AccessPath retval,
+        private int getResult(AccessPath retval,
                              int orderSpoilers[],
                              List<AbstractExpression> bindings) {
             WindowFunctionScore answer = null;
@@ -1631,8 +1566,7 @@ public abstract class SubPlanAssembler {
             List<ColumnRef> indexedColRefs,
             AccessPath retval,
             int[] orderSpoilers,
-            List<AbstractExpression> bindingsForOrder)
-    {
+            List<AbstractExpression> bindingsForOrder) {
         // Organize a little bit.
         ParsedSelectStmt pss = (m_parsedStmt instanceof ParsedSelectStmt)
                                   ? ((ParsedSelectStmt)m_parsedStmt)
@@ -1733,29 +1667,27 @@ public abstract class SubPlanAssembler {
      * a statement expression or column.  The nextStatementEOC
      * must be an expression, not a column reference.
      *
-     * @param nextStatementEOC The expression or column in the SQL statement.
+     * @param expr The expression or column in the SQL statement.
      * @param indexEntry The expression or column in the index.
      * @return A list of bindings for this match.  Return null if
      *         there is no match.  If there are no bindings but the
      *         expressions match, return an empty, non-null list.
      */
     private static List<AbstractExpression>
-        findBindingsForOneIndexedExpression(ExpressionOrColumn nextStatementEOC,
+        findBindingsForOneIndexedExpression(AbstractExpression expr,
                                             ExpressionOrColumn indexEntry) {
-        assert(nextStatementEOC.m_expr != null);
-        AbstractExpression nextStatementExpr = nextStatementEOC.m_expr;
         if (indexEntry.m_colRef != null) {
             ColumnRef indexColRef = indexEntry.m_colRef;
             // This is a column.  So try to match it
             // with the expression in nextStatementEOC.
-            if (matchExpressionAndColumnRef(nextStatementExpr, indexColRef, indexEntry.m_tableScan)) {
+            if (matchExpressionAndColumnRef(expr, indexColRef, indexEntry.m_tableScan)) {
                 return s_reusableImmutableEmptyBinding;
             }
             return null;
         }
         // So, this index entry is an expression.
         List<AbstractExpression> moreBindings =
-                nextStatementEOC.m_expr.bindingToIndexedExpression(indexEntry.m_expr);
+                expr.bindingToIndexedExpression(indexEntry.m_expr);
         if (moreBindings != null) {
             return moreBindings;
         }
@@ -1786,11 +1718,14 @@ public abstract class SubPlanAssembler {
      * @param tableScan      the index base table scan, used to validate column base tables
      * @param filtersToCover query conditions that may contain the desired equality filters
      */
-    private static List<AbstractExpression> recoverOrderSpoilers(int[] orderSpoilers, int nSpoilers,
-        int nRecoveredSpoilers,
-        List<AbstractExpression> indexedExprs, int[] colIds,
-        StmtTableScan tableScan, List<AbstractExpression> filtersToCover)
-    {
+    private static List<AbstractExpression> recoverOrderSpoilers(
+            int[] orderSpoilers,
+            int nSpoilers,
+            int nRecoveredSpoilers,
+            List<AbstractExpression> indexedExprs,
+            int[] colIds,
+            StmtTableScan tableScan,
+            List<AbstractExpression> filtersToCover) {
         // Filters leveraged for an optimization, such as the skipping of an ORDER BY plan node
         // always risk adding a dependency on a particular parameterization, so be prepared to
         // add prerequisite parameter bindings to the plan.
@@ -1870,8 +1805,7 @@ public abstract class SubPlanAssembler {
         ExpressionType targetComparator, ExpressionType altTargetComparator,
         AbstractExpression coveringExpr, int coveringColId, StmtTableScan tableScan,
         List<AbstractExpression> filtersToCover,
-        boolean allowIndexedJoinFilters, boolean filterAction)
-    {
+        boolean allowIndexedJoinFilters, boolean filterAction) {
         List<AbstractExpression> binding = null;
         AbstractExpression indexableExpr = null;
         AbstractExpression otherExpr = null;
@@ -2089,8 +2023,7 @@ public abstract class SubPlanAssembler {
 
     private static List<AbstractExpression> bindingIfValidIndexedFilterOperand(StmtTableScan tableScan,
         AbstractExpression indexableExpr, AbstractExpression otherExpr,
-        AbstractExpression coveringExpr, int coveringColId)
-    {
+        AbstractExpression coveringExpr, int coveringColId) {
         // Do some preliminary disqualifications.
 
         VoltType keyType = indexableExpr.getValueType();
@@ -2178,8 +2111,7 @@ public abstract class SubPlanAssembler {
      * @return A scan plan node
      */
     private static AbstractScanPlanNode
-    getScanAccessPlanForTable(StmtTableScan tableScan, AccessPath path)
-    {
+    getScanAccessPlanForTable(StmtTableScan tableScan, AccessPath path) {
         // build the scan node
         SeqScanPlanNode scanNode = new SeqScanPlanNode(tableScan);
         // build the predicate
@@ -2285,9 +2217,7 @@ public abstract class SubPlanAssembler {
     // Replace the IN LIST condition in the end expression referencing the first given rhs
     // with an equality filter referencing the second given rhs.
     private static void replaceInListFilterWithEqualityFilter(List<AbstractExpression> endExprs,
-                                                       AbstractExpression inListRhs,
-                                                       AbstractExpression equalityRhs)
-    {
+            AbstractExpression inListRhs, AbstractExpression equalityRhs) {
         for (AbstractExpression comparator : endExprs) {
             AbstractExpression otherExpr = comparator.getRight();
             if (otherExpr == inListRhs) {

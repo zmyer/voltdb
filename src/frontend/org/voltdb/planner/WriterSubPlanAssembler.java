@@ -79,10 +79,11 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
             // into the WHERE list.
             tableNode.m_whereInnerList.addAll(tableNode.m_joinInnerList);
             tableNode.m_joinInnerList.clear();
-            tableNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(tableNode.getTableScan(),
+            getRelevantAccessPathsForTable(tableNode.m_accessPaths,
+                    tableNode.getTableScan(),
                     null,
                     tableNode.m_whereInnerList,
-                    null));
+                    null);
 
             for (AccessPath path : tableNode.m_accessPaths) {
                 tableNode.m_currentAccessPath = path;
