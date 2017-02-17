@@ -193,7 +193,6 @@ CREATE STREAM replicated_export
 , adhocjmp   bigint             NOT NULL
 , value      varbinary(1048576) NOT NULL
 );
-EXPORT TABLE replicated_export;
 
 -- For loadsinglepartition
 CREATE TABLE loadp
