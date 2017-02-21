@@ -76,6 +76,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     // keep sync with DREventType in ee/src/common/types.h
+    // WARNING: the order of the enum values should not be altered
     public static enum EventType {
         NOT_A_EVENT(0),
         POISON_PILL(1),
