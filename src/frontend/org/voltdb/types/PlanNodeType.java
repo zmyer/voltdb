@@ -40,9 +40,9 @@ import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.plannodes.SetOpPlanNode;
 import org.voltdb.plannodes.TableCountPlanNode;
 import org.voltdb.plannodes.TupleScanPlanNode;
-import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.plannodes.WindowFunctionPlanNode;
 
@@ -87,7 +87,7 @@ public enum PlanNodeType {
     //
     AGGREGATE       (50, AggregatePlanNode.class),
     HASHAGGREGATE   (51, HashAggregatePlanNode.class),
-    UNION           (52, UnionPlanNode.class),
+    SETOP           (52, SetOpPlanNode.class),
     ORDERBY         (53, OrderByPlanNode.class),
     PROJECTION      (54, ProjectionPlanNode.class),
     MATERIALIZE     (55, MaterializePlanNode.class),

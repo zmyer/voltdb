@@ -23,6 +23,8 @@
 
 package org.voltdb.planner;
 
+import java.util.List;
+
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -33,44 +35,45 @@ import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SeqScanPlanNode;
-import org.voltdb.plannodes.UnionPlanNode;
+import org.voltdb.plannodes.SetOpPlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SetOpType;
 
-public class TestUnion extends PlannerTestCase {
+public class TestPlansSetOp extends PlannerTestCase {
 
     public void testUnion() {
         AbstractPlanNode pn = compile("select A from T1 UNION select B from T2 UNION select C from T3");
-        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
-        UnionPlanNode unionPN = (UnionPlanNode) pn.getChild(0);
-        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.UNION);
+        assertTrue(pn.getChild(0) instanceof SetOpPlanNode);
+        SetOpPlanNode unionPN = (SetOpPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getSetOpType() == SetOpType.UNION);
         assertTrue(unionPN.getChildCount() == 3);
 
         pn = compile("(select A from T1 UNION select B from T2) UNION select C from T3");
-        unionPN = (UnionPlanNode) pn.getChild(0);
-        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.UNION);
+        unionPN = (SetOpPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getSetOpType() == SetOpType.UNION);
         assertTrue(unionPN.getChildCount() == 3);
 
         pn = compile("select A from T1 UNION (select B from T2 UNION select C from T3)");
-        unionPN = (UnionPlanNode) pn.getChild(0);
-        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.UNION);
+        unionPN = (SetOpPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getSetOpType() == SetOpType.UNION);
         assertTrue(unionPN.getChildCount() == 3);
    }
 
     public void testUnionWithExpressionSubquery() {
         AbstractPlanNode pn = compile("select B from T2 union select A from T1 where A in (select B from T2 where T1.A > B)");
-        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
-        UnionPlanNode unionPN = (UnionPlanNode) pn.getChild(0);
-        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.UNION);
+        assertTrue(pn.getChild(0) instanceof SetOpPlanNode);
+        SetOpPlanNode unionPN = (SetOpPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getSetOpType() == SetOpType.UNION);
         assertTrue(unionPN.getChildCount() == 2);
     }
 
     public void testPartitioningMixes() {
         // Sides are identically single-partitioned.
         AbstractPlanNode pn = compile("select DESC from T1 WHERE A = 1 UNION select TEXT from T5 WHERE E = 1");
-        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
-        UnionPlanNode unionPN = (UnionPlanNode) pn.getChild(0);
-        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.UNION);
+        assertTrue(pn.getChild(0) instanceof SetOpPlanNode);
+        SetOpPlanNode unionPN = (SetOpPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getSetOpType() == SetOpType.UNION);
         assertTrue(unionPN.getChildCount() == 2);
 
         // In the future, new capabilities like "pushdown of set ops into the collector fragment" and
@@ -80,87 +83,86 @@ public class TestUnion extends PlannerTestCase {
 
     public void testUnionAll() {
         AbstractPlanNode pn = compile("select A from T1 UNION ALL select B from T2");
-        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
-        UnionPlanNode unionPN = (UnionPlanNode) pn.getChild(0);
-        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.UNION_ALL);
+        assertTrue(pn.getChild(0) instanceof SetOpPlanNode);
+        SetOpPlanNode unionPN = (SetOpPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getSetOpType() == SetOpType.UNION_ALL);
         assertTrue(unionPN.getChildCount() == 2);
     }
 
     public void testExcept() {
         AbstractPlanNode pn = compile("select A from T1 EXCEPT select B from T2 EXCEPT select C from T3 EXCEPT select F from T6");
-        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
-        UnionPlanNode unionPN = (UnionPlanNode) pn.getChild(0);
-        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.EXCEPT);
+        assertTrue(pn.getChild(0) instanceof SetOpPlanNode);
+        SetOpPlanNode unionPN = (SetOpPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getSetOpType() == SetOpType.EXCEPT);
         assertTrue(unionPN.getChildCount() == 4);
 
         pn = compile("select A from T1 EXCEPT (select B from T2 EXCEPT select C from T3) EXCEPT select F from T6");
-        unionPN = (UnionPlanNode) pn.getChild(0);
-        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.EXCEPT);
+        unionPN = (SetOpPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getSetOpType() == SetOpType.EXCEPT);
         assertTrue(unionPN.getChildCount() == 3);
-        UnionPlanNode childPN = (UnionPlanNode) unionPN.getChild(1);
-        assertTrue(childPN.getUnionType() == ParsedUnionStmt.UnionType.EXCEPT);
+        SetOpPlanNode childPN = (SetOpPlanNode) unionPN.getChild(1);
+        assertTrue(childPN.getSetOpType() == SetOpType.EXCEPT);
         assertTrue(childPN.getChildCount() == 2);
     }
 
     public void testExceptAll() {
         AbstractPlanNode pn = compile("select A from T1 EXCEPT ALL select B from T2");
-        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
-        UnionPlanNode unionPN = (UnionPlanNode) pn.getChild(0);
-        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.EXCEPT_ALL);
+        assertTrue(pn.getChild(0) instanceof SetOpPlanNode);
+        SetOpPlanNode unionPN = (SetOpPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getSetOpType() == SetOpType.EXCEPT_ALL);
         assertTrue(unionPN.getChildCount() == 2);
 
         pn = compile("select A from T1 EXCEPT ALL (select B from T2 EXCEPT ALL select C from T3) EXCEPT ALL select F from T6");
-        unionPN = (UnionPlanNode) pn.getChild(0);
-        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.EXCEPT_ALL);
+        unionPN = (SetOpPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getSetOpType() == SetOpType.EXCEPT_ALL);
         assertTrue(unionPN.getChildCount() == 3);
-        UnionPlanNode childPN = (UnionPlanNode) unionPN.getChild(1);
-        assertTrue(childPN.getUnionType() == ParsedUnionStmt.UnionType.EXCEPT_ALL);
+        SetOpPlanNode childPN = (SetOpPlanNode) unionPN.getChild(1);
+        assertTrue(childPN.getSetOpType() == SetOpType.EXCEPT_ALL);
         assertTrue(childPN.getChildCount() == 2);
     }
 
     public void testIntersect() {
         AbstractPlanNode pn = compile("select A from T1 INTERSECT select B from T2 INTERSECT select C from T3");
-        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
-        UnionPlanNode unionPN = (UnionPlanNode) pn.getChild(0);
-        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.INTERSECT);
+        assertTrue(pn.getChild(0) instanceof SetOpPlanNode);
+        SetOpPlanNode unionPN = (SetOpPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getSetOpType() == SetOpType.INTERSECT);
         assertTrue(unionPN.getChildCount() == 3);
 
         pn = compile("(select A from T1 INTERSECT select B from T2) INTERSECT select C from T3");
-        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
-        unionPN = (UnionPlanNode) pn.getChild(0);
-        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.INTERSECT);
+        assertTrue(pn.getChild(0) instanceof SetOpPlanNode);
+        unionPN = (SetOpPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getSetOpType() == SetOpType.INTERSECT);
         assertTrue(unionPN.getChildCount() == 3);
 
         pn = compile("select A from T1 INTERSECT (select B from T2 INTERSECT select C from T3)");
-        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
-        unionPN = (UnionPlanNode) pn.getChild(0);
-        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.INTERSECT);
+        assertTrue(pn.getChild(0) instanceof SetOpPlanNode);
+        unionPN = (SetOpPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getSetOpType() == SetOpType.INTERSECT);
         assertTrue(unionPN.getChildCount() == 3);
     }
 
     public void testIntersectAll() {
         AbstractPlanNode pn = compile("select A from T1 INTERSECT ALL select B from T2");
-        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
-        UnionPlanNode unionPN = (UnionPlanNode) pn.getChild(0);
-        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.INTERSECT_ALL);
+        assertTrue(pn.getChild(0) instanceof SetOpPlanNode);
+        SetOpPlanNode unionPN = (SetOpPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getSetOpType() == SetOpType.INTERSECT_ALL);
         assertTrue(unionPN.getChildCount() == 2);
     }
 
     public void testMultipleSetOperations() {
         AbstractPlanNode pn = compile("select A from T1 UNION select B from T2 EXCEPT select C from T3");
-        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
-        UnionPlanNode unionPN1 = (UnionPlanNode) pn.getChild(0);
-        assertTrue(unionPN1.getUnionType() == ParsedUnionStmt.UnionType.EXCEPT);
+        assertTrue(pn.getChild(0) instanceof SetOpPlanNode);
+        SetOpPlanNode unionPN1 = (SetOpPlanNode) pn.getChild(0);
+        assertTrue(unionPN1.getSetOpType() == SetOpType.EXCEPT);
         assertTrue(unionPN1.getChildCount() == 2);
-        assertTrue(unionPN1.getChild(0) instanceof UnionPlanNode);
-        UnionPlanNode unionPN2 = (UnionPlanNode) unionPN1.getChild(0);
-        assertTrue(unionPN2.getUnionType() == ParsedUnionStmt.UnionType.UNION);
+        assertTrue(unionPN1.getChild(0) instanceof SetOpPlanNode);
+        SetOpPlanNode unionPN2 = (SetOpPlanNode) unionPN1.getChild(0);
+        assertTrue(unionPN2.getSetOpType() == SetOpType.UNION);
         assertTrue(unionPN2.getChildCount() == 2);
         assertTrue(unionPN1.getChild(1) instanceof SeqScanPlanNode);
     }
 
-    public void testNonSupportedUnions()
-    {
+    public void testNonSupportedUnions() {
         // If both sides are multi-partitioned, there is no facility for pushing down the
         // union processing below the send/receive, so each child of the union requires
         // its own send/receive so the plan ends up as an unsupported 3-fragment plan.
@@ -223,7 +225,7 @@ public class TestUnion extends PlannerTestCase {
 
     public void testSelfUnion() {
         AbstractPlanNode pn = compile("select B from T2 UNION select B from T2");
-        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+        assertTrue(pn.getChild(0) instanceof SetOpPlanNode);
         pn = pn.getChild(0);
         assertTrue(pn.getChildCount() == 2);
         assertTrue(pn.getChild(0) instanceof SeqScanPlanNode);
@@ -231,7 +233,7 @@ public class TestUnion extends PlannerTestCase {
 
         // The same table/alias is repeated twice in the union but in the different selects
         pn = compile("select A1.B from T2 A1, T2 A2 WHERE A1.B = A2.B UNION select B from T2 A1");
-        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+        assertTrue(pn.getChild(0) instanceof SetOpPlanNode);
         pn = pn.getChild(0);
         assertTrue(pn.getChildCount() == 2);
         assertTrue(pn.getChild(0) instanceof ProjectionPlanNode);
@@ -240,7 +242,7 @@ public class TestUnion extends PlannerTestCase {
 
         // BOTH sides are single-partitioned  for the same partition
         pn = compile("select F from T1 WHERE T1.A = 2 UNION select F from T1 WHERE T1.A = 2");
-        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+        assertTrue(pn.getChild(0) instanceof SetOpPlanNode);
 
         // If BOTH sides are single-partitioned, but for different partitions,
         // it would theoretically be possible to satisfy
@@ -266,7 +268,7 @@ public class TestUnion extends PlannerTestCase {
         assertTrue(pn.getChild(0) instanceof ProjectionPlanNode);
         assertTrue(pn.getChild(0).getChild(0) instanceof OrderByPlanNode);
         assertTrue(pn.getChild(0).getChild(0).getChild(0) instanceof SeqScanPlanNode);
-        assertTrue(pn.getChild(0).getChild(0).getChild(0).getChild(0) instanceof UnionPlanNode);
+        assertTrue(pn.getChild(0).getChild(0).getChild(0).getChild(0) instanceof SetOpPlanNode);
 
     }
 
@@ -275,40 +277,40 @@ public class TestUnion extends PlannerTestCase {
             AbstractPlanNode pn = compile(
                     "select C from T3 UNION select B from T2 limit 3 offset 2");
             checkLimitNode(pn.getChild(0), 3, 2);
-            assertTrue(pn.getChild(0).getChild(0) instanceof UnionPlanNode);
+            assertTrue(pn.getChild(0).getChild(0) instanceof SetOpPlanNode);
         }
         {
             AbstractPlanNode pn = compile(
                     "select C from T3 UNION (select B from T2 limit 3 offset 2) ");
-            assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+            assertTrue(pn.getChild(0) instanceof SetOpPlanNode);
         }
         {
             AbstractPlanNode pn = compile(
                     "select C from T3 INTERSECT select B from T2 limit 3");
             checkLimitNode(pn.getChild(0), 3, 0);
-            assertTrue(pn.getChild(0).getChild(0) instanceof UnionPlanNode);
+            assertTrue(pn.getChild(0).getChild(0) instanceof SetOpPlanNode);
         }
         {
             AbstractPlanNode pn = compile(
                     "select C from T3 EXCEPT select B from T2 offset 2");
             checkLimitNode(pn.getChild(0), -1, 2);
-            assertTrue(pn.getChild(0).getChild(0) instanceof UnionPlanNode);
+            assertTrue(pn.getChild(0).getChild(0) instanceof SetOpPlanNode);
         }
         {
             AbstractPlanNode pn = compile(
                     "(select C from T3 EXCEPT select B from T2 offset 2) UNION select F from T6 limit 4 offset 5");
             checkLimitNode(pn.getChild(0), 4, 5);
-            assertTrue(pn.getChild(0).getChild(0) instanceof UnionPlanNode);
-            UnionPlanNode upn = (UnionPlanNode) pn.getChild(0).getChild(0);
+            assertTrue(pn.getChild(0).getChild(0) instanceof SetOpPlanNode);
+            SetOpPlanNode upn = (SetOpPlanNode) pn.getChild(0).getChild(0);
             checkLimitNode(upn.getChild(0), -1, 2);
-            assertTrue(upn.getChild(0).getChild(0) instanceof UnionPlanNode);
+            assertTrue(upn.getChild(0).getChild(0) instanceof SetOpPlanNode);
         }
         {
             // T1 is partitioned
             AbstractPlanNode pn = compile(
                     "select A from T1 EXCEPT select B from T2 offset 2");
             checkLimitNode(pn.getChild(0), -1, 2);
-            assertTrue(pn.getChild(0).getChild(0) instanceof UnionPlanNode);
+            assertTrue(pn.getChild(0).getChild(0) instanceof SetOpPlanNode);
         }
     }
 
@@ -463,73 +465,73 @@ public class TestUnion extends PlannerTestCase {
       {
           AbstractPlanNode pn = compile("select A from T1 union ((select B from T2 UNION select B from T2) order by B)");
           pn = pn.getChild(0);
-          assertTrue(pn instanceof UnionPlanNode);
+          assertTrue(pn instanceof SetOpPlanNode);
           assertEquals(2, pn.getChildCount());
           // Left branch - SELECT FRM T1
           assertTrue(pn.getChild(0).getChild(0) instanceof ReceivePlanNode);
           // Right branch - union with order by
           assertTrue(pn.getChild(1) instanceof OrderByPlanNode);
           pn = pn.getChild(1);
-          assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+          assertTrue(pn.getChild(0) instanceof SetOpPlanNode);
       }
       {
           AbstractPlanNode pn = compile("select A from T1 union (select B from T2 UNION select B from T2 limit 3)");
           pn = pn.getChild(0);
-          assertTrue(pn instanceof UnionPlanNode);
+          assertTrue(pn instanceof SetOpPlanNode);
           assertEquals(2, pn.getChildCount());
           // Left branch - SELECT FRM T1
           assertTrue(pn.getChild(0).getChild(0) instanceof ReceivePlanNode);
           // Right branch - union with limit
           assertTrue(pn.getChild(1) instanceof LimitPlanNode);
           pn = pn.getChild(1);
-          assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+          assertTrue(pn.getChild(0) instanceof SetOpPlanNode);
       }
       {
           AbstractPlanNode pn = compile("select A from T1 union (select B from T2 UNION select B from T2 offset 3)");
           pn = pn.getChild(0);
-          assertTrue(pn instanceof UnionPlanNode);
+          assertTrue(pn instanceof SetOpPlanNode);
           assertEquals(2, pn.getChildCount());
           // Left branch - SELECT FRM T1
           assertTrue(pn.getChild(0).getChild(0) instanceof ReceivePlanNode);
           // Right branch - union with limit
           assertTrue(pn.getChild(1) instanceof LimitPlanNode);
           pn = pn.getChild(1);
-          assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+          assertTrue(pn.getChild(0) instanceof SetOpPlanNode);
       }
       {
           AbstractPlanNode pn = compile("(select A from T1 union select B from T2 order by A) UNION select B from T2");
           pn = pn.getChild(0);
-          assertTrue(pn instanceof UnionPlanNode);
+          assertTrue(pn instanceof SetOpPlanNode);
           assertEquals(2, pn.getChildCount());
           // Left branch - union with order by
           assertTrue(pn.getChild(0) instanceof OrderByPlanNode);
-          assertTrue(pn.getChild(0).getChild(0) instanceof UnionPlanNode);
+          assertTrue(pn.getChild(0).getChild(0) instanceof SetOpPlanNode);
           // Right branch - select from T2
           assertTrue(pn.getChild(1) instanceof SeqScanPlanNode);
       }
       {
           AbstractPlanNode pn = compile("(select A from T1 union select B from T2 offset 1) UNION select B from T2");
           pn = pn.getChild(0);
-          assertTrue(pn instanceof UnionPlanNode);
+          assertTrue(pn instanceof SetOpPlanNode);
           assertEquals(2, pn.getChildCount());
           // Left branch - union with offset
           assertTrue(pn.getChild(0) instanceof LimitPlanNode);
-          assertTrue(pn.getChild(0).getChild(0) instanceof UnionPlanNode);
+          assertTrue(pn.getChild(0).getChild(0) instanceof SetOpPlanNode);
           // Right branch - select from T2
           assertTrue(pn.getChild(1) instanceof SeqScanPlanNode);
       }
       {
           AbstractPlanNode pn = compile("(select A from T1 union select B from T2 limit 1) UNION select B from T2");
           pn = pn.getChild(0);
-          assertTrue(pn instanceof UnionPlanNode);
+          assertTrue(pn instanceof SetOpPlanNode);
           assertEquals(2, pn.getChildCount());
           // Left branch - union with offset
           assertTrue(pn.getChild(0) instanceof LimitPlanNode);
-          assertTrue(pn.getChild(0).getChild(0) instanceof UnionPlanNode);
+          assertTrue(pn.getChild(0).getChild(0) instanceof SetOpPlanNode);
           // Right branch - select from T2
           assertTrue(pn.getChild(1) instanceof SeqScanPlanNode);
       }
-  }
+    }
 
     public void testUnionOrderByExpr() {
         {
@@ -572,7 +574,7 @@ public class TestUnion extends PlannerTestCase {
             String[] columnNames = {"C"};
             pn = pn.getChild(0);
             checkOrderByNode(pn, columnNames, new int[]{0});
-            assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+            assertTrue(pn.getChild(0) instanceof SetOpPlanNode);
             pn = pn.getInlinePlanNode(PlanNodeType.LIMIT);
             checkLimitNode(pn, 3, 2);
         }
@@ -583,7 +585,7 @@ public class TestUnion extends PlannerTestCase {
             String[] columnNames = {"TAG"};
             pn = pn.getChild(0);
             checkOrderByNode(pn, columnNames, new int[]{0});
-            assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+            assertTrue(pn.getChild(0) instanceof SetOpPlanNode);
             pn = pn.getInlinePlanNode(PlanNodeType.LIMIT);
             checkLimitNode(pn, 3, 2);
         }
@@ -594,7 +596,7 @@ public class TestUnion extends PlannerTestCase {
             String[] columnNames = {"TAG"};
             pn = pn.getChild(0);
             checkOrderByNode(pn, columnNames, new int[]{0});
-            assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+            assertTrue(pn.getChild(0) instanceof SetOpPlanNode);
             pn = pn.getInlinePlanNode(PlanNodeType.LIMIT);
             checkLimitNode(pn, 3, 2);
         }
@@ -607,7 +609,7 @@ public class TestUnion extends PlannerTestCase {
         pn = pn.getChild(0);
         int[] idxs = {0};
         checkOrderByNode(pn, columnNames, idxs);
-        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+        assertTrue(pn.getChild(0) instanceof SetOpPlanNode);
         pn = pn.getInlinePlanNode(PlanNodeType.LIMIT);
         assert (pn instanceof LimitPlanNode);
         assertTrue(pn.toExplainPlanString().contains("LIMIT with parameter"));
@@ -636,6 +638,6 @@ public class TestUnion extends PlannerTestCase {
 
     @Override
     protected void setUp() throws Exception {
-        setupSchema(TestUnion.class.getResource("testplans-union-ddl.sql"), "testunion", false);
+        setupSchema(TestPlansSetOp.class.getResource("testplans-union-ddl.sql"), "testunion", false);
     }
 }

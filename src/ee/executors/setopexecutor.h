@@ -42,48 +42,35 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-#include "unionnode.h"
 
-#include "common/SerializableEEException.h"
+#ifndef HSTOREUNIONEXECUTOR_H
+#define HSTOREUNIONEXECUTOR_H
 
-#include <sstream>
+#include "executors/abstractexecutor.h"
+
+#include "boost/shared_ptr.hpp"
 
 namespace voltdb {
 
-UnionPlanNode::~UnionPlanNode() { }
-
-PlanNodeType UnionPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_UNION; }
-
-std::string UnionPlanNode::debugInfo(const std::string &spacer) const
-{
-    std::ostringstream buffer;
-    buffer << spacer << "UnionType[" << m_unionType << "]\n";
-    return buffer.str();
+namespace detail {
+struct SetOperator;
 }
 
-void UnionPlanNode::loadFromJSONObject(PlannerDomValue obj)
-{
-    std::string unionTypeStr = obj.valueForKey("UNION_TYPE").asStr();
-    if (unionTypeStr == "UNION") {
-        m_unionType = UNION_TYPE_UNION;
-    } else if (unionTypeStr == "UNION_ALL") {
-        m_unionType = UNION_TYPE_UNION_ALL;
-    } else if (unionTypeStr == "INTERSECT") {
-        m_unionType = UNION_TYPE_INTERSECT;
-    } else if (unionTypeStr == "INTERSECT_ALL") {
-        m_unionType = UNION_TYPE_INTERSECT_ALL;
-    } else if (unionTypeStr == "EXCEPT") {
-        m_unionType = UNION_TYPE_EXCEPT;
-    } else if (unionTypeStr == "EXCEPT_ALL") {
-        m_unionType = UNION_TYPE_EXCEPT_ALL;
-    } else if (unionTypeStr == "NOUNION") {
-        m_unionType = UNION_TYPE_NOUNION;
-    } else {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "UnionPlanNode::loadFromJSONObject:"
-                                      " Unsupported UNION_TYPE value " +
-                                      unionTypeStr);
-    }
-}
+/**
+ *
+ */
+class SetOpExecutor : public AbstractExecutor {
+public:
+    SetOpExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
 
-} // namespace voltdb
+protected:
+    bool p_init(AbstractPlanNode*, TempTableLimits* limits);
+    bool p_execute(const NValueArray &params);
+
+private:
+    boost::shared_ptr<detail::SetOperator> m_setOperator;
+};
+
+}// namespace voltdb
+
+#endif
