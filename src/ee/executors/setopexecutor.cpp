@@ -43,10 +43,10 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "unionexecutor.h"
+#include "setopexecutor.h"
 
 #include "common/tabletuple.h"
-#include "plannodes/unionnode.h"
+#include "plannodes/setopnode.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
 #include "storage/tablefactory.h"
@@ -74,7 +74,7 @@ struct SetOperator {
 
     virtual bool processTuples() = 0;
 
-    static SetOperator* getSetOperator(UnionPlanNode* node);
+    static SetOperator* getSetOperator(SetOpPlanNode* node);
 
     // for debugging - may be unused
     static void printTupleMap(const char* nonce, TupleMap &tuples);
@@ -214,7 +214,8 @@ bool ExceptIntersectSetOperator::processTuples()
         collectTuples(*input_table, next_tuples);
         if (m_is_except) {
             exceptTupleMaps(tuples, next_tuples);
-        } else {
+        }
+        else {
             intersectTupleMaps(tuples, next_tuples);
         }
     }
@@ -237,7 +238,8 @@ void ExceptIntersectSetOperator::collectTuples(Table& input_table, TupleMap& tup
         TupleMap::iterator mapIt = tuple_map.find(tuple);
         if (mapIt == tuple_map.end()) {
             tuple_map.insert(std::make_pair(tuple, 1));
-        } else if (m_is_all) {
+        }
+        else if (m_is_all) {
             ++(mapIt->second);
         }
     }
@@ -246,7 +248,7 @@ void ExceptIntersectSetOperator::collectTuples(Table& input_table, TupleMap& tup
 void ExceptIntersectSetOperator::exceptTupleMaps(TupleMap& map_a, TupleMap& map_b)
 {
     TupleMap::iterator it_a = map_a.begin();
-    while(it_a != map_a.end()) {
+    while (it_a != map_a.end()) {
         TupleMap::iterator it_b = map_b.find(it_a->first);
         if (it_b != map_b.end()) {
             if (it_a->second > it_b->second) {
@@ -264,35 +266,36 @@ void ExceptIntersectSetOperator::exceptTupleMaps(TupleMap& map_a, TupleMap& map_
 void ExceptIntersectSetOperator::intersectTupleMaps(TupleMap& map_a, TupleMap& map_b)
 {
     TupleMap::iterator it_a = map_a.begin();
-    while(it_a != map_a.end()) {
+    while (it_a != map_a.end()) {
         TupleMap::iterator it_b = map_b.find(it_a->first);
         if (it_b == map_b.end()) {
             it_a = map_a.erase(it_a);
-        } else {
+        }
+        else {
             it_a->second = std::min(it_a->second, it_b->second);
             ++it_a;
         }
     }
 }
 
-SetOperator* SetOperator::getSetOperator(UnionPlanNode* node)
+SetOperator* SetOperator::getSetOperator(SetOpPlanNode* node)
 {
-    UnionType unionType = node->getUnionType();
+    SetOpType unionType = node->getSetOpType();
     switch (unionType) {
-        case UNION_TYPE_UNION_ALL:
+        case SETOP_TYPE_UNION_ALL:
             return new UnionSetOperator(node->getInputTableRefs(), node->getTempOutputTable(), true);
-        case UNION_TYPE_UNION:
+        case SETOP_TYPE_UNION:
             return new UnionSetOperator(node->getInputTableRefs(), node->getTempOutputTable(), false);
-        case UNION_TYPE_EXCEPT_ALL:
+        case SETOP_TYPE_EXCEPT_ALL:
             return new ExceptIntersectSetOperator(node->getInputTableRefs(), node->getTempOutputTable(),
                 true, true);
-        case UNION_TYPE_EXCEPT:
+        case SETOP_TYPE_EXCEPT:
             return new ExceptIntersectSetOperator(node->getInputTableRefs(), node->getTempOutputTable(),
                 false, true);
-        case UNION_TYPE_INTERSECT_ALL:
+        case SETOP_TYPE_INTERSECT_ALL:
             return new ExceptIntersectSetOperator(node->getInputTableRefs(), node->getTempOutputTable(),
                 true, false);
-        case UNION_TYPE_INTERSECT:
+        case SETOP_TYPE_INTERSECT:
             return new ExceptIntersectSetOperator(node->getInputTableRefs(), node->getTempOutputTable(),
                 false, false);
         default:
@@ -303,17 +306,15 @@ SetOperator* SetOperator::getSetOperator(UnionPlanNode* node)
 
 } // namespace detail
 
-UnionExecutor::UnionExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+SetOpExecutor::SetOpExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
     : AbstractExecutor(engine, abstract_node)
 { }
 
-bool UnionExecutor::p_init(AbstractPlanNode* abstract_node,
-                           TempTableLimits* limits)
-{
-    VOLT_TRACE("init Union Executor");
+bool SetOpExecutor::p_init(AbstractPlanNode*, TempTableLimits* limits) {
+    VOLT_TRACE("init SetOp Executor");
 
-    UnionPlanNode* node = dynamic_cast<UnionPlanNode*>(abstract_node);
-    assert(node);
+    SetOpPlanNode* node = static_cast<SetOpPlanNode*>(m_abstractNode);
+    assert(dynamic_cast<SetOpPlanNode*>(m_abstractNode));
 
     //
     // First check to make sure they have the same number of columns
@@ -372,7 +373,7 @@ bool UnionExecutor::p_init(AbstractPlanNode* abstract_node,
     return true;
 }
 
-bool UnionExecutor::p_execute(const NValueArray &params) {
+bool SetOpExecutor::p_execute(const NValueArray &params) {
     return m_setOperator->processTuples();
 }
 

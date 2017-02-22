@@ -193,7 +193,7 @@ public class StatementPartitioning implements Cloneable{
      * @return A new PartitioningForStatement
      */
     @Override
-    public Object clone() {
+    public StatementPartitioning clone() {
         return new StatementPartitioning(m_inferPartitioning, m_forceSP);
     }
 

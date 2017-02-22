@@ -42,33 +42,54 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+#include "setopnode.h"
 
-#ifndef HSTOREUNIONNODE_H
-#define HSTOREUNIONNODE_H
+#include "common/SerializableEEException.h"
 
-#include "abstractplannode.h"
+#include <sstream>
 
 namespace voltdb {
 
-/**
- *
- */
-class UnionPlanNode : public AbstractPlanNode {
-public:
-    UnionPlanNode() : m_unionType(UNION_TYPE_NOUNION) { }
-    ~UnionPlanNode();
-    PlanNodeType getPlanNodeType() const;
-    std::string debugInfo(const std::string &spacer) const;
+SetOpPlanNode::~SetOpPlanNode() { }
 
-    UnionType getUnionType() const { return m_unionType; }
+PlanNodeType SetOpPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_SETOP; }
 
-protected:
-    void loadFromJSONObject(PlannerDomValue obj);
+std::string SetOpPlanNode::debugInfo(const std::string& spacer) const {
+    std::ostringstream buffer;
+    buffer << spacer << "SetOpType[" << m_setopType << "]\n";
+    return buffer.str();
+}
 
-private:
-   UnionType m_unionType;
-};
+void SetOpPlanNode::loadFromJSONObject(PlannerDomValue obj) {
+    m_setopType = parseSetOpType(obj.valueForKey("SETOP_TYPE").asStr());
+}
 
-} // namespace voltdb
+SetOpType SetOpPlanNode::parseSetOpType(const std::string& setopTypeStr) {
+    if (setopTypeStr == "UNION") {
+        return SETOP_TYPE_UNION;
+    }
+    if (setopTypeStr == "UNION_ALL") {
+        return SETOP_TYPE_UNION_ALL;
+    }
+    if (setopTypeStr == "INTERSECT") {
+        return SETOP_TYPE_INTERSECT;
+    }
+    if (setopTypeStr == "INTERSECT_ALL") {
+        return SETOP_TYPE_INTERSECT_ALL;
+    }
+    if (setopTypeStr == "EXCEPT") {
+        return SETOP_TYPE_EXCEPT;
+    }
+    if (setopTypeStr == "EXCEPT_ALL") {
+        return SETOP_TYPE_EXCEPT_ALL;
+    }
+    if (setopTypeStr == "NONE") {
+        return SETOP_TYPE_NONE;
+    }
+    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                  "SetopPlanNode::parseSetOpType:"
+                                  " Unsupported SETOP_TYPE value " +
+                                  setopTypeStr);
+}
 
-#endif
+}// namespace voltdb

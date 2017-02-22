@@ -725,7 +725,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             }
         }
 
-        for (AbstractPlanNode pd : union.keySet() ) {
+        for (AbstractPlanNode pd : union.keySet()) {
             if (union.get(pd) == m_parents.size())
                 m_dominators.add(pd);
         }
@@ -757,16 +757,15 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     private void findAllNodesOfType_recurse(PlanNodeType type, Class< ? extends AbstractPlanNode> pnClass, ArrayList<AbstractPlanNode> collected,
-        HashSet<AbstractPlanNode> visited)
-    {
+        HashSet<AbstractPlanNode> visited) {
         if (visited.contains(this)) {
             assert(false): "do not expect loops in plangraph.";
             return;
         }
+
         visited.add(this);
-        if (getPlanNodeType() == type) {
-                collected.add(this);
-        } else if (pnClass != null && pnClass.isAssignableFrom(getClass())) {
+        if (getPlanNodeType() == type ||
+            (pnClass != null && pnClass.isAssignableFrom(getClass()))) {
             collected.add(this);
         }
 
@@ -1000,7 +999,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         int pos = 0;
         StringBuilder sb = new StringBuilder();
         // Find all the subqueries from the input string
-        while(matcher.find()) {
+        while (matcher.find()) {
             sb.append(explainedSubquery.substring(pos, matcher.end(2)));
             pos = matcher.end();
             // Recurse into the subquery string to extract its own subqueries if any
@@ -1174,8 +1173,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             PlanNodeTree pnt = new PlanNodeTree();
             pnt.loadPlanNodesFromJSONArrays(jarray, db);
             List<AbstractPlanNode> list = pnt.getNodeList();
-            for( AbstractPlanNode pn : list ) {
-                m_inlineNodes.put( pn.getPlanNodeType(), pn);
+            for (AbstractPlanNode pn : list) {
+                addInlinePlanNode(pn);
             }
         }
         //children and parents list loading implemented in planNodeTree.loadFromJsonArray

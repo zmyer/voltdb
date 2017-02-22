@@ -75,7 +75,7 @@ import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
-import org.voltdb.plannodes.UnionPlanNode;
+import org.voltdb.plannodes.SetOpPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.plannodes.WindowFunctionPlanNode;
 import org.voltdb.types.ConstraintType;
@@ -125,7 +125,7 @@ public class PlanAssembler {
     /** parsed statement for an select */
     private ParsedSelectStmt m_parsedSelect = null;
     /** parsed statement for an union */
-    private ParsedUnionStmt m_parsedUnion = null;
+    private ParsedSetOpStmt m_parsedSetOp = null;
 
     /** plan selector */
     private final PlanSelector m_planSelector;
@@ -285,8 +285,8 @@ public class PlanAssembler {
         m_bestAndOnlyPlanWasGenerated = false;
         m_partitioning.analyzeTablePartitioning(parsedStmt.allScans());
 
-        if (parsedStmt instanceof ParsedUnionStmt) {
-            m_parsedUnion = (ParsedUnionStmt) parsedStmt;
+        if (parsedStmt instanceof ParsedSetOpStmt) {
+            m_parsedSetOp = (ParsedSetOpStmt) parsedStmt;
             return;
         }
 
@@ -666,9 +666,9 @@ public class PlanAssembler {
     private CompiledPlan getNextPlan() {
         CompiledPlan retval;
         AbstractParsedStmt nextStmt = null;
-        if (m_parsedUnion != null) {
-            nextStmt = m_parsedUnion;
-            retval = getNextUnionPlan();
+        if (m_parsedSetOp != null) {
+            nextStmt = m_parsedSetOp;
+            retval = getNextSetOpPlan();
         }
         else if (m_parsedSelect != null) {
             nextStmt = m_parsedSelect;
@@ -703,13 +703,13 @@ public class PlanAssembler {
     }
 
     /**
-     * This is a UNION specific method. Generate a unique and correct plan
-     * for the current SQL UNION statement by building the best plans for each individual statements
-     * within the UNION.
+     * This is a SETOP specific method. Generate a unique and correct plan
+     * for the current SQL SET OP statement by building the best plans for each individual statements
+     * within the SET OP.
      *
-     * @return A union plan or null.
+     * @return A setop plan or null.
      */
-    private CompiledPlan getNextUnionPlan() {
+    private CompiledPlan getNextSetOpPlan() {
         String isContentDeterministic = null;
         // Since only the one "best" plan is considered,
         // this method should be called only once.
@@ -719,7 +719,7 @@ public class PlanAssembler {
 
         m_bestAndOnlyPlanWasGenerated = true;
         // Simply return an union plan node with a corresponding union type set
-        AbstractPlanNode subUnionRoot = new UnionPlanNode(m_parsedUnion.m_unionType);
+        AbstractPlanNode subSetOpRoot = new SetOpPlanNode(m_parsedSetOp.m_unionType);
         m_recentErrorMsg = null;
 
         ArrayList<CompiledPlan> childrenPlans = new ArrayList<>();
@@ -727,7 +727,7 @@ public class PlanAssembler {
 
         // Build best plans for the children first
         int planId = 0;
-        for (AbstractParsedStmt parsedChildStmt : m_parsedUnion.m_children) {
+        for (AbstractParsedStmt parsedChildStmt : m_parsedSetOp.m_children) {
             StatementPartitioning partitioning = (StatementPartitioning)m_partitioning.clone();
             PlanSelector planSelector = (PlanSelector) m_planSelector.clone();
             planSelector.m_planId = planId;
@@ -813,25 +813,25 @@ public class PlanAssembler {
 
         // Add and link children plans
         for (CompiledPlan selectPlan : childrenPlans) {
-            subUnionRoot.addAndLinkChild(selectPlan.rootPlanGraph);
+            subSetOpRoot.addAndLinkChild(selectPlan.rootPlanGraph);
         }
 
         // order by
-        if (m_parsedUnion.hasOrderByColumns()) {
-            subUnionRoot = handleOrderBy(m_parsedUnion, subUnionRoot);
+        if (m_parsedSetOp.hasOrderByColumns()) {
+            subSetOpRoot = handleOrderBy(m_parsedSetOp, subSetOpRoot);
         }
 
         // limit/offset
-        if (m_parsedUnion.hasLimitOrOffset()) {
-            subUnionRoot = handleUnionLimitOperator(subUnionRoot);
+        if (m_parsedSetOp.hasLimitOrOffset()) {
+            subSetOpRoot = handleSetOpLimitOperator(subSetOpRoot);
         }
 
         CompiledPlan retval = new CompiledPlan();
-        retval.rootPlanGraph = subUnionRoot;
+        retval.rootPlanGraph = subSetOpRoot;
         retval.setReadOnly(true);
         retval.sql = m_planSelector.m_sql;
-        boolean orderIsDeterministic = m_parsedUnion.isOrderDeterministic();
-        boolean hasLimitOrOffset = m_parsedUnion.hasLimitOrOffset();
+        boolean orderIsDeterministic = m_parsedSetOp.isOrderDeterministic();
+        boolean hasLimitOrOffset = m_parsedSetOp.hasLimitOrOffset();
         retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic, isContentDeterministic);
 
         // compute the cost - total of all children
@@ -845,9 +845,9 @@ public class PlanAssembler {
     private int planForParsedSubquery(StmtSubqueryScan subqueryScan, int planId) {
         AbstractParsedStmt subQuery = subqueryScan.getSubqueryStmt();
         assert(subQuery != null);
-        PlanSelector planSelector = (PlanSelector) m_planSelector.clone();
+        PlanSelector planSelector = m_planSelector.clone();
         planSelector.m_planId = planId;
-        StatementPartitioning currentPartitioning = (StatementPartitioning)m_partitioning.clone();
+        StatementPartitioning currentPartitioning = m_partitioning.clone();
         PlanAssembler assembler = new PlanAssembler(
                 m_catalogCluster, m_catalogDb, currentPartitioning, planSelector);
         CompiledPlan compiledPlan = assembler.getBestCostPlan(subQuery);
@@ -1944,7 +1944,7 @@ public class PlanAssembler {
      * @return new orderByNode (the new root) or the original root if no orderByNode was required.
      */
     private static AbstractPlanNode handleOrderBy(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
-        assert (parsedStmt instanceof ParsedSelectStmt || parsedStmt instanceof ParsedUnionStmt ||
+        assert (parsedStmt instanceof ParsedSelectStmt || parsedStmt instanceof ParsedSetOpStmt ||
                 parsedStmt instanceof ParsedDeleteStmt);
 
         if (! isOrderByNodeRequired(parsedStmt, root)) {
@@ -2039,12 +2039,12 @@ public class PlanAssembler {
      * @param root top of the original plan
      * @return new plan's root node
      */
-    private AbstractPlanNode handleUnionLimitOperator(AbstractPlanNode root) {
+    private AbstractPlanNode handleSetOpLimitOperator(AbstractPlanNode root) {
         // The coordinator's top limit graph fragment for a MP plan.
-        // If planning "order by ... limit", getNextUnionPlan()
+        // If planning "order by ... limit", getNextSetOpPlan()
         // will have already added an order by to the coordinator frag.
         // This is the only limit node in a SP plan
-        LimitPlanNode topLimit = m_parsedUnion.getLimitNodeTop();
+        LimitPlanNode topLimit = m_parsedSetOp.getLimitNodeTop();
         assert(topLimit != null);
         return inlineLimitOperator(root, topLimit);
     }
@@ -3313,4 +3313,11 @@ public class PlanAssembler {
         return false;
     }
 
+    /**
+     * A helper method for subassemblers (SetOp) to get partitioning data
+     * @return
+     */
+    StatementPartitioning getPartitioning() {
+        return m_partitioning;
+    }
 }

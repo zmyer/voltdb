@@ -156,16 +156,16 @@ enum SortDirectionType {
 };
 
 // ------------------------------------------------------------------
-// Union Type
+// SetOp Type
 // ------------------------------------------------------------------
-enum UnionType {
-    UNION_TYPE_NOUNION          = 0,
-    UNION_TYPE_UNION            = 1,
-    UNION_TYPE_UNION_ALL        = 2,
-    UNION_TYPE_INTERSECT        = 3,
-    UNION_TYPE_INTERSECT_ALL    = 4,
-    UNION_TYPE_EXCEPT_ALL       = 5,
-    UNION_TYPE_EXCEPT           = 6
+enum SetOpType {
+    SETOP_TYPE_NONE             = 0,
+    SETOP_TYPE_UNION            = 1,
+    SETOP_TYPE_UNION_ALL        = 2,
+    SETOP_TYPE_INTERSECT        = 3,
+    SETOP_TYPE_INTERSECT_ALL    = 4,
+    SETOP_TYPE_EXCEPT_ALL       = 5,
+    SETOP_TYPE_EXCEPT           = 6
 };
 
 // ------------------------------------------------------------------
@@ -213,7 +213,7 @@ enum PlanNodeType {
     //
     PLAN_NODE_TYPE_AGGREGATE        = 50,
     PLAN_NODE_TYPE_HASHAGGREGATE    = 51,
-    PLAN_NODE_TYPE_UNION            = 52,
+    PLAN_NODE_TYPE_SETOP            = 52,
     PLAN_NODE_TYPE_ORDERBY          = 53,
     PLAN_NODE_TYPE_PROJECTION       = 54,
     PLAN_NODE_TYPE_MATERIALIZE      = 55,

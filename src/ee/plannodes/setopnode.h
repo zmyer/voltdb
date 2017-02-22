@@ -43,40 +43,35 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREUNIONEXECUTOR_H
-#define HSTOREUNIONEXECUTOR_H
+#ifndef HSTORESETOPNODE_H
+#define HSTORESETOPNODE_H
 
-#include "boost/shared_ptr.hpp"
-
-#include "common/common.h"
-#include "common/valuevector.h"
-#include "executors/abstractexecutor.h"
+#include "abstractplannode.h"
 
 namespace voltdb {
-
-class UndoLog;
-class ReadWriteSet;
-
-namespace detail {
-    struct SetOperator;
-}
 
 /**
  *
  */
-class UnionExecutor : public AbstractExecutor {
-    public:
-        UnionExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
+class SetOpPlanNode : public AbstractPlanNode {
+public:
+    SetOpPlanNode() : m_setopType(SETOP_TYPE_NONE), m_needSendChildrenRows(false) { }
+    ~SetOpPlanNode();
+    PlanNodeType getPlanNodeType() const;
+    std::string debugInfo(const std::string& spacer) const;
 
-    protected:
-        bool p_init(AbstractPlanNode*,
-                    TempTableLimits* limits);
-        bool p_execute(const NValueArray &params);
+    SetOpType getSetOpType() const { return m_setopType; }
+    bool needSendChildrenRows() const { return m_needSendChildrenRows; }
+    static SetOpType parseSetOpType(const std::string& setopTypeStr);
 
-    private:
-        boost::shared_ptr<detail::SetOperator> m_setOperator;
+protected:
+    void loadFromJSONObject(PlannerDomValue obj);
+
+private:
+   SetOpType m_setopType;
+   bool m_needSendChildrenRows;
 };
 
-}
+}// namespace voltdb
 
 #endif

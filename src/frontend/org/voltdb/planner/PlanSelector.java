@@ -107,7 +107,7 @@ public class PlanSelector implements Cloneable {
      * @return deep copy of self
      */
     @Override
-    public Object clone() {
+    public PlanSelector clone() {
         return new PlanSelector(m_cluster, m_db, m_estimates, m_stmtName, m_procName, m_sql,
                 m_costModel, m_paramHints, m_detMode, m_quietPlanner);
     }
