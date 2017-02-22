@@ -23,21 +23,32 @@ import java.util.List;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SetOpType;
 import org.voltdb.types.SortDirectionType;
 
 public class SetOpPlanNode extends AbstractPlanNode {
+    public static final String TMP_COLUMN_NAME = "VOLT_TMP_TAG_COLUMN";
 
     private static class Members {
         static final String SETOP_TYPE = "SETOP_TYPE";
+        static final String SEND_CHILDREN_RESULTS_UP = "SEND_CHILDREN_RESULTS_UP";
     }
 
     // SetOp Type
     private SetOpType m_setOpType;
+
+    // In case of a MP plan, the coordinator SetOp node may need an output from all children
+    // to do a cross-partition set op. To differentiate which child a particular row came from
+    // an extra TAG column needs to be added to the output schema that identifies the actual
+    // source table
+    // This column will be removed from the final output schema.
+    private boolean m_needTagColumn = false;
 
     public SetOpPlanNode() {
         super();
@@ -93,9 +104,25 @@ public class SetOpPlanNode extends AbstractPlanNode {
 
         assert(! hasInlineVarcharOrVarbinary());
 
-        m_outputSchema = m_children.get(0).getOutputSchema();
-        m_hasSignificantOutputSchema = false; // It's just the first child's
-        // Then check that they have the same types
+        // Add an extra tag column if needed
+        if (m_needTagColumn) {
+            assert(m_children.get(0).getOutputSchema() != null);
+            m_outputSchema = m_children.get(0).getOutputSchema().clone();
+            assert(!outputColumns.isEmpty());
+            SchemaColumn firstColumn = outputColumns.get(0);
+            ConstantValueExpression expr = new ConstantValueExpression();
+            expr.setValueType(VoltType.BIGINT);
+            SchemaColumn extra = new SchemaColumn(firstColumn.getTableName(),
+                                                  firstColumn.getTableAlias(),
+                                                  TMP_COLUMN_NAME,
+                                                  TMP_COLUMN_NAME,
+                                                  expr);
+            m_outputSchema.addColumn(extra);
+            m_hasSignificantOutputSchema = true;
+        }
+        else {
+            m_hasSignificantOutputSchema = false; // It's just the first child's
+        }
    }
 
     private boolean hasInlineVarcharOrVarbinary() {
@@ -115,6 +142,9 @@ public class SetOpPlanNode extends AbstractPlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.keySymbolValuePair(Members.SETOP_TYPE, m_setOpType.name());
+        if (m_needTagColumn) {
+            stringer.keySymbolValuePair(Members.SEND_CHILDREN_RESULTS_UP, true);
+        }
     }
 
     @Override
@@ -126,6 +156,8 @@ public class SetOpPlanNode extends AbstractPlanNode {
     public void loadFromJSONObject(JSONObject jobj, Database db) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
         m_setOpType = SetOpType.valueOf(jobj.getString(Members.SETOP_TYPE));
+        m_needTagColumn = jobj.has(Members.SEND_CHILDREN_RESULTS_UP) &&
+                jobj.getBoolean(Members.SEND_CHILDREN_RESULTS_UP);
     }
 
     @Override
@@ -136,5 +168,9 @@ public class SetOpPlanNode extends AbstractPlanNode {
     @Override
     public boolean isOrderDeterministic() {
         return false;
+    }
+
+    public void setNeedTagColumn(boolean needColumn) {
+        m_needTagColumn = needColumn;
     }
 }

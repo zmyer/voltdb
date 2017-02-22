@@ -304,6 +304,8 @@ CTX.INPUT['executors'] = """
  sendexecutor.cpp
  seqscanexecutor.cpp
  setopexecutor.cpp
+ setoperator.cpp
+ setopreceiveexecutor.cpp
  swaptablesexecutor.cpp
  tablecountexecutor.cpp
  tuplescanexecutor.cpp
@@ -351,6 +353,7 @@ CTX.INPUT['plannodes'] = """
  sendnode.cpp
  seqscannode.cpp
  setopnode.cpp
+ setopreceivenode.cpp
  swaptablesnode.cpp
  tuplescannode.cpp
  updatenode.cpp
@@ -499,6 +502,7 @@ if whichtests in ("${eetestsuite}", "executors"):
     CTX.TESTS['executors'] = """
     OptimizedProjectorTest
     MergeReceiveExecutorTest
+    SetOpExecutorTest
     TestGeneratedPlans
     TestWindowedRank
     TestWindowedCount

@@ -75,7 +75,6 @@ import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
-import org.voltdb.plannodes.SetOpPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.plannodes.WindowFunctionPlanNode;
 import org.voltdb.types.ConstraintType;
@@ -287,6 +286,7 @@ public class PlanAssembler {
 
         if (parsedStmt instanceof ParsedSetOpStmt) {
             m_parsedSetOp = (ParsedSetOpStmt) parsedStmt;
+            m_subAssembler = new SetOpSubPlanAssembler(m_catalogCluster, m_catalogDb, m_parsedSetOp, m_partitioning, m_planSelector);
             return;
         }
 
@@ -707,10 +707,11 @@ public class PlanAssembler {
      * for the current SQL SET OP statement by building the best plans for each individual statements
      * within the SET OP.
      *
-     * @return A setop plan or null.
+     * @return A setOp plan or null.
      */
     private CompiledPlan getNextSetOpPlan() {
-        String isContentDeterministic = null;
+        assert(m_subAssembler != null);
+        assert(m_subAssembler instanceof SetOpSubPlanAssembler);
         // Since only the one "best" plan is considered,
         // this method should be called only once.
         if (m_bestAndOnlyPlanWasGenerated) {
@@ -718,127 +719,37 @@ public class PlanAssembler {
         }
 
         m_bestAndOnlyPlanWasGenerated = true;
-        // Simply return an union plan node with a corresponding union type set
-        AbstractPlanNode subSetOpRoot = new SetOpPlanNode(m_parsedSetOp.m_unionType);
-        m_recentErrorMsg = null;
+        CompiledPlan retval = new CompiledPlan();
 
-        ArrayList<CompiledPlan> childrenPlans = new ArrayList<>();
-        StatementPartitioning commonPartitioning = null;
-
-        // Build best plans for the children first
-        int planId = 0;
-        for (AbstractParsedStmt parsedChildStmt : m_parsedSetOp.m_children) {
-            StatementPartitioning partitioning = (StatementPartitioning)m_partitioning.clone();
-            PlanSelector planSelector = (PlanSelector) m_planSelector.clone();
-            planSelector.m_planId = planId;
-            PlanAssembler assembler = new PlanAssembler(
-                    m_catalogCluster, m_catalogDb, partitioning, planSelector);
-            CompiledPlan bestChildPlan = assembler.getBestCostPlan(parsedChildStmt);
-            partitioning = assembler.m_partitioning;
-
-            // make sure we got a winner
-            if (bestChildPlan == null) {
-                m_recentErrorMsg = assembler.getErrorMessage();
-                if (m_recentErrorMsg == null) {
-                    m_recentErrorMsg = "Unable to plan for statement. Error unknown.";
-                }
-                return null;
-            }
-
-            childrenPlans.add(bestChildPlan);
-            // Remember the content non-determinism message for the
-            // first non-deterministic children we find.
-            if (isContentDeterministic != null) {
-                isContentDeterministic = bestChildPlan.nondeterminismDetail();
-            }
-
-            // Make sure that next child's plans won't override current ones.
-            planId = planSelector.m_planId;
-
-            // Decide whether child statements' partitioning is compatible.
-            if (commonPartitioning == null) {
-                commonPartitioning = partitioning;
-                continue;
-            }
-
-            AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpression();
-            if (commonPartitioning.requiresTwoFragments()) {
-                if (partitioning.requiresTwoFragments() || statementPartitionExpression != null) {
-                    // If two child statements need to use a second fragment,
-                    // it can't currently be a two-fragment plan.
-                    // The coordinator expects a single-table result from each partition.
-                    // Also, currently the coordinator of a two-fragment plan is not allowed to
-                    // target a particular partition, so neither can the union of the coordinator
-                    // and a statement that wants to run single-partition.
-                    throw new PlanningErrorException(
-                            "Statements are too complex in set operation using multiple partitioned tables.");
-                }
-                // the new statement is apparently a replicated read and has no effect on partitioning
-                continue;
-            }
-
-            AbstractExpression commonPartitionExpression = commonPartitioning.singlePartitioningExpression();
-            if (commonPartitionExpression == null) {
-                // the prior statement(s) were apparently replicated reads
-                // and have no effect on partitioning
-                commonPartitioning = partitioning;
-                continue;
-            }
-
-            if (partitioning.requiresTwoFragments()) {
-                // Again, currently the coordinator of a two-fragment plan is not allowed to
-                // target a particular partition, so neither can the union of the coordinator
-                // and a statement that wants to run single-partition.
-                throw new PlanningErrorException(
-                        "Statements are too complex in set operation using multiple partitioned tables.");
-            }
-
-            if (statementPartitionExpression == null) {
-                // the new statement is apparently a replicated read and has no effect on partitioning
-                continue;
-            }
-
-            if ( ! commonPartitionExpression.equals(statementPartitionExpression)) {
-                throw new PlanningErrorException(
-                        "Statements use conflicting partitioned table filters in set operation or sub-query.");
-            }
+        // Simply return a setOp plan node with a corresponding type set
+        AbstractPlanNode rootNode = m_subAssembler.nextPlan();
+        if (rootNode == null) {
+            // Failed to produce a valid Set Op plan
+            m_recentErrorMsg = m_subAssembler.m_recentErrorMsg;
+            retval.rootPlanGraph = null;
+            return retval;
         }
 
-        if (commonPartitioning != null) {
-            m_partitioning = commonPartitioning;
-        }
-
-        // need to reset plan id for the entire UNION
-        m_planSelector.m_planId = planId;
-
-        // Add and link children plans
-        for (CompiledPlan selectPlan : childrenPlans) {
-            subSetOpRoot.addAndLinkChild(selectPlan.rootPlanGraph);
-        }
+        // reset the partitioning from the common partitioning for all setOp children
+        m_partitioning = ((SetOpSubPlanAssembler)m_subAssembler).getSetOpPartitioning();
+        assert(m_partitioning != null);
 
         // order by
         if (m_parsedSetOp.hasOrderByColumns()) {
-            subSetOpRoot = handleOrderBy(m_parsedSetOp, subSetOpRoot);
+            rootNode = handleOrderBy(m_parsedSetOp, rootNode);
         }
 
         // limit/offset
         if (m_parsedSetOp.hasLimitOrOffset()) {
-            subSetOpRoot = handleSetOpLimitOperator(subSetOpRoot);
+            rootNode = handleSetOpLimitOperator(rootNode);
         }
-
-        CompiledPlan retval = new CompiledPlan();
-        retval.rootPlanGraph = subSetOpRoot;
+        retval.rootPlanGraph = rootNode;
         retval.setReadOnly(true);
         retval.sql = m_planSelector.m_sql;
         boolean orderIsDeterministic = m_parsedSetOp.isOrderDeterministic();
         boolean hasLimitOrOffset = m_parsedSetOp.hasLimitOrOffset();
+        String isContentDeterministic = ((SetOpSubPlanAssembler)m_subAssembler).getIsContentDeterministic();
         retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic, isContentDeterministic);
-
-        // compute the cost - total of all children
-        retval.cost = 0.0;
-        for (CompiledPlan bestChildPlan : childrenPlans) {
-            retval.cost += bestChildPlan.cost;
-        }
         return retval;
     }
 

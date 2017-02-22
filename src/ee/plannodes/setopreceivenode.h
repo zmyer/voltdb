@@ -42,56 +42,34 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-#include "setopnode.h"
 
-#include "common/SerializableEEException.h"
+#ifndef HSTORESETOPRECEIVENODE_H
+#define HSTORESETOPRECEIVENODE_H
 
-#include <sstream>
+#include "abstractreceivenode.h"
+
 
 namespace voltdb {
 
-SetOpPlanNode::~SetOpPlanNode() { }
+class SetOpReceivePlanNode : public AbstractReceivePlanNode {
+public:
+    SetOpReceivePlanNode();
+    ~SetOpReceivePlanNode();
+    PlanNodeType getPlanNodeType() const;
+    std::string debugInfo(const std::string& spacer) const;
 
-PlanNodeType SetOpPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_SETOP; }
+    SetOpType getSetOpType() const { return m_setopType; }
 
-std::string SetOpPlanNode::debugInfo(const std::string& spacer) const {
-    std::ostringstream buffer;
-    buffer << spacer << "SetOpType[" << m_setopType << "]\n";
-    return buffer.str();
-}
+    int getChildrenCount() const { return m_childrenCnt; }
 
-void SetOpPlanNode::loadFromJSONObject(PlannerDomValue obj) {
-    m_setopType = parseSetOpType(obj.valueForKey("SETOP_TYPE").asStr());
-    m_needSendChildrenRows = obj.hasKey("SEND_CHILDREN_RESULTS_UP") &&
-        obj.valueForKey("SEND_CHILDREN_RESULTS_UP").asBool();
-}
+protected:
+    void loadFromJSONObject(PlannerDomValue obj);
 
-SetOpType SetOpPlanNode::parseSetOpType(const std::string& setopTypeStr) {
-    if (setopTypeStr == "UNION") {
-        return SETOP_TYPE_UNION;
-    }
-    if (setopTypeStr == "UNION_ALL") {
-        return SETOP_TYPE_UNION_ALL;
-    }
-    if (setopTypeStr == "INTERSECT") {
-        return SETOP_TYPE_INTERSECT;
-    }
-    if (setopTypeStr == "INTERSECT_ALL") {
-        return SETOP_TYPE_INTERSECT_ALL;
-    }
-    if (setopTypeStr == "EXCEPT") {
-        return SETOP_TYPE_EXCEPT;
-    }
-    if (setopTypeStr == "EXCEPT_ALL") {
-        return SETOP_TYPE_EXCEPT_ALL;
-    }
-    if (setopTypeStr == "NONE") {
-        return SETOP_TYPE_NONE;
-    }
-    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                  "SetopPlanNode::parseSetOpType:"
-                                  " Unsupported SETOP_TYPE value " +
-                                  setopTypeStr);
-}
+private:
+   SetOpType m_setopType;
+   int m_childrenCnt;
+};
 
 }// namespace voltdb
+
+#endif
