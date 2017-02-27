@@ -387,6 +387,12 @@ public final class InvocationDispatcher {
             else if ("@Explain".equals(procName)) {
                 return dispatchAdHoc(task, handler, ccxn, true, user);
             }
+            else if ("@JSONPlan".equals(procName)) {
+                String sql = (String)task.getParams().getParam(0);
+                ExplainMode explainMode = ExplainMode.EXPLAIN_ADHOC_JSON;
+                dispatchAdHocCommon(task, handler, ccxn, explainMode, sql, null, null, user);
+                return null;
+            }
             else if ("@ExplainProc".equals(procName)) {
                 return dispatchExplainProcedure(task, handler, ccxn, user);
             }
@@ -1440,7 +1446,8 @@ public final class InvocationDispatcher {
 
                         m_mailbox.send(m_plannerSiteId, work);
                     }
-                    else if (explainMode == ExplainMode.EXPLAIN_ADHOC) {
+                    else if (explainMode == ExplainMode.EXPLAIN_ADHOC
+                             || explainMode == ExplainMode.EXPLAIN_ADHOC_JSON) {
                         processExplainPlannedStmtBatch(plannedStmtBatch);
                     }
                     else if (explainMode == ExplainMode.EXPLAIN_DEFAULT_PROC) {
@@ -1562,10 +1569,12 @@ public final class InvocationDispatcher {
         Database db = m_catalogContext.get().database;
         int size = planBatch.getPlannedStatementCount();
 
+        boolean getJSONString = planBatch.work.explainMode == ExplainMode.EXPLAIN_ADHOC_JSON;
+
         VoltTable[] vt = new VoltTable[ size ];
         for (int i = 0; i < size; ++i) {
-            vt[i] = new VoltTable(new VoltTable.ColumnInfo("EXECUTION_PLAN", VoltType.STRING));
-            String str = planBatch.explainStatement(i, db);
+            vt[i] = new VoltTable(new VoltTable.ColumnInfo(getJSONString ? "JSON_PLAN": "EXECUTION_PLAN", VoltType.STRING));
+            String str = planBatch.explainStatement(i, db, getJSONString);
             vt[i].addRow(str);
         }
 
@@ -1619,7 +1628,7 @@ public final class InvocationDispatcher {
         assert(planBatch.getPlannedStatementCount() == 1);
         AdHocPlannedStatement ahps = planBatch.getPlannedStatement(0);
         String sql = new String(ahps.sql, StandardCharsets.UTF_8);
-        String explain = planBatch.explainStatement(0, db);
+        String explain = planBatch.explainStatement(0, db, false);
 
         VoltTable vt = new VoltTable(new VoltTable.ColumnInfo( "SQL_STATEMENT", VoltType.STRING),
                 new VoltTable.ColumnInfo( "EXECUTION_PLAN", VoltType.STRING));
