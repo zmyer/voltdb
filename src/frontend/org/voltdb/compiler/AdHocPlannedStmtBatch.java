@@ -381,7 +381,8 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
             String result;
             if (getJSONString) {
                 PlanNodeList pnl = new PlanNodeList(pnt.getRootPlanNode());
-                result = pnl.toJSONString();
+                JSONObject jsonObject = new JSONObject(pnl.toJSONString());
+                result = jsonObject.toString(4);
             }
             else {
                 result = pnt.getRootPlanNode().toExplainPlanString();
