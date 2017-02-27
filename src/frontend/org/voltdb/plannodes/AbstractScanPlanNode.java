@@ -260,9 +260,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         initPreAggOutputSchema();
 
         // Generate the output schema for subqueries
-        Collection<AbstractExpression> exprs = findAllSubquerySubexpressions();
-        for (AbstractExpression expr: exprs) {
-            ((AbstractSubqueryExpression) expr).generateOutputSchema(db);
+        for (AbstractSubqueryExpression expr: findAllSubquerySubexpressions()) {
+            expr.generateOutputSchema(db);
         }
 
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
@@ -492,7 +491,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+    public <aeClass> void findAllExpressionsOfClass(
+            Class< ? extends AbstractExpression> aeClass,
+            Set<aeClass> collected) {
         super.findAllExpressionsOfClass(aeClass, collected);
         if (m_predicate != null) {
             collected.addAll(m_predicate.findAllSubexpressionsOfClass(aeClass));

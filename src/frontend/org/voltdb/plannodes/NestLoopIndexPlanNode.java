@@ -17,8 +17,6 @@
 
 package org.voltdb.plannodes;
 
-import java.util.Collection;
-
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -26,7 +24,6 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
-import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
@@ -74,10 +71,8 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         generateRealOutputSchema(db);
 
         // Generate the output schema for subqueries
-        Collection<AbstractExpression> subqueryExpressions = findAllSubquerySubexpressions();
-        for (AbstractExpression subqueryExpression : subqueryExpressions) {
-            assert(subqueryExpression instanceof AbstractSubqueryExpression);
-            ((AbstractSubqueryExpression) subqueryExpression).generateOutputSchema(db);
+        for (AbstractSubqueryExpression subqueryExpression : findAllSubquerySubexpressions()) {
+            subqueryExpression.generateOutputSchema(db);
         }
     }
 

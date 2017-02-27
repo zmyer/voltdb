@@ -136,7 +136,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             return m_offset;
         }
 
-        public long getLimitParameterId () {
+        public long getLimitParameterId() {
             return m_limitParameterId;
         }
     }
@@ -280,7 +280,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         prepareMVBasedQueryFix();
     }
 
-    private void processAvgPushdownOptimization (VoltXMLElement displayElement,
+    private void processAvgPushdownOptimization(VoltXMLElement displayElement,
             VoltXMLElement groupbyElement, VoltXMLElement havingElement,
             VoltXMLElement orderbyElement) {
 
@@ -350,7 +350,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     /**
      * Switch the optimal set for pushing down AVG
      */
-    public void switchOptimalSuiteForAvgPushdown () {
+    public void switchOptimalSuiteForAvgPushdown() {
         m_displayColumns = m_avgPushdownDisplayColumns;
         m_aggResultColumns = m_avgPushdownAggResultColumns;
         m_groupByColumns = m_avgPushdownGroupByColumns;
@@ -397,8 +397,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
-    private boolean needComplexAggregation () {
-        if (!m_hasAggregateExpression && !isGrouped()) {
+    private boolean needComplexAggregation() {
+        if ( ! m_hasAggregateExpression && ! isGrouped()) {
             m_hasComplexAgg = false;
             return false;
         }
@@ -466,7 +466,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      * function needComplexAggregation().
      * After this function, aggResultColumns construction work.
      */
-    private void fillUpAggResultColumns () {
+    private void fillUpAggResultColumns() {
         for (ParsedColInfo col : m_displayColumns) {
             if (m_aggResultColumns.contains(col)) {
                 continue;
@@ -488,7 +488,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      * Generate new output Schema and Place TVEs for display columns if needed.
      * Place TVEs for order by columns always.
      */
-    private void placeTVEsinColumns () {
+    private void placeTVEsinColumns() {
         // Build the association between the table column with its index
         Map<AbstractExpression, Integer> aggTableIndexMap = new HashMap<>();
         Map<Integer, ParsedColInfo> indexToColumnMap = new HashMap<>();
@@ -593,13 +593,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     /**
      * ParseDisplayColumns and ParseOrderColumns will call this function
      * to add Aggregation expressions to aggResultColumns
-     * @param aggColumns
      * @param cookedCol
      */
-    private void insertAggExpressionsToAggResultColumns (
-            List<AbstractExpression> aggColumns, ParsedColInfo cookedCol) {
-        for (AbstractExpression expr: aggColumns) {
-            assert(expr instanceof AggregateExpression);
+    private void insertAggExpressionsToAggResultColumns(ParsedColInfo cookedCol) {
+        for (AggregateExpression expr : m_aggregationList) {
             if (expr.hasSubquerySubexpression()) {
                 throw new PlanningErrorException(
                         "SQL Aggregate with subquery expression is not allowed.");
@@ -611,13 +608,13 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (col.expression.getExpressionType() == ExpressionType.AGGREGATE_AVG) {
                 m_hasAverage = true;
             }
-            if (aggColumns.size() == 1 &&
-                    cookedCol.expression.equals(aggColumns.get(0))) {
+            if (m_aggregationList.size() == 1 &&
+                    cookedCol.expression.equals(m_aggregationList.get(0))) {
                 col.alias = cookedCol.alias;
                 col.tableName = cookedCol.tableName;
                 col.tableAlias = cookedCol.tableAlias;
                 col.columnName = cookedCol.columnName;
-                if (!m_aggResultColumns.contains(col)) {
+                if ( ! m_aggResultColumns.contains(col)) {
                     m_aggResultColumns.add(col);
                 }
                 return;
@@ -628,14 +625,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             col.tableName = TEMP_TABLE_NAME;
             col.tableAlias = TEMP_TABLE_NAME;
             col.columnName = "";
-            if (!m_aggResultColumns.contains(col)) {
+            if ( ! m_aggResultColumns.contains(col)) {
                 m_aggResultColumns.add(col);
             }
             ExpressionUtil.finalizeValueTypes(col.expression);
         }
     }
 
-    private void insertTVEsToAggResultColumns (
+    private void insertTVEsToAggResultColumns(
             List<TupleValueExpression> colCollection) {
         // TVEs do not need to take care
         for (TupleValueExpression tve: colCollection) {
@@ -645,7 +642,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             col.tableName = tve.getTableName();
             col.tableAlias = tve.getTableAlias();
             col.expression = tve;
-            if (!m_aggResultColumns.contains(col)) {
+            if ( ! m_aggResultColumns.contains(col)) {
                 m_aggResultColumns.add(col);
             }
         }
@@ -655,7 +652,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private static void insertToColumnList(
             List<ParsedColInfo> columnList, List<ParsedColInfo> newCols) {
         for (ParsedColInfo col : newCols) {
-            if (!columnList.contains(col)) {
+            if ( ! columnList.contains(col)) {
                 columnList.add(col);
             }
         }
@@ -678,7 +675,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      */
     private void findAllTVEs(
             AbstractExpression expr, List<TupleValueExpression> tveList) {
-        if (!isNewtoColumnList(m_aggResultColumns, expr)) {
+        if ( ! isNewtoColumnList(m_aggResultColumns, expr)) {
             return;
         }
 
@@ -702,19 +699,19 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
-    private void updateAvgExpressions () {
-        List<AbstractExpression> optimalAvgAggs = new ArrayList<>();
-        Iterator<AbstractExpression> itr = m_aggregationList.iterator();
+    private void updateAvgExpressions() {
+        List<AggregateExpression> optimalAvgAggs = new ArrayList<>();
+        Iterator<AggregateExpression> itr = m_aggregationList.iterator();
         while (itr.hasNext()) {
             AbstractExpression aggExpr = itr.next();
             assert(aggExpr instanceof AggregateExpression);
             if (aggExpr.getExpressionType() == ExpressionType.AGGREGATE_AVG) {
                 itr.remove();
 
-                AbstractExpression left =
+                AggregateExpression left =
                         new AggregateExpression(ExpressionType.AGGREGATE_SUM);
                 left.setLeft(aggExpr.getLeft().clone());
-                AbstractExpression right =
+                AggregateExpression right =
                         new AggregateExpression(ExpressionType.AGGREGATE_COUNT);
                 right.setLeft(aggExpr.getLeft().clone());
 
@@ -771,12 +768,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
 
         // limit and offset can't have both value and parameter
-        if (limitOffset.m_limit != -1) {
-            assert limitOffset.m_limitParameterId == -1 : "Parsed value and param. limit.";
-        }
-        if (limitOffset.m_offset != 0) {
-            assert limitOffset.m_offsetParameterId == -1 : "Parsed value and param. offset.";
-        }
+        assert limitOffset.m_limit == -1 || limitOffset.m_limitParameterId == -1 : "Parsed value and param. limit.";
+        assert limitOffset.m_offset == 0 || limitOffset.m_offsetParameterId == -1 : "Parsed value and param. offset.";
     }
 
     private void parseDisplayColumns(VoltXMLElement columnsNode,
@@ -875,14 +868,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         calculateColumnNames(child, col);
 
-        insertAggExpressionsToAggResultColumns(m_aggregationList, col);
-        if (m_aggregationList.size() >= 1) {
+        if ( ! m_aggregationList.isEmpty()) {
+            insertAggExpressionsToAggResultColumns(col);
             m_hasAggregateExpression = true;
 
-            for (AbstractExpression agg: m_aggregationList) {
-                assert(agg instanceof AggregateExpression);
-                if (! m_hasAggregateDistinct &&
-                        ((AggregateExpression)agg).isDistinct() ) {
+            for (AggregateExpression agg: m_aggregationList) {
+                if ( ! m_hasAggregateDistinct && agg.isDistinct() ) {
                     m_hasAggregateDistinct = true;
                     break;
                 }
@@ -960,7 +951,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
                 VoltType valType = orderByExpressions.get(0).getValueType();
                 assert(valType != null);
-                if (!valType.isAnyIntegerType() && (valType != VoltType.TIMESTAMP)) {
+                if ( ! valType.isAnyIntegerType() && (valType != VoltType.TIMESTAMP)) {
                     throw new PlanningErrorException(
                             "Windowed function call expressions can have only integer or TIMESTAMP value types in the ORDER BY expression of their window.");
                 }
@@ -988,7 +979,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 AbstractExpression arg = windowFunctionExpression.getAggregateArguments().get(0);
                 VoltType vt = arg.getValueType();
                 assert(vt != null);
-                if (! vt.isNumber()) {
+                if ( ! vt.isNumber()) {
                     throw new PlanningErrorException(
                                 "Windowed SUM must have exactly one numeric argument");
                 }
@@ -1048,7 +1039,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         // find the matching columns in selection list
         for (ParsedColInfo col : m_displayColumns) {
-            if (! col.expression.equals(groupbyCol.expression)) {
+            if ( ! col.expression.equals(groupbyCol.expression)) {
                 continue;
             }
             groupbyCol.alias = col.alias;
@@ -1118,10 +1109,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         assert( ! (order_exp instanceof ConstantValueExpression));
         assert( ! (order_exp instanceof ParameterValueExpression));
 
-        insertAggExpressionsToAggResultColumns(m_aggregationList, order_col);
-        if (m_aggregationList.size() >= 1) {
+        if ( ! m_aggregationList.isEmpty()) {
+            insertAggExpressionsToAggResultColumns(order_col);
             m_hasAggregateExpression = true;
+
+            // TODO: DISTINCT aggs in the ORDER BY when there are none
+            // in the display list do not set m_hasAggregateDistinct.
+            // Could this cause wrong answers in aggs erroneously pushed down?
         }
+
         // Add TVEs in ORDER BY statement if we have,
         // stop recursive finding when we have it in AggResultColumns
         List<TupleValueExpression> tveList = new ArrayList<>();
@@ -1140,6 +1136,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             throw new PlanningErrorException(
                     "SQL HAVING with subquery expression is not allowed.");
         }
+
         if (isDistributed) {
             m_having = m_having.replaceAVG();
             updateAvgExpressions();
@@ -1149,44 +1146,45 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // If the condition is a trivial CVE(TRUE)
         // (after the evaluation) simply drop it
         if (ConstantValueExpression.isBooleanTrue(m_having)) {
-            m_aggregationList.clear();
             m_having = null;
-        }
-
-        if (m_aggregationList.isEmpty()) {
             return;
         }
 
-        m_hasAggregateExpression = true;
+        // TODO: DISTINCT aggs in the HAVING when there are none
+        // in the display list do not set m_hasAggregateDistinct.
+        // Could this cause wrong answers in aggs erroneously pushed down?
 
-        for (AbstractExpression expr: m_aggregationList) {
-            assert(expr instanceof AggregateExpression);
+        for (AggregateExpression expr : m_aggregationList) {
+            m_hasAggregateExpression = true;
+
             if (expr.getExpressionType() == ExpressionType.AGGREGATE_AVG) {
                 m_hasAverage = true;
             }
 
-            boolean isNewAgg = true;
+            boolean isRepeatedAgg = false;
             for (ParsedColInfo existingAggCol : m_aggResultColumns) {
                 AbstractExpression existingExpr = existingAggCol.expression;
 
                 if (expr.equals(existingExpr)) {
-                    isNewAgg = false;
+                    isRepeatedAgg = true;
                     break;
                 }
             }
 
-            if (isNewAgg) {
-                ExpressionUtil.finalizeValueTypes(expr);
-
-                ParsedColInfo col = new ParsedColInfo();
-                col.expression = expr.clone();
-                col.tableName = TEMP_TABLE_NAME;
-                col.tableAlias = TEMP_TABLE_NAME;
-                col.columnName = "";
-
-                m_aggResultColumns.add(col);
-                m_hasComplexAgg = true;
+            if (isRepeatedAgg) {
+                continue;
             }
+
+            ExpressionUtil.finalizeValueTypes(expr);
+
+            ParsedColInfo col = new ParsedColInfo();
+            col.expression = expr.clone();
+            col.tableName = TEMP_TABLE_NAME;
+            col.tableAlias = TEMP_TABLE_NAME;
+            col.columnName = "";
+
+            m_aggResultColumns.add(col);
+            m_hasComplexAgg = true;
         }
     }
 
@@ -1415,7 +1413,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                     ExpressionUtil.combinePredicates(whereList));
         }
         // Add new HAVING expressions
-        if (!havingList.isEmpty()) {
+        if ( ! havingList.isEmpty()) {
             if (selectStmt.m_having != null) {
                 havingList.add(selectStmt.m_having);
             }
@@ -1486,7 +1484,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             Iterator<ParsedColInfo >iter = m_displayColumns.iterator();
             while (iter.hasNext()) {
                 ParsedColInfo col = iter.next();
-                if (!col.expression.hasAnySubexpressionOfClass(
+                if ( ! col.expression.hasAnySubexpressionOfClass(
                         AggregateExpression.class)) {
                     iter.remove();
                 }
@@ -1604,7 +1602,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         for (String element : joinOrder.trim().split(",")) {
             String alias = element.trim().toUpperCase();
             tableAliases.add(alias);
-            if (!dupCheck.add(alias)) {
+            if ( ! dupCheck.add(alias)) {
                 if (m_hasLargeNumberOfTableJoins) {
                     return false;
                 }
@@ -1887,7 +1885,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private void detectComplexOrderby() {
         m_isComplexOrderBy = false;
 
-        if (! hasOrderByColumns() || ! isGrouped()) {
+        if ( ! hasOrderByColumns() || ! isGrouped()) {
             return;
         }
 
@@ -2060,7 +2058,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             List<AbstractExpression> nonOrdered) {
         List<ParsedColInfo> unorderedDisplayColumns = new ArrayList<>();
         for (ParsedColInfo col : m_displayColumns) {
-            if (! col.orderBy) {
+            if ( ! col.orderBy) {
                 unorderedDisplayColumns.add(col);
             }
         }
@@ -2245,7 +2243,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
 
         for (ParsedColInfo col : m_displayColumns) {
-            if (! orderExprs.contains(col.expression)) {
+            if ( ! orderExprs.contains(col.expression)) {
                 return false;
             }
         }
@@ -2381,17 +2379,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      * m_having and m_projectSchema seem to have the same issue in ENG-8263.
      */
     @Override
-    public Set<AbstractExpression> findAllSubexpressionsOfClass(
+    public <aeClass> Set<aeClass> findAllSubexpressionsOfClass(
             Class< ? extends AbstractExpression> aeClass) {
-        Set<AbstractExpression> exprs =
-                super.findAllSubexpressionsOfClass(aeClass);
+        Set<aeClass> exprs = super.findAllSubexpressionsOfClass(aeClass);
 
         if (m_having != null) {
-            Collection<AbstractExpression> found =
-                    m_having.findAllSubexpressionsOfClass(aeClass);
-            if (! found.isEmpty()) {
-                exprs.addAll(found);
-            }
+            exprs.addAll(m_having.findAllSubexpressionsOfClass(aeClass));
         }
         addAllSubexpressionsOfClassFromColList(exprs, aeClass, m_groupByColumns);
         if (m_projectSchema != null) {
@@ -2403,13 +2396,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // So, also look for the original expression in m_aggResultColumns.
         addAllSubexpressionsOfClassFromColList(exprs, aeClass, m_aggResultColumns);
 
-        if (m_avgPushdownHaving != null &&
-                m_avgPushdownHaving != m_having) {
-            Collection<AbstractExpression> found =
-                    m_avgPushdownHaving.findAllSubexpressionsOfClass(aeClass);
-            if (! found.isEmpty()) {
-                exprs.addAll(found);
-            }
+        if (m_avgPushdownHaving != null && m_avgPushdownHaving != m_having) {
+            exprs.addAll(m_avgPushdownHaving.findAllSubexpressionsOfClass(aeClass));
         }
         if (m_avgPushdownGroupByColumns != null &&
                 m_avgPushdownGroupByColumns != m_groupByColumns) {
@@ -2436,8 +2424,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     }
 
-    private static void addAllSubexpressionsOfClassFromColList(
-            Set<AbstractExpression> exprs,
+    private static <aeClass> void addAllSubexpressionsOfClassFromColList(
+            Set<aeClass> exprs,
             Class<? extends AbstractExpression> aeClass,
             List<ParsedColInfo> colList) {
         for (ParsedColInfo col : colList) {
@@ -2446,13 +2434,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 continue;
             }
 
-            Collection<AbstractExpression> found =
-                    colExpr.findAllSubexpressionsOfClass(aeClass);
-            if (found.isEmpty()) {
-                continue;
-            }
-
-            exprs.addAll(found);
+            exprs.addAll(colExpr.findAllSubexpressionsOfClass(aeClass));
         }
     }
 

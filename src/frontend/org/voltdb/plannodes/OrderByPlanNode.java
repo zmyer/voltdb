@@ -179,7 +179,9 @@ public class OrderByPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+    public <aeClass> void findAllExpressionsOfClass(
+            Class< ? extends AbstractExpression> aeClass,
+            Set<aeClass> collected) {
         super.findAllExpressionsOfClass(aeClass, collected);
         for (AbstractExpression ae : m_sortExpressions) {
             collected.addAll(ae.findAllSubexpressionsOfClass(aeClass));

@@ -1021,7 +1021,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
     }
 
     @Override
-    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+    public <aeClass> void findAllExpressionsOfClass(
+            Class< ? extends AbstractExpression> aeClass,
+            Set<aeClass> collected) {
         super.findAllExpressionsOfClass(aeClass, collected);
         if (m_endExpression != null) {
             collected.addAll(m_endExpression.findAllSubexpressionsOfClass(aeClass));

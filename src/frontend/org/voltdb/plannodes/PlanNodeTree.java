@@ -18,7 +18,6 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -272,10 +271,7 @@ public class PlanNodeTree implements JSONString {
      */
     private void extractSubqueries(AbstractPlanNode node)  throws Exception {
         assert(node != null);
-        Collection<AbstractExpression> subexprs = node.findAllSubquerySubexpressions();
-        for (AbstractExpression nextexpr : subexprs) {
-            assert(nextexpr instanceof AbstractSubqueryExpression);
-            AbstractSubqueryExpression subqueryExpr = (AbstractSubqueryExpression) nextexpr;
+        for (AbstractSubqueryExpression subqueryExpr : node.findAllSubquerySubexpressions()) {
             int stmtId = subqueryExpr.getSubqueryId();
             List<AbstractPlanNode> planNodes = new ArrayList<AbstractPlanNode>();
             assert(!m_planNodesListMap.containsKey(stmtId));

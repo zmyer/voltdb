@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.HSQLInterface;
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -540,7 +539,9 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+    public <aeClass> void findAllExpressionsOfClass(
+            Class< ? extends AbstractExpression> aeClass,
+            Set<aeClass> collected) {
         super.findAllExpressionsOfClass(aeClass, collected);
         if (m_skip_null_predicate != null) {
             collected.addAll(m_skip_null_predicate.findAllSubexpressionsOfClass(aeClass));

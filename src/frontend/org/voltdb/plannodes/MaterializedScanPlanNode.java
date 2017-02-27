@@ -157,7 +157,9 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+    public <aeClass> void findAllExpressionsOfClass(
+            Class< ? extends AbstractExpression> aeClass,
+            Set<aeClass> collected) {
         super.findAllExpressionsOfClass(aeClass, collected);
         collected.addAll(m_tableData.findAllSubexpressionsOfClass(aeClass));
     }

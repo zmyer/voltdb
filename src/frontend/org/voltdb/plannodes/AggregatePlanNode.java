@@ -266,10 +266,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
 
         // Generate the output schema for subqueries
-        Collection<AbstractExpression> subqueryExpressions = findAllSubquerySubexpressions();
-        for (AbstractExpression subqueryExpression : subqueryExpressions) {
-            assert(subqueryExpression instanceof AbstractSubqueryExpression);
-            ((AbstractSubqueryExpression) subqueryExpression).generateOutputSchema(db);
+        for (AbstractSubqueryExpression subqueryExpression : findAllSubquerySubexpressions()) {
+            subqueryExpression.generateOutputSchema(db);
         }
     }
 
@@ -332,15 +330,6 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
 
         resolveSubqueryColumnIndexes();
-    }
-
-    @Override
-    protected void resolveSubqueryColumnIndexes() {
-        // Possible subquery expressions
-        Collection<AbstractExpression> exprs = findAllSubquerySubexpressions();
-        for (AbstractExpression expr: exprs) {
-            ((AbstractSubqueryExpression) expr).resolveColumnIndexes();
-        }
     }
 
     /**
@@ -548,7 +537,9 @@ public class AggregatePlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+    public <aeClass> void findAllExpressionsOfClass(
+            Class< ? extends AbstractExpression> aeClass,
+            Set<aeClass> collected) {
         super.findAllExpressionsOfClass(aeClass, collected);
         if (m_prePredicate != null) {
             collected.addAll(m_prePredicate.findAllSubexpressionsOfClass(aeClass));

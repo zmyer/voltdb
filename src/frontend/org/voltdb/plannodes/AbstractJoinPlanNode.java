@@ -162,9 +162,9 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
         }
 
         // Generate the output schema for subqueries
-        Collection<AbstractExpression> subqueryExpressions = findAllSubquerySubexpressions();
-        for (AbstractExpression expr : subqueryExpressions) {
-            ((AbstractSubqueryExpression) expr).generateOutputSchema(db);
+        Collection<AbstractSubqueryExpression> subqueryExpressions = findAllSubquerySubexpressions();
+        for (AbstractSubqueryExpression expr : subqueryExpressions) {
+            expr.generateOutputSchema(db);
         }
 
         // Join the schema together to form the output schema
@@ -377,7 +377,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
     }
 
     @Override
-    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+    public <aeClass> void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<aeClass> collected) {
         super.findAllExpressionsOfClass(aeClass, collected);
         if (m_preJoinPredicate != null) {
             collected.addAll(m_preJoinPredicate.findAllSubexpressionsOfClass(aeClass));

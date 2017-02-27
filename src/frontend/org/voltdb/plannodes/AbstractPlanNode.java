@@ -132,10 +132,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     public int overrideId(int newId) {
         m_id = newId++;
         // Override subqueries ids
-        Collection<AbstractExpression> subqueries = findAllSubquerySubexpressions();
-        for (AbstractExpression expr : subqueries) {
-            assert(expr instanceof AbstractSubqueryExpression);
-            AbstractSubqueryExpression subquery = (AbstractSubqueryExpression) expr;
+        for (AbstractSubqueryExpression subquery : findAllSubquerySubexpressions()) {
             // overrideSubqueryNodeIds(newId) will get an NPE if the subquery
             // has not been planned, presumably the effect of hitting a bug
             // earlier in the planner. If that happens again, it MAY be useful
@@ -239,9 +236,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     protected void resolveSubqueryColumnIndexes() {
         // Possible subquery expressions
-        Collection<AbstractExpression> exprs = findAllSubquerySubexpressions();
-        for (AbstractExpression expr: exprs) {
-            ((AbstractSubqueryExpression) expr).resolveColumnIndexes();
+        for (AbstractSubqueryExpression expr: findAllSubquerySubexpressions()) {
+            expr.resolveColumnIndexes();
         }
     }
 
@@ -777,8 +773,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             inlined.findAllNodesOfType_recurse(type, pnClass, collected, visited);
     }
 
-    final public Collection<AbstractExpression> findAllSubquerySubexpressions() {
-        Set<AbstractExpression> collected = new HashSet<>();
+    final public Collection<AbstractSubqueryExpression> findAllSubquerySubexpressions() {
+        Set<AbstractSubqueryExpression> collected = new HashSet<>();
         findAllExpressionsOfClass(AbstractSubqueryExpression.class, collected);
         return collected;
     }
@@ -788,8 +784,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * @param aeClass AbstractExpression class to search for
      * @param collection set to populate with expressions that this node has
      */
-    protected void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass,
-            Set<AbstractExpression> collected) {
+    protected <aeClass> void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass,
+            Set<aeClass> collected) {
         // Check the inlined plan nodes
         for (AbstractPlanNode inlineNode: getInlinePlanNodes().values()) {
             // For inline node we MUST go recursive to its children!!!!!

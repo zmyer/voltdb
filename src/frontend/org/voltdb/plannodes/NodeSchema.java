@@ -358,17 +358,17 @@ public class NodeSchema {
         return sb.toString();
     }
 
-    public void addAllSubexpressionsOfClassFromNodeSchema(
-            Set<AbstractExpression> exprs,
+    public <aeClass> void addAllSubexpressionsOfClassFromNodeSchema(
+            Set<aeClass> collected,
             Class<? extends AbstractExpression> aeClass) {
         for (SchemaColumn column : getColumns()) {
             AbstractExpression colExpr = column.getExpression();
             if (colExpr == null) {
                 continue;
             }
-            Collection<AbstractExpression> found =
+            Collection<aeClass> found =
                     colExpr.findAllSubexpressionsOfClass(aeClass);
-            exprs.addAll(found);
+            collected.addAll(found);
         }
     }
 

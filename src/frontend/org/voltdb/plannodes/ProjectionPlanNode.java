@@ -106,10 +106,8 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         m_hasSignificantOutputSchema = true;
 
         // Generate the output schema for subqueries
-        Collection<AbstractExpression> subqueryExpressions = findAllSubquerySubexpressions();
-        for (AbstractExpression subqueryExpression : subqueryExpressions) {
-            assert(subqueryExpression instanceof AbstractSubqueryExpression);
-            ((AbstractSubqueryExpression) subqueryExpression).generateOutputSchema(db);
+        for (AbstractSubqueryExpression subqueryExpression : findAllSubquerySubexpressions()) {
+            subqueryExpression.generateOutputSchema(db);
         }
     }
 

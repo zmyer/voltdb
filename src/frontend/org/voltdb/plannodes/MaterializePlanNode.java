@@ -17,13 +17,10 @@
 
 package org.voltdb.plannodes;
 
-import java.util.Collection;
-
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
-import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.types.PlanNodeType;
 
@@ -55,9 +52,8 @@ public class MaterializePlanNode extends ProjectionPlanNode {
         // MaterializePlanNode's output schema is pre-determined, don't touch
         // except when its output column(s) has a scalar subquery expression
         // Generate the output schema for subqueries if any
-        Collection<AbstractExpression> exprs = findAllSubquerySubexpressions();
-        for (AbstractExpression expr: exprs) {
-            ((AbstractSubqueryExpression) expr).generateOutputSchema(db);
+        for (AbstractSubqueryExpression subqueryExpression : findAllSubquerySubexpressions()) {
+            subqueryExpression.generateOutputSchema(db);
         }
 
         return;

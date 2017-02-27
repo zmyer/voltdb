@@ -96,7 +96,7 @@ public abstract class AbstractParsedStmt {
 
     public ArrayList<AbstractExpression> m_noTableSelectionList = new ArrayList<>();
 
-    protected ArrayList<AbstractExpression> m_aggregationList = null;
+    protected ArrayList<AggregateExpression> m_aggregationList = null;
 
     // Hierarchical join representation
     public JoinNode m_joinTree = null;
@@ -1985,8 +1985,9 @@ public abstract class AbstractParsedStmt {
     /*
      *  Extract all subexpressions of a given expression class from this statement
      */
-    protected Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        HashSet<AbstractExpression> exprs = new HashSet<>();
+    protected <aeClass> Set<aeClass> findAllSubexpressionsOfClass(
+            Class< ? extends AbstractExpression> aeClass) {
+        HashSet<aeClass> exprs = new HashSet<>();
         if (m_joinTree != null) {
             AbstractExpression treeExpr = m_joinTree.getAllFilters();
             if (treeExpr != null) {
@@ -2013,7 +2014,7 @@ public abstract class AbstractParsedStmt {
         return !findSubquerySubexpressions().isEmpty();
     }
 
-    protected Set<AbstractExpression> findSubquerySubexpressions() {
+    protected Set<SelectSubqueryExpression> findSubquerySubexpressions() {
         return findAllSubexpressionsOfClass(SelectSubqueryExpression.class);
     }
 
