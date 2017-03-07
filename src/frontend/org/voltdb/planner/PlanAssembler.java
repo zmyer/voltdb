@@ -52,7 +52,6 @@ import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
-import org.voltdb.plannodes.IndexSortablePlanNode;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
@@ -61,6 +60,7 @@ import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.IndexSortablePlanNode;
 import org.voltdb.plannodes.IndexUseForOrderBy;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -490,9 +490,8 @@ public class PlanAssembler {
         }
 
         // Get the best plans for the expression subqueries ( IN/EXISTS (SELECT...) )
-        Set<AbstractExpression> subqueryExprs = parsedStmt.findSubquerySubexpressions();
+        Set<SelectSubqueryExpression> subqueryExprs = parsedStmt.findSubquerySubexpressions();
         if ( ! subqueryExprs.isEmpty() ) {
-
             // guards against IN/EXISTS/Scalar subqueries
             if ( ! m_partitioning.wasSpecifiedAsSingle() ) {
                 // Don't allow partitioned tables in subqueries.
@@ -633,16 +632,10 @@ public class PlanAssembler {
      * @param subqueryExprs - list of subquery expressions
      * @return true if a best plan was generated for each subquery, false otherwise
      */
-    private boolean getBestCostPlanForExpressionSubQueries(Set<AbstractExpression> subqueryExprs) {
+    private boolean getBestCostPlanForExpressionSubQueries(
+            Set<SelectSubqueryExpression> subqueryExprs) {
         int nextPlanId = m_planSelector.m_planId;
-
-        for (AbstractExpression expr : subqueryExprs) {
-            assert(expr instanceof SelectSubqueryExpression);
-            if (!(expr instanceof SelectSubqueryExpression)) {
-                continue; // DEAD CODE?
-            }
-
-            SelectSubqueryExpression subqueryExpr = (SelectSubqueryExpression) expr;
+        for (SelectSubqueryExpression subqueryExpr : subqueryExprs) {
             StmtSubqueryScan subqueryScan = subqueryExpr.getSubqueryScan();
             nextPlanId = planForParsedSubquery(subqueryScan, nextPlanId);
             CompiledPlan bestPlan = subqueryScan.getBestCostPlan();
@@ -661,7 +654,6 @@ public class PlanAssembler {
         }
         // need to reset plan id for the entire SQL
         m_planSelector.m_planId = nextPlanId;
-
         return true;
     }
 
@@ -2482,7 +2474,7 @@ public class PlanAssembler {
          * "Select A from T group by A" is grouped but has no aggregate operator
          * expressions. Catch that case by checking the grouped flag
          */
-        if (m_parsedSelect.hasAggregateOrGroupby()) {
+        if (m_parsedSelect.hasAggregateOrGroupBy()) {
             AggregatePlanNode aggNode = null;
             AggregatePlanNode topAggNode = null; // i.e., on the coordinator
             IndexGroupByInfo gbInfo = new IndexGroupByInfo();

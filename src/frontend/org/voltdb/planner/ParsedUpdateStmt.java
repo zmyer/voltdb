@@ -76,8 +76,9 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
     }
 
     @Override
-    public Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        Set<AbstractExpression> exprs = super.findAllSubexpressionsOfClass(aeClass);
+    public <aeClass> Set<aeClass> findAllSubexpressionsOfClass(
+            Class< ? extends AbstractExpression> aeClass) {
+        Set<aeClass> exprs = super.findAllSubexpressionsOfClass(aeClass);
 
         for (AbstractExpression expr : columns.values()) {
             if (expr != null) {
