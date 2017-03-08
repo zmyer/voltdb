@@ -3034,14 +3034,14 @@ public class TestPlansJoin extends PlannerTestCase {
                     "FROM P1 FULL JOIN P3 ON P1.A" +
                     joinOp + "P3.A AND P1.A = ? AND P3.F = 1 " +
                     "ORDER BY P1.A, P1.C, P3.A, P3.F";
-            explained = buildExplainPlan(compileToFragments(query));
+            explained = buildExplainPlan(query);
             assertTrue(explained.contains("NESTLOOP INDEX FULL JOIN"));
             assertEquals(notDistinctCount, StringUtils.countMatches(explained, "NOT DISTINCT"));
             query = "SELECT R1.A, R1.C, R3.A, R3.C " +
                     "FROM R1 FULL JOIN R3 ON R3.A" +
                     joinOp + "R1.A AND R3.A < 2 " +
                     "ORDER BY R1.A, R1.D, R3.A, R3.C";
-            explained = buildExplainPlan(compileToFragments(query));
+            explained = buildExplainPlan(query);
             //* enable to debug */ System.out.println("DEBUG: " + explained);
             assertTrue(explained.contains("NESTLOOP INDEX FULL JOIN"));
             assertEquals(notDistinctCount, StringUtils.countMatches(explained, "NOT DISTINCT"));
@@ -3049,7 +3049,7 @@ public class TestPlansJoin extends PlannerTestCase {
                     "FROM R3 LHS FULL JOIN R3 RHS ON LHS.A" +
                     joinOp + "RHS.A AND LHS.A < 2 " +
                     "ORDER BY 1, 2, 3, 4";
-            explained = buildExplainPlan(compileToFragments(query));
+            explained = buildExplainPlan(query);
             //* enable to debug */ System.out.println("DEBUG: " + explained);
             assertTrue(explained.contains("NESTLOOP INDEX FULL JOIN"));
             assertEquals(notDistinctCount, StringUtils.countMatches(explained, "NOT DISTINCT"));
@@ -3060,7 +3060,7 @@ public class TestPlansJoin extends PlannerTestCase {
                     "ON P2.A" +
                     joinOp + "R1.A " +
                     "ORDER BY P2.A";
-            explained = buildExplainPlan(compileToFragments(query));
+            explained = buildExplainPlan(query);
             //* enable to debug */ System.out.println("DEBUG: " + explained);
             // Account for how IS NOT DISTINCT FROM does not reject all nulls.
             if (joinOp == JoinOp.EQUAL) { // weaken test for now
@@ -3078,7 +3078,7 @@ public class TestPlansJoin extends PlannerTestCase {
                     "ON P2.A" +
                     joinOp + "R2.A " +
                     "ORDER BY P2.A";
-            explained = buildExplainPlan(compileToFragments(query));
+            explained = buildExplainPlan(query);
             assertTrue(explained.contains("FULL"));
             query = "SELECT * " +
                     "FROM R1 RIGHT JOIN R2 " +
@@ -3087,7 +3087,7 @@ public class TestPlansJoin extends PlannerTestCase {
                     "ON R1.A" +
                     joinOp + "P2.A " +
                     "ORDER BY P2.A";
-            explained = buildExplainPlan(compileToFragments(query));
+            explained = buildExplainPlan(query);
             assertTrue(explained.contains("LEFT"));
             query = "SELECT * " +
                     "FROM R1 FULL JOIN R2 " +
@@ -3096,25 +3096,25 @@ public class TestPlansJoin extends PlannerTestCase {
                     "ON R1.A" +
                     joinOp + "P2.A " +
                     "ORDER BY P2.A";
-            explained = buildExplainPlan(compileToFragments(query));
+            explained = buildExplainPlan(query);
             assertEquals(2, StringUtils.countMatches(explained, "FULL"));
             query = "SELECT MAX(R1.C), A " +
                     "FROM R1 FULL JOIN R2 USING (A) " +
                     "WHERE A > 0 GROUP BY A ORDER BY A";
-            explained = buildExplainPlan(compileToFragments(query));
+            explained = buildExplainPlan(query);
             assertEquals(1, StringUtils.countMatches(explained, "FULL"));
             query = "SELECT A " +
                     "FROM R1 FULL JOIN R2 USING (A) " +
                     "FULL JOIN R3 USING(A) " +
                     "WHERE A > 0 ORDER BY A";
-            explained = buildExplainPlan(compileToFragments(query));
+            explained = buildExplainPlan(query);
             assertEquals(2, StringUtils.countMatches(explained, "FULL"));
             query = "SELECT L.A " +
                     "FROM R3 L FULL JOIN R3 R " +
                     "ON L.C" +
                     joinOp + "R.C " +
                     "ORDER BY A";
-            explained = buildExplainPlan(compileToFragments(query));
+            explained = buildExplainPlan(query);
             assertEquals(1, StringUtils.countMatches(explained, "FULL"));
             assertEquals(1, StringUtils.countMatches(explained, "SORT"));
             query = "SELECT L.A, SUM(L.C) " +
@@ -3122,7 +3122,7 @@ public class TestPlansJoin extends PlannerTestCase {
                     "ON L.C" +
                     joinOp + "R.C " +
                     "GROUP BY L.A ORDER BY 1";
-            explained = buildExplainPlan(compileToFragments(query));
+            explained = buildExplainPlan(query);
             assertEquals(1, StringUtils.countMatches(explained, "FULL"));
             assertEquals(1, StringUtils.countMatches(explained, "SORT"));
             assertEquals(1, StringUtils.countMatches(explained, "Serial AGGREGATION"));

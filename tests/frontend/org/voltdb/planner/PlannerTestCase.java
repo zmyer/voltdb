@@ -36,6 +36,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 
+import junit.framework.TestCase;
+
 import org.apache.commons.lang3.StringUtils;
 import org.json_voltpatches.JSONException;
 import org.voltdb.catalog.Database;
@@ -50,8 +52,6 @@ import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
-
-import junit.framework.TestCase;
 
 public class PlannerTestCase extends TestCase {
 
@@ -329,7 +329,8 @@ public class PlannerTestCase extends TestCase {
         }
     }
 
-    protected String buildExplainPlan(List<AbstractPlanNode> planNodes) {
+    protected String buildExplainPlan(String sql) {
+        List<AbstractPlanNode> planNodes = compileToFragments(sql);
         String explain = "";
         for (AbstractPlanNode apn: planNodes) {
             explain += apn.toExplainPlanString() + '\n';
@@ -339,11 +340,8 @@ public class PlannerTestCase extends TestCase {
 
     protected void checkQueriesPlansAreTheSame(String sql1, String sql2) {
         String explainStr1, explainStr2;
-        List<AbstractPlanNode> pns = compileToFragments(sql1);
-        explainStr1 = buildExplainPlan(pns);
-        pns = compileToFragments(sql2);
-        explainStr2 = buildExplainPlan(pns);
-
+        explainStr1 = buildExplainPlan(sql1);
+        explainStr2 = buildExplainPlan(sql2);
         assertEquals(explainStr1, explainStr2);
     }
 
