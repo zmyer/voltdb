@@ -3257,11 +3257,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         Encoder.hexEncode(deploymentHash).substring(0, 10)));
 
                 // get old debugging info
+                VoltTrace.add(() -> VoltTrace.beginDuration("uac_generate_debug_info", VoltTrace.Category.SPSITE));
                 SortedMap<String, String> oldDbgMap = m_catalogContext.getDebuggingInfoFromCatalog(false);
                 byte[] oldDeployHash = m_catalogContext.deploymentHash;
                 final String oldDRConnectionSource = m_catalogContext.cluster.getDrmasterhost();
+                VoltTrace.add(VoltTrace::endDuration);
 
                 // 0. A new catalog! Update the global context and the context tracker
+                VoltTrace.add(() -> VoltTrace.beginDuration("uac_new_context", VoltTrace.Category.SPSITE));
                 m_catalogContext =
                     m_catalogContext.update(
                             currentTxnId,
@@ -3272,6 +3275,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             true,
                             deploymentBytes,
                             m_messenger);
+                VoltTrace.add(VoltTrace::endDuration);
+
                 final CatalogSpecificPlanner csp = new CatalogSpecificPlanner( m_asyncCompilerAgent, m_catalogContext);
                 m_txnIdToContextTracker.put(currentTxnId,
                         new ContextTracker(
@@ -3288,6 +3293,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     hostLog.info(e.getValue());
                 }
 
+                VoltTrace.add(() -> VoltTrace.beginDuration("uac_context_construct_sites_partitions", VoltTrace.Category.SPSITE));
                 //Construct the list of partitions and sites because it simply doesn't exist anymore
                 SiteTracker siteTracker = VoltDB.instance().getSiteTrackerForSnapshot();
                 List<Long> sites = siteTracker.getSitesForHost(m_messenger.getHostId());
@@ -3297,6 +3303,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     Integer partition = siteTracker.getPartitionForSite(site);
                     partitions.add(partition);
                 }
+                VoltTrace.add(VoltTrace::endDuration);
 
 
                 // 1. update the export manager.
@@ -3329,12 +3336,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 // The stats agent will hold all other stats in memory.
                 getStatsAgent().notifyOfCatalogUpdate();
 
+                VoltTrace.add(() -> VoltTrace.beginDuration("uac_update_MPI", VoltTrace.Category.MPI));
                 // 5. MPIs don't run fragments. Update them here. Do
                 // this after flushing the stats -- this will re-register
                 // the MPI statistics.
                 if (m_MPI != null) {
                     m_MPI.updateCatalog(diffCommands, m_catalogContext, csp);
                 }
+                VoltTrace.add(VoltTrace::endDuration);
 
                 // Update catalog for import processor this should be just/stop start and updat partitions.
                 ImportManager.instance().updateCatalog(m_catalogContext, m_messenger);
@@ -3367,7 +3376,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
                 }
 
+                VoltTrace.add(() -> VoltTrace.beginDuration("uac_log_catalogjar", VoltTrace.Category.SPSITE));
                 new ConfigLogging().logCatalogAndDeployment();
+                VoltTrace.add(VoltTrace::endDuration);
 
                 // log system setting information if the deployment config has changed
                 if (!Arrays.equals(oldDeployHash, m_catalogContext.deploymentHash)) {

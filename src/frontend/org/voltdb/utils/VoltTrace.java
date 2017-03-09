@@ -45,11 +45,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
-import com.google_voltpatches.common.collect.EvictingQueue;
-import com.google_voltpatches.common.util.concurrent.Futures;
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
-import com.google_voltpatches.common.util.concurrent.SettableFuture;
 import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
@@ -63,6 +58,12 @@ import org.voltdb.StatsSelector;
 import org.voltdb.StatsSource;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+
+import com.google_voltpatches.common.collect.EvictingQueue;
+import com.google_voltpatches.common.util.concurrent.Futures;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 /**
  * Utility class to log Chrome Trace Event format trace messages into files.
@@ -80,7 +81,7 @@ public class VoltTrace extends StatsSource implements Runnable {
     }
 
     public enum Category {
-        CI, MPI, MPSITE, SPI, SPSITE, EE
+        CI, MPI, MPSITE, SPI, SPSITE, EE, ASYNC
     }
 
     private static Map<Character, TraceEventType> s_typeMap = new HashMap<>();

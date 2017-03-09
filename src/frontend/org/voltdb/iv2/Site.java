@@ -103,6 +103,7 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
+import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
@@ -1507,8 +1508,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         //Necessary to quiesce before updating the catalog
         //so export data for the old generation is pushed to Java.
+        VoltTrace.add(() -> VoltTrace.beginDuration("uac_ee_update", VoltTrace.Category.SPSITE));
         m_ee.quiesce(m_lastCommittedSpHandle);
         m_ee.updateCatalog(m_context.m_uniqueId, diffCmds);
+        VoltTrace.add(VoltTrace::endDuration);
         if (DRCatalogChange) {
             final DRCatalogCommands catalogCommands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(m_context.catalog, -1);
             generateDREvent( EventType.CATALOG_UPDATE, uniqueId, m_lastCommittedSpHandle,

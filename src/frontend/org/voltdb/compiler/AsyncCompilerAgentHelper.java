@@ -37,6 +37,7 @@ import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
+import org.voltdb.utils.VoltTrace;
 
 public class AsyncCompilerAgentHelper
 {
@@ -66,8 +67,9 @@ public class AsyncCompilerAgentHelper
             // catalog to be applied, and deploymentString will contain an actual deployment string,
             // or null if it still needs to be filled in.
             InMemoryJarfile newCatalogJar = null;
+            VoltTrace.add(() -> VoltTrace.beginDuration("inmemoryjar_deepcopy", VoltTrace.Category.ASYNC));
             InMemoryJarfile oldJar = context.getCatalogJar().deepCopy();
-
+            VoltTrace.add(VoltTrace::endDuration);
             String deploymentString = work.operationString;
             if ("@UpdateApplicationCatalog".equals(work.invocationName)) {
                 // Grab the current catalog bytes if @UAC had a null catalog from deployment-only update
@@ -83,8 +85,11 @@ public class AsyncCompilerAgentHelper
                 // provided operationString is really a String with class patterns to delete,
                 // provided newCatalogJar is the jarfile with the new classes
                 if (work.operationBytes != null) {
+                    VoltTrace.add(() -> VoltTrace.beginDuration("bytes_to_inmemoryjar", VoltTrace.Category.ASYNC));
                     newCatalogJar = new InMemoryJarfile(work.operationBytes);
+                    VoltTrace.add(VoltTrace::endDuration);
                 }
+                VoltTrace.add(() -> VoltTrace.beginDuration("modify_classes", VoltTrace.Category.ASYNC));
                 try {
                     newCatalogJar = modifyCatalogClasses(context.catalog, oldJar, work.operationString,
                             newCatalogJar, work.drRole == DrRoleType.XDCR);
@@ -94,6 +99,7 @@ public class AsyncCompilerAgentHelper
                         "from catalog: " + e.getMessage();
                     return retval;
                 }
+                VoltTrace.add(VoltTrace::endDuration);
                 // Real deploymentString should be the current deployment, just set it to null
                 // here and let it get filled in correctly later.
                 deploymentString = null;
@@ -140,6 +146,7 @@ public class AsyncCompilerAgentHelper
             // get the diff between catalogs
             // try to get the new catalog from the params
             Pair<InMemoryJarfile, String> loadResults = null;
+            VoltTrace.add(() -> VoltTrace.beginDuration("loadAndUpgradeCatalogFromJar", VoltTrace.Category.ASYNC));
             try {
                 loadResults = CatalogUtil.loadAndUpgradeCatalogFromJar(newCatalogJar, work.drRole == DrRoleType.XDCR);
             }
@@ -149,10 +156,16 @@ public class AsyncCompilerAgentHelper
                 retval.errorMsg = ioe.getMessage();
                 return retval;
             }
+            VoltTrace.add(VoltTrace::endDuration);
+
+            VoltTrace.add(() -> VoltTrace.beginDuration("get_full_jar_bytes", VoltTrace.Category.ASYNC));
             retval.catalogBytes = loadResults.getFirst().getFullJarBytes();
+            VoltTrace.add(VoltTrace::endDuration);
             retval.isForReplay = work.isForReplay();
             if (!retval.isForReplay) {
+                VoltTrace.add(() -> VoltTrace.beginDuration("get_sha1_hash", VoltTrace.Category.ASYNC));
                 retval.catalogHash = loadResults.getFirst().getSha1Hash();
+                VoltTrace.add(VoltTrace::endDuration);
             } else {
                 retval.catalogHash = work.replayHashOverride;
             }
@@ -165,8 +178,10 @@ public class AsyncCompilerAgentHelper
                 retval.errorMsg = "Unable to read from catalog bytes";
                 return retval;
             }
+            VoltTrace.add(() -> VoltTrace.beginDuration("calculate_new_catalog", VoltTrace.Category.ASYNC));
             Catalog newCatalog = new Catalog();
             newCatalog.execute(newCatalogCommands);
+            VoltTrace.add(VoltTrace::endDuration);
 
             // Retrieve the original deployment string, if necessary
             if (deploymentString == null) {
@@ -214,11 +229,13 @@ public class AsyncCompilerAgentHelper
             retval.expectedCatalogVersion = context.catalogVersion;
 
             // compute the diff in StringBuilder
+            VoltTrace.add(() -> VoltTrace.beginDuration("diff_engine", VoltTrace.Category.ASYNC));
             CatalogDiffEngine diff = new CatalogDiffEngine(context.catalog, newCatalog);
             if (!diff.supported()) {
                 retval.errorMsg = "The requested catalog change(s) are not supported:\n" + diff.errors();
                 return retval;
             }
+            VoltTrace.add(VoltTrace::endDuration);
 
             String commands = diff.commands();
 
@@ -272,6 +289,7 @@ public class AsyncCompilerAgentHelper
     {
         // modify the old jar in place based on the @UpdateClasses inputs, and then
         // recompile it if necessary
+        VoltTrace.add(() -> VoltTrace.beginDuration("inmemoryjar_modify_classes", VoltTrace.Category.ASYNC));
         boolean deletedClasses = false;
         if (deletePatterns != null) {
             String[] patterns = deletePatterns.split(",");
@@ -304,9 +322,11 @@ public class AsyncCompilerAgentHelper
                 jarfile.put(e.getKey(), e.getValue());
             }
         }
+        VoltTrace.add(VoltTrace::endDuration);
         if (deletedClasses || foundClasses) {
             compilerLog.info("Checking java classes available to stored procedures");
             // TODO: check the jar classes on all nodes
+            VoltTrace.add(() -> VoltTrace.beginDuration("class_loader_checking", VoltTrace.Category.ASYNC));
             Database db = VoltCompiler.getCatalogDatabase(catalog);
             for (Procedure proc: db.getProcedures()) {
                 // single statement procedure does not need to check class loading
@@ -316,6 +336,7 @@ public class AsyncCompilerAgentHelper
                     throw new ClassNotFoundException("Cannot load class for procedure " + proc.getClassname());
                 }
             }
+            VoltTrace.add(VoltTrace::endDuration);
         }
         return jarfile;
     }

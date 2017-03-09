@@ -32,6 +32,7 @@ import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.groovy.GroovyScriptProcedureDelegate;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -117,17 +118,23 @@ public class LoadedProcedureSet {
         m_defaultProcCache.clear();
         m_plannerTool = catalogContext.m_ptool;
 
+        VoltTrace.add(() -> VoltTrace.beginDuration("loader_user_procedures", VoltTrace.Category.SPSITE));
         // reload user procedures
         m_userProcs = loadUserProcedureRunners(catalogContext, m_site, m_csp);
+        VoltTrace.add(VoltTrace::endDuration);
 
+        VoltTrace.add(() -> VoltTrace.beginDuration("loader_sys_procedures", VoltTrace.Category.SPSITE));
         if (forUpdateOnly) {
             // When catalog updates, only user procedures needs to be reloaded.
             // System procedures can be left without changes.
+            VoltTrace.add(() -> VoltTrace.beginDuration("reinit_sys_procedures", VoltTrace.Category.SPSITE));
             reInitSystemProcedureRunners(catalogContext, csp);
+            VoltTrace.add(VoltTrace::endDuration);
         } else {
             // reload all system procedures from beginning
             m_sysProcs = loadSystemProcedures(catalogContext, m_site, csp);
         }
+        VoltTrace.add(VoltTrace::endDuration);
     }
 
     private static ImmutableMap<String, ProcedureRunner> loadUserProcedureRunners(

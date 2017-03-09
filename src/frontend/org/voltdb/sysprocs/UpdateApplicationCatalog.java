@@ -55,6 +55,7 @@ import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.InMemoryJarfile.JarLoader;
 import org.voltdb.utils.VoltTableUtil;
+import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.base.Throwables;
 
@@ -246,7 +247,9 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         if (fragmentId == SysProcFragmentId.PF_updateCatalogPrecheckAndSync) {
             String[] tablesThatMustBeEmpty = (String[]) params.getParam(0);
             String[] reasonsForEmptyTables = (String[]) params.getParam(1);
+            VoltTrace.add(() -> VoltTrace.beginDuration("uac_emptytablescheck", VoltTrace.Category.SPSITE));
             checkForNonEmptyTables(tablesThatMustBeEmpty, reasonsForEmptyTables, context);
+            VoltTrace.add(VoltTrace::endDuration);
 
             // Send out fragments to do the initial round-trip to synchronize
             // all the cluster sites on the start of catalog update, we'll do
@@ -268,14 +271,17 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                 }
                 return success;
             }
+            VoltTrace.add(() -> VoltTrace.beginDuration("uac_loadclasses_precheck", VoltTrace.Category.SPSITE));
 
             // We know the ZK bytes are okay because the run() method wrote them before sending
             // out fragments
             CatalogAndIds catalogStuff = null;
             try {
+                VoltTrace.add(() -> VoltTrace.beginDuration("uac_readjarfromzk", VoltTrace.Category.SPSITE));
                 catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
                 InMemoryJarfile testjar = new InMemoryJarfile(catalogStuff.catalogBytes);
                 JarLoader testjarloader = testjar.getLoader();
+                VoltTrace.add(VoltTrace::endDuration);
                 for (String classname : testjarloader.getClassNames()) {
                     try {
                         m_javaClass.forName(classname, true, testjarloader);
@@ -322,6 +328,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                 log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
                         " completed data and catalog precheck.");
             }
+            VoltTrace.add(VoltTrace::endDuration);
             return success;
         }
         else if (fragmentId == SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate) {
@@ -339,17 +346,19 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             boolean requiresSnapshotIsolation = ((Byte) params.toArray()[2]) != 0;
 
             CatalogAndIds catalogStuff = null;
+            VoltTrace.add(() -> VoltTrace.beginDuration("uac_read_catalog_fromzk", VoltTrace.Category.SPSITE));
             try {
                 catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
             } catch (Exception e) {
                 Throwables.propagate(e);
             }
+            VoltTrace.add(VoltTrace::endDuration);
 
             String replayInfo = m_runner.getTxnState().isForReplay() ? " (FOR REPLAY)" : "";
 
             // if this is a new catalog, do the work to update
             if (context.getCatalogVersion() == expectedCatalogVersion) {
-
+                VoltTrace.add(() -> VoltTrace.beginDuration("uac_instance().catalogUpdate", VoltTrace.Category.SPSITE));
                 // update the global catalog if we get there first
                 @SuppressWarnings("deprecation")
                 Pair<CatalogContext, CatalogSpecificPlanner> p =
@@ -362,6 +371,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                         getUniqueId(),
                         catalogStuff.deploymentBytes,
                         catalogStuff.getDeploymentHash());
+                VoltTrace.add(VoltTrace::endDuration);
 
                 // If the cluster is in master role only (not replica or XDCR), reset trackers.
                 // The producer would have been turned off by the code above already.
@@ -373,8 +383,10 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                 // update the local catalog.  Safe to do this thanks to the check to get into here.
                 long uniqueId = m_runner.getUniqueId();
                 long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
+                VoltTrace.add(() -> VoltTrace.beginDuration("uac.context.updateCatalog", VoltTrace.Category.SPSITE));
                 context.updateCatalog(commands, p.getFirst(), p.getSecond(),
                         requiresSnapshotIsolation, uniqueId, spHandle);
+                VoltTrace.add(VoltTrace::endDuration);
 
                 if (log.isDebugEnabled()) {
                     log.debug(String.format("Site %s completed catalog update with catalog hash %s, deployment hash %s%s.",
