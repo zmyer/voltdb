@@ -40,6 +40,7 @@ import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.TrivialCostModel;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.VoltTrace;
 
 /**
  * Planner tool accepts an already compiled VoltDB catalog and then
@@ -69,10 +70,16 @@ public class PlannerTool {
         m_cache = AdHocCompilerCache.getCacheForCatalogHash(catalogHash);
 
         // LOAD HSQL
+        VoltTrace.add(() -> VoltTrace.beginDuration("ctx_loadhsqldb", VoltTrace.Category.SPSITE));
         m_hsql = HSQLInterface.loadHsqldb();
+        VoltTrace.add(VoltTrace::endDuration);
+        VoltTrace.add(() -> VoltTrace.beginDuration("ctx_hsqldb_decompress_schema", VoltTrace.Category.SPSITE));
         String binDDL = m_database.getSchema();
         String ddl = Encoder.decodeBase64AndDecompress(binDDL);
+        VoltTrace.add(VoltTrace::endDuration);
         String[] commands = ddl.split("\n");
+
+        VoltTrace.add(() -> VoltTrace.beginDuration("ctx_hsqldb_apply_schema", VoltTrace.Category.SPSITE));
         for (String command : commands) {
             String decoded_cmd = Encoder.hexDecodeToString(command);
             decoded_cmd = decoded_cmd.trim();
@@ -86,6 +93,7 @@ public class PlannerTool {
                 throw new RuntimeException("Error creating hsql: " + e.getMessage() + " in DDL statement: " + decoded_cmd);
             }
         }
+        VoltTrace.add(VoltTrace::endDuration);
 
         hostLog.debug("hsql loaded");
 

@@ -45,6 +45,7 @@ import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
+import org.voltdb.utils.VoltTrace;
 
 public class CatalogContext {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -121,6 +122,7 @@ public class CatalogContext {
         }
 
         if (catalogBytes != null) {
+            VoltTrace.add(() -> VoltTrace.beginDuration("ctx_constructor_bytestojar", VoltTrace.Category.SPSITE));
             try {
                 m_jarfile = new InMemoryJarfile(catalogBytes);
                 catalogCRC = m_jarfile.getCRC();
@@ -128,13 +130,16 @@ public class CatalogContext {
             catch (Exception e) {
                 throw new RuntimeException(e);
             }
+            VoltTrace.add(VoltTrace::endDuration);
 
             if (catalogBytesHash != null) {
                 // This is expensive to compute so if it was passed in to us, use it.
                 this.catalogHash = catalogBytesHash;
             }
             else {
+                VoltTrace.add(() -> VoltTrace.beginDuration("ctx_jar_shar1hash", VoltTrace.Category.SPSITE));
                 this.catalogHash = m_jarfile.getSha1Hash();
+                VoltTrace.add(VoltTrace::endDuration);
             }
         }
         else {
@@ -155,17 +160,25 @@ public class CatalogContext {
         this.m_dbSettings = settings;
 
         this.deploymentBytes = deploymentBytes;
+        VoltTrace.add(() -> VoltTrace.beginDuration("ctx_makeDeploymentHash", VoltTrace.Category.SPSITE));
         this.deploymentHash = CatalogUtil.makeDeploymentHash(deploymentBytes);
+        VoltTrace.add(VoltTrace::endDuration);
+        VoltTrace.add(() -> VoltTrace.beginDuration("ctx_makeDeploymentHashForConfig", VoltTrace.Category.SPSITE));
         this.deploymentHashForConfig = CatalogUtil.makeDeploymentHashForConfig(deploymentBytes);
+        VoltTrace.add(VoltTrace::endDuration);
+
         m_memoizedDeployment = null;
 
         m_defaultProcs = new DefaultProcedureManager(database);
 
         m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog, m_defaultProcs, m_jarfile);
+        VoltTrace.add(() -> VoltTrace.beginDuration("ctx_plantool", VoltTrace.Category.SPSITE));
         m_ptool = new PlannerTool(cluster, database, catalogHash);
+        VoltTrace.add(VoltTrace::endDuration);
         catalogVersion = version;
         m_messenger = messenger;
 
+        VoltTrace.add(() -> VoltTrace.beginDuration("ctx_proc_partition_info", VoltTrace.Category.SPSITE));
         if (procedures != null) {
             for (Procedure proc : procedures) {
                 if (proc.getSinglepartition()) {
@@ -174,6 +187,7 @@ public class CatalogContext {
                 }
             }
         }
+        VoltTrace.add(VoltTrace::endDuration);
     }
 
     public Cluster getCluster() {
@@ -198,8 +212,12 @@ public class CatalogContext {
             byte[] deploymentBytes,
             HostMessenger messenger)
     {
+        VoltTrace.add(() -> VoltTrace.beginDuration("ctx_update_catalog_deepcopy", VoltTrace.Category.SPSITE));
         Catalog newCatalog = catalog.deepCopy();
+        VoltTrace.add(VoltTrace::endDuration);
+        VoltTrace.add(() -> VoltTrace.beginDuration("ctx_update_catalog_exe_diff", VoltTrace.Category.SPSITE));
         newCatalog.execute(diffCommands);
+        VoltTrace.add(VoltTrace::endDuration);
         int incValue = incrementVersion ? 1 : 0;
         // If there's no new catalog bytes, preserve the old one rather than
         // bashing it
@@ -217,6 +235,7 @@ public class CatalogContext {
         if (depbytes == null) {
             depbytes = this.deploymentBytes;
         }
+        VoltTrace.add(() -> VoltTrace.beginDuration("ctx_update_constructor", VoltTrace.Category.SPSITE));
         CatalogContext retval =
             new CatalogContext(
                     txnId,
@@ -228,6 +247,7 @@ public class CatalogContext {
                     depbytes,
                     catalogVersion + incValue,
                     messenger);
+        VoltTrace.add(VoltTrace::endDuration);
         return retval;
     }
 
