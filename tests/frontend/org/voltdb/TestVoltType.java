@@ -27,9 +27,9 @@ import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-import junit.framework.TestCase;
-
 import org.voltdb.types.TimestampType;
+
+import junit.framework.TestCase;
 
 public class TestVoltType extends TestCase {
 
@@ -271,14 +271,14 @@ public class TestVoltType extends TestCase {
     public void testTimestampToStringBeforeEpoch() {
         long micros = -48932323284323L;
         TimestampType beforeEpoch = new TimestampType(micros);
-        assertEquals("1968-06-13 11:41:16.715677", beforeEpoch.toString());
+        assertEquals("1968-06-13 15:41:16.715677", beforeEpoch.toString());
         assertEquals(micros, beforeEpoch.getTime());
 
         // test Long.MIN as NULL_TimestampType
         // NULL_TimestampType is translated to VoltType.NULL_BIGINT in
         // @see org.voltdb.ParameterSet#flattenToBuffer()
         beforeEpoch = new TimestampType(VoltType.NULL_BIGINT);
-        assertEquals("290303-12-10 14:59:05.224192", beforeEpoch.toString());
+        assertEquals("290303-12-10 19:59:05.224192", beforeEpoch.toString());
         assertEquals(VoltType.NULL_BIGINT, beforeEpoch.getTime());
     }
 

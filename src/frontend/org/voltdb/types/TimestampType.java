@@ -148,6 +148,7 @@ public class TimestampType implements JSONString, Comparable<TimestampType> {
     @Override
     public String toString() {
         SimpleDateFormat sdf = new SimpleDateFormat(Constants.ODBC_DATE_FORMAT_STRING);
+        sdf.setTimeZone(java.util.TimeZone.getTimeZone("GMT+0"));
         Date dateToMillis = (Date) m_date.clone(); // deep copy as we change it later
         short usecs = m_usecs;
         if (usecs < 0) {
