@@ -30,13 +30,11 @@
 #include <algorithm>
 #include <vector>
 
-#include "boost/scoped_ptr.hpp"
 #include "boost/functional/hash.hpp"
 #include "ttmath/ttmathint.h"
 
 #include "catalog/catalog.h"
 #include "common/ExportSerializeIo.h"
-#include "common/FatalException.hpp"
 #include "common/MiscUtil.h"
 #include "common/Pool.hpp"
 #include "common/SQLException.h"
@@ -51,6 +49,8 @@
 #include "murmur3/MurmurHash3.h"
 
 namespace voltdb {
+
+class ScalarFunction;
 
 /*
  * Objects are length preceded with a short length value or a long length value
@@ -451,6 +451,8 @@ class NValue {
 
     template <int F> // template for SQL functions of multiple NValues
     static NValue call(const std::vector<NValue>& arguments);
+
+    static NValue callScalarFunction(ScalarFunction *scalarFunction, const std::vector<NValue>& arguments);
 
     /// Iterates over UTF8 strings one character "code point" at a time, being careful not to walk off the end.
     class UTF8Iterator {

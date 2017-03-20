@@ -55,6 +55,8 @@
 #include "catalog/connector.h"
 #include "catalog/database.h"
 #include "catalog/index.h"
+#include "catalog/udf.h"
+#include "catalog/udflibrary.h"
 #include "catalog/materializedviewhandlerinfo.h"
 #include "catalog/materializedviewinfo.h"
 #include "catalog/planfragment.h"
@@ -112,6 +114,8 @@ ENABLE_BOOST_FOREACH_ON_CONST_MAP(Column);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Index);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(MaterializedViewInfo);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Table);
+ENABLE_BOOST_FOREACH_ON_CONST_MAP(UDF);
+ENABLE_BOOST_FOREACH_ON_CONST_MAP(UDFLibrary);
 
 static const size_t PLAN_CACHE_SIZE = 1000;
 // table name prefix of DR conflict table
@@ -126,6 +130,8 @@ typedef std::pair<std::string, catalog::Column*> LabeledColumn;
 typedef std::pair<std::string, catalog::Index*> LabeledIndex;
 typedef std::pair<std::string, catalog::Table*> LabeledTable;
 typedef std::pair<std::string, catalog::MaterializedViewInfo*> LabeledView;
+typedef std::pair<std::string, catalog::UDF*> LabeledUDF;
+typedef std::pair<std::string, catalog::UDFLibrary*> LabeledUDFLibrary;
 
 /**
  * The set of plan bytes is explicitly maintained in MRU-first order,
@@ -268,6 +274,11 @@ VoltDBEngine::~VoltDBEngine() {
         tid.second->decrementRefcount();
     }
 
+    for (auto nameLibraryPair : m_libraries) {
+        delete nameLibraryPair.second;
+    }
+    m_libraries.clear();
+
     delete m_executorContext;
 
     delete m_drReplicatedStream;
@@ -305,6 +316,10 @@ catalog::Table* VoltDBEngine::getCatalogTable(const std::string& name) const {
         }
     }
     return NULL;
+}
+
+ScalarFunction *VoltDBEngine::getScalarFunction(const int functionId) {
+    return findInMapOrNull(functionId, m_scalarFunctions);
 }
 
 void VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput& out) const {
@@ -1081,6 +1096,32 @@ bool VoltDBEngine::processCatalogAdditions(int64_t timestamp) {
 
             BOOST_FOREACH (auto toDrop, obsoleteViews) {
                 persistentTable->dropMaterializedView(toDrop);
+            }
+        }
+    }
+
+    BOOST_FOREACH (LabeledUDFLibrary labeledUDFLibrary, m_database->UDFLibraries()) {
+        catalog::UDFLibrary *catalogUDFLibrary = labeledUDFLibrary.second;
+        UDFLibrary *udflib = findInMapOrNull(catalogUDFLibrary->libraryName(), m_libraries);
+        if (udflib == NULL) {
+            // If the library is not loaded before, then load now.
+            udflib = new UDFLibrary(catalogUDFLibrary->filePath());
+            m_libraries[catalogUDFLibrary->libraryName()] = udflib;
+        }
+        else {
+            // otherwise, check if there are functions in this library that needs to be loaded.
+            BOOST_FOREACH (LabeledUDF labeledUDF, catalogUDFLibrary->loadedUDFs()) {
+                catalog::UDF *catalogUDF = labeledUDF.second;
+                if (catalogUDF->functionType() != UDF_TYPE_SCALAR) {
+                    // We currently only support scalar udf.
+                    continue;
+                }
+                if (findInMapOrNull(catalogUDF->functionId(), m_scalarFunctions) == NULL) {
+                    ScalarFunction *scalarFunction = udflib->loadScalarFunction(
+                                                              catalogUDF->functionName(),
+                                                              catalogUDF->entryName());
+                    m_scalarFunctions[catalogUDF->functionId()] = scalarFunction;
+                }
             }
         }
     }

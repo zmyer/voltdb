@@ -59,6 +59,7 @@
 #include "stats/StatsAgent.h"
 
 #include "storage/BinaryLogSinkWrapper.h"
+#include "udf/UDFLibrary.h"
 
 #include "boost/scoped_ptr.hpp"
 #include "boost/unordered_map.hpp"
@@ -92,6 +93,7 @@ class ExecutorVector;
 class PersistentTable;
 class RecoveryProtoMsg;
 class StreamedTable;
+class ScalarFunctions;
 class Table;
 class TableCatalogDelegate;
 class TempTableLimits;
@@ -167,6 +169,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             m_drPartitionedConflictStreamedTable = partitionedConflictTable;
             m_drReplicatedConflictStreamedTable = replicatedConflictTable;
         }
+
+        ScalarFunction *getScalarFunction(const int functionId);
 
         ExecutorContext* getExecutorContext() { return m_executorContext; }
 
@@ -553,6 +557,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         // map catalog table name to table pointers
         std::map<std::string, Table*> m_tablesByName;
+
+        std::map<std::string, UDFLibrary*> m_libraries;
+        std::map<int, ScalarFunction*> m_scalarFunctions;
 
         /*
          * Map of catalog table ids to snapshotting tables.

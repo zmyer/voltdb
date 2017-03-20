@@ -18,10 +18,6 @@
 #ifndef ELASTICHASHINATOR_H_
 #define ELASTICHASHINATOR_H_
 
-#include "common/FatalException.hpp"
-#include "common/NValue.hpp"
-#include "common/ValueFactory.hpp"
-#include "common/ValuePeeker.hpp"
 #include "common/serializeio.h"
 #include "common/TheHashinator.h"
 #include "boost_ext/FastAllocator.hpp"

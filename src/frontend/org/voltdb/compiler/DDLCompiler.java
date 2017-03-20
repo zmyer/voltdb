@@ -539,6 +539,16 @@ public class DDLCompiler {
         // either PROCEDURE, REPLICATE, PARTITION, ROLE, EXPORT or DR
         String commandPrefix = statementMatcher.group(1).toUpperCase();
 
+        statementMatcher = SQLParser.matchCreateLibrary(statement);
+        if (statementMatcher.matches()) {
+            return UDFCompiler.processCreateLibraryStatement(statementMatcher, db);
+        }
+
+        statementMatcher = SQLParser.matchCreateFunction(statement);
+        if (statementMatcher.matches()) {
+            return UDFCompiler.processCreateFunctionStatement(statementMatcher, db, m_compiler);
+        }
+
         // matches if it is CREATE PROCEDURE [ALLOW <role> ...] [PARTITION ON ...] FROM CLASS <class-name>;
         statementMatcher = SQLParser.matchCreateProcedureFromClass(statement);
         if (statementMatcher.matches()) {
