@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -112,6 +112,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
             // Expect all rows to be deleted
             executeAndTestDelete(table, delete, ROWS);
         }
+        verifyStmtFails(getClient(), "DELETE FROM P1 WHERE COUNT(*) = 1", "invalid WHERE expression");
     }
 
     public void testDeleteWithEqualToIndexPredicate()

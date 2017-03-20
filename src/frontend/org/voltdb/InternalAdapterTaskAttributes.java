@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -51,13 +51,6 @@ final class InternalAdapterTaskAttributes implements InvocationClientHandler, In
     @Override
     final public String getName() {
         return m_name;
-    }
-
-    @Override
-    final public void setBackPressure(boolean hasBackPressure) {
-        if (m_proxy != null) {
-            m_proxy.setBackPressure(hasBackPressure);
-        }
     }
 
     final public InvocationClientHandler asHandler() {

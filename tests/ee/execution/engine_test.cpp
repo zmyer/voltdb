@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -51,11 +51,6 @@
 
 #include "harness.h"
 
-#include "catalog/catalog.h"
-#include "catalog/cluster.h"
-#include "catalog/constraint.h"
-#include "catalog/database.h"
-#include "catalog/table.h"
 #include "common/tabletuple.h"
 #include "common/valuevector.h"
 #include "expressions/abstractexpression.h"
@@ -64,11 +59,10 @@
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
-#include "storage/temptable.h"
 #include "storage/tableutil.h"
 
-#include "test_utils/LoadTableFrom.hpp"
 #include "test_utils/plan_testing_baseclass.h"
+#include "test_utils/LoadTableFrom.hpp"
 
 #include <cstdlib>
 #include <ctime>
@@ -111,8 +105,6 @@ const char *catalog_string =
             "set $PREV voltRoot \"\"\n"
             "set $PREV exportOverflow \"\"\n"
             "set $PREV drOverflow \"\"\n"
-            "set $PREV adminport 0\n"
-            "set $PREV adminstartup false\n"
             "set $PREV heartbeatTimeout 0\n"
             "set $PREV useddlschema false\n"
             "set $PREV drConsumerEnabled false\n"

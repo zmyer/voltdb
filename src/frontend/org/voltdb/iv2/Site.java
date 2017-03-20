@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,7 +27,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -77,6 +76,7 @@ import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.DRCatalogCommands;
 import org.voltdb.catalog.DRCatalogDiffEngine;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
@@ -99,6 +99,7 @@ import org.voltdb.rejoin.TaskLog;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.SysProcFragmentId;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
@@ -544,16 +545,30 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
+        public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap) {
+            for (Map.Entry<Byte, Integer> entry : clusterIdToPartitionCountMap.entrySet()) {
+                int producerClusterId = entry.getKey();
+                if (m_maxSeenDrLogsBySrcPartition.containsKey(producerClusterId)) {
+                    continue;
+                }
+                int producerPartitionCount = entry.getValue();
+                assert(producerPartitionCount != -1);
+                Map<Integer, DRConsumerDrIdTracker> clusterSources = new HashMap<>();
+                for (int i = 0; i < producerPartitionCount; i++) {
+                    DRConsumerDrIdTracker tracker =
+                            DRConsumerDrIdTracker.createPartitionTracker(
+                                    DRLogSegmentId.makeEmptyDRId(producerClusterId),
+                                    Long.MIN_VALUE, Long.MIN_VALUE, i);
+                    clusterSources.put(i, tracker);
+                }
+                m_maxSeenDrLogsBySrcPartition.put(producerClusterId, clusterSources);
+            }
+        }
+
+        @Override
         public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackers()
         {
-            if (drLog.isTraceEnabled()) {
-                for (Entry<Integer, Map<Integer, DRConsumerDrIdTracker>> e1 : m_maxSeenDrLogsBySrcPartition.entrySet()) {
-                    for (Entry<Integer, DRConsumerDrIdTracker> e2 : e1.getValue().entrySet()) {
-                        drLog.trace("Tracker for Producer " + e1.getKey() + "'s PID " + e2.getKey() +
-                                " contains " + e2.getValue().toShortString());
-                    }
-                }
-            }
+            DRConsumerDrIdTracker.debugTraceTracker(drLog, m_maxSeenDrLogsBySrcPartition);
             return m_maxSeenDrLogsBySrcPartition;
         }
 
@@ -1240,7 +1255,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 while (stats.advanceRow()) {
                     //Assert column index matches name for ENG-4092
                     assert(stats.getColumnName(7).equals("TUPLE_COUNT"));
-                    tupleCount += stats.getLong(7);
+                    assert(stats.getColumnName(6).equals("TABLE_TYPE"));
+                    if ("PersistentTable".equals(stats.getString(6))){
+                        tupleCount += stats.getLong(7);
+                    }
                     assert(stats.getColumnName(8).equals("TUPLE_ALLOCATED_MEMORY"));
                     tupleAllocatedMem += stats.getLong(8);
                     assert(stats.getColumnName(9).equals("TUPLE_DATA_MEMORY"));
@@ -1445,10 +1463,17 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_context = context;
         m_ee.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
                 getSystemsettings().get("systemsettings").getQuerytimeout());
-        m_loadedProcedures.loadProcedures(m_context, m_backend, csp);
+        m_loadedProcedures.loadProcedures(m_context, csp, false);
 
         if (isMPI) {
             // the rest of the work applies to sites with real EEs
+            return true;
+        }
+
+        diffCmds = CatalogUtil.getDiffCommandsForEE(diffCmds);
+        if (diffCmds.length() == 0) {
+            // empty diff cmds for the EE to apply, so skip the JNI call
+            hostLog.info("Skipped applying diff commands on EE.");
             return true;
         }
 
@@ -1483,9 +1508,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_ee.quiesce(m_lastCommittedSpHandle);
         m_ee.updateCatalog(m_context.m_uniqueId, diffCmds);
         if (DRCatalogChange) {
-            final Pair<Long, String> catalogCommands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(m_context.catalog);
+            final DRCatalogCommands catalogCommands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(m_context.catalog, -1);
             generateDREvent( EventType.CATALOG_UPDATE, uniqueId, m_lastCommittedSpHandle,
-                    spHandle, catalogCommands.getSecond().getBytes(Charsets.UTF_8));
+                    spHandle, catalogCommands.commands.getBytes(Charsets.UTF_8));
         }
 
         return true;
@@ -1500,7 +1525,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public boolean updateSettings(CatalogContext context, CatalogSpecificPlanner csp) {
         m_context = context;
         // here you could bring the timeout settings
-        m_loadedProcedures.loadProcedures(m_context, m_backend, csp);
+        m_loadedProcedures.loadProcedures(m_context, csp);
         return true;
     }
 
@@ -1616,6 +1641,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         hostLog.info("DR protocol version has been set to " + drVersion);
     }
 
+    @Override
+    public void setDRProtocolVersion(int drVersion, long spHandle, long uniqueId) {
+        setDRProtocolVersion(drVersion);
+        generateDREvent(
+                EventType.DR_STREAM_START, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);
+    }
+
     /**
      * Generate a in-stream DR event which pushes an event buffer to topend
      */
@@ -1630,5 +1662,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         paramBuffer.putInt(payloads.length);
         paramBuffer.put(payloads);
         m_ee.executeTask(TaskType.GENERATE_DR_EVENT, paramBuffer);
+    }
+
+    @Override
+    public SystemProcedureExecutionContext getSystemProcedureExecutionContext() {
+        return m_sysprocContext;
+    }
+
+    public ExecutionEngine getExecutionEngine() {
+        return m_ee;
     }
 }

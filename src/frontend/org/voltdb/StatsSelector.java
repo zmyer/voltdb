@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -34,6 +34,7 @@ public enum StatsSelector {
     SNAPSHOTSTATUS,
     PROCEDUREINPUT,
     PROCEDUREOUTPUT,
+    PROCEDUREDETAIL,  // provides more granular statistics for procedure calls at a per-statement level.
 
     /*
      * DRPRODUCERPARTITION and DRPRODUCERNODE are internal names
@@ -47,6 +48,8 @@ public enum StatsSelector {
     DRCONSUMER,
     DRCONSUMERNODE,
     DRCONSUMERPARTITION,
+
+    DRROLE,
 
     TOPO,           // return leader and site info for iv2
     REBALANCE,      // return elastic rebalance progress

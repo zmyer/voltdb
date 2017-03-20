@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,6 +24,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,6 +39,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.types.TimestampType;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.AddPerson;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.AddThing;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.AggAges;
@@ -1785,6 +1787,31 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         }
     }
 
+    public void testViewOnGeoJoin() throws Exception {
+        if (isHSQL()) {
+            return;
+        }
+        Client client = getClient();
+        String[] inserts = {
+            "INSERT INTO REGIONS VALUES (1, POLYGONFROMTEXT('POLYGON((116.223593 39.993320, 116.210284 39.913219, 116.314654 39.907425, 116.311221 39.959550, 116.297064 39.982798, 116.285391 40.013307, 116.223593 39.993320))'));",
+            "INSERT INTO REGIONS VALUES (2, POLYGONFROMTEXT('POLYGON((116.285391 40.013307, 116.297064 39.982798, 116.311221 39.959550, 116.314654 39.907425, 116.417906 39.908933, 116.417098 40.022447, 116.285391 40.013307))'));",
+            "INSERT INTO REGIONS VALUES (3, POLYGONFROMTEXT('POLYGON((116.417906 39.908933, 116.541565 39.910605, 116.541565 39.942285, 116.484160 40.013818, 116.417098 40.022447, 116.417906 39.908933))'));",
+            "INSERT INTO REGIONS VALUES (4, POLYGONFROMTEXT('POLYGON((116.314654 39.907425, 116.210284 39.913219, 116.236834 39.833608, 116.276535 39.774669, 116.302437 39.781428, 116.341139 39.778454, 116.346115 39.831547, 116.290273 39.830698, 116.314654 39.907425))'));",
+            "INSERT INTO REGIONS VALUES (5, POLYGONFROMTEXT('POLYGON((116.341139 39.778454, 116.368231 39.776329, 116.379289 39.758905, 116.417438 39.766130, 116.430708 39.790775, 116.417906 39.908933, 116.314654 39.907425, 116.290273 39.830698, 116.346115 39.831547, 116.341139 39.778454))'));",
+            "INSERT INTO REGIONS VALUES (6, POLYGONFROMTEXT('POLYGON((116.417906 39.908933, 116.430708 39.790775, 116.461670 39.791625, 116.476598 39.807342, 116.542945 39.845557, 116.541565 39.910605, 116.417906 39.908933))'));",
+            "INSERT INTO TAXI_LOCATIONS VALUES (223, '2008-02-02 15:31:02', POINTFROMTEXT('POINT(116.286058 39.990632)'));", // region 1
+            "INSERT INTO TAXI_LOCATIONS VALUES (223, '2008-02-02 15:31:02', POINTFROMTEXT('POINT(116.471170 39.953689)'));", // region 3
+            "INSERT INTO TAXI_LOCATIONS VALUES (223, '2008-02-02 15:31:02', POINTFROMTEXT('POINT(116.334239 39.861732)'));", // region 5
+            "INSERT INTO TAXI_LOCATIONS VALUES (223, '2008-02-02 15:31:02', POINTFROMTEXT('POINT(116.433545 39.896514)'));", // region 6
+            "INSERT INTO TAXI_LOCATIONS VALUES (223, '2008-02-02 15:31:02', POINTFROMTEXT('POINT(116.537664 39.913775)'));"  // region 3
+        };
+        for (String insert : inserts) {
+            insertRowAdHoc(client, insert);
+        }
+        VoltTable vresult = client.callProcedure("@AdHoc", "SELECT * FROM REGIONAL_TAXI_COUNT ORDER BY 1;").getResults()[0];
+        assertContentOfTable(new Object[][]{{1, 1}, {3, 2}, {5, 1}, {6, 1}}, vresult);
+    }
+
     public void testEng11024() throws Exception {
         // Regression test for ENG-11024, found by sqlcoverage
         Client client = getClient();
@@ -2270,8 +2297,37 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         doTestMVFailedCase(sql, "cannot include the function NOW or CURRENT_TIMESTAMP");
     }
 
+    public void testENG11935() throws Exception {
+        // to_timestamp function is not implemented in the HSQL backend, skip HSQL.
+        if (isHSQL()) {
+            return;
+        }
+        // All the statements will not crash the server.
+        Client client = getClient();
+        // exec ENG11935.insert '0' 'abc' 1486148453 'def' 'ghi' 'jkl' 'mno0' 35094 30847 27285 36335 59247 50750 '0';
+        // exec ENG11935.insert '0' 'abc' 1486148453 'def' 'ghi' 'jkl' 'mno1' 35094 30847 27285 36335 59247 50750 '1';
+        client.callProcedure("ENG11935.insert", "0", "abc", 1486148453, "def", "ghi", "jkl",
+                             "mno0", 35094, 30847, 27285, 36335, 59247, 50750, "0");
+        client.callProcedure("ENG11935.insert", "0", "abc", 1486148453, "def", "ghi", "jkl",
+                             "mno1", 35094, 30847, 27285, 36335, 59247, 50750, "1");
+        TimestampType timestamp = new TimestampType("1970-01-18 04:50:00.000000");
+        VoltTable vt = client.callProcedure("@AdHoc", "SELECT * FROM V_ENG11935;").getResults()[0];
+        Object[][] expectedAnswer = new Object[][] {
+            {"0", "abc", "def", "ghi", "jkl", timestamp, 1486200, 2, "mno1",
+             new BigDecimal("1403760.000000000000"), new BigDecimal("1233880.000000000000"),
+             1091400, 1453400, 64662175800L, 73760050000L} };
+        assertContentOfTable(expectedAnswer, vt);
+        client.callProcedure("@AdHoc", "DELETE FROM ENG11935 WHERE VAR1 = '0' AND PRIMKEY = '1';");
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM V_ENG11935;").getResults()[0];
+        expectedAnswer = new Object[][] {
+            {"0", "abc", "def", "ghi", "jkl", timestamp, 1486200, 1, "mno0",
+             new BigDecimal("701880.000000000000"), new BigDecimal("616940.000000000000"),
+             545700, 726700, 32331087900L, 36880025000L} };
+        assertContentOfTable(expectedAnswer, vt);
+    }
+
     /**
-     * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
+     * Build a list of the tests that will be run when TestMaterializedViewSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
      * This particular class runs all tests on the the local JNI backend with both
      * one and two partition configurations, as well as on the hsql backend.

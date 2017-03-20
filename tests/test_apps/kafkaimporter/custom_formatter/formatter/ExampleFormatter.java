@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -41,7 +41,7 @@ public class ExampleFormatter implements Formatter<String> {
      *                <format-property ...>...</format-property> below the specification of importer properties.
      */
     Properties m_prop;
-    ExampleFormatter (String formatName, Properties prop) {
+    public ExampleFormatter (String formatName, Properties prop) {
         // System.out.println("+++ ExampleFormatter properties: " + prop.propertyNames());
         m_prop = prop;
     }

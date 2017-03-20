@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -54,9 +54,8 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
     static final int DEP_aggregate = (int) SysProcFragmentId.PF_aggregate;
 
     @Override
-    public void init() {
-        registerPlanFragment(SysProcFragmentId.PF_distribute);
-        registerPlanFragment(SysProcFragmentId.PF_aggregate);
+    public long[] getPlanFragmentIds() {
+        return new long[]{SysProcFragmentId.PF_distribute, SysProcFragmentId.PF_aggregate};
     }
 
 

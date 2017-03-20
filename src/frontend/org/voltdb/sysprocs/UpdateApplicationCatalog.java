@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -35,6 +35,7 @@ import org.voltdb.DependencyPair;
 import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
+import org.voltdb.ReplicationRole;
 import org.voltdb.StatsSelector;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
@@ -73,11 +74,12 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             SysProcFragmentId.PF_updateCatalogAggregate;
 
     @Override
-    public void init() {
-        registerPlanFragment(SysProcFragmentId.PF_updateCatalogPrecheckAndSync);
-        registerPlanFragment(SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate);
-        registerPlanFragment(SysProcFragmentId.PF_updateCatalog);
-        registerPlanFragment(SysProcFragmentId.PF_updateCatalogAggregate);
+    public long[] getPlanFragmentIds() {
+        return new long[]{
+            SysProcFragmentId.PF_updateCatalogPrecheckAndSync,
+            SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate,
+            SysProcFragmentId.PF_updateCatalog,
+            SysProcFragmentId.PF_updateCatalogAggregate};
     }
 
     /**
@@ -361,6 +363,13 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                         catalogStuff.deploymentBytes,
                         catalogStuff.getDeploymentHash());
 
+                // If the cluster is in master role only (not replica or XDCR), reset trackers.
+                // The producer would have been turned off by the code above already.
+                if (VoltDB.instance().getReplicationRole() == ReplicationRole.NONE &&
+                    !VoltDB.instance().getReplicationActive()) {
+                    context.resetDrAppliedTracker();
+                }
+
                 // update the local catalog.  Safe to do this thanks to the check to get into here.
                 long uniqueId = m_runner.getUniqueId();
                 long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
@@ -407,7 +416,6 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
     }
 
     private final void performCatalogVerifyWork(
-            String catalogDiffCommands,
             int expectedCatalogVersion,
             String[] tablesThatMustBeEmpty,
             String[] reasonsForEmptyTables,
@@ -548,7 +556,6 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
 
         try {
             performCatalogVerifyWork(
-                    catalogDiffCommands,
                     expectedCatalogVersion,
                     tablesThatMustBeEmpty,
                     reasonsForEmptyTables,

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -38,7 +38,10 @@ public:
     static const size_t HASH_DELIMITER_SIZE = 1 + 4;
 
     // Also update DRProducerProtocol.java if version changes
-    static const uint8_t PROTOCOL_VERSION = 6;
+    // whenever PROTOCOL_VERSION changes, check if DRBufferParser needs to be updated,
+    // check if unit tests that use MockPartitionQueue and getTestDRBuffer() need to be updated
+    static const uint8_t PROTOCOL_VERSION = 7;
+    static const uint8_t COMPATIBLE_PROTOCOL_VERSION = 7;
 
     DRTupleStream(int partitionId, int defaultBufferSize);
 

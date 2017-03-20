@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -97,7 +97,7 @@ public class Producer extends Thread {
         props.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, m_compression); // compression.type
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        props.put(ProducerConfig.ACKS_CONFIG, "all");
+        props.put(ProducerConfig.ACKS_CONFIG, "0");
 
         m_producer = new KafkaProducer<String,String>(props);
         log.info("Instantiate Producer: " + m_topic + ", " + m_servers + ", " +

@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2016 VoltDB Inc.
+# Copyright (C) 2008-2017 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -55,7 +55,7 @@ class Hosts(object):
             value = int(value)
         self.hosts_by_id.setdefault(host_id, Host(host_id, self.abort_func))[prop_name] = value
 
-    def get_target_and_connection_host(self, host_name):
+    def get_target_and_connection_host(self, host_name, port):
         """
         Find an arbitrary host that isn't the one being stopped.
         Returns a tuple with connection and target host objects.
@@ -63,7 +63,7 @@ class Hosts(object):
         connection_host = None
         target_host = None
         for host in self.hosts_by_id.values():
-            if host.hostname == host_name:
+            if host.hostname == host_name and host.internalport == port:
                 target_host = host
             elif connection_host is None:
                 connection_host = host

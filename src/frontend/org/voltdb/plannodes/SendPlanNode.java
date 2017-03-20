@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,6 +26,7 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.PlanNodeType;
 
 public class SendPlanNode extends AbstractPlanNode {
@@ -47,10 +48,12 @@ public class SendPlanNode extends AbstractPlanNode {
         childNode.resolveColumnIndexes();
         NodeSchema inputSchema = childNode.getOutputSchema();
         if (!(inputSchema.equalsOnlyNames(m_outputSchema))) {
-            System.out.println("ERROR: IN: " + inputSchema + " OUT: " + m_outputSchema);
+            throw new PlanningErrorException("Internal Error: Send Node input schema differs from output schema");
         }
-        assert(inputSchema.equalsOnlyNames(m_outputSchema));
-
+        //
+        // This assert should be reenabled when ENG-12116 is fixed for trulio true.
+        // assert(inputSchema.equalsOnlyNames(m_outputSchema));
+        //
         for (SchemaColumn col : m_outputSchema.getColumns()) {
             AbstractExpression colExpr = col.getExpression();
             // At this point, they'd better all be TVEs.

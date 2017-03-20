@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2016 VoltDB Inc.
+# Copyright (C) 2008-2017 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -34,11 +34,11 @@ from voltdbclient import *
 
 parser = argparse.ArgumentParser(description="This script is used to monitor current performance metrics.")
 parser.add_argument('-s', '--server', help='Hostname or IP of VoltDB server', default='localhost')
-parser.add_argument('-p', '--port', help='Port number of VoltDB server', default=21211)
+parser.add_argument('-p', '--port', help='Port number of VoltDB server', type=int, default=21211)
 parser.add_argument('-u', '--username', help='User name (if security is enabled)', default='')
 parser.add_argument('-pw', '--password', help='Password (if security is enabled)', default='')
-parser.add_argument('-f', '--frequency', help='Frequency of gathering statistics in seconds (default = 5 seconds)', default=5)
-parser.add_argument('-d', '--duration', help='Duration of gathering statistics in minutes (default = 30)', default=30)
+parser.add_argument('-f', '--frequency', help='Frequency of gathering statistics in seconds (default = 5 seconds)', type=int, default=5)
+parser.add_argument('-d', '--duration', help='Duration of gathering statistics in minutes (default = 30)', type=int, default=30)
 args = parser.parse_args()
 
 client = FastSerializer(args.server, args.port, args.username, args.password)
@@ -121,7 +121,7 @@ def get_cpu():
     return cpu_perc
 
 def get_latencies():
-    response = proc_stats.call(["INITIATOR",1])
+    response = proc_stats.call(["INITIATOR",0])
     check_response(response)
     table = response.tables[0]
     latencies = dict()
@@ -180,7 +180,7 @@ partition_stats = dict()
 procedure_stats = dict()
 partition_count = get_partition_count()
 
-print "    time                                procedure label exec_pct invocations txn/sec    exec_ms  svr_ms     c cpu partitions   skew   inMB/s  outMB/s"
+print "    time                                procedure label exec_pct invocations txn/sec    exec_ms  lat_ms     c cpu partitions   skew   inMB/s  outMB/s"
 print "-------- ---------------------------------------- ----- -------- ----------- ------- ---------- ------- ----- --- ---------- ------ -------- --------"
 
 # begin monitoring every (frequency) seconds for (duration) minutes
@@ -239,7 +239,7 @@ while end_time > time.time():
 
         new_values = (incr_invs, tps, exec_millis, c_svrs, mbin, mbout)
 
-        if incr_invs > 0:
+        if (incr_invs > 0 and exec_millis > 0):
             if (procname, partition_id) in partition_proc_stats:
                 pass # do nothing
             else:

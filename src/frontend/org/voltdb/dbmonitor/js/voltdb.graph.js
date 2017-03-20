@@ -4,11 +4,11 @@
     var IMonitorGraphUI = (function () {
         var RETAINED_TIME_INTERVAL = 60; //60 means graph data within 60 minutes time interval will be stored in local storage.
         var currentView = "Seconds";
+        var currentViewDr = "Seconds";
         var cpuSecCount = 0;
         var cpuMinCount = 0;
         var cmdLogSecCount = 0;
         var cmdLogMinCount = 0;
-
         var tpsSecCount = 0;
         var tpsMinCount = 0;
         var memSecCount = 0;
@@ -27,7 +27,9 @@
         var latencyChart;
         var transactionChart;
         var partitionChart;
-        var drReplicationChart;        var cmdLogChart;
+        var drReplicationChart;
+        var drReplicationCharts = {};
+        var cmdLogChart;
         var cmdLogOverlay = [];
         var cmdLogOverlayMin = [];
         var cmdLogOverlayDay = [];
@@ -38,7 +40,10 @@
         var ChartLatency = nv.models.lineChart();
         var ChartTransactions = nv.models.lineChart();
         var ChartPartitionIdleTime = nv.models.lineChart();
-        var ChartDrReplicationRate = nv.models.lineChart();        var ChartCommandlog = nv.models.lineChart();        var dataMapperSec = {};
+        var ChartDrReplicationRate = nv.models.lineChart();
+        var drChartList = {}
+        var ChartCommandlog = nv.models.lineChart();
+        var dataMapperSec = {};
         var dataMapperMin = {};
         var dataMapperDay = {};
         this.enumPartitionColor = {
@@ -228,6 +233,8 @@
             "color": "rgb(27, 135, 200)"
         }];
 
+        var dataDrReplication = {}
+
         var dataCommandLog = [{
             "key": "Command Log Statistics",
             "values": getEmptyDataOptimized(),
@@ -247,7 +254,7 @@
 
                 ChartCpu.xAxis.rotateLabels(-20);
 
-               ChartCpu.yAxis
+                ChartCpu.yAxis
                     .tickFormat(d3.format(',.2f'));
 
                 ChartCpu.yAxis
@@ -276,9 +283,9 @@
         nv.addGraph({
             generate: function() {
                 ChartRam.xAxis
-              .tickFormat(function (d) {
-                  return d3.time.format('%X')(new Date(d));
-              });
+                    .tickFormat(function (d) {
+                      return d3.time.format('%X')(new Date(d));
+                    });
 
                 ChartRam.xAxis.rotateLabels(-20);
 
@@ -308,9 +315,9 @@
         nv.addGraph({
             generate: function() {
                 ChartLatency.xAxis
-              .tickFormat(function (d) {
-                  return d3.time.format('%X')(new Date(d));
-              });
+                    .tickFormat(function (d) {
+                      return d3.time.format('%X')(new Date(d));
+                    });
 
                 ChartLatency.xAxis.rotateLabels(-20);
 
@@ -338,31 +345,30 @@
         });
 
         nv.addGraph({
-           generate: function() {
-               ChartTransactions.xAxis
-              .tickFormat(function (d) {
-                  return d3.time.format('%X')(new Date(d));
-              });
+            generate: function() {
+                ChartTransactions.xAxis
+                    .tickFormat(function (d) {
+                      return d3.time.format('%X')(new Date(d));
+                    });
 
+                ChartTransactions.xAxis.rotateLabels(-20);
 
-               ChartTransactions.xAxis.rotateLabels(-20);
-
-               ChartTransactions.yAxis
+                ChartTransactions.yAxis
                    .tickFormat(d3.format(',.2f'));
 
-               ChartTransactions.yAxis
+                ChartTransactions.yAxis
                    .axisLabel('(Transactions/s)')
                    .axisLabelDistance(10);
 
-               ChartTransactions.margin({ left: 100 });
-               ChartTransactions.lines.forceY([0, 1]);
+                ChartTransactions.margin({ left: 100 });
+                ChartTransactions.lines.forceY([0, 1]);
 
-               d3.select('#visualisationTransaction')
+                d3.select('#visualisationTransaction')
                    .datum(dataTransactions)
                    .transition().duration(500)
                    .call(ChartTransactions);
 
-               nv.utils.windowResize(ChartTransactions.update);
+                nv.utils.windowResize(ChartTransactions.update);
            },
            callback: function(p) {
                ChartTransactions.useInteractiveGuideline(true);
@@ -373,9 +379,9 @@
         nv.addGraph({
             generate:function() {
                 ChartPartitionIdleTime.xAxis
-                .tickFormat(function (d) {
-                    return d3.time.format('%X')(new Date(d));
-                });
+                    .tickFormat(function (d) {
+                        return d3.time.format('%X')(new Date(d));
+                    });
 
                 ChartPartitionIdleTime.showLegend(false);
                 ChartPartitionIdleTime.xAxis.rotateLabels(-20);
@@ -405,40 +411,9 @@
         });
 
         nv.addGraph({
-            generate:function() {
-                ChartDrReplicationRate.xAxis
-               .tickFormat(function (d) {
-                   return d3.time.format('%X')(new Date(d));
-               });
-
-                ChartDrReplicationRate.xAxis.rotateLabels(-20);
-
-                ChartDrReplicationRate.yAxis
-                    .tickFormat(d3.format(',.2f'));
-
-                ChartDrReplicationRate.yAxis
-                    .axisLabel('(KBps)')
-                    .axisLabelDistance(10);
-
-                ChartDrReplicationRate.margin({ left: 100 });
-                ChartDrReplicationRate.lines.forceY([0, 1]);
-
-                d3.select('#visualizationDrReplicationRate')
-                    .datum(dataDrReplicationRate)
-                    .transition().duration(500)
-                    .call(ChartDrReplicationRate);
-
-                nv.utils.windowResize(ChartDrReplicationRate.update);
-            },
-            callback: function() {
-                ChartDrReplicationRate.useInteractiveGuideline(true);
-                return ChartDrReplicationRate;
-            }
-        });
-
-        nv.addGraph({
             generate: function () {
                 ChartCommandlog.showLegend(false);
+
                 ChartCommandlog.xAxis
                     .tickFormat(function (d) {
                         return d3.time.format('%X')(new Date(d));
@@ -463,7 +438,7 @@
 
                 nv.utils.windowResize(ChartCommandlog.update);
            },
-            callback:function() {
+           callback:function() {
                ChartCommandlog.useInteractiveGuideline(true);
                return ChartCommandlog;
            }
@@ -480,7 +455,6 @@
             n -= x >>> 31;
             return n;
         };
-
 
         function Histogram(lowestTrackableValue, highestTrackableValue, nSVD, totalCount) {
             this.lowestTrackableValue = lowestTrackableValue;
@@ -509,7 +483,6 @@
                 bucketsNeeded++;
             }
             this.bucketCount = bucketsNeeded;
-
             this.countsArrayLength = (this.bucketCount + 1) * (this.subBucketCount / 2);
         };
 
@@ -715,16 +688,11 @@
                 'partitionDataDay': getEmptyDataForPartitionForDay(),
                 'partitionFirstData': true,
                 'partitionMaxTimeStamp':null,
-                'drReplicationData': getEmptyDataOptimized(),
-                'drReplicationDataMin': getEmptyDataForMinutesOptimized(),
-                'drReplicationDataDay': getEmptyDataForDaysOptimized(),
-                'drMaxTimeStamp': null,
                 'cmdLogData': getEmptyDataOptimized(),
                 'cmdLogDataMin': getEmptyDataForMinutesOptimized(),
                 'cmdLogDataDay': getEmptyDataForDaysOptimized(),
                 'cmdLogFirstData': true,
                 'cmdLogMaxTimeStamp': null,
-                'drFirstData': true,
                 'lastTimedTransactionCount': -1,
                 'lastTimerTick': -1
             };
@@ -734,10 +702,43 @@
             dataLatency[0]["values"] = getEmptyDataForView(view);
             dataTransactions[0]["values"] = getEmptyDataForView(view);
             dataPartitionIdleTime = getEmptyDataForPartitionView(view);
-            dataDrReplicationRate[0]["values"] = getEmptyDataForView(view);
             dataCommandLog[0]["values"] = getEmptyDataForView(view);
             changeAxisTimeFormat(view);
         };
+
+        this.InitializeDrData = function(){
+            var chartList = VoltDbUI.drChartList;
+            if(chartList != undefined && chartList.length > 0){
+                for(var i = 0; i < chartList.length; i++){
+                    dataDrReplication['dataDrReplication_' + chartList[i]] = [
+                        {
+                            "key": "Replication Rate",
+                            "values": getEmptyDataOptimized(),
+                            "color": "rgb(27, 135, 200)"
+                        }
+                    ];
+                }
+            }
+        }
+
+        this.AddDrGraph = function(view){
+            currentViewDr = view;
+            var chartList = VoltDbUI.drChartList;
+            if(chartList != undefined && chartList.length > 0){
+                for(var i = 0; i < chartList.length; i++){
+                    drReplicationCharts['ChartDrReplicationRate_' + chartList[i]] = $('#ChartDrReplicationRate_' + chartList[i]);
+                    Monitors['drReplicationData_' + chartList[i]] = getEmptyDataOptimized();
+                    Monitors['drReplicationDataMin_' + chartList[i]] = getEmptyDataForMinutesOptimized();
+                    Monitors['drReplicationDataDay_' + chartList[i]] = getEmptyDataForDaysOptimized();
+                    Monitors['drFirstData_' + chartList[i]] = true;
+                    Monitors['drMaxTimeStamp_' + chartList[i]] = null;
+                    Monitors['drSecCount_' + chartList[i]] = 0;
+                    Monitors['drMinCount_' + chartList[i]] = 0;
+                    dataDrReplication['dataDrReplication_' + chartList[i]][0]["values"] = getEmptyDataForView();
+                }
+            }
+            changeDrAxisTimeFormat(view)
+        }
 
         this.RefreshGraph = function (view) {
             currentView = view;
@@ -747,7 +748,6 @@
                 dataRam[0]["values"] = Monitors.memDataDay;
                 dataLatency[0]["values"] = Monitors.latDataDay;
                 dataPartitionIdleTime = Monitors.partitionDataDay;
-                dataDrReplicationRate[0]["values"] = Monitors.drReplicationDataDay;
                 dataCommandLog[0]["values"] = Monitors.cmdLogDataDay;
             } else if (view == 'Minutes') {
                 dataCpu[0]["values"] = Monitors.cpuDataMin;
@@ -755,7 +755,6 @@
                 dataRam[0]["values"] = Monitors.memDataMin;
                 dataLatency[0]["values"] = Monitors.latDataMin;
                 dataPartitionIdleTime = Monitors.partitionDataMin;
-                dataDrReplicationRate[0]["values"] = Monitors.drReplicationDataMin;
                 dataCommandLog[0]["values"] = Monitors.cmdLogDataMin;
             } else {
                 dataCpu[0]["values"] = Monitors.cpuData;
@@ -763,7 +762,6 @@
                 dataRam[0]["values"] = Monitors.memData;
                 dataLatency[0]["values"] = Monitors.latData;
                 dataPartitionIdleTime = Monitors.partitionData;
-                dataDrReplicationRate[0]["values"] = Monitors.drReplicationData;
                 dataCommandLog[0]["values"] = Monitors.cmdLogData;
             }
 
@@ -771,8 +769,25 @@
             changeAxisTimeFormat(view);
         };
 
-        this.UpdateCharts = function () {
+        this.RefreshDrGraph = function (view) {
+            currentViewDr = view;
+            var chartList = VoltDbUI.drChartList;
+            if(chartList != undefined && chartList.length > 0){
+                for(var i = 0; i < chartList.length; i++){
+                    if (view == 'Days') {
+                        dataDrReplication['dataDrReplication_' + chartList[i]][0]["values"] = Monitors['drReplicationDataDay_' + chartList[i]]
+                    } else if (view == 'Minutes') {
+                        dataDrReplication['dataDrReplication_' + chartList[i]][0]["values"] = Monitors['drReplicationDataMin_' + chartList[i]]
+                    } else {
+                        dataDrReplication['dataDrReplication_' + chartList[i]][0]["values"] = Monitors['drReplicationData_' + chartList[i]]
+                    }
+                }
+            }
 
+            changeDrAxisTimeFormat(view);
+        };
+
+        this.UpdateCharts = function () {
             if (ramChart.is(":visible"))
                 ChartRam.update();
 
@@ -788,11 +803,65 @@
             if (partitionChart.is(":visible"))
                 ChartPartitionIdleTime.update();
 
-            if (drReplicationChart.is(":visible"))                ChartDrReplicationRate.update();
-
             if (cmdLogChart.is(":visible"))
                 ChartCommandlog.update();
         };
+
+        this.UpdateDrCharts = function () {
+            var chartList = VoltDbUI.drChartList;
+            if(chartList != undefined && chartList.length > 0 && !$.isEmptyObject(drReplicationCharts)){
+                for(var i = 0; i < chartList.length; i++){
+                    if(drReplicationCharts["ChartDrReplicationRate_" + chartList[i]].is(":visible")) {
+                        drChartList['ChartDrReplicationRate_' + chartList[i]].update();
+                    }
+                }
+            }
+        };
+
+
+        this.InitializeDRGraph = function (){
+            var drChartIds = VoltDbUI.drChartList;
+            if(drChartIds.length > 0) {
+                for(var i = 0; i < drChartIds.length; i++){
+                    initializeGraph(drChartIds[i])
+                }
+            }
+        }
+
+        var initializeGraph = function (i){
+            drChartList['ChartDrReplicationRate_' +i] = nv.models.lineChart();
+
+            nv.addGraph({
+                generate:function() {
+                    drChartList['ChartDrReplicationRate_' + i].xAxis
+                        .tickFormat(function (d) {
+                           return d3.time.format('%X')(new Date(d));
+                        });
+
+                    drChartList['ChartDrReplicationRate_' + i].xAxis.rotateLabels(-20);
+
+                    drChartList['ChartDrReplicationRate_' + i].yAxis
+                        .tickFormat(d3.format(',.2f'));
+
+                    drChartList['ChartDrReplicationRate_' + i].yAxis
+                        .axisLabel('(KBps)')
+                        .axisLabelDistance(10);
+
+                    drChartList['ChartDrReplicationRate_' + i].margin({ left: 100 });
+                    drChartList['ChartDrReplicationRate_' + i].lines.forceY([0, 1]);
+                    d3.select('#visualizationDrReplicationRate_' + i)
+                        .datum(dataDrReplication['dataDrReplication_' + i])
+                        .transition().duration(500)
+                        .call(drChartList['ChartDrReplicationRate_' + i]);
+
+                    nv.utils.windowResize(drChartList['ChartDrReplicationRate_' + i].update);
+                },
+                callback: function() {
+                    drChartList['ChartDrReplicationRate_' + i].useInteractiveGuideline(true);
+                    return drChartList['ChartDrReplicationRate_' + i];
+                }
+            });
+        }
 
         var changeAxisTimeFormat = function (view) {
             var dateFormat = '%X';
@@ -819,14 +888,27 @@
                 .tickFormat(function (d) {
                     return d3.time.format(dateFormat)(new Date(d));
                 });
-            ChartDrReplicationRate.xAxis
-                .tickFormat(function (d) {
-                    return d3.time.format(dateFormat)(new Date(d));
-                });
             ChartCommandlog.xAxis
                 .tickFormat(function(d) {
                     return d3.time.format(dateFormat)(new Date(d));
                 });
+
+        };
+
+        var changeDrAxisTimeFormat = function (view) {
+            var dateFormat = '%X';
+            if (view == 'Days')
+                dateFormat = '%d %b %X';
+
+            var chartIds = VoltDbUI.drChartList;
+            if(chartIds.length > 0) {
+                for(var i = 0; i < chartIds.length; i++){
+                    drChartList['ChartDrReplicationRate_' + chartIds[i]].xAxis
+                        .tickFormat(function (d) {
+                            return d3.time.format(dateFormat)(new Date(d));
+                        });
+                }
+            }
         };
 
         var dataView = {
@@ -836,15 +918,13 @@
         };
 
         function sliceFirstData(dataArray, view) {
-
             var total = totalEmptyData;
             var refEmptyData = emptyData;
 
             if (view == dataView.Minutes) {
                 total = totalEmptyDataForMinutes;
                 refEmptyData = emptyDataForMinutes;
-            }
-            else if (view == dataView.Days) {
+            } else if (view == dataView.Days) {
                 total = totalEmptyDataForDays;
                 refEmptyData = emptyDataForDays;
             }
@@ -876,7 +956,7 @@
 
             if(localStorage.latencyMin != undefined){
                 latencyArrMin = getFormattedDataFromLocalStorage(JSON.parse(localStorage.latencyMin))
-            } else{
+            } else {
                 latencyArrMin = JSON.stringify(convertDataFormat(dataLatMin, 'timestamp', 'latency'))
                 latencyArrMin = JSON.parse(latencyArrMin)
             }
@@ -1308,8 +1388,7 @@
                     if(localStorage.transDetails == undefined){
                         datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": 0 });
                         Monitors.tpsData = datatrans;
-                    }
-                    else{
+                    } else {
                         var calculatedValue = parseFloat(delta * 1000.0 / (currentTimerTick - monitor.lastTimerTick)).toFixed(1) * 1;
                         if (delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)) {
                             datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
@@ -1368,7 +1447,7 @@
 
             if(localStorage.cpuDetailsMin != undefined)
                 cpuDetailsArrMin = getFormattedDataFromLocalStorage(JSON.parse(localStorage.cpuDetailsMin))
-            else{
+            else {
                 cpuDetailsArrMin = JSON.stringify(convertDataFormat(cpuDataMin, 'timestamp', 'percentUsed'))
                 cpuDetailsArrMin = JSON.parse(cpuDetailsArrMin)
             }
@@ -1382,7 +1461,7 @@
 
             if(localStorage.cpuDetails != undefined){
                 cpuDetailsArr = getFormattedDataFromLocalStorage(JSON.parse(localStorage.cpuDetails))
-            } else{
+            } else {
                 cpuDetailsArr =  JSON.stringify(convertDataFormat(cpuData, 'timestamp', 'percentUsed'))
                 cpuDetailsArr =  JSON.parse(cpuDetailsArr)
             }
@@ -1466,8 +1545,7 @@
                     localStorage.cpuDetails = JSON.stringify(cpuDetailsArr)
                     localStorage.cpuDetailsMin = JSON.stringify(cpuDetailsArrMin)
                     localStorage.cpuDetailsDay = JSON.stringify(cpuDetailsArrDay)
-                }
-                catch(e){
+                } catch(e) {
                     $(".errorMsgLocalStorageFull").show();
                 }
                 Monitors.cpuData = cpuData;
@@ -1699,7 +1777,6 @@
                         } else {
                             partitionData[keyIndexSec].values.push({ 'x': new Date(timeStamp), 'y': percentValue });
                             partitionDetailsArr = savePartitionDataToLocalStorage(partitionDetailsArr, { 'x': new Date(timeStamp), 'y': percentValue }, keyIndexSec  )
-
                         }
                         Monitors.partitionData = partitionData;
                     });
@@ -1741,134 +1818,142 @@
 
         this.RefreshDrReplicationGraph = function (drDetails, currentServer, graphView, currentTab) {
             var monitor = Monitors;
-            var drData = monitor.drReplicationData;
-            var drDataMin = monitor.drReplicationDataMin;
-            var drDataDay = monitor.drReplicationDataDay;
-            var drDetail = drDetails;
-            var drDetailsArr = []
-            var drDetailsArrMin = []
-            var drDetailsArrDay = []
+            var chartList = VoltDbUI.drChartList;
+            if(chartList != undefined && chartList.length > 0){
+                for(var i = 0; i < chartList.length; i++){
+                    var drData = monitor['drReplicationData_' + chartList[i]];
+                    var drDataMin = monitor['drReplicationDataMin_' + chartList[i]];
+                    var drDataDay = monitor['drReplicationDataDay_' + chartList[i]];
+                    var drDetail = drDetails;
+                    var drDetailsArr = []
+                    var drDetailsArrMin = []
+                    var drDetailsArrDay = []
 
-            if ($.isEmptyObject(drDetail) || drDetail == undefined || drDetail["DR_GRAPH"].REPLICATION_RATE_1M == undefined || drDetail["DR_GRAPH"].TIMESTAMP == undefined)
-                return;
+                    if ($.isEmptyObject(drDetail) || drDetail == undefined || drDetail["DR_GRAPH"][chartList[i]].REPLICATION_RATE_1M == undefined ||
+                    drDetail["DR_GRAPH"][chartList[i]].TIMESTAMP == undefined)
+                        return true;
 
-            if(localStorage.drDetailsMin != undefined){
-                drDetailsArrMin = getFormattedDataFromLocalStorage(JSON.parse(localStorage.drDetailsMin))
-            } else {
-                drDetailsArrMin =  JSON.stringify(convertDataFormat(drDataMin, 'timestamp', 'replicationRate'))
-                drDetailsArrMin = JSON.parse(drDetailsArrMin)
-            }
+                    if(localStorage["drDetailsMin_" + chartList[i]] != undefined){
+                        drDetailsArrMin = getFormattedDataFromLocalStorage(JSON.parse(localStorage["drDetailsMin_" + chartList[i]]))
+                    } else {
+                        drDetailsArrMin =  JSON.stringify(convertDataFormat(drDataMin, 'timestamp', 'replicationRate'))
+                        drDetailsArrMin = JSON.parse(drDetailsArrMin)
+                    }
 
-            if(localStorage.drDetailsDay != undefined){
-                drDetailsArrDay = getFormattedDataFromLocalStorage(JSON.parse(localStorage.drDetailsDay))
-            } else {
-                drDetailsArrDay =  JSON.stringify(convertDataFormat(drDataDay, 'timestamp', 'replicationRate'))
-                drDetailsArrDay = JSON.parse(drDetailsArrDay)
-            }
+                    if(localStorage["drDetailsDay_" + chartList[i]] != undefined){
+                        drDetailsArrDay = getFormattedDataFromLocalStorage(JSON.parse(localStorage["drDetailsDay_" + chartList[i]]))
+                    } else {
+                        drDetailsArrDay =  JSON.stringify(convertDataFormat(drDataDay, 'timestamp', 'replicationRate'))
+                        drDetailsArrDay = JSON.parse(drDetailsArrDay)
+                    }
 
-            if(localStorage.drDetails != undefined){
-                drDetailsArr = getFormattedDataFromLocalStorage(JSON.parse(localStorage.drDetails))
-            } else {
-                drDetailsArr =  JSON.stringify(convertDataFormat(drData, 'timestamp', 'replicationRate'))
-                drDetailsArr = JSON.parse(drDetailsArr)
-            }
+                    if(localStorage["drDetails_" + chartList[i]] != undefined){
+                        drDetailsArr = getFormattedDataFromLocalStorage(JSON.parse(localStorage["drDetails_" + chartList[i]]))
+                    } else {
+                        drDetailsArr =  JSON.stringify(convertDataFormat(drData, 'timestamp', 'replicationRate'))
+                        drDetailsArr = JSON.parse(drDetailsArr)
+                    }
 
-            if(monitor.drFirstData){
-                if(drDetailsArr.length > 0 && !(currentTime.getTime() - (new Date(drDetailsArr[drDetailsArr.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.secGraph)){
-                    drData = []
-                    for(var i = 0; i< drDetailsArr.length; i++){
+                    if(monitor["drFirstData_" + chartList[i]]){
+                        if(drDetailsArr.length > 0 && !(currentTime.getTime() - (new Date(drDetailsArr[drDetailsArr.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.secGraph)){
+                            drData = []
+                            for(var l = 0; l < drDetailsArr.length; l++){
+                                drData = sliceFirstData(drData, dataView.Seconds);
+                                drData.push({"x": new Date(drDetailsArr[l].timestamp),
+                                    "y": drDetailsArr[l].replicationRate
+                                })
+                            }
+                        }
+
+                        if(drDetailsArrMin.length > 0 && !(currentTime.getTime() - (new Date(drDetailsArrMin[drDetailsArrMin.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.minGraph)){
+                            drDataMin = []
+                            for(var j = 0; j< drDetailsArrMin.length; j++){
+                                drDataMin = sliceFirstData(drDataMin, dataView.Minutes);
+                                drDataMin.push({"x": new Date(drDetailsArrMin[j].timestamp),
+                                    "y": drDetailsArrMin[j].replicationRate
+                                })
+                            }
+                        }
+
+                        if(drDetailsArrDay.length > 0 && !(currentTime.getTime() - (new Date(drDetailsArrDay[drDetailsArrDay.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.dayGraph)){
+                            drDataDay = []
+                            for(var k = 0; k< drDetailsArrDay.length; k++){
+                                drDataDay = sliceFirstData(drDataDay, dataView.Days );
+                                drDataDay.push({"x": new Date(drDetailsArrDay[k].timestamp),
+                                    "y": drDetailsArrDay[k].replicationRate
+                                })
+                            }
+                        }
+                    }
+
+                    var timeStamp = drDetail["DR_GRAPH"][chartList[i]].TIMESTAMP;
+
+                    if (timeStamp >= monitor["drMaxTimeStamp_" + chartList[i]]) {
+                        var plottingPoint = parseFloat(drDetail["DR_GRAPH"][chartList[i]].REPLICATION_RATE_1M).toFixed(1) * 1;
+
+                        if (monitor["drSecCount_" + chartList[i]] >= 6 || monitor["drFirstData_" + chartList[i]]) {
+                            drDataMin = sliceFirstData(drDataMin, dataView.Minutes);
+                            if (timeStamp == monitor["drMaxTimeStamp_" + chartList[i]]) {
+                                drDataMin.push({ "x": new Date(timeStamp), "y": drDataMin[drDataMin.length - 1].y });
+                                drDetailsArrMin = saveLocalStorageInterval(drDetailsArrMin, {"timestamp": new Date(timeStamp), "replicationRate": drDataMin[drDataMin.length - 1].y})
+                            } else {
+                                drDataMin.push({ "x": new Date(timeStamp), "y": plottingPoint });
+                                drDetailsArrMin = saveLocalStorageInterval(drDetailsArrMin, {"timestamp": new Date(timeStamp), "replicationRate": plottingPoint})
+                            }
+                            monitor["drReplicationDataMin_" + chartList[i]] = drDataMin;
+                            monitor["drSecCount_" + chartList[i]] = 0;
+                        }
+                        if (monitor["drMinCount_" + chartList[i]] >= 60 || monitor["drFirstData_" + chartList[i]]) {
+                            drDataDay = sliceFirstData(drDataDay, dataView.Days);
+                            if (timeStamp == monitor["drMaxTimeStamp_" + chartList[i]]) {
+                                drDataDay.push({ "x": new Date(timeStamp), "y": drDataDay[drDataDay.length - 1].y });
+                                drDetailsArrDay = saveLocalStorageInterval(drDetailsArrDay, {"timestamp": new Date(timeStamp), "replicationRate": drDataDay[drDataDay.length - 1].y})
+                            } else {
+                                drDataDay.push({ "x": new Date(timeStamp), "y": plottingPoint });
+                                drDetailsArrDay = saveLocalStorageInterval(drDetailsArrDay, {"timestamp": new Date(timeStamp), "replicationRate": plottingPoint})
+                            }
+                            monitor["drReplicationDataDay_" + chartList[i]] = drDataDay;
+                            monitor["drMinCount_" + chartList[i]] = 0;
+                        }
                         drData = sliceFirstData(drData, dataView.Seconds);
-                        drData.push({"x": new Date(drDetailsArr[i].timestamp),
-                            "y": drDetailsArr[i].replicationRate
-                        })
-                    }
-                }
+                        if (timeStamp == monitor["drMaxTimeStamp_" + chartList[i]]) {
+                            drData.push({ "x": new Date(timeStamp), "y": drData[drData.length - 1].y });
+                            drDetailsArr = saveLocalStorageInterval(drDetailsArr, {"timestamp": new Date(timeStamp), "replicationRate": drData[drData.length - 1].y})
+                        } else {
+                            drData.push({ "x": new Date(timeStamp), "y": plottingPoint });
+                            drDetailsArr = saveLocalStorageInterval(drDetailsArr, {"timestamp": new Date(timeStamp), "replicationRate": plottingPoint})
+                        }
 
-                if(drDetailsArrMin.length > 0 && !(currentTime.getTime() - (new Date(drDetailsArrMin[drDetailsArrMin.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.minGraph)){
-                    drDataMin = []
-                    for(var j = 0; j< drDetailsArrMin.length; j++){
-                        drDataMin = sliceFirstData(drDataMin, dataView.Minutes);
-                        drDataMin.push({"x": new Date(drDetailsArrMin[j].timestamp),
-                            "y": drDetailsArrMin[j].replicationRate
-                        })
-                    }
-                }
+                        localStorage["drDetails_" + chartList[i]] = JSON.stringify(drDetailsArr)
+                        localStorage["drDetailsMin_" + chartList[i]] = JSON.stringify(drDetailsArrMin)
+                        localStorage["drDetailsDay_" + chartList[i]] = JSON.stringify(drDetailsArrDay)
 
-                if(drDetailsArrDay.length > 0 && !(currentTime.getTime() - (new Date(drDetailsArrDay[drDetailsArrDay.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.dayGraph)){
-                    drDataDay = []
-                    for(var k = 0; k< drDetailsArrDay.length; k++){
-                        drDataDay = sliceFirstData(drDataDay, dataView.Days );
-                        drDataDay.push({"x": new Date(drDetailsArrDay[k].timestamp),
-                            "y": drDetailsArrDay[k].replicationRate
-                        })
+                        monitor["drReplicationData_" + chartList[i]] = drData;
+                        monitor["drFirstData_" + chartList[i]] = false;
+
+                        if (graphView == 'Minutes')
+                            dataDrReplication['dataDrReplication_' + chartList[i]][0]["values"]  = drDataMin;
+                        else if (graphView == 'Days')
+                            dataDrReplication['dataDrReplication_' + chartList[i]][0]["values"]  = drDataDay;
+                        else {
+                            dataDrReplication['dataDrReplication_' + chartList[i]][0]["values"]  = drData;
+                        }
+                        if (currentTab == NavigationTabs.DR && currentViewDr == graphView) {
+                            d3.select("#visualizationDrReplicationRate_" + chartList[i])
+                                .datum(dataDrReplication['dataDrReplication_' + chartList[i]])
+                                .transition().duration(500)
+                                .call(drChartList["ChartDrReplicationRate_" + chartList[i]]);
+                        }
                     }
+
+                    if (timeStamp > monitor["drMaxTimeStamp_" + chartList[i]])
+                        monitor["drMaxTimeStamp_" + chartList[i]] = timeStamp;
+
+                    monitor['drSecCount_' + chartList[i]]++;
+                    monitor['drMinCount_' + chartList[i]]++;
                 }
             }
 
-            var timeStamp = drDetail["DR_GRAPH"].TIMESTAMP;
-            if (timeStamp >= monitor.drMaxTimeStamp) {
-                var plottingPoint = parseFloat(drDetail["DR_GRAPH"].REPLICATION_RATE_1M).toFixed(1) * 1;
-
-                if (drSecCount >= 6 || monitor.drFirstData) {
-                    drDataMin = sliceFirstData(drDataMin, dataView.Minutes);
-                    if (timeStamp == monitor.drMaxTimeStamp) {
-                        drDataMin.push({ "x": new Date(timeStamp), "y": drDataMin[drDataMin.length - 1].y });
-                        drDetailsArrMin = saveLocalStorageInterval(drDetailsArrMin, {"timestamp": new Date(timeStamp), "replicationRate": drDataMin[drDataMin.length - 1].y})
-                    } else {
-                        drDataMin.push({ "x": new Date(timeStamp), "y": plottingPoint });
-                        drDetailsArrMin = saveLocalStorageInterval(drDetailsArrMin, {"timestamp": new Date(timeStamp), "replicationRate": plottingPoint})
-                    }
-                    Monitors.drReplicationDataMin = drDataMin;
-                    drSecCount = 0;
-                }
-                if (drMinCount >= 60 || monitor.drFirstData) {
-                    drDataDay = sliceFirstData(drDataDay, dataView.Days);
-                    if (timeStamp == monitor.drMaxTimeStamp) {
-                        drDataDay.push({ "x": new Date(timeStamp), "y": drDataDay[drDataDay.length - 1].y });
-                        drDetailsArrDay = saveLocalStorageInterval(drDetailsArrDay, {"timestamp": new Date(timeStamp), "replicationRate": drDataDay[drDataDay.length - 1].y})
-                    } else {
-                        drDataDay.push({ "x": new Date(timeStamp), "y": plottingPoint });
-                        drDetailsArrDay = saveLocalStorageInterval(drDetailsArrDay, {"timestamp": new Date(timeStamp), "replicationRate": plottingPoint})
-                    }
-                    Monitors.drReplicationDataDay = drDataDay;
-                    drMinCount = 0;
-                }
-                drData = sliceFirstData(drData, dataView.Seconds);
-                if (timeStamp == monitor.drMaxTimeStamp) {
-                    drData.push({ "x": new Date(timeStamp), "y": drData[drData.length - 1].y });
-                    drDetailsArr = saveLocalStorageInterval(drDetailsArr, {"timestamp": new Date(timeStamp), "replicationRate": drData[drData.length - 1].y})
-                } else {
-                    drData.push({ "x": new Date(timeStamp), "y": plottingPoint });
-                    drDetailsArr = saveLocalStorageInterval(drDetailsArr, {"timestamp": new Date(timeStamp), "replicationRate": plottingPoint})
-                }
-
-                localStorage.drDetails = JSON.stringify(drDetailsArr)
-                localStorage.drDetailsMin = JSON.stringify(drDetailsArrMin)
-                localStorage.drDetailsDay = JSON.stringify(drDetailsArrDay)
-
-                Monitors.drReplicationData = drData;
-                monitor.drFirstData = false;
-
-                if (graphView == 'Minutes')
-                    dataDrReplicationRate[0]["values"] = drDataMin;
-                else if (graphView == 'Days')
-                    dataDrReplicationRate[0]["values"] = drDataDay;
-                else {
-                    dataDrReplicationRate[0]["values"] = drData;
-
-                }
-
-                if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && drReplicationChart.is(":visible")) {
-                    d3.select('#visualizationDrReplicationRate')
-                        .datum(dataDrReplicationRate)
-                        .transition().duration(500)
-                        .call(ChartDrReplicationRate);
-                }
-            }
-            if (timeStamp > monitor.drMaxTimeStamp)
-                monitor.drMaxTimeStamp = timeStamp;
-            drSecCount++;
-            drMinCount++;
         };
 
         this.RefreshCommandLog = function (cmdLogDetails, currentServer, graphView, currentTab) {
@@ -1890,6 +1975,7 @@
                 cmdLogArrMin =  JSON.stringify(convertDataFormat(cmdLogDataMin))
                 cmdLogArrMin = JSON.parse(cmdLogArrMin)
             }
+
             if(localStorage.cmdLogDay != undefined)
                 cmdLogArrDay = getFormattedDataFromLocalStorage(JSON.parse(localStorage.cmdLogDay))
             else {
@@ -2003,6 +2089,7 @@
                     overlayDataArrMin = []
                     cmdLogSecCount = 0;
                 }
+
                 if (cmdLogMinCount >= 60 || monitor.cmdLogFirstData) {
                     cmdLogDataDay = sliceFirstData(cmdLogDataDay, dataView.Days);
                     if (timeStamp == monitor.cmdLogMaxTimeStamp) {
@@ -2112,10 +2199,8 @@
                             .attr('y', 0)
                             .attr('class', 'overlayGraph')
                             .attr('height', ChartCommandlog.yAxis.range()[0]);
-
                     }
                 }
-
             }
             if (timeStamp > monitor.cmdLogMaxTimeStamp) {
                 monitor.cmdLogMaxTimeStamp = timeStamp;
@@ -2166,12 +2251,15 @@
         };
 
         this.refreshGraphDR = function () {
-            if ($.isFunction(ChartDrReplicationRate.update))
-                ChartDrReplicationRate.update();
+            var drChartIds = VoltDbUI.drChartList;
+            if(drChartIds.length > 0 && !$.isEmptyObject(drChartList)) {
+                for(var i = 0; i < drChartIds.length; i++){
+                    if ($.isFunction(drChartList['ChartDrReplicationRate_' + drChartIds[i]].update))
+                        drChartList['ChartDrReplicationRate_' + drChartIds[i]].update();
+                }
+            }
         };
     });
-
-
 
     window.MonitorGraphUI = new IMonitorGraphUI();
 })(window);

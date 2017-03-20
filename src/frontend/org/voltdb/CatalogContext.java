@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,7 +25,10 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.UUID;
 
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.json_voltpatches.JSONException;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.HostMessenger;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
@@ -78,6 +81,7 @@ public class CatalogContext {
     // The DPM knows which default procs COULD EXIST
     //  and also how to get SQL for them.
     public final DefaultProcedureManager m_defaultProcs;
+    public final HostMessenger m_messenger;
 
     /*
      * Planner associated with this catalog version.
@@ -102,7 +106,8 @@ public class CatalogContext {
             byte[] catalogBytes,
             byte[] catalogBytesHash,
             byte[] deploymentBytes,
-            int version)
+            int version,
+            HostMessenger messenger)
     {
         m_transactionId = transactionId;
         m_uniqueId = uniqueId;
@@ -159,6 +164,7 @@ public class CatalogContext {
         m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog, m_defaultProcs, m_jarfile);
         m_ptool = new PlannerTool(cluster, database, catalogHash);
         catalogVersion = version;
+        m_messenger = messenger;
 
         if (procedures != null) {
             for (Procedure proc : procedures) {
@@ -189,7 +195,8 @@ public class CatalogContext {
             byte[] catalogBytesHash,
             String diffCommands,
             boolean incrementVersion,
-            byte[] deploymentBytes)
+            byte[] deploymentBytes,
+            HostMessenger messenger)
     {
         Catalog newCatalog = catalog.deepCopy();
         newCatalog.execute(diffCommands);
@@ -219,7 +226,8 @@ public class CatalogContext {
                     bytes,
                     catalogBytesHash,
                     depbytes,
-                    catalogVersion + incValue);
+                    catalogVersion + incValue,
+                    messenger);
         return retval;
     }
 
@@ -284,7 +292,7 @@ public class CatalogContext {
 
     /**
      * Given a class name in the catalog jar, loads it from the jar, even if the
-     * jar is served from a url and isn't in the classpath.
+     * jar is served from an URL and isn't in the classpath.
      *
      * @param procedureClassName The name of the class to load.
      * @return A java Class variable associated with the class.
@@ -296,7 +304,7 @@ public class CatalogContext {
 
     public static Class<?> classForProcedure(String procedureClassName, ClassLoader loader)
         throws ClassNotFoundException {
-        // this is a safety mechanism to prevent catalog classes overriding voltdb stuff
+        // this is a safety mechanism to prevent catalog classes overriding VoltDB stuff
         if (procedureClassName.startsWith("org.voltdb.")) {
             return Class.forName(procedureClassName);
         }
@@ -308,33 +316,48 @@ public class CatalogContext {
     // Generate helpful status messages based on configuration present in the
     // catalog.  Used to generated these messages at startup and after an
     // @UpdateApplicationCatalog
-    SortedMap<String, String> getDebuggingInfoFromCatalog()
+    SortedMap<String, String> getDebuggingInfoFromCatalog(boolean verbose)
     {
         SortedMap<String, String> logLines = new TreeMap<>();
 
         // topology
         Deployment deployment = cluster.getDeployment().iterator().next();
         int hostCount = m_dbSettings.getCluster().hostcount();
-        Map<Integer, Integer> sphMap = VoltDB.instance().getHostMessenger().getSitesPerHostMapFromZK();
-        int totalSitesCount = 0;
-        for (Map.Entry<Integer, Integer> e : sphMap.entrySet()) {
-            totalSitesCount += e.getValue();
-        }
-        int localSitesCount = sphMap.get(VoltDB.instance().getHostMessenger().getHostId());
-        int kFactor = deployment.getKfactor();
-        logLines.put("deployment1",
-                String.format("Cluster has %d hosts with leader hostname: \"%s\". %d local sites count. K = %d.",
-                hostCount, VoltDB.instance().getConfig().m_leader, localSitesCount, kFactor));
+        if (verbose) {
+            Map<Integer, Integer> sphMap;
+            try {
+                sphMap = m_messenger.getSitesPerHostMapFromZK();
+            } catch (KeeperException | InterruptedException | JSONException e) {
+                hostLog.warn("Failed to get sitesperhost information from Zookeeper", e);
+                sphMap = null;
+            }
+            int kFactor = deployment.getKfactor();
+            if (sphMap == null) {
+                logLines.put("deployment1",
+                        String.format("Cluster has %d hosts with leader hostname: \"%s\". [unknown] local sites count. K = %d.",
+                                hostCount, VoltDB.instance().getConfig().m_leader, kFactor));
+                logLines.put("deployment2", "Unable to retrieve partition information from the cluster.");
+            } else {
+                int localSitesCount = sphMap.get(m_messenger.getHostId());
+                logLines.put("deployment1",
+                        String.format("Cluster has %d hosts with leader hostname: \"%s\". %d local sites count. K = %d.",
+                                hostCount, VoltDB.instance().getConfig().m_leader, localSitesCount, kFactor));
 
-        int replicas = kFactor + 1;
-        int partitionCount = totalSitesCount / replicas;
-        logLines.put("deployment2",
-                String.format("The entire cluster has %d %s of%s %d logical partition%s.",
-                replicas,
-                replicas > 1 ? "copies" : "copy",
-                partitionCount > 1 ? " each of the" : "",
-                partitionCount,
-                partitionCount > 1 ? "s" : ""));
+                int totalSitesCount = 0;
+                for (Map.Entry<Integer, Integer> e : sphMap.entrySet()) {
+                    totalSitesCount += e.getValue();
+                }
+                int replicas = kFactor + 1;
+                int partitionCount = totalSitesCount / replicas;
+                logLines.put("deployment2",
+                        String.format("The entire cluster has %d %s of%s %d logical partition%s.",
+                                replicas,
+                                replicas > 1 ? "copies" : "copy",
+                                        partitionCount > 1 ? " each of the" : "",
+                                                partitionCount,
+                                                partitionCount > 1 ? "s" : ""));
+            }
+        }
 
         // voltdb root
         logLines.put("voltdbroot", "Using \"" + VoltDB.instance().getVoltDBRootPath() + "\" for voltdbroot directory.");
@@ -391,5 +414,9 @@ public class CatalogContext {
     public byte[] getCatalogHash()
     {
         return catalogHash;
+    }
+
+    public InMemoryJarfile getCatalogJar() {
+        return m_jarfile;
     }
 }

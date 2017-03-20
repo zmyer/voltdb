@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -63,6 +63,14 @@ public class SQLStmt {
     boolean isReadOnly;
 
     boolean inCatalog;
+
+    String stmtName = null;
+    protected void setStmtName(String name) {
+        stmtName = name;
+    }
+    protected String getStmtName() {
+        return stmtName;
+    }
 
     // used to clean up plans
     SiteProcedureConnection site;

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -38,7 +38,9 @@ import org.voltdb.VoltTable;
 public class UpdateLogging extends VoltSystemProcedure
 {
     @Override
-    public void init() {}
+    public long[] getPlanFragmentIds() {
+        return new long[]{};
+    }
 
     @Override
     public DependencyPair executePlanFragment(
@@ -59,7 +61,8 @@ public class UpdateLogging extends VoltSystemProcedure
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
                            String xmlConfig)
     {
-        VoltDB.instance().logUpdate(xmlConfig, DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this));
+        VoltDB.instance().logUpdate(xmlConfig, DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
+                ctx.getPaths().getVoltDBRoot());
         ctx.updateBackendLogLevels();
 
         VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);

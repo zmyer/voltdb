@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,7 +29,6 @@ import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
-import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.StartAction;
 import org.voltdb.StarvationTracker;
 import org.voltdb.StatsAgent;
@@ -161,15 +160,8 @@ public abstract class BaseInitiator implements Initiator
                                        coreBindIds,
                                        taskLog,
                                        hasMPDRGateway);
-            ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
-            prf.configure(m_executionSite, m_executionSite.m_sysprocContext);
-
-            LoadedProcedureSet procSet = new LoadedProcedureSet(
-                    m_executionSite,
-                    prf,
-                    m_initiatorMailbox.getHSId(),
-                    0); // this has no meaning
-            procSet.loadProcedures(catalogContext, backend, csp);
+            LoadedProcedureSet procSet = new LoadedProcedureSet(m_executionSite);
+            procSet.loadProcedures(catalogContext, csp);
             m_executionSite.setLoadedProcedures(procSet);
             m_scheduler.setCommandLog(cl);
 

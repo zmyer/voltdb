@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -63,8 +63,7 @@ public class InlineAggregation extends MicroOptimization {
 
     AbstractPlanNode inlineAggregationApply(AbstractPlanNode plan) {
         // check for an aggregation of the right form
-        if ((plan instanceof AggregatePlanNode) == false
-                || (plan instanceof WindowFunctionPlanNode)) {
+        if ( ! (plan instanceof AggregatePlanNode) ) {
             return plan;
         }
         assert(plan.getChildCount() == 1);

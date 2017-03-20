@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -156,6 +156,9 @@ public class SyncBenchmark {
         @Option(desc = "password.")
         String password = "";
 
+        @Option(desc = "Enable SSL with configuration file.")
+        String sslfile = "";
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -185,7 +188,11 @@ public class SyncBenchmark {
     public SyncBenchmark(KVConfig config) {
         this.config = config;
 
-        ClientConfig clientConfig = new ClientConfig(config.username, config.password);
+        ClientConfig clientConfig = new ClientConfig("", "");
+        if (config.sslfile.trim().length() > 0) {
+            clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
+            clientConfig.enableSSL();
+        }
         clientConfig.setReconnectOnConnectionLoss(true);
         clientConfig.setClientAffinity(!config.noclientaffinity);
         client = ClientFactory.createClient(clientConfig);

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -56,7 +56,7 @@ import org.voltdb.compiler.VoltCompiler;
 public class InMemoryJarfile extends TreeMap<String, byte[]> {
 
     private static final long serialVersionUID = 1L;
-    protected final JarLoader m_loader = new JarLoader();;
+    protected final JarLoader m_loader = new JarLoader();
 
     ///////////////////////////////////////////////////////
     // CONSTRUCTION
@@ -382,6 +382,10 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         public Set<String> getClassNames() {
             return m_classNames;
         }
+
+        public void initFrom(JarLoader loader) {
+            m_classNames.addAll(loader.getClassNames());
+        }
     }
 
     public JarLoader getLoader() {
@@ -442,5 +446,23 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
     @Override
     public java.util.Map.Entry<String, byte[]> pollLastEntry() {
         throw new UnsupportedOperationException();
+    }
+
+    public InMemoryJarfile deepCopy () {
+        InMemoryJarfile copy = new InMemoryJarfile();
+        for (Entry<String, byte[]> e: this.entrySet()) {
+            copy.put(e.getKey(), e.getValue().clone());
+        }
+        copy.m_loader.initFrom(m_loader);
+        return copy;
+    }
+
+    public String debug() {
+        StringBuilder sb = new StringBuilder("InMemoryJar -- Key set: ");
+        for (Entry<String, byte[]> e: this.entrySet()) {
+            sb.append(e.getKey()).append(", ");
+        }
+
+        return sb.toString();
     }
 }

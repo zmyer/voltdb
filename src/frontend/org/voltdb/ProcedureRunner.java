@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -56,7 +56,9 @@ import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.groovy.GroovyScriptProcedureDelegate;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.iv2.Site;
 import org.voltdb.iv2.UniqueIdGenerator;
+import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.sysprocs.AdHocBase;
@@ -119,8 +121,9 @@ public class ProcedureRunner {
     // hooks into other parts of voltdb
     //
     protected final SiteProcedureConnection m_site;
+    protected ExecutionEngine m_ee;
     protected final SystemProcedureExecutionContext m_systemProcedureContext;
-    protected final CatalogSpecificPlanner m_csp;
+    protected CatalogSpecificPlanner m_csp;
 
     // per procedure state and catalog info
     //
@@ -165,27 +168,28 @@ public class ProcedureRunner {
                 }
             };
 
-    ProcedureRunner(VoltProcedure procedure,
+    ProcedureRunner(Language lang,
+                    VoltProcedure procedure,
                     SiteProcedureConnection site,
-                    SystemProcedureExecutionContext sysprocContext,
                     Procedure catProc,
                     CatalogSpecificPlanner csp) {
+        this(lang, procedure, site, null, catProc, csp);
+        // assert this constructor for non-system procedures
+        assert(procedure instanceof VoltSystemProcedure == false);
+    }
+
+    ProcedureRunner(Language lang,
+            VoltProcedure procedure,
+            SiteProcedureConnection site,
+            SystemProcedureExecutionContext sysprocContext,
+            Procedure catProc,
+            CatalogSpecificPlanner csp) {
+
         assert(m_inputCRC.getValue() == 0L);
-
-        String language = catProc.getLanguage();
-
-        if (language != null && !language.trim().isEmpty()) {
-            m_language = Language.valueOf(language.trim().toUpperCase());
-        } else if (procedure instanceof StmtProcedure){
-            m_language = null;
-        } else {
-            m_language = Language.JAVA;
-        }
-
-        if (procedure instanceof StmtProcedure) {
+        m_language = lang;
+        if (m_language == null) {
             m_procedureName = catProc.getTypeName().intern();
-        }
-        else {
+        } else {
             m_procedureName = m_language.accept(procedureNameRetriever, procedure);
         }
         m_procedure = procedure;
@@ -208,16 +212,70 @@ public class ProcedureRunner {
 
         m_procedure.init(this);
 
-        m_statsCollector = new ProcedureStatsCollector(
-                m_site.getCorrespondingSiteId(),
-                m_site.getCorrespondingPartitionId(),
-                m_catProc);
-        VoltDB.instance().getStatsAgent().registerStatsSource(
-                StatsSelector.PROCEDURE,
-                site.getCorrespondingSiteId(),
-                m_statsCollector);
+        // Analyze and process the stored procedure, return a list of variable names of
+        // the SQLStmts defined in the stored procedure.
+        // The variable names are used in the granular statistics.
+        ArrayList<String> stmtList = reflect();
 
-        reflect();
+        // Normally m_statsCollector is returned as it is and there is no affect to assign it to itself.
+        // Sometimes when this procedure statistics needs to reuse the existing one, the old stats gets returned.
+        m_statsCollector = VoltDB.instance().getStatsAgent().registerProcedureStatsSource(
+                site.getCorrespondingSiteId(),
+                new ProcedureStatsCollector(
+                        m_site.getCorrespondingSiteId(),
+                        m_site.getCorrespondingPartitionId(),
+                        m_catProc,
+                        stmtList)
+                );
+
+        // Read the ProcStatsOption annotation from the procedure class.
+        // Basically, it is about setting the sampling interval for this stored procedure.
+        ProcStatsOption statsOption = m_procedure.getClass().getAnnotation(ProcStatsOption.class);
+        if (statsOption != null) {
+            m_statsCollector.setProcSamplingInterval(statsOption.procSamplingInterval());
+            m_statsCollector.setStmtSamplingInterval(statsOption.stmtSamplingInterval());
+        }
+    }
+
+    /**
+     * This function returns the ExecutionEngine for this site.
+     * ProcedureRunner needs the access to the ExecutionEngine for two purposes:
+     *     - Telling the C++ side to turn on/off the per-fragment time measurement.
+     *     - Collecting the time measurements and the failure indicator from
+     *       the per-fragment stats shared buffer.
+     * The ExecutionEngine may not have been initialized when a ProcedureRunner is created,
+     *     (See BaseInitiator.java, the configureCommon() function)
+     * so we do not find this engine in the constructor.
+     */
+    public ExecutionEngine getExecutionEngine() {
+        if (m_ee != null) {
+            return m_ee;
+        }
+        // m_site is declared as SiteProcedureConnection here.
+        // SiteProcedureConnection only has two implementations: Site and MpRoSite.
+        // Only SP site has an underlying ExecutionEngine, MpRoSite does not.
+        if (m_site instanceof Site) {
+            m_ee = ((Site)m_site).getExecutionEngine();
+            return m_ee;
+        }
+        return null;
+    }
+
+    public void reInitSysProc(CatalogContext catalogContext, CatalogSpecificPlanner csp) {
+        assert(m_procedure != null);
+        if (! m_isSysProc) {
+            return;
+        }
+        ((VoltSystemProcedure) m_procedure).initSysProc(m_site,
+                catalogContext.cluster,
+                catalogContext.getClusterSettings(),
+                catalogContext.getNodeSettings());
+
+        m_csp = csp;
+    }
+
+    public ProcedureStatsCollector getStatsCollector() {
+        return m_statsCollector;
     }
 
     public Procedure getCatalogProcedure() {
@@ -273,7 +331,7 @@ public class ProcedureRunner {
         assert(m_batch.size() == 0);
 
         try {
-            m_statsCollector.beginProcedure();
+            m_statsCollector.beginProcedure(isSystemProcedure());
 
             VoltTable[] results = null;
 
@@ -450,6 +508,11 @@ public class ProcedureRunner {
      */
     public boolean checkPartition(TransactionState txnState, TheHashinator hashinator) {
         if (m_isSinglePartition) {
+            // can happen when a proc changes from multi-to-single after it's routed
+            if (hashinator == null) {
+                return false; // this will kick it back to CI for re-routing
+            }
+
             TheHashinator.HashinatorType hashinatorType = hashinator.getConfigurationType();
             if (hashinatorType == TheHashinator.HashinatorType.LEGACY) {
                 // Legacy hashinator is not used for elastic, no need to check partitioning. In fact,
@@ -1008,22 +1071,12 @@ public class ProcedureRunner {
         }
     }
 
-
-    protected void reflect() {
+    // Returns a list that contains the names of the statements which are defined in the stored procedure.
+    protected ArrayList<String> reflect() {
         Map<String, SQLStmt> stmtMap;
 
         // fill in the sql for single statement procs
-        if (m_catProc.getHasjava()) {
-            // this is where, in the case of java procedures, m_procMethod is set
-            m_paramTypes = m_language.accept(parametersTypeRetriever, this);
-
-            if (m_procMethod == null && m_language == Language.JAVA) {
-                throw new RuntimeException("No \"run\" method found in: " + m_procedure.getClass().getName());
-            }
-            // iterate through the fields and deal with sql statements
-            stmtMap = m_language.accept(sqlStatementsRetriever, this);
-        }
-        else {
+        if (m_language == null) {
             try {
                 stmtMap = ProcedureCompiler.getValidSQLStmts(null, m_procedureName, m_procedure.getClass(), m_procedure, true);
                 SQLStmt stmt = stmtMap.get(VoltDB.ANON_STMT_NAME);
@@ -1074,12 +1127,30 @@ public class ProcedureRunner {
             catch (Exception e1) {
                 // shouldn't throw anything outside of the compiler
                 e1.printStackTrace();
-                return;
+                return null;
             }
         }
+        else {
+            // this is where, in the case of java procedures, m_procMethod is set
+            m_paramTypes = m_language.accept(parametersTypeRetriever, this);
 
+            if (m_procMethod == null && m_language == Language.JAVA) {
+                throw new RuntimeException("No \"run\" method found in: " + m_procedure.getClass().getName());
+            }
+            // iterate through the fields and deal with sql statements
+            stmtMap = m_language.accept(sqlStatementsRetriever, this);
+        }
+
+        ArrayList<String> stmtNames = new ArrayList<String>(stmtMap.entrySet().size());
         for (final Entry<String, SQLStmt> entry : stmtMap.entrySet()) {
             String name = entry.getKey();
+            stmtNames.add(name);
+            // Label the SQLStmts with its variable name.
+            // This is useful for multi-partition stored procedures.
+            // When a statement is sent to another site for execution,
+            // that SP site can use this name to find the correct place to
+            // update the statistics numbers.
+            entry.getValue().setStmtName(name);
             Statement s = m_catProc.getStatements().get(name);
             if (s != null) {
                 /*
@@ -1094,50 +1165,51 @@ public class ProcedureRunner {
                 //LOG.fine("Found statement " + name);
             }
         }
+        return stmtNames;
     }
 
     private final static Language.Visitor<Class<?>[], ProcedureRunner> parametersTypeRetriever =
             new Language.Visitor<Class<?>[], ProcedureRunner>() {
-                @Override
-                public Class<?>[] visitJava(ProcedureRunner p) {
-                    Method[] methods = p.m_procedure.getClass().getDeclaredMethods();
+        @Override
+        public Class<?>[] visitJava(ProcedureRunner p) {
+            Method[] methods = p.m_procedure.getClass().getDeclaredMethods();
 
-                    for (final Method m : methods) {
-                        String name = m.getName();
-                        if (name.equals("run")) {
-                            if (Modifier.isPublic(m.getModifiers()) == false) {
-                                continue;
-                            }
-                            p.m_procMethod = m;
-                            return m.getParameterTypes();
-                        }
+            for (final Method m : methods) {
+                String name = m.getName();
+                if (name.equals("run")) {
+                    if (Modifier.isPublic(m.getModifiers()) == false) {
+                        continue;
                     }
-                    return null;
+                    p.m_procMethod = m;
+                    return m.getParameterTypes();
                 }
-                @Override
-                public Class<?>[] visitGroovy(ProcedureRunner p) {
-                    return ((GroovyScriptProcedureDelegate)p.m_procedure).getParameterTypes();
-                }
-            };
+            }
+            return null;
+        }
+        @Override
+        public Class<?>[] visitGroovy(ProcedureRunner p) {
+            return ((GroovyScriptProcedureDelegate)p.m_procedure).getParameterTypes();
+        }
+    };
 
    private final static Language.Visitor<Map<String,SQLStmt>, ProcedureRunner> sqlStatementsRetriever =
            new Language.Visitor<Map<String,SQLStmt>, ProcedureRunner>() {
-            @Override
-            public Map<String, SQLStmt> visitJava(ProcedureRunner p) {
-                Map<String, SQLStmt> stmtMap = null;
-                try {
-                    stmtMap = ProcedureCompiler.getValidSQLStmts(null, p.m_procedureName, p.m_procedure.getClass(), p.m_procedure, true);
-                } catch (Exception e1) {
-                    // shouldn't throw anything outside of the compiler
-                    e1.printStackTrace();
-                }
-                return stmtMap;
-            }
-            @Override
-            public Map<String, SQLStmt> visitGroovy(ProcedureRunner p) {
-                return ((GroovyScriptProcedureDelegate)p.m_procedure).getStatementMap();
-            }
-        };
+       @Override
+       public Map<String, SQLStmt> visitJava(ProcedureRunner p) {
+           Map<String, SQLStmt> stmtMap = null;
+           try {
+               stmtMap = ProcedureCompiler.getValidSQLStmts(null, p.m_procedureName, p.m_procedure.getClass(), p.m_procedure, true);
+           } catch (Exception e1) {
+               // shouldn't throw anything outside of the compiler
+               e1.printStackTrace();
+           }
+           return stmtMap;
+       }
+       @Override
+       public Map<String, SQLStmt> visitGroovy(ProcedureRunner p) {
+           return ((GroovyScriptProcedureDelegate)p.m_procedure).getStatementMap();
+       }
+   };
 
    /**
     * Test whether or not the given stack frame is within a procedure invocation
@@ -1406,7 +1478,8 @@ public class ProcedureRunner {
                   long siteId,
                   boolean finalTask,
                   String procedureName,
-                  byte[] procToLoad) {
+                  byte[] procToLoad,
+                  boolean perFragmentStatsRecording) {
            m_batchSize = batchSize;
            m_txnState = txnState;
 
@@ -1424,6 +1497,7 @@ public class ProcedureRunner {
                                                  txnState.isForReplay());
            m_localTask.setProcedureName(procedureName);
            m_localTask.setBatchTimeout(m_txnState.getInvocation().getBatchTimeout());
+           m_localTask.setPerFragmentStatsRecording(perFragmentStatsRecording);
 
            // the data and message for all sites in the transaction
            m_distributedTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
@@ -1437,6 +1511,7 @@ public class ProcedureRunner {
            // this works fine if procToLoad is NULL
            m_distributedTask.setProcNameToLoad(procToLoad);
            m_distributedTask.setBatchTimeout(m_txnState.getInvocation().getBatchTimeout());
+           m_distributedTask.setPerFragmentStatsRecording(perFragmentStatsRecording);
        }
 
        /*
@@ -1457,7 +1532,7 @@ public class ProcedureRunner {
                m_depsForLocalTask[index] = -1;
                // Add the local fragment data.
                if (stmt.inCatalog) {
-                   m_localTask.addFragment(stmt.aggregator.planHash, m_depsToResume[index], params);
+                   m_localTask.addFragment(stmt.aggregator.planHash, stmt.getStmtName(), m_depsToResume[index], params);
                }
                else {
                    byte[] planBytes = ActivePlanRepository.planForFragmentId(stmt.aggregator.id);
@@ -1475,8 +1550,8 @@ public class ProcedureRunner {
                m_depsForLocalTask[index] = outputDepId;
                // Add local and distributed fragments.
                if (stmt.inCatalog) {
-                   m_localTask.addFragment(stmt.aggregator.planHash, m_depsToResume[index], params);
-                   m_distributedTask.addFragment(stmt.collector.planHash, outputDepId, params);
+                   m_localTask.addFragment(stmt.aggregator.planHash, stmt.getStmtName(), m_depsToResume[index], params);
+                   m_distributedTask.addFragment(stmt.collector.planHash, stmt.getStmtName(), outputDepId, params);
                }
                else {
                    byte[] planBytes = ActivePlanRepository.planForFragmentId(stmt.aggregator.id);
@@ -1498,7 +1573,8 @@ public class ProcedureRunner {
                                          m_site.getCorrespondingSiteId(),
                                          finalTask,
                                          m_procedureName,
-                                         m_procNameToLoadForFragmentTasks);
+                                         m_procNameToLoadForFragmentTasks,
+                                         m_statsCollector.isStmtRecording());
 
        // iterate over all sql in the batch, filling out the above data structures
        for (int i = 0; i < batch.size(); ++i) {
@@ -1587,6 +1663,7 @@ public class ProcedureRunner {
        Object[] params = new Object[batchSize];
        long[] fragmentIds = new long[batchSize];
        String[] sqlTexts = new String[batchSize];
+       int succeededFragmentsCount = 0;
 
        int i = 0;
        for (final QueuedSQL qs : batch) {
@@ -1604,6 +1681,8 @@ public class ProcedureRunner {
        }
 
        VoltTable[] results = null;
+       // Before executing the fragments, tell the EE if this batch should be timed.
+       getExecutionEngine().setPerFragmentTimingEnabled(m_statsCollector.isStmtRecording());
        try {
            results = m_site.executePlanFragments(
                    batchSize,
@@ -1625,7 +1704,33 @@ public class ProcedureRunner {
 
            throw ex;
        }
+       finally {
+           long[] executionTimes = null;
+           if (m_statsCollector.isStmtRecording()) {
+               executionTimes = new long[batchSize];
+           }
+           succeededFragmentsCount = getExecutionEngine().extractPerFragmentStats(batchSize, executionTimes);
 
+           for (i = 0; i < batchSize; i++) {
+               QueuedSQL qs = batch.get(i);
+               // No coordinator task for a single partition procedure.
+               boolean hasCoordinatorTask = false;
+               // If all the fragments in this batch are executed successfully, succeededFragmentsCount == batchSize.
+               // Otherwise, the fragment whose index equals succeededFragmentsCount is the one that failed.
+               boolean failed = i == succeededFragmentsCount;
+               m_statsCollector.finishStatement(qs.stmt.getStmtName(),
+                                                hasCoordinatorTask,
+                                                m_statsCollector.isStmtRecording(),
+                                                failed,
+                                                executionTimes == null ? 0 : executionTimes[i],
+                                                results == null ? null : results[i],
+                                                qs.params);
+               // If this fragment failed, no subsequent fragments will be executed.
+               if (failed) {
+                   break;
+               }
+           }
+       }
        return results;
     }
 }

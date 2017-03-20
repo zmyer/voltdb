@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -64,11 +64,13 @@ public class ValidatePartitioning extends VoltSystemProcedure {
             SysProcFragmentId.PF_matchesHashinatorResults;
 
     @Override
-    public void init() {
-        registerPlanFragment(SysProcFragmentId.PF_validatePartitioningResults);
-        registerPlanFragment(SysProcFragmentId.PF_validatePartitioning);
-        registerPlanFragment(SysProcFragmentId.PF_matchesHashinatorResults);
-        registerPlanFragment(SysProcFragmentId.PF_matchesHashinator);
+    public long[] getPlanFragmentIds() {
+        return new long[] {
+            SysProcFragmentId.PF_validatePartitioningResults,
+            SysProcFragmentId.PF_validatePartitioning,
+            SysProcFragmentId.PF_matchesHashinatorResults,
+            SysProcFragmentId.PF_matchesHashinator
+        };
     }
 
     @Override

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -91,12 +91,14 @@ public class SystemInformation extends VoltSystemProcedure
     };
 
     @Override
-    public void init()
+    public long[] getPlanFragmentIds()
     {
-        registerPlanFragment(SysProcFragmentId.PF_systemInformationOverview);
-        registerPlanFragment(SysProcFragmentId.PF_systemInformationOverviewAggregate);
-        registerPlanFragment(SysProcFragmentId.PF_systemInformationDeployment);
-        registerPlanFragment(SysProcFragmentId.PF_systemInformationAggregate);
+        return new long[]{
+            SysProcFragmentId.PF_systemInformationOverview,
+            SysProcFragmentId.PF_systemInformationOverviewAggregate,
+            SysProcFragmentId.PF_systemInformationDeployment,
+            SysProcFragmentId.PF_systemInformationAggregate
+        };
     }
 
     @Override
@@ -452,6 +454,10 @@ public class SystemInformation extends VoltSystemProcedure
             vt.addRow(hostId, "LICENSE", VoltDB.instance().getLicenseInformation());
         }
         populatePartitionGroups(hostId, vt);
+
+        // root path
+        vt.addRow(hostId, "VOLTDBROOT", VoltDB.instance().getVoltDBRootPath());
+        vt.addRow(hostId, "FULLCLUSTERSIZE", Integer.toString(VoltDB.instance().getCatalogContext().getClusterSettings().hostcount()));
         return vt;
     }
 
@@ -526,25 +532,11 @@ public class SystemInformation extends VoltSystemProcedure
         if (cluster.getNetworkpartition())
         {
             partition_detect_enabled = "true";
-            String partition_detect_snapshot_path = VoltDB.instance().getSnapshotPath();
-            String partition_detect_snapshot_prefix =
-                cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPrefix();
-            results.addRow("snapshotpath",
-                           partition_detect_snapshot_path);
-            results.addRow("partitiondetectionsnapshotprefix",
-                           partition_detect_snapshot_prefix);
         }
         results.addRow("partitiondetection", partition_detect_enabled);
 
         results.addRow("heartbeattimeout", Integer.toString(cluster.getHeartbeattimeout()));
-
         results.addRow("adminport", Integer.toString(VoltDB.instance().getConfig().m_adminPort));
-        String adminstartup = "false";
-        if (cluster.getAdminstartup())
-        {
-            adminstartup = "true";
-        }
-        results.addRow("adminstartup", adminstartup);
 
         String command_log_enabled = "false";
         // log name is MAGIC, you knoooow

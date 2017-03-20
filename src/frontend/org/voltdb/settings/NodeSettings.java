@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,11 +29,12 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.aeonbits.owner.Config.Sources;
-import org.aeonbits.owner.ConfigFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
+
+import org.aeonbits.owner.Config.Sources;
+import org.aeonbits.owner.ConfigFactory;
 
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;

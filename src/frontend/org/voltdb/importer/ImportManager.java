@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -109,8 +109,8 @@ public class ImportManager implements ChannelChangeCallback {
 
     /**
      * This creates a import connector from configuration provided.
+     * @param myHostId
      * @param catalogContext
-     * @param partitions
      */
     private synchronized void create(int myHostId, CatalogContext catalogContext) {
         try {

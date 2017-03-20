@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -62,9 +62,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         SET_DR_SEQUENCE_NUMBERS(2),
         SET_DR_PROTOCOL_VERSION(3),
         SP_JAVA_GET_DRID_TRACKER(4),
-        SET_DRID_TRACKER(5),
+        SET_DRID_TRACKER_START(5),
         GENERATE_DR_EVENT(6),
-        RESET_DR_APPLIED_TRACKER(7);
+        RESET_DR_APPLIED_TRACKER(7),
+        SET_MERGED_DRID_TRACKER(8),
+        INIT_DRID_TRACKER(9);
 
         private TaskType(int taskId) {
             this.taskId = taskId;
@@ -77,7 +79,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public static enum EventType {
         NOT_A_EVENT(0),
         POISON_PILL(1),
-        CATALOG_UPDATE(2);
+        CATALOG_UPDATE(2),
+        DR_STREAM_START(3);
 
         private EventType(int typeId) {
             this.typeId = typeId;
@@ -645,6 +648,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                                             long uniqueId,
                                                             long undoQuantumToken) throws EEException;
 
+    public abstract void setPerFragmentTimingEnabled(boolean enabled);
+
+    // Extract the per-fragment stats from the buffer.
+    public abstract int extractPerFragmentStats(int batchSize, long[] executionTimesOut);
+
     /** Used for test code only (AFAIK jhugg) */
     public abstract VoltTable serializeTable(int tableId) throws EEException;
 
@@ -832,13 +840,17 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param pointer
      * @param parameter_buffer
      * @param parameter_buffer_size
+     * @param per_fragment_stats_buffer
+     * @param per_fragment_stats_buffer_size
      * @param resultBuffer
      * @param result_buffer_size
      * @param exceptionBuffer
      * @param exception_buffer_size
      * @return error code
      */
-    protected native int nativeSetBuffers(long pointer, ByteBuffer parameter_buffer, int parameter_buffer_size,
+    protected native int nativeSetBuffers(long pointer,
+                                          ByteBuffer parameter_buffer, int parameter_buffer_size,
+                                          ByteBuffer per_fragment_stats_buffer, int per_fragment_stats_buffer_size,
                                           ByteBuffer resultBuffer, int result_buffer_size,
                                           ByteBuffer exceptionBuffer, int exception_buffer_size);
 
@@ -1082,7 +1094,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param startSequenceNumber the starting sequence number of DR buffers
      * @return payload bytes (only txns with no InvocationBuffer header)
      */
-    public native static byte[] getTestDRBuffer(boolean compatible, int partitionId, int partitionKeyValues[], int flags[],
+    public native static byte[] getTestDRBuffer(int partitionId, int partitionKeyValues[], int flags[],
             long startSequenceNumber);
 
     /**

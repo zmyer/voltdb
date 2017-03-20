@@ -404,6 +404,7 @@ def buildMakefile(CTX):
     makefile.write("BUILD=%s\n" % CTX.LEVEL.lower())
     makefile.write("CC = %s\n" % CTX.CC)
     makefile.write("CXX = %s\n" % CTX.CXX)
+    makefile.write("VOLT_LOG_LEVEL = %s\n" % CTX.LOG_LEVEL)
     makefile.write("CPPFLAGS += %s\n" % (MAKECPPFLAGS))
     makefile.write("LDFLAGS += %s\n" % (CTX.LDFLAGS))
     makefile.write("JNILIBFLAGS += %s\n" % (JNILIBFLAGS))
@@ -505,7 +506,7 @@ def buildMakefile(CTX):
     makefile.write("\t$(AR) $(ARFLAGS) $@ $?\n")
     harness_source = TEST_PREFIX + "/harness.cpp"
     makefile.write("objects/harness.o: $(ROOTDIR)/" + harness_source + "\n")
-    makefile.write("\t$(CCACHE) $(COMPILE.cpp) -MMD -MP -o $@ $^\n")
+    makefile.write("\t$(CCACHE) $(COMPILE.cpp) -MMD -MP -o $@ $(ROOTDIR)/" + harness_source + "\n")
     makefile.write("-include %s\n" % "objects/harness.d")
     makefile.write("\n")
     cleanobjs += ["objects/volt.a", "objects/harness.o", "objects/harness.d"]

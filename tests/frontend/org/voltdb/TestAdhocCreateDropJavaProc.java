@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -70,23 +70,20 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
             m_client.createConnection(cluster.getListenerAddress(0));
 
             ClientResponse resp;
-            // Can't create a procedure without a class, Marge
+            // Can't create a procedure without a class
             resp = m_client.callProcedure("@SystemCatalog", "CLASSES");
             System.out.println("CLASSES: " + resp.getResults()[0]);
-            boolean threw = false;
             try {
                 resp = m_client.callProcedure("@AdHoc",
                         "create procedure from class org.voltdb_testprocs.updateclasses.testImportProc");
+                fail("Shouldn't be able to create a procedure backed by no class");
             }
             catch (ProcCallException pce) {
-                pce.printStackTrace();
-                threw = true;
             }
-            assertTrue("Shouldn't be able to create a procedure backed by no class", threw);
             assertFalse(findProcedureInSystemCatalog("testImportProc"));
 
             InMemoryJarfile jarfile = new InMemoryJarfile();
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, org.voltdb_testprocs.updateclasses.testImportProc.class);
 
             resp = m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
@@ -101,21 +98,17 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
             }
             assertTrue(findProcedureInSystemCatalog("testImportProc"));
             // Make sure we don't crash when we call it though
-            threw = false;
             try {
                 resp = m_client.callProcedure("testImportProc");
+                fail("Should return an error and not crash calling procedure w/ bad dependencies");
             }
             catch (ProcCallException pce) {
-                pce.printStackTrace();
                 assertTrue(pce.getMessage().contains("ClassNotFoundException"));
-                threw = true;
             }
-            assertTrue("Should return an error and not crash calling procedure w/ bad dependencies",
-                    threw);
 
             // Okay, add the missing dependency
             jarfile = new InMemoryJarfile();
-            comp = new VoltCompiler();
+            comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, org.voltdb_testprocs.updateclasses.NoMeaningClass.class);
             resp = m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
             // now we should be able to call it
@@ -123,24 +116,21 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
                 resp = m_client.callProcedure("testImportProc");
             }
             catch (ProcCallException pce) {
-                pce.printStackTrace();
                 fail("Should be able to call fully consistent procedure");
             }
             assertEquals(10L, resp.getResults()[0].asScalarLong());
 
             // Now try to remove the procedure class
-            threw = false;
             try {
                 resp = m_client.callProcedure("@UpdateClasses", null,
                         "org.voltdb_testprocs.updateclasses.*");
+                fail("Shouldn't be able to rip a class out from under an active proc");
             }
             catch (ProcCallException pce) {
-                pce.printStackTrace();
-                assertTrue(pce.getMessage().contains("modifying classes from catalog"));
-                threw = true;
+                assertTrue(pce.getMessage(),
+                        pce.getMessage().contains("Cannot load class for procedure org.voltdb_testprocs.updateclasses.testImportProc"));
             }
-            assertTrue("Shouldn't be able to rip a class out from under an active proc",
-                    threw);
+
             // Make sure we didn't purge anything (even the extra dependency)
             resp = m_client.callProcedure("@SystemCatalog", "CLASSES");
             assertEquals(2, resp.getResults()[0].getRowCount());
@@ -150,7 +140,6 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
                 resp = m_client.callProcedure("@AdHoc", "drop procedure testImportProc");
             }
             catch (ProcCallException pce) {
-                pce.printStackTrace();
                 fail("Should be able to drop a stored procedure");
             }
             assertFalse(findProcedureInSystemCatalog("testImportProc"));
@@ -161,7 +150,6 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
                         "org.voltdb_testprocs.updateclasses.*");
             }
             catch (ProcCallException pce) {
-                pce.printStackTrace();
                 fail("Should be able to remove the classes for an inactive procedure");
             }
             resp = m_client.callProcedure("@SystemCatalog", "CLASSES");
@@ -204,7 +192,7 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
 
             // Now load the procedure requiring the already-resident dependency
             InMemoryJarfile jarfile = new InMemoryJarfile();
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, org.voltdb_testprocs.updateclasses.testImportProc.class);
 
             try {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -230,6 +230,17 @@ public class FragmentTask extends TransactionTask
             return currentFragResponse;
         }
 
+        ProcedureRunner currRunner = siteConnection.getProcedureRunner(m_fragmentMsg.getProcedureName());
+        long[] executionTimes = null;
+        int succeededFragmentsCount = 0;
+        if (currRunner != null) {
+            currRunner.getExecutionEngine().setPerFragmentTimingEnabled(m_fragmentMsg.isPerFragmentStatsRecording());
+            if (m_fragmentMsg.isPerFragmentStatsRecording()) {
+                // At this point, we will execute the fragments one by one.
+                executionTimes = new long[1];
+            }
+        }
+
         for (int frag = 0; frag < m_fragmentMsg.getFragmentCount(); frag++)
         {
             byte[] planHash = m_fragmentMsg.getPlanHash(frag);
@@ -252,8 +263,8 @@ public class FragmentTask extends TransactionTask
              * I am pretty sure what we don't support is partial rollback.
              * The entire procedure will roll back successfully on failure
              */
+            VoltTable dependency = null;
             try {
-                VoltTable dependency;
                 fragmentPlan = m_fragmentMsg.getFragmentPlan(frag);
                 String stmtText = null;
 
@@ -324,6 +335,19 @@ public class FragmentTask extends TransactionTask
                 // ensure adhoc plans are unloaded
                 if (fragmentPlan != null) {
                     ActivePlanRepository.decrefPlanFragmentById(fragmentId);
+                }
+                // If the executed fragment comes from a stored procedure, we need to update the per-fragment stats for it.
+                // Notice that this code path is used to handle multi-partition stored procedures.
+                // The single-partition stored procedure handler is in the ProcedureRunner.
+                if (currRunner != null) {
+                    succeededFragmentsCount = currRunner.getExecutionEngine().extractPerFragmentStats(1, executionTimes);
+                    currRunner.getStatsCollector().finishStatement(m_fragmentMsg.getStmtName(frag),
+                                                                   m_fragmentMsg.isCoordinatorTask(),
+                                                                   m_fragmentMsg.isPerFragmentStatsRecording(),
+                                                                   succeededFragmentsCount == 0,
+                                                                   executionTimes == null ? 0 : executionTimes[0],
+                                                                   dependency,
+                                                                   params);
                 }
             }
         }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -122,7 +122,8 @@ public class TestCommandLine
         CommandLine cl = new CommandLine(StartAction.REJOIN);
         cl.leader("127.0.0.1:6666");
         System.err.println(cl.toString());
-        assertTrue(cl.toString().contains("rejoin host 127.0.0.1:6666"));
+        assertTrue(cl.toString().contains("rejoin "));
+        assertTrue(cl.toString().contains("host 127.0.0.1:6666"));
         assertFalse(cl.toString().contains("start"));
         assertFalse(cl.toString().contains("recover"));
     }
@@ -133,7 +134,8 @@ public class TestCommandLine
         CommandLine cl = new CommandLine(StartAction.LIVE_REJOIN);
         cl.leader("127.0.0.1:6666");
         System.err.println(cl.toString());
-        assertTrue(cl.toString().contains("live rejoin host 127.0.0.1:6666"));
+        assertTrue(cl.toString().contains("live rejoin "));
+        assertTrue(cl.toString().contains("host 127.0.0.1:6666"));
         assertFalse(cl.toString().contains("start"));
         assertFalse(cl.toString().contains("recover"));
     }

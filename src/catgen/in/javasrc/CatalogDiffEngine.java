@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -38,6 +38,7 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogChangeGroup.FieldChange;
 import org.voltdb.catalog.CatalogChangeGroup.TypeChanges;
 import org.voltdb.compiler.MaterializedViewProcessor;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.utils.CatalogSizing;
 import org.voltdb.utils.CatalogUtil;
@@ -918,6 +919,17 @@ public class CatalogDiffEngine {
                 else {
                     return null;
                 }
+            } else if (field.equals("drRole")) {
+                final String prevRole = (String) prevType.getField("drRole");
+                final String newRole = (String) suspect.getField("drRole");
+                // Promote from replica to master
+                if (prevRole.equals(DrRoleType.REPLICA.value()) && newRole.equals(DrRoleType.MASTER.value())) {
+                    return null;
+                }
+                // Everything else is illegal
+                else {
+                    restrictionQualifier = " from " + prevRole + " to " + newRole;
+                }
             }
         }
 
@@ -1080,25 +1092,6 @@ public class CatalogDiffEngine {
                                                                                 final String field)
     {
         if (prevType instanceof Database) {
-            if(field.equalsIgnoreCase("isActiveActiveDRed")) {
-                List<TablePopulationRequirements> retval = new ArrayList<>();
-                for (Table t : ((Database) prevType).getTables()) {
-                    if (t.getIsdred()) {
-                        String tableName = t.getTypeName();
-                        String errorMessage =
-                                String.format(
-                                        "Unable to change DR mode of table %s because it is not empty.",
-                                        tableName);
-                        TablePopulationRequirements entry =
-                            new TablePopulationRequirements(tableName,
-                                                            tableName,
-                                                            errorMessage);
-                        retval.add(entry);
-                    }
-                }
-                return retval;
-            }
-
             return null;
         }
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -111,7 +111,6 @@
 #include "common/LegacyHashinator.h"
 #include "common/ElasticHashinator.h"
 #include "storage/DRTupleStream.h"
-#include "storage/CompatibleDRTupleStream.h"
 #include "murmur3/MurmurHash3.h"
 #include "execution/VoltDBEngine.h"
 #include "execution/JNITopend.h"
@@ -287,25 +286,20 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
         // initialization is separated from constructor so that constructor
         // never fails.
         VOLT_DEBUG("calling initialize...");
-        bool success =
-                engine->initialize(clusterIndex,
-                                   siteId,
-                                   partitionId,
-                                   hostId,
-                                   hostString,
-                                   drClusterId,
-                                   defaultDrBufferSize,
-                                   tempTableMemory,
-                                   createDrReplicatedStream,
-                                   static_cast<int32_t>(compactionThreshold));
-        if (success) {
-            VOLT_DEBUG("initialize succeeded");
-            return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
-        } else {
-            throwFatalException("initialize failed");
-            return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
-        }
-    } catch (const FatalException &e) {
+        engine->initialize(clusterIndex,
+                           siteId,
+                           partitionId,
+                           hostId,
+                           hostString,
+                           drClusterId,
+                           defaultDrBufferSize,
+                           tempTableMemory,
+                           createDrReplicatedStream,
+                           static_cast<int32_t>(compactionThreshold));
+        VOLT_DEBUG("initialize succeeded");
+        return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
+    }
+    catch (const FatalException &e) {
         topend->crashVoltDB(e);
     }
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
@@ -494,9 +488,11 @@ int deserializeParameterSet(const char* serialized_parameterset, jint serialized
 /**
  * Sets (or re-sets) the buffer shared between java and the EE. This is for reducing
  * cost of GetDirectBufferAddress().
- * @param pointer the VoltDBEngine pointer
+ * @param engine_ptr the VoltDBEngine pointer
  * @param parameter_buffer direct byte buffer to be set
- * @param m_parameterBuffersize size of the buffer
+ * @param parameter_buffer_size size of the buffer
+ * @param per_fragment_stats_buffer direct byte buffer to be set
+ * @param per_fragment_stats_buffer_size size of the buffer
  * @param result_buffer direct byte buffer to be set
  * @param result_buffer_size size of the buffer
  * @param exception_buffer direct byte buffer to be set
@@ -504,7 +500,9 @@ int deserializeParameterSet(const char* serialized_parameterset, jint serialized
  * @return error code
 */
 SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetBuffers
-  (JNIEnv *env, jobject obj, jlong engine_ptr, jobject parameter_buffer, jint parameter_buffer_size,
+  (JNIEnv *env, jobject obj, jlong engine_ptr,
+   jobject parameter_buffer, jint parameter_buffer_size,
+   jobject per_fragment_stats_buffer, jint per_fragment_stats_buffer_size,
    jobject result_buffer, jint result_buffer_size,
    jobject exception_buffer, jint exception_buffer_size)
 {
@@ -521,6 +519,10 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetBu
                 env->GetDirectBufferAddress(parameter_buffer));
         int parameterBufferCapacity = parameter_buffer_size;
 
+        char *perFragmentStatsBuffer = reinterpret_cast<char*>(
+                env->GetDirectBufferAddress(per_fragment_stats_buffer));
+        int perFragmentStatsBufferCapacity = per_fragment_stats_buffer_size;
+
         char *reusedResultBuffer = reinterpret_cast<char*>(
                 env->GetDirectBufferAddress(result_buffer));
         int reusedResultBufferCapacity = result_buffer_size;
@@ -530,6 +532,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetBu
         int exceptionBufferCapacity = exception_buffer_size;
 
         engine->setBuffers(parameterBuffer, parameterBufferCapacity,
+            perFragmentStatsBuffer, perFragmentStatsBufferCapacity,
             reusedResultBuffer, reusedResultBufferCapacity,
             exceptionBuffer, exceptionBufferCapacity);
     } catch (const FatalException &e) {
@@ -569,6 +572,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
     try {
         updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
         engine->resetReusedResultOutputBuffer();
+        engine->resetPerFragmentStatsOutputBuffer();
         static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
 
         // fragment info
@@ -1421,10 +1425,10 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    getTestDRBuffer
- * Signature: (ZI[I[I)[B
+ * Signature: (I[I[IJ)[B
  */
 SHAREDLIB_JNIEXPORT jbyteArray JNICALL Java_org_voltdb_jni_ExecutionEngine_getTestDRBuffer
-  (JNIEnv *env, jclass clazz, jboolean compatible, jint partitionId, jintArray partitionKeyValues, jintArray flags,
+  (JNIEnv *env, jclass clazz, jint partitionId, jintArray partitionKeyValues, jintArray flags,
           jlong startSequenceNumber) {
     try {
         jint *partitionKeyValuesJPtr = env->GetIntArrayElements(partitionKeyValues, NULL);
@@ -1441,14 +1445,8 @@ SHAREDLIB_JNIEXPORT jbyteArray JNICALL Java_org_voltdb_jni_ExecutionEngine_getTe
         assert(partitionKeyValueList.size() == flagList.size());
 
         char *output = new char[1024 * 256];
-        int32_t length;
-        if (compatible) {
-            length = CompatibleDRTupleStream::getTestDRBuffer(partitionId, partitionKeyValueList, flagList,
-                    startSequenceNumber, output);
-        } else {
-            length = DRTupleStream::getTestDRBuffer(partitionId, partitionKeyValueList, flagList,
-                    startSequenceNumber, output);
-        }
+        int32_t length = DRTupleStream::getTestDRBuffer(partitionId, partitionKeyValueList, flagList,
+                startSequenceNumber, output);
         jbyteArray array = env->NewByteArray(length);
         jbyte *arrayBytes = env->GetByteArrayElements(array, NULL);
         ::memcpy(arrayBytes, output, length);

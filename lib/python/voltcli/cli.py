@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2016 VoltDB Inc.
+# Copyright (C) 2008-2017 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -306,6 +306,7 @@ class ExtendedHelpOptionParser(optparse.OptionParser):
         optparse.OptionParser.print_help(self)
         if not self.format_epilog_called:
             sys.stdout.write(self.on_format_epilog())
+        sys.stdout.write('\n')
 
     def on_format_epilog(self):
         utility.abort('ExtendedHelpOptionParser subclass must override on_format_epilog(): %s'
@@ -537,7 +538,6 @@ class CLIParser(ExtendedHelpOptionParser):
         utility.error(*msgs)
         sys.stdout.write('\n')
         self.print_help()
-        sys.stdout.write('\n')
         sys.exit(1)
 
     def _format_verb_list(self):

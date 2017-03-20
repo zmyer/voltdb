@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -183,7 +183,7 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
                     networkLog.error(
                             "Backpressure reports a negative outstanding transaction byte count (" +
                             m_pendingTxnBytes +
-                            "). No action required.");
+                            "). No action required.", new RuntimeException("for stack trace purposes"));
                 }
             }
 

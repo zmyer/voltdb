@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -137,6 +137,9 @@ public class AsyncBenchmark {
         @Option(desc = "Password for connection.")
         String password = "";
 
+        @Option(desc = "Enable SSL, Optionally provide configuration file.")
+        String sslfile = "";
+
         @Option(desc = "Enable topology awareness")
         boolean topologyaware = false;
 
@@ -175,7 +178,10 @@ public class AsyncBenchmark {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig(config.user, config.password, new StatusListener());
-        clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
+        if (!config.sslfile.trim().isEmpty()) {
+            clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
+            clientConfig.enableSSL();
+        }
 
         if (config.topologyaware) {
             clientConfig.setTopologyChangeAware(true);
