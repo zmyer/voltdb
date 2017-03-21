@@ -194,4 +194,8 @@ public interface ProducerDRGateway {
     public void resumeAllReaders();
 
     public void pauseAllReaders();
+
+    public boolean isSnapshotRequestInProgress();
+
+    public void scheduleToReset(byte clusterId);
 }
