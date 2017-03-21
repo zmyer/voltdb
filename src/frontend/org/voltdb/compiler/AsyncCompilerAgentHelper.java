@@ -58,6 +58,7 @@ public class AsyncCompilerAgentHelper
         retval.hostname = work.hostname;
         retval.user = work.user;
         retval.tablesThatMustBeEmpty = new String[0]; // ensure non-null
+        retval.hasSchemaChange = true;
 
         try {
             // catalog change specific boiler plate
@@ -69,7 +70,11 @@ public class AsyncCompilerAgentHelper
             InMemoryJarfile newCatalogJar = null;
             VoltTrace.add(() -> VoltTrace.beginDuration("inmemoryjar_deepcopy", VoltTrace.Category.ASYNC));
             InMemoryJarfile oldJar = context.getCatalogJar().deepCopy();
+<<<<<<< HEAD
             VoltTrace.add(VoltTrace::endDuration);
+=======
+            boolean updatedClass = false;
+>>>>>>> uactrace
             String deploymentString = work.operationString;
             if ("@UpdateApplicationCatalog".equals(work.invocationName)) {
                 // Grab the current catalog bytes if @UAC had a null catalog from deployment-only update
@@ -91,8 +96,14 @@ public class AsyncCompilerAgentHelper
                 }
                 VoltTrace.add(() -> VoltTrace.beginDuration("modify_classes", VoltTrace.Category.ASYNC));
                 try {
-                    newCatalogJar = modifyCatalogClasses(context.catalog, oldJar, work.operationString,
+                    InMemoryJarfile modifiedJar = modifyCatalogClasses(context.catalog, oldJar, work.operationString,
                             newCatalogJar, work.drRole == DrRoleType.XDCR);
+                    if (modifiedJar == null) {
+                        newCatalogJar = oldJar;
+                    } else {
+                        newCatalogJar = modifiedJar;
+                        updatedClass = true;
+                    }
                 }
                 catch (ClassNotFoundException e) {
                     retval.errorMsg = "Unexpected error in @UpdateClasses modifying classes " +
@@ -103,6 +114,9 @@ public class AsyncCompilerAgentHelper
                 // Real deploymentString should be the current deployment, just set it to null
                 // here and let it get filled in correctly later.
                 deploymentString = null;
+
+                // mark it as non-schema change
+                retval.hasSchemaChange = false;
             }
             else if ("@AdHoc".equals(work.invocationName)) {
                 // work.adhocDDLStmts should be applied to the current catalog
@@ -238,6 +252,7 @@ public class AsyncCompilerAgentHelper
             VoltTrace.add(VoltTrace::endDuration);
 
             String commands = diff.commands();
+            compilerLog.info(diff.getDescriptionOfChanges(updatedClass));
 
             // since diff commands can be stupidly big, compress them here
             retval.encodedDiffCommands = Encoder.compressAndBase64Encode(commands);
@@ -284,6 +299,10 @@ public class AsyncCompilerAgentHelper
         return jarfile;
     }
 
+    /**
+     * @return NUll if no classes changed, otherwise return the update jar file.
+     * @throws ClassNotFoundException
+     */
     private InMemoryJarfile modifyCatalogClasses(Catalog catalog, InMemoryJarfile jarfile, String deletePatterns,
             InMemoryJarfile newJarfile, boolean isXDCR) throws ClassNotFoundException
     {
@@ -322,6 +341,7 @@ public class AsyncCompilerAgentHelper
                 jarfile.put(e.getKey(), e.getValue());
             }
         }
+<<<<<<< HEAD
         VoltTrace.add(VoltTrace::endDuration);
         if (deletedClasses || foundClasses) {
             compilerLog.info("Checking java classes available to stored procedures");
@@ -331,10 +351,21 @@ public class AsyncCompilerAgentHelper
             for (Procedure proc: db.getProcedures()) {
                 // single statement procedure does not need to check class loading
                 if (proc.getHasjava() == false) continue;
+=======
+        if (!deletedClasses && !foundClasses) {
+            return null;
+        }
+>>>>>>> uactrace
 
-                if (! VoltCompilerUtils.containsClassName(jarfile, proc.getClassname())) {
-                    throw new ClassNotFoundException("Cannot load class for procedure " + proc.getClassname());
-                }
+        compilerLog.info("Checking java classes available to stored procedures");
+        // TODO: check the jar classes on all nodes
+        Database db = VoltCompiler.getCatalogDatabase(catalog);
+        for (Procedure proc: db.getProcedures()) {
+            // single statement procedure does not need to check class loading
+            if (proc.getHasjava() == false) continue;
+
+            if (! VoltCompilerUtils.containsClassName(jarfile, proc.getClassname())) {
+                throw new ClassNotFoundException("Cannot load class for procedure " + proc.getClassname());
             }
             VoltTrace.add(VoltTrace::endDuration);
         }

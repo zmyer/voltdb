@@ -67,12 +67,10 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.mindrot.BCrypt;
-import org.xml.sax.SAXException;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.HealthMonitor;
-import org.voltdb.RealVoltDB;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -124,6 +122,7 @@ import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
+import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SnmpType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
@@ -141,6 +140,7 @@ import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.types.ConstraintType;
+import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -702,7 +702,7 @@ public abstract class CatalogUtil {
             setClusterInfo(catalog, deployment);
 
             //Set the snapshot schedule
-            setSnapshotInfo( catalog, deployment.getSnapshot());
+            setSnapshotInfo(catalog, deployment.getSnapshot());
 
             //Set enable security
             setSecurityEnabled(catalog, deployment.getSecurity());
@@ -715,7 +715,7 @@ public abstract class CatalogUtil {
             }
 
             // set the HTTPD info
-            setHTTPDInfo(catalog, deployment.getHttpd());
+            setHTTPDInfo(catalog, deployment.getHttpd(), deployment.getSsl());
 
             setDrInfo(catalog, deployment.getDr(), deployment.getCluster());
 
@@ -868,6 +868,12 @@ public abstract class CatalogUtil {
         if (deployment.getHeartbeat() == null) {
             HeartbeatType hb = new HeartbeatType();
             deployment.setHeartbeat(hb);
+        }
+
+        SslType ssl = deployment.getSsl();
+        if (ssl == null) {
+            ssl = new SslType();
+            deployment.setSsl(ssl);
         }
         //httpd
         HttpdType httpd = deployment.getHttpd();
@@ -1898,12 +1904,12 @@ public abstract class CatalogUtil {
         return roles;
     }
 
-    private static void setHTTPDInfo(Catalog catalog, HttpdType httpd) {
+    private static void setHTTPDInfo(Catalog catalog, HttpdType httpd, SslType ssl) {
         Cluster cluster = catalog.getClusters().get("cluster");
 
         // set the catalog info
         int defaultPort = VoltDB.DEFAULT_HTTP_PORT;
-        if (httpd.getHttps()!=null && httpd.getHttps().isEnabled()) {
+        if (ssl !=null && ssl.isEnabled()) {
             defaultPort = VoltDB.DEFAULT_HTTPS_PORT;
         }
         cluster.setHttpdportno(httpd.getPort()==null ? defaultPort : httpd.getPort());
@@ -2568,6 +2574,7 @@ public abstract class CatalogUtil {
         paths.setCommandlogsnapshot(prev.getCommandlogsnapshot());
 
         clone.setPaths(paths);
+        clone.setSsl(o.getSsl());
 
         clone.setSnmp(o.getSnmp());
         return clone;
