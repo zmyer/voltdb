@@ -614,7 +614,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
         m_client = ClientFactory.createClient();
         m_client.createConnection("localhost", config.m_port);
 
-        String sql = getQueryForLongQueryTable(750);
+        String sql = getQueryForLongQueryTable(1200);
         try {
             m_client.callProcedure("@AdHoc", sql);
             fail("Query was expected to generate stack overflow error");
@@ -823,9 +823,10 @@ public class TestAdHocQueries extends AdHocQueryTester {
                     "                      WHERE STAFF.EMPNUM = WORKS.EMPNUM);";
             try {
                 env.m_client.callProcedure("@AdHoc", adHocQuery);
+                fail("did not fail on subquery In/Exists");
             }
             catch (ProcCallException pcex) {
-                fail("did fail on subquery In/Exists in UPDATE statement");
+                assertTrue(pcex.getMessage().indexOf("Subquery expressions are only supported in SELECT statements") > 0);
             }
 
             adHocQuery = "     SELECT 'ZZ', EMPNUM, EMPNAME, -99 \n" +
@@ -897,7 +898,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("Compilation should have failed.");
             }
             catch(ProcCallException e) {
-                assertTrue(e.getMessage().contains("Error compiling"));
+                assertTrue(e.getMessage().contains("invalid format for a constant timestamp value"));
             }
             String sql = String.format("INSERT INTO TS_CONSTRAINT_EXCEPTION VALUES ('%s','{}');",
                     new TimestampType().toString());

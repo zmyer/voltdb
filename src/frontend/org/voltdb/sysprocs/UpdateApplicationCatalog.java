@@ -74,11 +74,12 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             SysProcFragmentId.PF_updateCatalogAggregate;
 
     @Override
-    public void init() {
-        registerPlanFragment(SysProcFragmentId.PF_updateCatalogPrecheckAndSync);
-        registerPlanFragment(SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate);
-        registerPlanFragment(SysProcFragmentId.PF_updateCatalog);
-        registerPlanFragment(SysProcFragmentId.PF_updateCatalogAggregate);
+    public long[] getPlanFragmentIds() {
+        return new long[]{
+            SysProcFragmentId.PF_updateCatalogPrecheckAndSync,
+            SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate,
+            SysProcFragmentId.PF_updateCatalog,
+            SysProcFragmentId.PF_updateCatalogAggregate};
     }
 
     /**
@@ -336,6 +337,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             String commands = Encoder.decodeBase64AndDecompress(catalogDiffCommands);
             int expectedCatalogVersion = (Integer)params.toArray()[1];
             boolean requiresSnapshotIsolation = ((Byte) params.toArray()[2]) != 0;
+            boolean hasSchemaChange = ((Byte) params.toArray()[3]) != 0;
 
             CatalogAndIds catalogStuff = null;
             try {
@@ -360,7 +362,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                         DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
                         getUniqueId(),
                         catalogStuff.deploymentBytes,
-                        catalogStuff.getDeploymentHash());
+                        catalogStuff.getDeploymentHash(),
+                        hasSchemaChange);
 
                 // If the cluster is in master role only (not replica or XDCR), reset trackers.
                 // The producer would have been turned off by the code above already.
@@ -445,7 +448,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
     private final VoltTable[] performCatalogUpdateWork(
             String catalogDiffCommands,
             int expectedCatalogVersion,
-            byte requiresSnapshotIsolation)
+            byte requiresSnapshotIsolation,
+            byte hasSchemaChange)
     {
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
 
@@ -455,7 +459,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         pfs[0].outputDepId = DEP_updateCatalog;
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.fromArrayNoCopy(
-                catalogDiffCommands, expectedCatalogVersion, requiresSnapshotIsolation);
+                catalogDiffCommands, expectedCatalogVersion, requiresSnapshotIsolation, hasSchemaChange);
 
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_updateCatalogAggregate;
@@ -490,7 +494,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                            String[] reasonsForEmptyTables,
                            byte requiresSnapshotIsolation,
                            byte worksWithElastic,
-                           byte[] deploymentHash)
+                           byte[] deploymentHash,
+                           byte hasSchemaChange)
                                    throws Exception
     {
         assert(tablesThatMustBeEmpty != null);
@@ -586,7 +591,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         performCatalogUpdateWork(
                 catalogDiffCommands,
                 expectedCatalogVersion,
-                requiresSnapshotIsolation);
+                requiresSnapshotIsolation,
+                hasSchemaChange);
 
         VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
         result.addRow(VoltSystemProcedure.STATUS_OK);

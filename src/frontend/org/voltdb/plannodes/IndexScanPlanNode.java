@@ -27,11 +27,9 @@ import java.util.Set;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.lib.StringUtil;
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
@@ -52,7 +50,7 @@ import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 import org.voltdb.utils.CatalogUtil;
 
-public class IndexScanPlanNode extends AbstractScanPlanNode {
+public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSortablePlanNode {
 
     public enum Members {
         TARGET_INDEX_NAME,
@@ -84,7 +82,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     // This list of expressions corresponds to the values that we will use
     // at runtime in the lookup on the index
-    protected final List<AbstractExpression> m_searchkeyExpressions = new ArrayList<AbstractExpression>();
+    protected final List<AbstractExpression> m_searchkeyExpressions = new ArrayList<>();
 
     // If the search key expression is actually a "not distinct" expression, we do not want the executor to skip null candidates.
     protected final List<Boolean> m_compareNotDistinct = new ArrayList<Boolean>();
@@ -111,7 +109,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // this index scan is going to use
     protected Index m_catalogIndex = null;
 
-    private ArrayList<AbstractExpression> m_bindings = new ArrayList<AbstractExpression>();
+    private List<AbstractExpression> m_bindings = new ArrayList<>();
 
     private static final int FOR_SCANNING_PERFORMANCE_OR_ORDERING = 1;
     private static final int FOR_GROUPING = 2;
@@ -120,7 +118,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     private int m_purpose = FOR_SCANNING_PERFORMANCE_OR_ORDERING;
 
     // Post-filters that got eliminated by exactly matched partial index filters
-    private final List<AbstractExpression> m_eliminatedPostFilterExpressions = new ArrayList<AbstractExpression>();
+    private final List<AbstractExpression> m_eliminatedPostFilterExpressions = new ArrayList<>();
+
+    private final IndexUseForOrderBy m_indexUse = new IndexUseForOrderBy();
 
     public IndexScanPlanNode() {
         super();
@@ -187,7 +187,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         String exprsjson = catalogIndex.getExpressionsjson();
         List<AbstractExpression> indexedExprs = null;
         if (exprsjson.isEmpty()) {
-            indexedExprs = new ArrayList<AbstractExpression>();
+            indexedExprs = new ArrayList<>();
 
             List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(catalogIndex.getColumns(), "index");
             assert(nullExprIndex < indexedColRefs.size());
@@ -224,7 +224,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 assert(false);
             }
             if (ExpressionUtil.isNullRejectingExpression(indexPredicate, tableScan.getTableAlias())) {
-                notNullTves = new HashSet<TupleValueExpression>();
+                notNullTves = new HashSet<>();
                 notNullTves.addAll(ExpressionUtil.getTupleValueExpressions(indexPredicate));
             }
         }
@@ -232,7 +232,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         AbstractExpression nullExpr = indexedExprs.get(nullExprIndex);
         AbstractExpression skipNullPredicate = null;
         if (notNullTves == null || !notNullTves.contains(nullExpr)) {
-            List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+            List<AbstractExpression> exprs = new ArrayList<>();
             for (int i = 0; i < nullExprIndex; i++) {
                 AbstractExpression idxExpr = indexedExprs.get(i);
                 ExpressionType exprType = ExpressionType.COMPARE_EQUAL;
@@ -545,7 +545,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
         // Collect all the TVEs in the AbstractExpression members.
         List<TupleValueExpression> index_tves =
-            new ArrayList<TupleValueExpression>();
+            new ArrayList<>();
         index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_endExpression));
         index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_initialExpression));
         index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_skip_null_predicate));
@@ -588,8 +588,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     @Override
     public void computeCostEstimates(long unusedChildOutputTupleCountEstimate,
-                                     Cluster unusedCluster,
-                                     Database unusedDb,
                                      DatabaseEstimates estimates,
                                      ScalarValueHints[] unusedParamHints) {
 
@@ -950,11 +948,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         return " while " + m_endExpression.explain(getTableNameForExplain());
     }
 
-    public void setBindings(ArrayList<AbstractExpression> bindings) {
+    public void setBindings(List<AbstractExpression> bindings) {
         m_bindings  = bindings;
     }
 
-    public ArrayList<AbstractExpression> getBindings() {
+    public List<AbstractExpression> getBindings() {
         return m_bindings;
     }
 
@@ -1034,6 +1032,18 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         for (AbstractExpression ae : m_searchkeyExpressions) {
             collected.addAll(ae.findAllSubexpressionsOfClass(aeClass));
         }
+    }
+
+    @Override
+    public IndexUseForOrderBy indexUse() {
+        // TODO Auto-generated method stub
+        return m_indexUse;
+    }
+
+    @Override
+    public AbstractPlanNode planNode() {
+        // TODO Auto-generated method stub
+        return this;
     }
 
 }

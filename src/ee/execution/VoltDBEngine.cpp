@@ -81,7 +81,6 @@
 #include "plannodes/plannodefragment.h"
 
 #include "storage/AbstractDRTupleStream.h"
-#include "storage/CompatibleDRTupleStream.h"
 #include "storage/DRTupleStream.h"
 #include "storage/MaterializedViewHandler.h"
 #include "storage/MaterializedViewTriggerForWrite.h"
@@ -107,6 +106,7 @@
 #include <sstream>
 #include <locale>
 #include <typeinfo>
+#include <chrono> // For measuring the execution time of each fragment.
 
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Column);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Index);
@@ -161,8 +161,6 @@ VoltDBEngine::VoltDBEngine(Topend* topend, LogProxy* logProxy)
       m_drReplicatedConflictStreamedTable(NULL),
       m_drStream(NULL),
       m_drReplicatedStream(NULL),
-      m_compatibleDRStream(NULL),
-      m_compatibleDRReplicatedStream(NULL),
       m_currExecutorVec(NULL)
 {
 }
@@ -214,12 +212,10 @@ void VoltDBEngine::initialize(int32_t clusterIndex,
     m_templateSingleLongTable[38] = 1; // row count
     m_templateSingleLongTable[42] = 8; // row size
 
-    // configure DR stream and DR compatible stream
+    // configure DR stream
     m_drStream = new DRTupleStream(partitionId, defaultDrBufferSize);
-    m_compatibleDRStream = new CompatibleDRTupleStream(partitionId, defaultDrBufferSize);
     if (createDrReplicatedStream) {
         m_drReplicatedStream = new DRTupleStream(16383, defaultDrBufferSize);
-        m_compatibleDRReplicatedStream = new CompatibleDRTupleStream(16383, defaultDrBufferSize);
     }
 
     // set the DR version
@@ -276,8 +272,6 @@ VoltDBEngine::~VoltDBEngine() {
 
     delete m_drReplicatedStream;
     delete m_drStream;
-    delete m_compatibleDRStream;
-    delete m_compatibleDRReplicatedStream;
 }
 
 // ------------------------------------------------------------------
@@ -385,8 +379,19 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
     m_executorContext->m_progressStats.resetForNewBatch();
     NValueArray &params = m_executorContext->getParameterContainer();
 
-    for (m_currentIndexInBatch = 0; m_currentIndexInBatch < numFragments; ++m_currentIndexInBatch) {
+    // Reserve the space to track the number of succeeded fragments.
+    size_t succeededFragmentsCountOffset = m_perFragmentStatsOutput.reserveBytes(sizeof(int32_t));
+    // All the time measurements use nanoseconds.
+    std::chrono::high_resolution_clock::time_point startTime, endTime;
+    std::chrono::duration<int64_t, std::nano> elapsedNanoseconds;
+    ReferenceSerializeInputBE perFragmentStatsBufferIn(getPerFragmentStatsBuffer(),
+                                                       getPerFragmentStatsBufferCapacity());
+    // There is a byte at the very begining of the per-fragment stats buffer indicating
+    // whether the time measurements should be enabled for the current batch.
+    // If the current procedure invocation is not sampled, all its batches will not be timed.
+    bool perFragmentTimingEnabled = perFragmentStatsBufferIn.readByte() > 0;
 
+    for (m_currentIndexInBatch = 0; m_currentIndexInBatch < numFragments; ++m_currentIndexInBatch) {
         int usedParamcnt = serialInput.readShort();
         m_executorContext->setUsedParameterCount(usedParamcnt);
         if (usedParamcnt < 0) {
@@ -398,6 +403,9 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
             params[j].deserializeFromAllocateForStorage(serialInput, &m_stringPool);
         }
 
+        if (perFragmentTimingEnabled) {
+            startTime = std::chrono::high_resolution_clock::now();
+        }
         // success is 0 and error is 1.
         if (executePlanFragment(planfragmentIds[m_currentIndexInBatch],
                                 inputDependencyIds ? inputDependencyIds[m_currentIndexInBatch] : -1,
@@ -405,6 +413,14 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
                                 m_currentIndexInBatch == (numFragments - 1),
                                 traceOn)) {
             ++failures;
+        }
+        if (perFragmentTimingEnabled) {
+            endTime = std::chrono::high_resolution_clock::now();
+            elapsedNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime);
+            // Write the execution time to the per-fragment stats buffer.
+            m_perFragmentStatsOutput.writeLong(elapsedNanoseconds.count());
+        }
+        if (failures > 0) {
             break;
         }
 
@@ -413,6 +429,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
 
         m_stringPool.purge();
     }
+    m_perFragmentStatsOutput.writeIntAt(succeededFragmentsCountOffset, m_currentIndexInBatch);
 
     m_currentIndexInBatch = -1;
 
@@ -1421,11 +1438,19 @@ int VoltDBEngine::getResultsSize() const {
     return static_cast<int>(m_resultOutput.size());
 }
 
-void VoltDBEngine::setBuffers(char* parameterBuffer, int parameterBuffercapacity,
+int32_t VoltDBEngine::getPerFragmentStatsSize() const {
+    return static_cast<int32_t>(m_perFragmentStatsOutput.size());
+}
+
+void VoltDBEngine::setBuffers(char* parameterBuffer, int parameterBufferCapacity,
+        char* perFragmentStatsBuffer, int perFragmentStatsBufferCapacity,
         char* resultBuffer, int resultBufferCapacity,
         char* exceptionBuffer, int exceptionBufferCapacity) {
     m_parameterBuffer = parameterBuffer;
-    m_parameterBufferCapacity = parameterBuffercapacity;
+    m_parameterBufferCapacity = parameterBufferCapacity;
+
+    m_perFragmentStatsBuffer = perFragmentStatsBuffer;
+    m_perFragmentStatsBufferCapacity = perFragmentStatsBufferCapacity;
 
     m_reusedResultBuffer = resultBuffer;
     m_reusedResultCapacity = resultBufferCapacity;
@@ -1976,38 +2001,26 @@ void VoltDBEngine::executeTask(TaskType taskType, ReferenceSerializeInputBE &tas
         break;
     }
     case TASK_TYPE_SET_DR_PROTOCOL_VERSION: {
-        uint32_t drVersion = taskInfo.readInt();
-        if (drVersion != DRTupleStream::PROTOCOL_VERSION) {
-            m_executorContext->setDrStream(m_compatibleDRStream);
-            if (m_compatibleDRReplicatedStream) {
-                m_executorContext->setDrReplicatedStream(m_compatibleDRReplicatedStream);
-            }
+        m_drVersion = taskInfo.readInt();
+        m_executorContext->setDrStream(m_drStream);
+        if (m_drReplicatedStream) {
+            m_executorContext->setDrReplicatedStream(m_drReplicatedStream);
         }
-        else {
-            m_executorContext->setDrStream(m_drStream);
-            if (m_drReplicatedStream) {
-                m_executorContext->setDrReplicatedStream(m_drReplicatedStream);
-            }
-        }
-        m_drVersion = drVersion;
         m_resultOutput.writeInt(0);
         break;
     }
     case TASK_TYPE_GENERATE_DR_EVENT: {
-        // we start using in-band CATALOG_UPDATE at version 5
-        if (m_drVersion >= 5) {
-            DREventType type = (DREventType)taskInfo.readInt();
-            int64_t uniqueId = taskInfo.readLong();
-            int64_t lastCommittedSpHandle = taskInfo.readLong();
-            int64_t spHandle = taskInfo.readLong();
-            ByteArray payloads = taskInfo.readBinaryString();
+        DREventType type = (DREventType)taskInfo.readInt();
+        int64_t uniqueId = taskInfo.readLong();
+        int64_t lastCommittedSpHandle = taskInfo.readLong();
+        int64_t spHandle = taskInfo.readLong();
+        ByteArray payloads = taskInfo.readBinaryString();
 
-            m_executorContext->drStream()->generateDREvent(type, lastCommittedSpHandle,
-                    spHandle, uniqueId, payloads);
-            if (m_executorContext->drReplicatedStream()) {
-                m_executorContext->drReplicatedStream()->generateDREvent(type, lastCommittedSpHandle,
-                        spHandle, uniqueId, payloads);
-            }
+        m_executorContext->drStream()->generateDREvent(type, lastCommittedSpHandle,
+                                                       spHandle, uniqueId, payloads);
+        if (m_executorContext->drReplicatedStream()) {
+            m_executorContext->drReplicatedStream()->generateDREvent(type, lastCommittedSpHandle,
+                                                                     spHandle, uniqueId, payloads);
         }
         break;
     }

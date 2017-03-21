@@ -24,6 +24,7 @@ import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashSet;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.network.Connection;
 import org.voltdb.TheHashinator.HashinatorConfig;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 
@@ -60,6 +61,14 @@ public class StatsAgent extends OpsAgent
     {
         StatsSelector subselector = StatsSelector.valueOf(request.subselector);
         switch (subselector) {
+        case PROCEDUREDETAIL:
+            request.aggregateTables = sortProcedureDetailStats(request.aggregateTables);
+            break;
+        // For PROCEDURE-series tables, they are all based on the procedure detail table.
+        case PROCEDURE:
+            request.aggregateTables =
+            aggregateProcedureStats(request.aggregateTables);
+            break;
         case PROCEDUREPROFILE:
             request.aggregateTables =
             aggregateProcedureProfileStats(request.aggregateTables);
@@ -77,6 +86,14 @@ public class StatsAgent extends OpsAgent
             break;
         default:
         }
+    }
+
+    private VoltTable[] sortProcedureDetailStats(VoltTable[] baseStats) {
+        if (baseStats == null || baseStats.length != 1) {
+            return baseStats;
+        }
+        ProcedureDetailResultTable result = new ProcedureDetailResultTable(baseStats[0]);
+        return result.getSortedResultTable();
     }
 
     private Supplier<Map<String, Boolean>> m_procInfo = getProcInfoSupplier();
@@ -110,6 +127,64 @@ public class StatsAgent extends OpsAgent
     }
 
     /**
+     * Produce PROCEDURE aggregation of PROCEDURE subselector
+     * Basically it leaves out the rows that were not labeled as "<ALL>".
+     */
+    private VoltTable[] aggregateProcedureStats(VoltTable[] baseStats)
+    {
+        if (baseStats == null || baseStats.length != 1) {
+            return baseStats;
+        }
+
+        VoltTable result = new VoltTable(
+            new ColumnInfo("TIMESTAMP", VoltType.BIGINT),
+            new ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID, VoltSystemProcedure.CTYPE_ID),
+            new ColumnInfo("HOSTNAME", VoltType.STRING),
+            new ColumnInfo(VoltSystemProcedure.CNAME_SITE_ID, VoltSystemProcedure.CTYPE_ID),
+            new ColumnInfo("PARTITION_ID", VoltType.INTEGER),
+            new ColumnInfo("PROCEDURE", VoltType.STRING),
+            new ColumnInfo("INVOCATIONS", VoltType.BIGINT),
+            new ColumnInfo("TIMED_INVOCATIONS", VoltType.BIGINT),
+            new ColumnInfo("MIN_EXECUTION_TIME", VoltType.BIGINT),
+            new ColumnInfo("MAX_EXECUTION_TIME", VoltType.BIGINT),
+            new ColumnInfo("AVG_EXECUTION_TIME", VoltType.BIGINT),
+            new ColumnInfo("MIN_RESULT_SIZE", VoltType.INTEGER),
+            new ColumnInfo("MAX_RESULT_SIZE", VoltType.INTEGER),
+            new ColumnInfo("AVG_RESULT_SIZE", VoltType.INTEGER),
+            new ColumnInfo("MIN_PARAMETER_SET_SIZE", VoltType.INTEGER),
+            new ColumnInfo("MAX_PARAMETER_SET_SIZE", VoltType.INTEGER),
+            new ColumnInfo("AVG_PARAMETER_SET_SIZE", VoltType.INTEGER),
+            new ColumnInfo("ABORTS", VoltType.BIGINT),
+            new ColumnInfo("FAILURES", VoltType.BIGINT));
+        baseStats[0].resetRowPosition();
+        while (baseStats[0].advanceRow()) {
+            if (baseStats[0].getString("STATEMENT").equalsIgnoreCase("<ALL>")) {
+                result.addRow(
+                    baseStats[0].getLong("TIMESTAMP"),
+                    baseStats[0].getLong(VoltSystemProcedure.CNAME_HOST_ID),
+                    baseStats[0].getString("HOSTNAME"),
+                    baseStats[0].getLong(VoltSystemProcedure.CNAME_SITE_ID),
+                    baseStats[0].getLong("PARTITION_ID"),
+                    baseStats[0].getString("PROCEDURE"),
+                    baseStats[0].getLong("INVOCATIONS"),
+                    baseStats[0].getLong("TIMED_INVOCATIONS"),
+                    baseStats[0].getLong("MIN_EXECUTION_TIME"),
+                    baseStats[0].getLong("MAX_EXECUTION_TIME"),
+                    baseStats[0].getLong("AVG_EXECUTION_TIME"),
+                    baseStats[0].getLong("MIN_RESULT_SIZE"),
+                    baseStats[0].getLong("MAX_RESULT_SIZE"),
+                    baseStats[0].getLong("AVG_RESULT_SIZE"),
+                    baseStats[0].getLong("MIN_PARAMETER_SET_SIZE"),
+                    baseStats[0].getLong("MAX_PARAMETER_SET_SIZE"),
+                    baseStats[0].getLong("AVG_PARAMETER_SET_SIZE"),
+                    baseStats[0].getLong("ABORTS"),
+                    baseStats[0].getLong("FAILURES"));
+            }
+        }
+        return new VoltTable[] { result };
+    }
+
+    /**
      * Produce PROCEDUREPROFILE aggregation of PROCEDURE subselector
      */
     private VoltTable[] aggregateProcedureProfileStats(VoltTable[] baseStats)
@@ -121,6 +196,9 @@ public class StatsAgent extends OpsAgent
         StatsProcProfTable timeTable = new StatsProcProfTable();
         baseStats[0].resetRowPosition();
         while (baseStats[0].advanceRow()) {
+            if ( ! baseStats[0].getString("STATEMENT").equalsIgnoreCase("<ALL>")) {
+                continue;
+            }
             String pname = baseStats[0].getString("PROCEDURE");
 
             timeTable.updateTable(!isReadOnlyProcedure(pname),
@@ -148,6 +226,9 @@ public class StatsAgent extends OpsAgent
         StatsProcInputTable timeTable = new StatsProcInputTable();
         baseStats[0].resetRowPosition();
         while (baseStats[0].advanceRow()) {
+            if ( ! baseStats[0].getString("STATEMENT").equalsIgnoreCase("<ALL>")) {
+                continue;
+            }
             String pname = baseStats[0].getString("PROCEDURE");
             timeTable.updateTable(!isReadOnlyProcedure(pname),
                     pname,
@@ -175,6 +256,9 @@ public class StatsAgent extends OpsAgent
         StatsProcOutputTable timeTable = new StatsProcOutputTable();
         baseStats[0].resetRowPosition();
         while (baseStats[0].advanceRow()) {
+            if ( ! baseStats[0].getString("STATEMENT").equalsIgnoreCase("<ALL>")) {
+                continue;
+            }
             String pname = baseStats[0].getString("PROCEDURE");
             timeTable.updateTable(!isReadOnlyProcedure(pname),
                     pname,
@@ -422,6 +506,7 @@ public class StatsAgent extends OpsAgent
         case PROCEDUREINPUT:
         case PROCEDUREOUTPUT:
         case PROCEDUREPROFILE:
+        case PROCEDUREDETAIL:
             stats = collectStats(StatsSelector.PROCEDURE, interval);
             break;
         case STARVATION:

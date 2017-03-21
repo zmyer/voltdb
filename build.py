@@ -367,8 +367,6 @@ CTX.INPUT['storage'] = """
  AbstractDRTupleStream.cpp
  BinaryLogSink.cpp
  BinaryLogSinkWrapper.cpp
- CompatibleBinaryLogSink.cpp
- CompatibleDRTupleStream.cpp
  ConstraintFailureException.cpp
  constraintutil.cpp
  CopyOnWriteContext.cpp
@@ -478,6 +476,7 @@ if whichtests in ("${eetestsuite}", "common"):
     CTX.TESTS['common'] = """
      debuglog_test
      elastic_hashinator_test
+     PerFragmentStatsTest
      nvalue_test
      pool_test
      serializeio_test

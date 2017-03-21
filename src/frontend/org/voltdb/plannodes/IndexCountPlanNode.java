@@ -24,12 +24,10 @@ import java.util.Map;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.HSQLInterface;
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
@@ -67,11 +65,11 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     protected String m_targetIndexName;
 
     //
-    protected List<AbstractExpression> m_endkeyExpressions = new ArrayList<AbstractExpression>();
+    protected List<AbstractExpression> m_endkeyExpressions = new ArrayList<>();
 
     // This list of expressions corresponds to the values that we will use
     // at runtime in the lookup on the index
-    protected List<AbstractExpression> m_searchkeyExpressions = new ArrayList<AbstractExpression>();
+    protected List<AbstractExpression> m_searchkeyExpressions = new ArrayList<>();
 
     // If the search key expression is actually a "not distinct" expression, we do not want the executor to skip null candidates.
     protected List<Boolean> m_compareNotDistinct = new ArrayList<Boolean>();
@@ -86,7 +84,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     // this index scan is going to use
     protected Index m_catalogIndex = null;
 
-    private ArrayList<AbstractExpression> m_bindings;
+    private List<AbstractExpression> m_bindings;
 
     private AbstractExpression m_skip_null_predicate;
 
@@ -211,7 +209,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         // add support for reverse scan
         // for ASC scan, check endExpression;
         // for DESC scan (isReverseScan()), check the searchkeys
-        List<AbstractExpression> endKeys = new ArrayList<AbstractExpression>();
+        List<AbstractExpression> endKeys = new ArrayList<>();
 
         // Translate the index scan's end condition into a list of end key
         // expressions and note the comparison operand of the last one.
@@ -378,7 +376,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     public void resolveColumnIndexes(){}
 
     @Override
-    public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeCostEstimates(long childOutputTupleCountEstimate, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
         // Cost counting index scans as constant, almost negligible work.
         // This might be unfair, as the tree has O(logn) complexity, but we
         // really want to pick this kind of search over others.
@@ -535,7 +533,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         return result;
     }
 
-    public ArrayList<AbstractExpression> getBindings() {
+    public List<AbstractExpression> getBindings() {
         return m_bindings;
     }
 
