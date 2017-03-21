@@ -15,7 +15,6 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <cmath>
 #include "udf/UDF.h"
 #define PI 3.14159
 
@@ -29,7 +28,7 @@ public:
     }
     NValue p_execute() {
         double degree = getDoubleArgument(0);
-        return ValueFactory::getDoubleValue(sin(degree / 180 * PI));
+        return ValueFactory::getDoubleValue(std::sin(degree));
     }
 };
 

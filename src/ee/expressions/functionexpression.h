@@ -293,6 +293,8 @@ static const int FUNC_VOLT_MIN_VALID_TIMESTAMP         = 21021;     // minimum v
 static const int FUNC_VOLT_MAX_VALID_TIMESTAMP         = 21022;     // maximum valid timestamp
 static const int FUNC_VOLT_IS_VALID_TIMESTAMP          = 21023;     // is a timestamp valid
 
+static const int FUNC_VOLT_JSIN          = 2000001;
+
 /*
  * These are the first and last user defined function indices.
  * We also need a generic user defined function, to make a

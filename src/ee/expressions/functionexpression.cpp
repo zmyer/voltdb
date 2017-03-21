@@ -281,6 +281,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
     }
     else if (nArgs == 1) {
         switch(functionId) {
+        case FUNC_VOLT_JSIN:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_JSIN>((*arguments)[0]);
+            break;
         case FUNC_ABS:
             ret = new UnaryFunctionExpression<FUNC_ABS>((*arguments)[0]);
             break;

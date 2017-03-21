@@ -214,6 +214,30 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         assert(m_decodeBase64AndDecompressToBytesMID != NULL);
         throw std::exception();
     }
+
+    m_jsineClass = m_jniEnv->FindClass("org/voltdb/JSine");
+    if (m_jsineClass == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_jsineClass != NULL);
+        throw std::exception();
+    }
+
+    m_jsineClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_jsineClass));
+    if (m_jsineClass == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_jsineClass != NULL);
+        throw std::exception();
+    }
+
+    m_jsineMID = m_jniEnv->GetStaticMethodID(
+            m_jsineClass,
+            "jsin",
+            "(D)D");
+    if (m_jsineMID == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_jsineMID != NULL);
+        throw std::exception();
+    }
 }
 
 
@@ -307,6 +331,10 @@ static std::string jbyteArrayToStdString(JNIEnv* jniEnv,
     return "";
  }
 
+inline double JNITopend::jsin(double arg) {
+    return m_jniEnv->CallStaticDoubleMethod(m_jsineClass, m_jsineMID, arg);
+}
+
 std::string JNITopend::planForFragmentId(int64_t fragmentId) {
     VOLT_DEBUG("fetching plan for id %d", (int) fragmentId);
 
@@ -392,6 +420,7 @@ JNITopend::~JNITopend() {
     m_jniEnv->DeleteGlobalRef(m_exportManagerClass);
     m_jniEnv->DeleteGlobalRef(m_partitionDRGatewayClass);
     m_jniEnv->DeleteGlobalRef(m_encoderClass);
+    m_jniEnv->DeleteGlobalRef(m_jsineClass);
 }
 
 int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, string signature) {

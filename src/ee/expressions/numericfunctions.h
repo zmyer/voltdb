@@ -57,6 +57,16 @@ template<> inline NValue NValue::callUnary<FUNC_ABS>() const {
     return retval;
 }
 
+template<> inline NValue NValue::callUnary<FUNC_VOLT_JSIN>() const {
+    if (isNull()) {
+        return *this;
+    }
+    const ValueType type = getValueType();
+    NValue retval(type);
+    retval.getDouble() = ExecutorContext::getEngine()->getTopend()->jsin(getDouble());
+    return retval;
+}
+
 /** implement the SQL FLOOR function for all numeric values */
 template<> inline NValue NValue::callUnary<FUNC_FLOOR>() const {
     if (isNull()) {

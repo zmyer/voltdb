@@ -30,6 +30,7 @@ public:
     JNITopend(JNIEnv *env, jobject caller);
     ~JNITopend();
 
+    double jsin(double arg);
     inline JNITopend* updateJNIEnv(JNIEnv *env) { m_jniEnv = env; return this; }
     int loadNextDependency(int32_t dependencyId, Pool *stringPool, Table* destination);
     int64_t fragmentProgressUpdate(
@@ -63,6 +64,8 @@ public:
 
 private:
     JNIEnv *m_jniEnv;
+    jclass m_jsineClass;
+    jmethodID m_jsineMID;
 
     /**
      * JNI object corresponding to this engine. for callback functions.

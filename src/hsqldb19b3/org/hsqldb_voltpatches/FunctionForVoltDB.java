@@ -196,6 +196,8 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_BEGIN_UDF_ID                 = 1000000;
         static final int FUNC_VOLT_END_UDF_ID                   = 2000000;
 
+        static final int FUNC_VOLT_JSIN                   = 2000001;
+
         /*
          * Note: The name must be all lower case.
          */
@@ -407,6 +409,10 @@ public class FunctionForVoltDB extends FunctionSQL {
 
             new FunctionId("inet6_ntoa", Type.SQL_VARCHAR, FUNC_INET6_NTOA, -1,
                     new Type[] { Type.SQL_VARBINARY },
+                    singleParamList),
+
+            new FunctionId("jsin", Type.SQL_DOUBLE, FUNC_VOLT_JSIN, -1,
+                    new Type[] { Type.SQL_DOUBLE },
                     singleParamList),
 
         };
