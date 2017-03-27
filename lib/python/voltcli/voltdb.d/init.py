@@ -13,6 +13,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+from voltcli import properties 
 
 # Main Java Class
 VoltDB = 'org.voltdb.VoltDB'
@@ -31,12 +32,53 @@ VoltDB = 'org.voltdb.VoltDB'
     description = 'Initializes a new, empty database.'
 )
 def init(runner):
+    global voltdb_properties
+    voltdb_properties = {}
     runner.args.extend(['initialize'])
     if runner.opts.configfile:
-        runner.args.extend(['deployment', runner.opts.configfile])
+        runner.opts.configfile = preconfig(runner.opts.configfile)
+        if runner.opts.configfile: 
+            runner.args.extend(['deployment', runner.opts.configfile])
     if runner.opts.directory_spec:
         runner.args.extend(['voltdbroot', runner.opts.directory_spec])
     if runner.opts.force:
         runner.args.extend(['force'])
     args = runner.args
     runner.java_execute(VoltDB, None, *args)
+    if len(voltdb_properties) > 0:
+        print "Saving properties file... " + runner.opts.directory_spec + "/voltdbroot/config/properties.conf"
+        properties.write_set(voltdb_properties,properties.INIT_FILE_SET,runner.opts.directory_spec + "/voltdbroot/config/properties.conf")
+
+def preconfig(f):
+    global voltdb_property_files, voltdb_properties
+    loaded = False
+    deploymentfile = None
+    voltdb_property_files = [] 
+    props = []
+    files = f.split(",")
+    for i in range(0,len(files)):
+        files[i] = files[i].strip()   # remove excess white space
+        parts = files[i].split(".")
+        extension = parts[len(parts)-1].lower()
+        if extension == "xml":
+            if not deploymentfile:
+                deploymentfile = files[i]
+            else:
+                print "FATAL: too many deployment files. Only one XML deployment file is allowed."
+                exit()
+        else:
+            voltdb_property_files.append(files[i])
+    if deploymentfile: print "DEBUG: Deployment file is " + deploymentfile
+    if len(voltdb_property_files) > 0: 
+        for i in voltdb_property_files: 
+            if not loaded:
+                try:
+                    properties.load_property_defs()
+                except Exception as e:
+                    WARNING("Cannot load property definitions.\n" + str(e))
+            print "Parsing configuration file " + i
+            props.append(properties.load(i))
+        voltdb_properties = props[0]    
+        for i in range(1,len(props)): 
+            voltdb_properties = properties.merge(props[0],props[i],False)
+    return deploymentfile
