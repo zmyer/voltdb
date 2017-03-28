@@ -434,7 +434,7 @@ public class RegressionSuite extends TestCase {
         validateTableOfLongs(sql, vt, expected);
     }
 
-    static protected void validateTableOfScalarLongs(VoltTable vt, long[] expected) {
+    static public void validateTableOfScalarLongs(VoltTable vt, long[] expected) {
         assertNotNull(expected);
         assertEquals("Different number of rows! ", expected.length, vt.getRowCount());
         int len = expected.length;
@@ -443,7 +443,7 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    static protected void validateTableOfScalarLongs(Client client, String sql, long[] expected)
+    static public void validateTableOfScalarLongs(Client client, String sql, long[] expected)
             throws NoConnectionsException, IOException, ProcCallException {
         assertNotNull(expected);
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
@@ -1060,11 +1060,11 @@ public class RegressionSuite extends TestCase {
         verifyProcFails(client, expectedPattern, "@AdHoc", stmt);
     }
 
-    static protected void verifyAdHocFails(Client client, String expectedPattern, Object... args) throws IOException {
+    static public void verifyAdHocFails(Client client, String expectedPattern, Object... args) throws IOException {
         verifyProcFails(client, expectedPattern, "@AdHoc", args);
     }
 
-    static protected void verifyProcFails(Client client, String expectedPattern, String storedProc, Object... args) throws IOException {
+    static public void verifyProcFails(Client client, String expectedPattern, String storedProc, Object... args) throws IOException {
 
         String what;
         if (storedProc.compareTo("@AdHoc") == 0) {
