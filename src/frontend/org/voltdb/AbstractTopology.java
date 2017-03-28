@@ -1358,7 +1358,7 @@ public class AbstractTopology {
 
     public int getReplicationFactor() {
         //assume all partitions have the same k factor.
-        Partition partition =  partitionsById.values().iterator().next();
+        Partition partition = partitionsById.values().iterator().next();
         return partition.k;
     }
 

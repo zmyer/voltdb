@@ -114,6 +114,7 @@ import org.voltdb.compiler.deploymentfile.ConsistencyType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
+import org.voltdb.compiler.deploymentfile.PartialAvailable;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
@@ -925,7 +926,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 System.setOut(new PrintStream(System.out, true, "UTF-8"));
                 System.setErr(new PrintStream(System.err, true, "UTF-8"));
             } catch (UnsupportedEncodingException e) {
-                hostLog.fatal("Support for the UTF-8 encoding is required for VoltDB. This means you are likely running an unsupported JVM. Exiting.");
+                hostLog.fatal("Support for the UTF-8 encoding is required for VoltDB."
+                        + "This means you are likely running an unsupported JVM. Exiting.");
                 VoltDB.exit(-1);
             }
 
@@ -1574,7 +1576,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     // before allowing the fault log to be updated by the notifications
                     // generated below.
                     Set<Integer> hostsOnRing = new HashSet<>();
-                    if (!m_leaderAppointer.isClusterKSafe(hostsOnRing)) {
+                    HashSet<Integer> missingPartitions = new HashSet<Integer>();
+                    if (!m_leaderAppointer.isClusterKSafe(hostsOnRing, missingPartitions)) {
+                        if (VoltDB.Configuration.getPartialAvailable()) {
+                            m_cartographer.setMissingPartitions(missingPartitions);
+                            return;
+                        }
                         VoltDB.crashLocalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
                                 false, null);
                         return;
@@ -2319,6 +2326,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             ConsistencyType consistencyType = deployment.getConsistency();
             if (consistencyType != null) {
                 m_config.m_consistencyReadLevel = Consistency.ReadLevel.fromReadLevelType(consistencyType.getReadlevel());
+            }
+
+            PartialAvailable partialAvailable = deployment.getPartialavailable();
+            if (partialAvailable != null) {
+                m_config.m_partialAvailable = partialAvailable.isEnabled();
             }
 
             final String elasticSetting = deployment.getCluster().getElastic().trim().toUpperCase();

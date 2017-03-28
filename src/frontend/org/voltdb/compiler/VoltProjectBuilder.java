@@ -61,6 +61,7 @@ import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
 import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
+import org.voltdb.compiler.deploymentfile.PartialAvailable;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Voltdbroot;
@@ -73,8 +74,8 @@ import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.ServerImportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
-import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SnmpType;
+import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
@@ -283,6 +284,7 @@ public class VoltProjectBuilder {
     private Integer m_heartbeatTimeout = null;
 
     private Consistency.ReadLevel m_consistencyReadLevel = null;
+    private boolean m_partialAvailable = false;
 
     private String m_internalSnapshotPath;
     private String m_commandLogPath;
@@ -662,6 +664,10 @@ public class VoltProjectBuilder {
 
     public void setDefaultConsistencyReadLevel(Consistency.ReadLevel level) {
         m_consistencyReadLevel = level;
+    }
+
+    public void setPartialAvailable(boolean partialAvailable) {
+        m_partialAvailable = partialAvailable;
     }
 
     public void addImport(boolean enabled, String importType, String importFormat, String importBundle, Properties config) {
@@ -1097,6 +1103,14 @@ public class VoltProjectBuilder {
             ConsistencyType ct = factory.createConsistencyType();
             deployment.setConsistency(ct);
             ct.setReadlevel(m_consistencyReadLevel.toReadLevelType());
+        }
+
+        // <partialAvailable>
+        // don't include this element if not explicitly set
+        if (m_partialAvailable) {
+            PartialAvailable partialAvailable = factory.createPartialAvailable();
+            deployment.setPartialavailable(partialAvailable);
+            partialAvailable.setEnabled(m_partialAvailable);
         }
 
         deployment.setSystemsettings(createSystemSettingsType(factory));

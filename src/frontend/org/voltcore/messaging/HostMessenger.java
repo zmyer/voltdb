@@ -600,7 +600,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     public void start() throws Exception {
         /*
-         * SJ uses this barrier if this node becomes the leader to know when ZooKeeper
+         * SocketJoiner uses this barrier if this node becomes the leader to know when ZooKeeper
          * has been finished bootstrapping.
          */
         CountDownLatch zkInitBarrier = new CountDownLatch(1);

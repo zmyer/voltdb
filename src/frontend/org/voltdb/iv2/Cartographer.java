@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -75,6 +76,7 @@ public class Cartographer extends StatsSource
     private final HostMessenger m_hostMessenger;
     private final ZooKeeper m_zk;
     private final Set<Integer> m_allMasters = new HashSet<Integer>();
+    private HashSet<Integer> m_missingPartitions = new HashSet<Integer>();
 
     public static final String JSON_PARTITION_ID = "partitionId";
     public static final String JSON_INITIATOR_HSID = "initiatorHSId";
@@ -252,6 +254,22 @@ public class Cartographer extends StatsSource
     public long getHSIdForSinglePartitionMaster(int partitionId)
     {
         return m_iv2Masters.get(partitionId);
+    }
+
+    public void setMissingPartitions(HashSet<Integer> missingPartitions) {
+        m_missingPartitions = missingPartitions;
+    }
+
+    public boolean hasMissingPartitions() {
+        return m_missingPartitions.size() != 0;
+    }
+
+    public boolean isPartitionMissing(int partitionId) {
+        return m_missingPartitions.contains(partitionId);
+    }
+
+    public String missingPartitionsString() {
+        return Arrays.toString(m_missingPartitions.toArray());
     }
 
     // This used to be the method to get this on SiteTracker

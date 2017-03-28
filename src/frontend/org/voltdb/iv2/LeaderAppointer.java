@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -196,11 +197,18 @@ public class LeaderAppointer implements Promotable
                             "for k-safety before startup");
                 }
             } else {
+                tmLog.debug("LeaderAppointer::PartitionCallBack::Run(): " + this.toString());
+
                 Set<Integer> hostsOnRing = new HashSet<Integer>();
+                HashSet<Integer> missingPartitions = new HashSet<Integer>();
                 // Check for k-safety
-                if (!isClusterKSafe(hostsOnRing)) {
-                    VoltDB.crashGlobalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
-                            false, null);
+                if (!isClusterKSafe(hostsOnRing, missingPartitions)) {
+                    if (VoltDB.Configuration.getPartialAvailable()) {
+                        tmLog.warn("Partitions " + Arrays.toString(missingPartitions.toArray()) + " have no replicas.");
+                    } else {
+                        VoltDB.crashGlobalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
+                                false, null);
+                    }
                 }
                 // Check if replay has completed
                 if (m_replayComplete.get() == false) {
@@ -214,18 +222,30 @@ public class LeaderAppointer implements Promotable
                     VoltDB.crashGlobalVoltDB("Detected node failure before DR sync snapshot completes. Cluster will shut down.",
                                              false, null);
                 }
-                // If we survived the above gauntlet of fail, appoint a new leader for this partition.
-                if (missingHSIds.contains(m_currentLeader)) {
-                    m_currentLeader = assignLeader(m_partitionId, updatedHSIds);
-                }
-                // If this partition doesn't have a leader yet, and we have new replicas added,
-                // elect a leader.
-                if (m_currentLeader == Long.MAX_VALUE && !updatedHSIds.isEmpty()) {
-                    m_currentLeader = assignLeader(m_partitionId, updatedHSIds);
+
+                if (missingPartitions.contains(m_partitionId)) {
+                    m_currentLeader = -1;
+                } else {
+                    // If we survived the above gauntlet of fail, appoint a new leader for this partition.
+                    if (missingHSIds.contains(m_currentLeader)) {
+                        m_currentLeader = assignLeader(m_partitionId, updatedHSIds);
+                    }
+                    // If this partition doesn't have a leader yet, and we have new replicas added,
+                    // elect a leader.
+                    if (m_currentLeader == Long.MAX_VALUE && !updatedHSIds.isEmpty()) {
+                        m_currentLeader = assignLeader(m_partitionId, updatedHSIds);
+                    }
                 }
             }
             m_replicas.clear();
             m_replicas.addAll(updatedHSIds);
+        }
+
+        @Override
+        public String toString() {
+            return String.format("[PartitionCallback] partition id %s, current leader %s, and replicas: %s",
+                    m_partitionId, CoreUtils.hsIdToString(m_currentLeader),
+                    Arrays.toString(m_replicas.stream().map(x -> CoreUtils.hsIdToString(x)).toArray()));
         }
     }
 
@@ -526,7 +546,7 @@ public class LeaderAppointer implements Promotable
         return masterHSId;
     }
 
-    public boolean isClusterKSafe(Set<Integer> hostsOnRing)
+    public boolean isClusterKSafe(Set<Integer> hostsOnRing, Set<Integer> missingPartitions)
     {
         boolean retval = true;
         List<String> partitionDirs = null;
@@ -580,7 +600,11 @@ public class LeaderAppointer implements Promotable
                         removeAndCleanupPartition(pid);
                         continue;
                     }
-                    tmLog.fatal("K-Safety violation: No replicas found for partition: " + pid);
+                    if (VoltDB.Configuration.getPartialAvailable()) {
+                        tmLog.warn("K-Safety violation: No replicas found for partition: " + pid);
+                    } else {
+                        tmLog.fatal("K-Safety violation: No replicas found for partition: " + pid);
+                    }
                     retval = false;
                 } else if (!partitionNotOnHashRing) {
                     //Record host ids for all partitions that are on the ring
@@ -596,6 +620,9 @@ public class LeaderAppointer implements Promotable
                     lackingReplication.add(
                             new KSafetyStats.StatsPoint(statTs, pid, m_kfactor + 1 - replicas.size())
                             );
+                    if (replicas.size() == 0) {
+                        missingPartitions.add(pid);
+                    }
                 }
             }
             catch (Exception e) {

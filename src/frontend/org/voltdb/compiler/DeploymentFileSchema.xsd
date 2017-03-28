@@ -50,6 +50,7 @@
       <xs:element name="dr" minOccurs='0' maxOccurs='1' type="drType" />
       <xs:element name="import" minOccurs="0" maxOccurs="1" type="importType"/>
       <xs:element name="consistency" minOccurs="0" type="consistencyType"/>
+      <xs:element name="partialavailable" minOccurs="0" maxOccurs='1' type="partialAvailable"/>
       <xs:element name="snmp" minOccurs="0" type="snmpType"/>
     </xs:all>
   </xs:complexType>
@@ -101,6 +102,11 @@
   <!-- <consistency> -->
   <xs:complexType name="consistencyType">
     <xs:attribute name="readlevel" type="readlevelType" default="safe"/>
+  </xs:complexType>
+
+  <!-- <partial available> -->
+  <xs:complexType name="partialAvailable">
+    <xs:attribute name="enabled" type="xs:boolean" default="false"/>
   </xs:complexType>
 
   <!-- <paths> -->

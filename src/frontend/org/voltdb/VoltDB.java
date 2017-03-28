@@ -46,7 +46,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
-
 import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.probe.MeshProber;
@@ -171,6 +170,8 @@ public class VoltDB {
 
         /** consistency level for reads */
         public Consistency.ReadLevel m_consistencyReadLevel = Consistency.ReadLevel.SAFE;
+
+        public boolean m_partialAvailable = false;
 
         /** port number to use to build intra-cluster mesh */
         public int m_internalPort = org.voltcore.common.Constants.DEFAULT_INTERNAL_PORT;
@@ -1018,6 +1019,10 @@ public class VoltDB {
             else {
                 return Consistency.ReadLevel.SAFE;
             }
+        }
+
+        public static boolean getPartialAvailable() {
+            return m_config.m_partialAvailable;
         }
     }
 

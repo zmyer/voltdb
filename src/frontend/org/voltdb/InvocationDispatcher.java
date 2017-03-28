@@ -142,6 +142,7 @@ public final class InvocationDispatcher {
     private final AtomicBoolean m_isInitialRestore = new AtomicBoolean(true);
     // used to decide if we should shortcut reads
     private final Consistency.ReadLevel m_defaultConsistencyReadLevel;
+    private String m_partialAvailableFailureMessage = null;
 
     private final boolean m_isConfiguredForNonVoltDBBackend;
 
@@ -489,6 +490,7 @@ public final class InvocationDispatcher {
             // unable to hash to a site, return an error
             return getMispartitionedErrorResponse(task, catProc, e);
         }
+
         boolean success = createTransaction(handler.connectionId(),
                         task,
                         catProc.getReadonly(),
@@ -500,7 +502,15 @@ public final class InvocationDispatcher {
         if (!success) {
             // when VoltDB.crash... is called, we close off the client interface
             // and it might not be possible to create new transactions.
+            // If the cluster is partial available, we give an specific error message.
             // Return an error.
+            if (m_partialAvailableFailureMessage != null) {
+                return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
+                        new VoltTable[0],
+                        m_partialAvailableFailureMessage,
+                        task.clientHandle);
+            }
+
             return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
                     new VoltTable[0],
                     "VoltDB failed to create the transaction internally.  It is possible this "
@@ -1420,6 +1430,14 @@ public final class InvocationDispatcher {
         m_mailbox.send(m_plannerSiteId, work);
     }
 
+    private final static void writeResponseToConnection(ClientResponseImpl response, Connection c) {
+        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
+        buf.putInt(buf.capacity() - 4);
+        response.flattenToBuffer(buf);
+        buf.flip();
+        c.writeStream().enqueue(buf);
+    }
+
     /*
      * Invoked from the AsyncCompilerWorkCompletionHandler from the AsyncCompilerAgent thread.
      * Has the effect of immediately handing the completed work to the network thread of the
@@ -1441,7 +1459,7 @@ public final class InvocationDispatcher {
                                     (result.errorCode == AsyncCompilerResult.UNINITIALIZED_ERROR_CODE) ? ClientResponse.GRACEFUL_FAILURE : result.errorCode,
                                     new VoltTable[0], result.errorMsg,
                                     result.clientHandle);
-                    writeResponseToConnection(errorResponse);
+                    writeResponseToConnection(errorResponse, c);
                     return;
                 }
                 Preconditions.checkState(
@@ -1477,7 +1495,7 @@ public final class InvocationDispatcher {
                         }
                         catch (VoltTypeException vte) {
                             String msg = "Unable to execute adhoc sql statement(s): " + vte.getMessage();
-                            writeResponseToConnection(gracefulFailureResponse(msg, result.clientHandle));
+                            writeResponseToConnection(gracefulFailureResponse(msg, result.clientHandle), c);
                         }
                     }
                     // early return for @AdHocPlannedStmtBatch case
@@ -1492,7 +1510,7 @@ public final class InvocationDispatcher {
                                     ClientResponseImpl.SUCCESS,
                                     new VoltTable[0], "Catalog update with no changes was skipped.",
                                     result.clientHandle);
-                    writeResponseToConnection(shortcutResponse);
+                    writeResponseToConnection(shortcutResponse, c);
                     return;
                 }
 
@@ -1502,7 +1520,7 @@ public final class InvocationDispatcher {
                 ClientResponseImpl error = null;
                 if ((error = m_permissionValidator.shouldAccept(task.getProcName(), result.user, task,
                         SystemProcedureCatalog.listing.get(task.getProcName()).asCatalogProcedure())) != null) {
-                    writeResponseToConnection(error);
+                    writeResponseToConnection(error, c);
                     return;
                 }
 
@@ -1517,17 +1535,18 @@ public final class InvocationDispatcher {
                 }
                 // initiate the transaction. These hard-coded values from catalog
                 // procedure are horrible, horrible, horrible.
-                createTransaction(changeResult.connectionId,
+                boolean success = createTransaction(changeResult.connectionId,
                         task, false, false, false, 0, task.getSerializedSize(),
                         System.nanoTime());
-            }
-
-            private final void writeResponseToConnection(ClientResponseImpl response) {
-                ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
-                buf.putInt(buf.capacity() - 4);
-                response.flattenToBuffer(buf);
-                buf.flip();
-                c.writeStream().enqueue(buf);
+                if (!success && m_partialAvailableFailureMessage != null) {
+                    writeResponseToConnection(
+                            new ClientResponseImpl(
+                                ClientResponseImpl.SERVER_UNAVAILABLE,
+                                new VoltTable[0],
+                                m_partialAvailableFailureMessage,
+                                result.clientHandle),
+                            c);
+                }
             }
         }, null);
         if (c != null) {
@@ -1730,26 +1749,17 @@ public final class InvocationDispatcher {
                     new VoltTable[0],
                     "Server is paused and is available in read-only mode - please try again later",
                     plannedStmtBatch.clientHandle);
-            ByteBuffer buffer = ByteBuffer.allocate(error.getSerializedSize() + 4);
-            buffer.putInt(buffer.capacity() - 4);
-            error.flattenToBuffer(buffer).flip();
-            c.writeStream().enqueue(buffer);
+            writeResponseToConnection(error, c);
         }
         else
         if ((error = m_permissionValidator.shouldAccept(task.getProcName(), plannedStmtBatch.work.user, task,
                 SystemProcedureCatalog.listing.get(task.getProcName()).asCatalogProcedure())) != null) {
-            ByteBuffer buffer = ByteBuffer.allocate(error.getSerializedSize() + 4);
-            buffer.putInt(buffer.capacity() - 4);
-            error.flattenToBuffer(buffer).flip();
-            c.writeStream().enqueue(buffer);
+            writeResponseToConnection(error, c);
         }
         else
         if ((error = m_invocationValidator.shouldAccept(task.getProcName(), plannedStmtBatch.work.user, task,
                 SystemProcedureCatalog.listing.get(task.getProcName()).asCatalogProcedure())) != null) {
-            ByteBuffer buffer = ByteBuffer.allocate(error.getSerializedSize() + 4);
-            buffer.putInt(buffer.capacity() - 4);
-            error.flattenToBuffer(buffer).flip();
-            c.writeStream().enqueue(buffer);
+            writeResponseToConnection(error, c);
         }
         else {
             /*
@@ -1762,10 +1772,21 @@ public final class InvocationDispatcher {
             }
 
             // initiate the transaction
-            createTransaction(plannedStmtBatch.connectionId, task,
+            boolean success = createTransaction(plannedStmtBatch.connectionId, task,
                     plannedStmtBatch.isReadOnly(), isSinglePartition, false,
                     partition,
                     task.getSerializedSize(), System.nanoTime());
+            if (!success) {
+                if (m_partialAvailableFailureMessage != null) {
+                    writeResponseToConnection(
+                            new ClientResponseImpl(
+                                ClientResponseImpl.SERVER_UNAVAILABLE,
+                                new VoltTable[0],
+                                m_partialAvailableFailureMessage,
+                                plannedStmtBatch.clientHandle),
+                            c);
+                }
+            }
         }
     }
 
@@ -1780,6 +1801,7 @@ public final class InvocationDispatcher {
             final int messageSize,
             final long nowNanos)
     {
+        m_partialAvailableFailureMessage = null;
         return createTransaction(
                 connectionId,
                 Iv2InitiateTaskMessage.UNUSED_MP_TXNID,
@@ -1809,6 +1831,7 @@ public final class InvocationDispatcher {
             final boolean isForReplay)
     {
         assert(!isSinglePartition || (partition >= 0));
+        m_partialAvailableFailureMessage = null;
         final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
         if (cihm == null) {
             hostLog.rateLimitedLog(60, Level.WARN, null,
@@ -1820,6 +1843,23 @@ public final class InvocationDispatcher {
 
         Long initiatorHSId = null;
         boolean isShortCircuitRead = false;
+
+        boolean isSpProcedure = isSinglePartition && !isEveryPartition;
+
+        if (isSpProcedure && m_cartographer.isPartitionMissing(partition)) {
+            m_partialAvailableFailureMessage = String.format(
+                "SP procedure %s can not execute on missing partition %d.",
+                invocation.getProcName(), partition);
+            return false;
+        }
+        if (!isSpProcedure && m_cartographer.hasMissingPartitions()) {
+            m_partialAvailableFailureMessage = String.format(
+                    "Some partitions (%s) are missing. MP procedure %s will not be executed.",
+                    (isSpProcedure ? Integer.toString(partition) : m_cartographer.missingPartitionsString()),
+                    invocation.getProcName());
+            return false;
+        }
+
         /*
          * ReadLevel.FAST:
          * If this is a read only single part, check if there is a local replica,
@@ -1828,7 +1868,7 @@ public final class InvocationDispatcher {
          * ReadLevel.SAFE:
          * Send the read to the partition leader only
          */
-        if (isSinglePartition && !isEveryPartition) {
+        if (isSpProcedure) {
             if (isReadOnly && (m_defaultConsistencyReadLevel == ReadLevel.FAST)) {
                 initiatorHSId = m_localReplicas.get().get(partition);
             }
@@ -1874,7 +1914,7 @@ public final class InvocationDispatcher {
                 (CatalogContext.ProcedurePartitionInfo)procedure.getAttachment();
         if (procedure.getSinglepartition()) {
             // break out the Hashinator and calculate the appropriate partition
-            return getPartitionForProcedure( ppi.index, ppi.type, task);
+            return getPartitionForProcedure(ppi.index, ppi.type, task);
         } else {
             return MpInitiator.MP_INIT_PID;
         }
