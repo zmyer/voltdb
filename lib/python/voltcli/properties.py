@@ -251,3 +251,10 @@ def write_cli_set(props, propset):
             if len(fragment) > 0: fragment = fragment + " "
             fragment = fragment + propset[p] + props[p]
     return fragment
+    
+def return_intersect_set(props, propset):
+    venn = {}
+    for p in propset:
+        if p in props: 
+            venn[p] = props[p]
+    return venn

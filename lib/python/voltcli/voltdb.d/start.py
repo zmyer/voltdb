@@ -15,11 +15,14 @@
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
+from voltcli import properties 
 
 voltdbroot_help = ('Specifies the root directory for the database. The default '
                    'is voltdbroot under the current working directory.')
 server_list_help = ('{hostname-or-ip[,...]}, '
              'Specifies the leader(s) for coordinating cluster startup. ')
+config_help = ('{property-file[,...]}, '
+             'Specifies 1 or more property files for changing server settings')
 
 @VOLT.Command(
     bundles = VOLT.ServerBundle('probe',
@@ -41,6 +44,7 @@ server_list_help = ('{hostname-or-ip[,...]}, '
         VOLT.BooleanOption('-A', '--add', 'enableadd', 'allows the server to elastically expand the cluster if the cluster is already complete', default = False),
         VOLT.IntegerOption('-s', '--sitesperhost', 'sitesperhost', None),
         VOLT.IntegerOption('-m', '--missing', 'missing', 'specifying how many nodes are missing at K-safe cluster startup'),
+        VOLT.StringOption('-C', '--config', 'config', config_help, default = None),
     ),
     description = 'Starts a database, which has been initialized.'
 )
@@ -59,4 +63,93 @@ def start(runner):
         runner.args.extend(['missing', runner.opts.missing])
     if runner.opts.enableadd:
         runner.args.extend(['enableadd'])
+    # do preconfiguration
+    #print "DEBUG: " + str(runner.opts)
+    preconfig(runner)
+    #print "DEBUG: " + str(runner.opts)
     runner.go()
+
+def preconfig(runner):
+    parent = runner.opts.directory_spec
+    config = runner.opts.config
+    root = parent
+    props = []
+    files = []
+    
+    # Find the root directory
+    if (not root): root = "."
+    root = os.path.abspath(os.path.expanduser(root))
+    print "DEBUG: dbroot is " + root + "/voltdbroot"
+    
+    #  Determine if a properties file was saved on init
+    pfile = root + "/voltdbroot/config/properties.conf"
+    if os.path.exists(pfile): files.append(pfile)
+    
+    # Check for properties file(s) on the command line
+    if (config):
+        cfiles = config.split(",")
+        for i in range(0,len(cfiles)): 
+            cfile = os.path.abspath(os.path.expanduser(cfiles[i].strip()))
+            parts = cfile.split(".")
+            extension = parts[len(parts)-1].lower()
+            if extension == "xml":
+                print "FATAL: You cannot change the XML deployment file on the start command.\n" + \
+                        "Only properties files are allowed in the --config option." 
+                exit()
+            files.append(cfile)
+            
+    # Parse and merge the properties files
+    for f in files: 
+        print "DEBUG: property file " + f
+        try:
+            props.append(properties.load(f))
+        except Exception as e:
+            print "FATAL: Cannot load properties file " + f + "\n" + str(e)
+            exit()
+        voltdb_properties = props[0]
+        
+    # No files, nothing to do
+    if len(files) == 0: return 
+       
+    #load defs then parse
+    try:
+        properties.load_property_defs()
+    except Exception as e:
+        WARNING("Cannot load property definitions.\n" + str(e))
+
+    for i in range(1,len(props)): 
+        voltdb_properties = properties.merge(props[0],props[i],False)
+            
+    # Pick out properties that need to be applied to the command line
+    cliprops = properties.return_intersect_set(voltdb_properties,properties.CLI_START_SET)
+    for p in cliprops:
+        a = properties.CLI_START_SET[p].split(",")
+        if not hasattr(runner.opts,a[0]):
+            if len(a) > 0:
+                if a[1] == "*":
+                    runner.args.extend([a[0],cliprops[p]])
+                    print "DEBUG: set property for " + a[0] + " to " + cliprops[p]
+
+                else:
+                    print "WARNING: internal error. Unrecognized CLI property option " + a[1]
+            else:
+                    runner.args.extend([a[0]])
+        else:
+            if getattr(runner.opts,a[0]) == None:
+                if len(a) > 0:
+                    if a[1] == "*":
+                        setattr(runner.opts,a[0],cliprops[p])
+                        print "DEBUG: set empty property for " + a[0] + " to " + cliprops[p]
+
+                    else:
+                        print "WARNING: internal error. Unrecognized CLI property option " + a[1]
+                else:
+                    setattr(runner.opts,a[0],None)
+                    print "DEBUG: set property for " + a[0] + " to nothing"
+
+            
+            else:
+                print "DEBUG: property " + a[0] + " overridden by command line option." 
+    #properties.dump(cliprops)
+            
+        
