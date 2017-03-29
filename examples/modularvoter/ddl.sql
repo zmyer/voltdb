@@ -18,66 +18,69 @@ END_OF_DROP_BATCH
 -- so that the schema loads quickly.
 file -inlinebatch END_OF_BATCH
 
--- contestants table holds the contestants numbers (for voting) and names
-CREATE TABLE contestants
+
+CREATE TABLE phones
 (
-  contestant_number integer     NOT NULL
-, contestant_name   varchar(50) NOT NULL
-, CONSTRAINT PK_contestants PRIMARY KEY
-  (
-    contestant_number
-  )
+    phone_number    bigint    NOT NULL PRIMARY KEY,
+    account_id      integer   NOT NULL,
+    cell_tower_id   smallint  NULL,
+    call_start_time timestamp NULL, -- will be null if no call is in progress
+    enabled         boolean   NOT NULL, -- set to false if they try something malicious or lose their phone
 );
 
--- votes table holds every valid vote.
---   voters are not allowed to submit more than <x> votes, x is passed to client application
-CREATE TABLE votes
+PARTITION TABLE phones ON COLUMN account_id;
+
+-- Holds account information that will need to be accessed in real time.
+-- The account_id can also correspond to a more complete store of account information,
+-- such as billing details, that don't need fast access.
+-- This table is partitioned so different sites (processors) share the load.
+CREATE TABLE accounts_realtime
 (
-  phone_number       bigint     NOT NULL
-, state              varchar(2) NOT NULL
-, contestant_number  integer    NOT NULL
+    account_id    integer  NOT NULL PRIMARY KEY,
+    account_type  char     NOT NULL, -- see 'account_types' table
+    minutes_left  integer  NOT NULL,
+    enabled       boolean  NOT NULL, -- set to false if they try something malicious or report that their info was stolen
+    valid_numbers bigint[] NOT NULL,
 );
 
-PARTITION TABLE votes ON COLUMN phone_number;
+PARTITION TABLE accounts_realtime ON COLUMN account_id;
 
--- Map of Area Codes and States for geolocation classification of incoming calls
-CREATE TABLE area_code_state
+-- Static, replicated table used to look up account types.
+CREATE TABLE account_types
 (
-  area_code smallint   NOT NULL
-, state     varchar(2) NOT NULL
-, CONSTRAINT PK_area_code_state PRIMARY KEY
-  (
-    area_code
-  )
+    type_identifier   char    NOT NULL PRIMARY KEY,
+    minutes_per_month integer NULL, -- NULL indicates unlimited
 );
 
--- rollup of votes by phone number, used to reject excessive voting
-CREATE VIEW v_votes_by_phone_number
+
+-- Incident reports are uncommon and best addressed by humans.
+-- The 'problem reported' booleans are 
+-- Enterprise Edition users should keep this as a real time export stream.
+-- Community Edition users can write a make it a table and query it with 'sqlcmd' (or upgrade)
+
+-- CREATE STREAM problem_reports
+CREATE TABLE problem_reports
 (
-  phone_number
-, num_votes
-)
-AS
-   SELECT phone_number
-        , COUNT(*)
-     FROM votes
- GROUP BY phone_number
-;
+    phone_number    bigint        NOT NULL,
+    account_id      integer       NOT NULL PRIMARY KEY,
+    report_time     timestamp     NOT NULL,
+    phone_blocked   boolean       NOT NULL,
+    account_blocked boolean       NOT NULL,
+    description     varchar(1000) NULL,
+);
+
 
 -- rollup of votes by contestant and state for the heat map and results
-CREATE VIEW v_votes_by_contestant_number_state
+CREATE VIEW active_callers_by_tower
 (
-  contestant_number
-, state
-, num_votes
+    tower_id,
+    num_active_callers,
 )
 AS
-   SELECT contestant_number
-        , state
+   SELECT cell_tower_id,
         , COUNT(*)
-     FROM votes
- GROUP BY contestant_number
-        , state
+     FROM phones
+ GROUP BY cell_tower_id
 ;
 
 END_OF_BATCH
@@ -98,3 +101,20 @@ CREATE PROCEDURE FROM CLASS voter.ContestantWinningStates;
 CREATE PROCEDURE FROM CLASS voter.GetStateHeatmap;
 
 END_OF_2ND_BATCH
+
+
+-- The following statements which populate tables can all be batched.
+file -inlinebatch END_OF_3RD_BATCH
+
+-- load account types
+INSERT INTO account_types VALUES ('U', null); -- Unlimited Plan
+INSERT INTO account_types VALUES ('P', 5000); -- Premium Plan
+INSERT INTO account_types VALUES ('S', 1000); -- Standard Plan
+INSERT INTO account_types VALUES ('E', 30);   -- Emergency Only Plan (helps test running out of minutes)
+INSERT INTO account_types VALUES ('R', 5);    -- Ripoff Plan (for testing running out of minutes)
+
+-- verify problem reports can be written
+INSERT INTO problem_reports VALUES (0010000000000, 0, CURRENT_TIME(), false, false, 'Benign Test Incident');
+
+
+END_OF_3RD_BATCH

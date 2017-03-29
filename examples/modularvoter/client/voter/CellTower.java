@@ -276,7 +276,7 @@ public class CellTower {
         System.out.printf("99.5th percentile latency:     %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.995));
         System.out.printf("99.9th percentile latency:     %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.999));
         System.out.printf("99.99th percentile latency:    %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.9999));
-        System.out.printf("Server Internal Avg Latency:   %,9.2f ms\n", stats.getAverageInternalLatency());
+        System.out.printf("Server Internal Avg latency:   %,9.2f ms\n", stats.getAverageInternalLatency());
 
         System.out.print("\n" + HORIZONTAL_RULE);
         System.out.println(" Latency Histogram");
