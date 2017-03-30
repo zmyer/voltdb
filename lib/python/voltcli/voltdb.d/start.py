@@ -52,6 +52,10 @@ def start(runner):
     if runner.opts.directory_spec:
         upath = os.path.expanduser(runner.opts.directory_spec)
         runner.args.extend(['voltdbroot', upath])
+        
+    #print "DEBUG opts: " + str(runner.opts)
+    preconfig(runner)
+    #print "DEBUG opts: " + str(runner.opts)
     if not runner.opts.server_list:
         runner.abort_with_help('You must specify the --host option.')
     runner.args.extend(['mesh', ','.join(runner.opts.server_list)])
@@ -64,9 +68,7 @@ def start(runner):
     if runner.opts.enableadd:
         runner.args.extend(['enableadd'])
     # do preconfiguration
-    #print "DEBUG: " + str(runner.opts)
-    preconfig(runner)
-    #print "DEBUG: " + str(runner.opts)
+    #print "DEBUG args: " + str(runner.args)
     runner.go()
 
 def preconfig(runner):
@@ -79,7 +81,7 @@ def preconfig(runner):
     # Find the root directory
     if (not root): root = "."
     root = os.path.abspath(os.path.expanduser(root))
-    print "DEBUG: dbroot is " + root + "/voltdbroot"
+    #print "DEBUG: dbroot is " + root + "/voltdbroot"
     
     #  Determine if a properties file was saved on init
     pfile = root + "/voltdbroot/config/properties.conf"
@@ -100,7 +102,7 @@ def preconfig(runner):
             
     # Parse and merge the properties files
     for f in files: 
-        print "DEBUG: property file " + f
+        #print "DEBUG: property file " + f
         try:
             props.append(properties.load(f))
         except Exception as e:
@@ -124,32 +126,53 @@ def preconfig(runner):
     cliprops = properties.return_intersect_set(voltdb_properties,properties.CLI_START_SET)
     for p in cliprops:
         a = properties.CLI_START_SET[p].split(",")
+        answer = None
+        if len(a) >1: answer = format_cli_arg(cliprops[p],a[1])
         if not hasattr(runner.opts,a[0]):
-            if len(a) > 0:
-                if a[1] == "*":
-                    runner.args.extend([a[0],cliprops[p]])
-                    print "DEBUG: set property for " + a[0] + " to " + cliprops[p]
-
+            if len(a) > 1:
+                if answer is not None: 
+                    runner.opts.extend([a[0],answer])
+                    #print "DEBUG: set property for " + a[0] + " to " + str(answer)
                 else:
                     print "WARNING: internal error. Unrecognized CLI property option " + a[1]
             else:
-                    runner.args.extend([a[0]])
+                runner.opts.extend([a[0]])
+                #print "DEBUG: set property " + a[0] + " with no value."
+                answer = True
         else:
-            if getattr(runner.opts,a[0]) == None:
-                if len(a) > 0:
-                    if a[1] == "*":
-                        setattr(runner.opts,a[0],cliprops[p])
-                        print "DEBUG: set empty property for " + a[0] + " to " + cliprops[p]
-
-                    else:
-                        print "WARNING: internal error. Unrecognized CLI property option " + a[1]
-                else:
-                    setattr(runner.opts,a[0],None)
-                    print "DEBUG: set property for " + a[0] + " to nothing"
-
-            
+            override = False
+            current_value = getattr(runner.opts,a[0])
+            if current_value == None: 
+                override = True
             else:
-                print "DEBUG: property " + a[0] + " overridden by command line option." 
+                if type(current_value) is list:
+                    if len(current_value) == 0: override = True
+                    if len(current_value) == 1: 
+                        if len(current_value[0]) == 0: override = True
+                    
+            if override: 
+                # Need special handling for server list, since it is an opt not an arg
+                if a[0] == "server_list":
+                    setattr(runner.opts,a[0],answer)   
+                else:         
+                    if len(a) > 0: 
+                        if answer is not None:
+                            setattr(runner.opts,a[0],answer)
+                            #print "DEBUG: set empty property for " + a[0] + " to " + str(answer)
+                        else:
+                            print "WARNING: internal error. Unrecognized CLI property option " + a[1]
+                    else:
+                        setattr(runner.opts,a[0],None)
+                        #print "DEBUG: set property for " + a[0] + " to nothing"           
+            else:
+                pass
+                #print "DEBUG: property " + a[0] + " overridden by command line option." 
     #properties.dump(cliprops)
             
-        
+def format_cli_arg(value,format):
+    answer = None
+    if format == "*": answer = value
+    if format == "n": answer = int(value)
+    if format == "[*]": answer = value.split(",")
+    return answer
+    

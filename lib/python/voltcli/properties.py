@@ -219,15 +219,16 @@ def dump(props):
 def merge(a,b, mustbeunique):
     props = {}
     validated = True
-    for p in a:
-        if p in b:
+    for p in a: props[p] = a[p]
+    for p in b:
+        if p in props:
             if mustbeunique:
                 WARNING("Multiple values for property " + p)
                 validated = False
             else:
                 props[p] = b[p]
         else:
-            props[p] = a[p]
+            props[p] = b[p]
             
     if validated:
         return props

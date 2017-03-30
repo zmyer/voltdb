@@ -76,7 +76,7 @@ def preconfig(f):
                     properties.load_property_defs()
                 except Exception as e:
                     WARNING("Cannot load property definitions.\n" + str(e))
-            print "Parsing configuration file " + i
+            print "Loading configuration file " + i
             props.append(properties.load(i))
         voltdb_properties = props[0]    
         for i in range(1,len(props)): 
