@@ -150,6 +150,7 @@ public class Table extends TableBase implements SchemaObject {
     Expression[]    colDefaults;               // fredt - expressions of DEFAULT values
     protected int[] defaultColumnMap;          // fred - holding 0,1,2,3,...
     private boolean hasDefaultValues;          //fredt - shortcut for above
+    String          statement;
 
     //
     public Table(Database database, HsqlName name, int type) {
@@ -278,6 +279,13 @@ public class Table extends TableBase implements SchemaObject {
         this.constraintList = Constraint.emptyArray;
 
         createPrimaryKey();
+    }
+
+    /**
+     * Returns the query expression for the view or streamed table.
+     */
+    public String getStatement() {
+        return statement;
     }
 
     public void createDefaultStore() {
@@ -2685,7 +2693,7 @@ public class Table extends TableBase implements SchemaObject {
             throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         VoltXMLElement table = new VoltXMLElement("table");
-        Map<String, String> autoGenNameMap = new HashMap<String, String>();
+        Map<String, String> autoGenNameMap = new HashMap<>();
 
         // add table metadata
         String tableName = getName().name;
@@ -2725,7 +2733,7 @@ public class Table extends TableBase implements SchemaObject {
         // See VoltXMLElement.java for further explanation of TEH HORROR
         constraints.attributes.put("name", "constraints");
         table.children.add(constraints);
-        List<VoltXMLElement> revisitList = new ArrayList<VoltXMLElement>();
+        List<VoltXMLElement> revisitList = new ArrayList<>();
         for (Constraint constraint : getConstraints()) {
             VoltXMLElement constraintChild = constraint.voltGetConstraintXML();
             if (constraintChild != null) {
@@ -2765,6 +2773,10 @@ public class Table extends TableBase implements SchemaObject {
                 autoGenNameMap.put(constraintChild.attributes.get("name"), constName);
             }
             constraints.children.add(constraintChild);
+        }
+
+        if (statement != null) {
+            table.attributes.put("query", statement);
         }
 
         return table;

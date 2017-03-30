@@ -48,7 +48,6 @@ import org.hsqldb_voltpatches.lib.OrderedHashSet;
 public class View extends TableDerived {
 
     SubQuery viewSubQuery;
-    String   statement;
 
     //
     HsqlName[] columnNames;
@@ -89,14 +88,17 @@ public class View extends TableDerived {
         compileTimeSchema = session.getSchemaHsqlName(null);
     }
 
+    @Override
     public int getType() {
         return SchemaObject.VIEW;
     }
 
+    @Override
     public OrderedHashSet getReferences() {
         return schemaObjectNames;
     }
 
+    @Override
     public OrderedHashSet getComponents() {
         return null;
     }
@@ -104,6 +106,7 @@ public class View extends TableDerived {
     /**
      * Compiles the query expression and sets up the columns.
      */
+    @Override
     public void compile(Session session) {
 
         if (!database.schemaManager.schemaExists(compileTimeSchema.name)) {
@@ -170,6 +173,7 @@ public class View extends TableDerived {
         }
     }
 
+    @Override
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer(128);
@@ -195,6 +199,7 @@ public class View extends TableDerived {
         return sb.toString();
     }
 
+    @Override
     public int[] getUpdatableColumns() {
         return queryExpression.getBaseTableColumnMap();
     }
@@ -204,15 +209,9 @@ public class View extends TableDerived {
     }
 
     /**
-     * Returns the query expression for the view.
-     */
-    public String getStatement() {
-        return statement;
-    }
-
-    /**
      * Overridden to disable SET TABLE READONLY DDL for View objects.
      */
+    @Override
     public void setDataReadOnly(boolean value) {
         throw Error.error(ErrorCode.X_28000);
     }
@@ -221,24 +220,4 @@ public class View extends TableDerived {
 
         // filter schemaObjectNames
     }
-
-    /************************* Volt DB Extensions *************************/
-
-    /**
-     * VoltDB added method to get a non-catalog-dependent
-     * representation of this HSQLDB object.
-     * @param session The current Session object may be needed to resolve
-     * some names.
-     * @return XML, correctly indented, representing this object.
-     * @throws HSQLParseException
-     */
-    VoltXMLElement voltGetTableXML(Session session) throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
-    {
-        VoltXMLElement table = super.voltGetTableXML(session);
-
-        // add view metadata
-        table.attributes.put("query", statement);
-        return table;
-    }
-    /**********************************************************************/
 }

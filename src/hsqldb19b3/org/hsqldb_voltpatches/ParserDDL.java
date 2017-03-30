@@ -1190,52 +1190,13 @@ public class ParserDDL extends ParserRoutine {
                                    null, null);
     }
 
-    // skip Export to target of statment
-    // skip constraint ?
-    StatementSchema compileCreateStream(int type) {
-
-        HsqlName name = readNewSchemaObjectNameNoCheck(SchemaObject.TABLE);
-        HsqlArrayList tempConstraints = new HsqlArrayList();
-
-        name.setSchemaIfNull(session.getCurrentSchemaHsqlName());
-
-        Table table = TableUtil.newTable(database, type, name);
-
-        if (token.tokenType == Tokens.AS) {
-            return readTableAsSubqueryDefinition(table);
-        }
-
-        int position = getPosition();
-
-        readUntilThis(Tokens.OPENBRACKET);
-
+    void compileCreateStreamNormal(Table table, HsqlArrayList tempConstraints, HsqlName name) {
         readThis(Tokens.OPENBRACKET);
-
-        {
-            Constraint c = new Constraint(null, null, Constraint.TEMP);
-
-            tempConstraints.add(c);
-        }
-
-        boolean start     = true;
         boolean startPart = true;
         boolean end       = false;
 
         while (!end) {
             switch (token.tokenType) {
-
-                case Tokens.LIKE : {
-                    ColumnSchema[] likeColumns = readLikeTable(table);
-
-                    for (int i = 0; i < likeColumns.length; i++) {
-                        table.addColumn(likeColumns[i]);
-                    }
-
-                    start     = false;
-                    startPart = false;
-
-                    break;
-                }
                 case Tokens.CONSTRAINT :
                 case Tokens.PRIMARY :
                 case Tokens.FOREIGN :
@@ -1252,8 +1213,6 @@ public class ParserDDL extends ParserRoutine {
                     }
 
                     readConstraint(table, tempConstraints);
-
-                    start     = false;
                     startPart = false;
                     break;
 
@@ -1290,43 +1249,66 @@ public class ParserDDL extends ParserRoutine {
                         hsqlName, tempConstraints);
 
                     if (newcolumn == null) {
-                        if (start) {
-                            rewind(position);
-
-                            return readTableAsSubqueryDefinition(table);
-                        } else {
-                            throw Error.error(ErrorCode.X_42000);
-                        }
+                        throw Error.error(ErrorCode.X_42000);
                     }
 
                     table.addColumn(newcolumn);
 
-                    start     = false;
                     startPart = false;
             }
         }
+    }
 
-        if (token.tokenType == Tokens.ON) {
-            if (!table.isTemp()) {
-                throw unexpectedToken();
-            }
+    void compileCreateStreamAs(Table table) {
+        readUntilThis(Tokens.AS);
+        readThis(Tokens.AS);
+        startRecording();
 
-            read();
-            readThis(Tokens.COMMIT);
+        QueryExpression queryExpression;
 
-            if (token.tokenType == Tokens.DELETE) {}
-            else if (token.tokenType == Tokens.PRESERVE) {
-                table.persistenceScope = TableBase.SCOPE_SESSION;
-            }
+        try {
+            queryExpression = XreadQueryExpression();
+        } catch (HsqlException e) {
+            queryExpression = XreadJoinedTable();
+        }
 
-            read();
-            readThis(Tokens.ROWS);
+        queryExpression.setAsTopLevel();
+        queryExpression.resolve(session);
+
+        Table resultTable = (Table)queryExpression.resultTable;
+        for (int i = 0; i < resultTable.getColumnCount(); i++) {
+            table.addColumn(resultTable.getColumn(i));
+        }
+
+        Token[] statement = getRecordedStatement();
+        String statementSQL = Token.getSQL(statement);
+        table.statement = statementSQL;
+    }
+
+    // skip Export to target of statment
+    // skip constraint ?
+    StatementSchema compileCreateStream(int type) {
+        HsqlName name = readNewSchemaObjectNameNoCheck(SchemaObject.TABLE);
+        HsqlArrayList tempConstraints = new HsqlArrayList();
+        tempConstraints.add(new Constraint(null, null, Constraint.TEMP));
+
+        name.setSchemaIfNull(session.getCurrentSchemaHsqlName());
+        Table table = TableUtil.newTable(database, type, name);
+
+        int position = getPosition();
+
+        if (readUntilThis(Tokens.OPENBRACKET)) {
+            compileCreateStreamNormal(table, tempConstraints, name);
+        }
+        else {
+            rewind(position);
+            compileCreateStreamAs(table);
         }
 
         Object[] args = new Object[] {
             table, tempConstraints, null
         };
-        String   sql  = getLastPart();
+        String sql = getLastPart();
 
         return new StatementSchema(sql, StatementTypes.CREATE_TABLE, args,
                                    null, null);
@@ -3316,7 +3298,7 @@ public class ParserDDL extends ParserRoutine {
         indexHsqlName.schema = table.getSchemaName();
 
         // A VoltDB extension to support indexed expressions and the assume unique attribute
-        java.util.List<Boolean> ascDesc = new java.util.ArrayList<Boolean>();
+        java.util.List<Boolean> ascDesc = new java.util.ArrayList<>();
         // A VoltDB extension to "readColumnList(table, true)" to support indexed expressions.
         java.util.List<Expression> indexExprs = XreadExpressions(ascDesc);
         OrderedHashSet set = getSimpleColumnNames(indexExprs);
@@ -5298,7 +5280,7 @@ public class ParserDDL extends ParserRoutine {
     private java.util.List<Expression> XreadExpressions(java.util.List<Boolean> ascDesc) {
         readThis(Tokens.OPENBRACKET);
 
-        java.util.List<Expression> indexExprs = new java.util.ArrayList<Expression>();
+        java.util.List<Expression> indexExprs = new java.util.ArrayList<>();
 
         while (true) {
             Expression expression = XreadValueExpression();
