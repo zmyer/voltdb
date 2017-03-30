@@ -1434,7 +1434,13 @@ class Distributer {
             ArrayList<NodeConnection> connections = new ArrayList<>();
             for (String site : vt.getString("Sites").split(",")) {
                 site = site.trim();
-                Integer hostId = Integer.valueOf(site.split(":")[0]);
+                Integer hostId = -1;
+                try {
+                    hostId = Integer.valueOf(site.split(":")[0]);
+                } catch(NumberFormatException ex) {
+                    System.out.println("Client affinity topology updates for invalid site:" + site);
+                    continue;
+                }
                 if (m_hostIdToConnection.containsKey(hostId)) {
                     connections.add(m_hostIdToConnection.get(hostId));
                 } else {
