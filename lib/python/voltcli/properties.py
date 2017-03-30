@@ -13,7 +13,7 @@ PROPERTY_DEFS = {}
 DEFAULT_SET = {}
 INIT_FILE_SET = {}
 
-PROPDEFROOT = "/Users/ajgent/demos/properties/definitions/"
+PROPDEFROOT = sys.path[0] + "/voltcli/properties.d/"
 
 class property_def():
     def __init__(self,name,repeatable,uniquechild):
@@ -116,6 +116,7 @@ def load_property_defs():
     global DEFAULT_SET
     CLI_START_SET = load(PROPDEFROOT + "cli_start_property_set.conf")
     INIT_FILE_SET = load(PROPDEFROOT + "init_file_property_set.conf")
+    DEPLOYMENT_XML_SET = load(PROPDEFROOT + "xml_property_set.conf")
     
     pass
     # This still needs to be defined.

@@ -16,6 +16,7 @@
 
 import os
 from voltcli import properties 
+#from voltcli import xmlproperties 
 
 voltdbroot_help = ('Specifies the root directory for the database. The default '
                    'is voltdbroot under the current working directory.')
@@ -67,16 +68,19 @@ def start(runner):
         runner.args.extend(['missing', runner.opts.missing])
     if runner.opts.enableadd:
         runner.args.extend(['enableadd'])
-    # do preconfiguration
+
+    #postconfig(runner)
     #print "DEBUG args: " + str(runner.args)
     runner.go()
 
 def preconfig(runner):
+    global voltdb_properties
     parent = runner.opts.directory_spec
     config = runner.opts.config
     root = parent
     props = []
     files = []
+    voltdbproperties = {}
     
     # Find the root directory
     if (not root): root = "."
@@ -168,7 +172,27 @@ def preconfig(runner):
                 pass
                 #print "DEBUG: property " + a[0] + " overridden by command line option." 
     #properties.dump(cliprops)
-            
+           
+#def postconfig(runner):
+#    global voltdb_properties
+#    
+#    # first see if there are any properties to set
+#    if len(voltdb_properties) == 0: return
+#    xmlprops = properties.return_intersect_set(voltdb_properties,properties.DEPLOYMENT_XML_SET)
+#    if len(xmlprops) == 0: return
+#     
+#    print ("DEBUG: settable properties.")
+#    # Next, see if they are settable. not implemented yet.
+#     
+#    #Finally, load the deployment file, set the properties, and write the deployment file
+#    deploymentfile = runner.opts.directory_spec + "/voltdbroot/config/deployment.xml"
+#    xml = xmlproperties.loadxmlfile(deploymentfile)
+#    xmlproperties.walktree(xml,"")
+#    for p in xmlprops:
+#        print "DEBUG: set " + p
+#        xmlproperties.setxml(xml,properties.DEPLOYMENT_XML_SET[p],xmlprops[p])
+
+     
 def format_cli_arg(value,format):
     answer = None
     if format == "*": answer = value

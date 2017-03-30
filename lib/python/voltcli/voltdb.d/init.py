@@ -13,7 +13,9 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
-from voltcli import properties 
+from voltcli import properties
+import os
+import sys 
 
 # Main Java Class
 VoltDB = 'org.voltdb.VoltDB'
@@ -34,6 +36,7 @@ VoltDB = 'org.voltdb.VoltDB'
 def init(runner):
     global voltdb_properties
     voltdb_properties = {}
+    #print "DEBUG: sys.path[0]  [" + str(sys.path[0]) + "]"
     runner.args.extend(['initialize'])
     if runner.opts.configfile:
         runner.opts.configfile = preconfig(runner.opts.configfile)
@@ -68,7 +71,7 @@ def preconfig(f):
                 exit()
         else:
             voltdb_property_files.append(files[i])
-    if deploymentfile: print "DEBUG: Deployment file is " + deploymentfile
+    #if deploymentfile: print "DEBUG: Deployment file is " + deploymentfile
     if len(voltdb_property_files) > 0: 
         for i in voltdb_property_files: 
             if not loaded:

@@ -1,0 +1,8 @@
+PropertyName,Type,Multiples,Required,Default,WhenAllowed,WhenDisallowed
+# ,Type values: tbd,,,,,
+# ,"Multiples, required values: 0 = no, 1 = yes",,,,,
+# ,Default values: any string,,,,,
+# ,"WhenAllowed, WhenDisallowed values: n.n.n.n where n is 1 for true, 0 for false in this order: init, running, recover, restart",,,,,
+# ,Type values: tbd,,,,,
+port.http,,0,0,8080,1.0.1.1,0.1.0.0
+port.internal,,0,0,3021,1.0.1.1,0.1.0.0
