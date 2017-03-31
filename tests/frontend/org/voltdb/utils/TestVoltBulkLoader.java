@@ -979,6 +979,24 @@ public class TestVoltBulkLoader extends TestCase {
                 "BLAH", myData2, myBatchSize2, expectedFailures2, false);
     }
 
+    //Test single table with single loader.
+    public void testSingleTableOnSingleLoaderPerf() throws Exception {
+        String mySchema =
+                "create table BLAH ("
+                        + "clm_integer integer not null, "
+                        + // column that is partitioned on
+                        "clm_tinyint tinyint default 0, "
+                        + "clm_smallint smallint default 0, "
+                        + "clm_bigint bigint default 0, "
+                        + "clm_string varchar(20) default null, "
+                        + "clm_decimal decimal default null, "
+                        + "clm_float float default null, "
+                        + "clm_timestamp timestamp default null, "
+                        + "PRIMARY KEY(clm_integer) "
+                        + "); ";
+        TimestampType currentTime = new TimestampType();
+
+    }
     //Test single table with single loader (MultiPartition).
     public void testSingleTableOnSingleLoaderMP() throws Exception {
         String mySchema =

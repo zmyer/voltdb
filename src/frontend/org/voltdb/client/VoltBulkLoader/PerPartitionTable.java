@@ -28,6 +28,12 @@ import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
+import com.lmax.disruptor.BatchEventProcessor;
+import com.lmax.disruptor.BusySpinWaitStrategy;
+import com.lmax.disruptor.RingBuffer;
+import com.lmax.disruptor.SequenceBarrier;
+import com.lmax.disruptor.WaitStrategy;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
@@ -39,12 +45,15 @@ import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 
+import static com.lmax.disruptor.RingBuffer.createSingleProducer;
+
 /**
  * Partition specific table potentially shared by multiple VoltBulkLoader instances,
  * provided that they are all inserting to the same table.
  */
 public class PerPartitionTable {
     private static final VoltLogger loaderLog = new VoltLogger("LOADER");
+    private static final int RINGBUFFER_NO_GC_DEFAULT_SIZE = 4 * 1024;
 
     // Client we are tied to
     final ClientImpl m_clientImpl;
@@ -74,6 +83,19 @@ public class PerPartitionTable {
     final String m_tableName;
     // Upsert Mode Flag
     final byte m_upsert;
+
+
+    // Disruptor related
+    // final Disruptor<RowEvent> m_disruptor;
+    final RowProducerWithTranslator m_producer;
+    final RingBuffer<RowEvent> m_ringBuffer;
+    final ExecutorService m_disruptorES;
+    private final SequenceBarrier m_sequenceBarrier;
+    private final BatchEventProcessor<RowEvent> m_batchEventProcessor;
+    private long lo = 1;
+    private long hi = 0;
+    final private boolean m_useDisruptor = false;
+    final private WaitStrategy m_ws = new BusySpinWaitStrategy();
 
     // Callback for batch submissions to the Client. A failed request submits the entire
     // batch of rows to m_failedQueue for row by row processing on m_failureProcessor.
@@ -125,6 +147,18 @@ public class PerPartitionTable {
         table = new VoltTable(m_columnInfo);
 
         m_es = CoreUtils.getSingleThreadExecutor(tableName + "-" + partitionId);
+        m_ringBuffer = createSingleProducer(RowEvent.FACTORY, RINGBUFFER_NO_GC_DEFAULT_SIZE, m_ws);
+        m_sequenceBarrier = m_ringBuffer.newBarrier();
+        m_batchEventProcessor = new BatchEventProcessor<>(m_ringBuffer, m_sequenceBarrier,
+                new RowEventHandler(m_clientImpl,m_columnInfo, m_columnTypes, m_tableName,
+                        m_minBatchTriggerSize, m_isMP, m_procName, m_upsert, m_es,
+                        m_partitionedColumnIndex, m_partitionColumnType, tableName + "-" + partitionId));
+        {
+            m_ringBuffer.addGatingSequences(m_batchEventProcessor.getSequence());
+        }
+        m_disruptorES = CoreUtils.getSingleThreadExecutor(tableName + "-" + partitionId + " disruptor");
+        m_producer = new RowProducerWithTranslator(m_ringBuffer);
+        m_disruptorES.submit(m_batchEventProcessor);
     }
 
     boolean updateMinBatchTriggerSize(int minBatchTriggerSize) {
@@ -143,20 +177,25 @@ public class PerPartitionTable {
      * drain the queue. The task will drain the queue until it doesn't contain a single batch.
      */
     synchronized void insertRowInTable(final VoltBulkLoaderRow nextRow) throws InterruptedException {
-        m_partitionRowQueue.put(nextRow);
-        if (m_partitionRowQueue.size() == m_minBatchTriggerSize) {
-            m_es.execute(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        while (m_partitionRowQueue.size() >= m_minBatchTriggerSize) {
-                            loadTable(buildTable(), table);
+        if (m_useDisruptor) {
+            m_producer.onData(nextRow);
+        } else {
+            m_partitionRowQueue.put(nextRow);
+            if (m_partitionRowQueue.size() == m_minBatchTriggerSize) {
+
+                m_es.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            while (m_partitionRowQueue.size() >= m_minBatchTriggerSize) {
+                                loadTable(buildTable(), table);
+                            }
+                        } catch (Exception e) {
+                            loaderLog.error("Failed to load batch", e);
                         }
-                    } catch (Exception e) {
-                        loaderLog.error("Failed to load batch", e);
                     }
-                }
-            });
+                });
+            }
         }
     }
 
@@ -183,6 +222,8 @@ public class PerPartitionTable {
         }
         m_es.shutdown();
         m_es.awaitTermination(365, TimeUnit.DAYS);
+        m_batchEventProcessor.halt();
+        m_disruptorES.shutdown();
     }
 
     private void reinsertFailed(List<VoltBulkLoaderRow> rows) throws Exception {
