@@ -67,6 +67,7 @@
 #include "storage/RecoveryContext.h"
 #include "storage/ElasticIndex.h"
 #include "storage/CopyOnWriteIterator.h"
+#include "storage/SQLStreamHandler.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
 
@@ -537,6 +538,10 @@ public:
 
     std::vector<uint64_t> getBlockAddresses() const;
 
+    void addStreamHandler(SQLStreamHandler *streamHandler) {
+        m_streamHandlers.push_back(streamHandler);
+    }
+
 private:
     // Zero allocation size uses defaults.
     PersistentTable(int partitionColumn, char const* signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX, bool drEnabled = false);
@@ -787,6 +792,8 @@ private:
     PersistentTable* m_deltaTable;
 
     bool m_deltaTableActive;
+
+    std::vector<SQLStreamHandler*> m_streamHandlers;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable& table) :

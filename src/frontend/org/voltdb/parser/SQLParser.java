@@ -315,7 +315,8 @@ public class SQLParser extends SQLPatternFactory
             SPF.statement(
                     SPF.token("create"), SPF.token("stream"), SPF.capture("name", SPF.databaseObjectName()),
                     unparsedStreamModifierClauses(),
-                    SPF.anyColumnFields()
+                    SPF.oneOf(SPF.clause(SPF.anyColumnFields()),
+                              SPF.clause(SPF.token("as"), SPF.capture("query", SPF.anyClause())))
             ).compile("PAT_CREATE_STREAM");
 
     /**
@@ -1020,7 +1021,7 @@ public class SQLParser extends SQLPatternFactory
          * find any reasonable solution.
          */
         Matcher stringFragmentMatcher = SingleQuotedString.matcher(query);
-        ArrayList<String> stringFragments = new ArrayList<String>();
+        ArrayList<String> stringFragments = new ArrayList<>();
         int i = 0;
         while (stringFragmentMatcher.find()) {
             stringFragments.add(stringFragmentMatcher.group());
@@ -1044,7 +1045,7 @@ public class SQLParser extends SQLPatternFactory
 
         String[] sqlFragments = query.split("\\s*;+\\s*");
 
-        ArrayList<String> queries = new ArrayList<String>();
+        ArrayList<String> queries = new ArrayList<>();
         for (String fragment : sqlFragments) {
             if (fragment.isEmpty()) {
                 continue;
@@ -1079,7 +1080,7 @@ public class SQLParser extends SQLPatternFactory
         // quotes don't trigger a false positive for the START of an unsafe string.
         // Skipping is accomplished by resetting paramText to an offset substring
         // after copying the skipped (or substituted) text to a string builder.
-        ArrayList<String> originalString = new ArrayList<String>();
+        ArrayList<String> originalString = new ArrayList<>();
         Matcher stringMatcher = SingleQuotedString.matcher(paramText);
         StringBuilder safeText = new StringBuilder();
         while (stringMatcher.find()) {
@@ -1100,7 +1101,7 @@ public class SQLParser extends SQLPatternFactory
         // Save anything after the last found string.
         safeText.append(paramText);
 
-        ArrayList<String> params = new ArrayList<String>();
+        ArrayList<String> params = new ArrayList<>();
         int subCount = 0;
         int neededSubs = originalString.size();
         // Split the params at the separators

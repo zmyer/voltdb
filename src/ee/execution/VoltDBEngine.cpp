@@ -112,6 +112,7 @@ ENABLE_BOOST_FOREACH_ON_CONST_MAP(Column);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Index);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(MaterializedViewInfo);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Table);
+ENABLE_BOOST_FOREACH_ON_CONST_MAP(SQLStreamHandlerInfo);
 
 static const size_t PLAN_CACHE_SIZE = 1000;
 // table name prefix of DR conflict table
@@ -126,6 +127,7 @@ typedef std::pair<std::string, catalog::Column*> LabeledColumn;
 typedef std::pair<std::string, catalog::Index*> LabeledIndex;
 typedef std::pair<std::string, catalog::Table*> LabeledTable;
 typedef std::pair<std::string, catalog::MaterializedViewInfo*> LabeledView;
+typedef std::pair<std::string, catalog::SQLStreamHandlerInfo*> LabeledSQLStreamHandlerInfo;
 
 /**
  * The set of plan bytes is explicitly maintained in MRU-first order,
@@ -1403,6 +1405,20 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans() {
         PersistentTable *persistentTable = dynamic_cast<PersistentTable*>(table);
         if (persistentTable != NULL) {
             initMaterializedViews(catalogTable, persistentTable);
+
+            BOOST_FOREACH (LabeledSQLStreamHandlerInfo labeledSQLStreamHandlerInfo,
+                           catalogTable->sqlStreamHandlerInfo()) {
+                catalog::SQLStreamHandlerInfo *info = labeledSQLStreamHandlerInfo.second;
+                auto *catalogDestTable = info->streamTarget();
+                Table *destTable = m_tables[catalogDestTable->relativeIndex()];
+                StreamedTable *destStreamedTable = dynamic_cast<StreamedTable*>(destTable);
+                if (destStreamedTable != NULL) {
+                    SQLStreamHandler* handler = new SQLStreamHandler(destStreamedTable, info);
+                    persistentTable->addStreamHandler(handler);
+                }
+            }
+
+
             if (catalogTable->tuplelimitDeleteStmt().size() > 0) {
                 auto stmt = catalogTable->tuplelimitDeleteStmt().begin()->second;
                 std::string const& b64String = stmt->fragments().begin()->second->plannodetree();

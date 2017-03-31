@@ -1,0 +1,10 @@
+<deployment>
+    <cluster hostcount="1" sitesperhost="1" />
+    <export>
+        <configuration enabled="true" target="demo" type="file">
+        <property name="type">csv</property>
+        <property name="nonce">demo</property>
+        <property name="skipinternals">true</property>
+        </configuration>
+    </export>
+</deployment>

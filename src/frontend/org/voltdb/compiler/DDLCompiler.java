@@ -56,6 +56,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.Index;
+import org.voltdb.catalog.SQLStreamHandlerInfo;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
@@ -73,8 +74,10 @@ import org.voltdb.parser.HSQLLexer;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.AbstractParsedStmt;
+import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.types.ConstraintType;
+import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogSchemaTools;
@@ -120,6 +123,7 @@ public class DDLCompiler {
     private final ClassMatcher m_classMatcher = new ClassMatcher();
 
     private final HashMap<Table, String> m_matViewMap = new HashMap<>();
+    private final HashMap<Table, String> m_sqlStreamMap = new HashMap<>();
 
     /** A cache of the XML used to do validation on LIMIT DELETE statements
      * Preserved here to avoid having to re-parse for planning */
@@ -393,7 +397,7 @@ public class DDLCompiler {
             return;
         }
         // Okay, get a list of deleted column names
-        Set<String> removedColumns = new HashSet<String>();
+        Set<String> removedColumns = new HashSet<>();
         for (VoltXMLElement e : columnsDiff.getRemovedNodes()) {
             assert(e.attributes.get("name") != null);
             removedColumns.add(e.attributes.get("name"));
@@ -1230,7 +1234,7 @@ public class DDLCompiler {
     }
 
     private TreeSet<String> getExportTableNames() {
-        TreeSet<String> exportTableNames = new TreeSet<String>();
+        TreeSet<String> exportTableNames = new TreeSet<>();
         NavigableMap<String, NavigableSet<String>> exportsByTargetName = m_tracker.getExportedTables();
         for (Entry<String, NavigableSet<String>> e : exportsByTargetName.entrySet()) {
             for (String tableName : e.getValue()) {
@@ -1238,6 +1242,57 @@ public class DDLCompiler {
             }
         }
         return exportTableNames;
+    }
+
+    void processSQLStreams(Database db) throws VoltCompilerException {
+        for (Entry<Table, String> entry : m_sqlStreamMap.entrySet()) {
+            Table destTable = entry.getKey();
+            String query = entry.getValue();
+
+            // get the xml for the query
+            VoltXMLElement xmlquery = null;
+            try {
+                xmlquery = m_hsql.getXMLCompiledStatement(query);
+            }
+            catch (HSQLParseException e) {
+                e.printStackTrace();
+            }
+            assert(xmlquery != null);
+
+            // parse the xml like any other sql statement
+            ParsedSelectStmt stmt = null;
+            try {
+                stmt = (ParsedSelectStmt) AbstractParsedStmt.parse(query, xmlquery, null, db, null);
+            }
+            catch (Exception e) {
+                throw m_compiler.new VoltCompilerException(e.getMessage());
+            }
+            assert(stmt != null);
+            if (stmt.m_tableList.size() > 1) {
+                throw m_compiler.new VoltCompilerException("Do not support join now.");
+            }
+            Table srcTable = stmt.m_tableList.get(0);
+            SQLStreamHandlerInfo sqlStreamHandlerInfo = srcTable.getSqlstreamhandlerinfo().add(destTable.getTypeName());
+            sqlStreamHandlerInfo.setStreamtarget(destTable);
+            List<Column> srcColumnArray = CatalogUtil.getSortedCatalogItems(srcTable.getColumns(), "index");
+            for (int i = 0; i < stmt.m_displayColumns.size(); i++) {
+                ParsedColInfo outcol = stmt.m_displayColumns.get(i);
+                if (outcol.expression.getExpressionType() != ExpressionType.VALUE_TUPLE) {
+                    throw m_compiler.new VoltCompilerException("Do not support expression now.");
+                }
+                ColumnRef c = sqlStreamHandlerInfo.getStreamcols().add(String.valueOf(i));
+                c.setIndex(i);
+                c.setColumn(srcColumnArray.get(((TupleValueExpression)outcol.expression).getColumnIndex()));
+            }
+            AbstractExpression where = stmt.getSingleTableFilterExpression();
+            if (where != null) {
+                String hex = Encoder.hexEncode(where.toJSONString());
+                sqlStreamHandlerInfo.setPredicate(hex);
+            }
+            else {
+                sqlStreamHandlerInfo.setPredicate("");
+            }
+        }
     }
 
     void compileToCatalog(Database db, boolean isXDCR) throws VoltCompilerException {
@@ -1259,6 +1314,7 @@ public class DDLCompiler {
         fillTrackerFromXML();
         handlePartitions(db);
         m_mvProcessor.startProcessing(db, m_matViewMap, getExportTableNames());
+        processSQLStreams(db);
     }
 
     // Fill the table stuff in VoltDDLElementTracker from the VoltXMLElement tree at the end when
@@ -1558,8 +1614,8 @@ public class DDLCompiler {
         assert node.name.equals("table");
 
         // Construct table-specific maps
-        HashMap<String, Column> columnMap = new HashMap<String, Column>();
-        HashMap<String, Index> indexMap = new HashMap<String, Index>();
+        HashMap<String, Column> columnMap = new HashMap<>();
+        HashMap<String, Index> indexMap = new HashMap<>();
 
         final String name = node.attributes.get("name");
 
@@ -1572,25 +1628,32 @@ public class DDLCompiler {
         TableAnnotation annotation = new TableAnnotation();
         table.setAnnotation(annotation);
 
+        final boolean isStream = (node.attributes.get("stream") != null);
+        final String streamTarget = node.attributes.get("export");
+        final String streamPartitionColumn = node.attributes.get("partitioncolumn");
+
         // handle the case where this is a materialized view
         final String query = node.attributes.get("query");
         if (query != null) {
             assert(query.length() > 0);
-            m_matViewMap.put(table, query);
+            if (isStream) {
+                m_sqlStreamMap.put(table, query);
+            }
+            else {
+                m_matViewMap.put(table, query);
+            }
         }
-        final boolean isStream = (node.attributes.get("stream") != null);
-        final String streamTarget = node.attributes.get("export");
-        final String streamPartitionColumn = node.attributes.get("partitioncolumn");
+
         // all tables start replicated
         // if a partition is found in the project file later,
         //  then this is reversed
         table.setIsreplicated(true);
 
         // map of index replacements for later constraint fixup
-        final Map<String, String> indexReplacementMap = new TreeMap<String, String>();
+        final Map<String, String> indexReplacementMap = new TreeMap<>();
 
         // Need the columnTypes sorted by column index.
-        SortedMap<Integer, VoltType> columnTypes = new TreeMap<Integer, VoltType>();
+        SortedMap<Integer, VoltType> columnTypes = new TreeMap<>();
         for (VoltXMLElement subNode : node.children) {
 
             if (subNode.name.equals("columns")) {
@@ -1703,7 +1766,7 @@ public class DDLCompiler {
 
         // Temporarily assign the view Query to the annotation so we can use when we build
         // the DDL statement for the VIEW
-        if (query != null) {
+        if (query != null && ! isStream) {
             annotation.ddl = query;
         } else {
             // Get the final DDL for the table rebuilt from the catalog object
@@ -1940,10 +2003,10 @@ public class DDLCompiler {
         // can be indexed. We scan for result type at first here and block those which
         // can't be indexed like boolean, geo ... We gather rest of expression into
         // checkExpressions list.  We will check on them all at once.
-        List<AbstractExpression> checkExpressions = new ArrayList<AbstractExpression>();
+        List<AbstractExpression> checkExpressions = new ArrayList<>();
         for (VoltXMLElement subNode : node.children) {
             if (subNode.name.equals("exprs")) {
-                exprs = new ArrayList<AbstractExpression>();
+                exprs = new ArrayList<>();
                 for (VoltXMLElement exprNode : subNode.children) {
                     AbstractExpression expr = dummy.parseExpressionTree(exprNode);
                     expr.resolveForTable(table);

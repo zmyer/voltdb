@@ -613,6 +613,9 @@ public class CatalogDiffEngine {
         else if (isTableLimitDeleteStmt(suspect)) {
             return null;
         }
+        else if (suspect instanceof SQLStreamHandlerInfo) {
+            return null;
+        }
 
         //TODO: This code is also pretty fishy
         // -- See the "salmon of doubt" comment in checkModifyWhitelist
@@ -944,6 +947,12 @@ public class CatalogDiffEngine {
                 assert isDRed != null;
                 if (!isDRed) return null;
             }
+            if (field.equals("sqlStreamHandlerInfo")) {
+                return null;
+            }
+        }
+        if (suspect instanceof SQLStreamHandlerInfo) {
+            return null;
         }
 
         // whitelist certain column changes

@@ -131,6 +131,13 @@ begin Table                                  "A table (relation) in the database
   int tuplelimit                             "A maximum number of rows in a table"
   bool isDRed                                "Is this table DRed?"
   Statement* tuplelimitDeleteStmt            "Delete statement to execute if tuple limit will be exceeded"
+  SQLStreamHandlerInfo* sqlStreamHandlerInfo ""
+end
+
+begin SQLStreamHandlerInfo
+  Table? streamTarget ""
+  ColumnRef* streamCols ""
+  string predicate                  "A filtering predicate"
 end
 
 begin MaterializedViewHandlerInfo       "Information used to build and update a materialized view"

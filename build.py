@@ -242,6 +242,7 @@ CTX.INPUT['catalog'] = """
  statement.cpp
  table.cpp
  tableref.cpp
+ sqlstreamhandlerinfo.cpp
 """
 
 CTX.INPUT['structures'] = """
@@ -397,6 +398,7 @@ CTX.INPUT['storage'] = """
  TempTableLimits.cpp
  TupleBlock.cpp
  TupleStreamBase.cpp
+ SQLStreamHandler.cpp
 """
 
 CTX.INPUT['stats'] = """

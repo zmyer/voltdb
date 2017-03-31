@@ -213,6 +213,10 @@ PersistentTable::~PersistentTable() {
     if (m_deltaTable) {
         m_deltaTable->decrementRefcount();
     }
+
+    BOOST_FOREACH (auto streamHandler, m_streamHandlers) {
+        delete streamHandler;
+    }
 }
 
 // ------------------------------------------------------------------
@@ -773,6 +777,10 @@ void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, b
     // Then copy the source into the target
     //
     target.copyForPersistentInsert(source); // tuple in freelist must be already cleared
+
+    BOOST_FOREACH (auto streamHandler, m_streamHandlers) {
+        streamHandler->handleTupleInsert(source);
+    }    
 
     try {
         insertTupleCommon(source, target, fallible);
