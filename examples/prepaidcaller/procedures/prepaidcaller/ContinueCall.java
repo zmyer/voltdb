@@ -37,6 +37,8 @@ public class ContinueCall extends VoltProcedure {
 
     public long run( long phoneNumber ) throws VoltAbortException {
 
+        try {
+
         voltQueueSQL(getAccountIDStmt, EXPECT_SCALAR, phoneNumber);
         final long accountID = voltExecuteSQL()[0].asScalarLong();
 
@@ -47,6 +49,12 @@ public class ContinueCall extends VoltProcedure {
             voltQueueSQL(updateCurrentMinutesStmt, EXPECT_ONE_ROW, currentMinutes - 1, accountID);
             voltExecuteSQL();
             setAppStatusCode(STORED_PROC_SUCCESS);
+        }
+
+        } catch (Throwable t){
+            t.printStackTrace();
+            System.err.println("Phone number is " + phoneNumber);
+            throw t;
         }
 
         return 0;

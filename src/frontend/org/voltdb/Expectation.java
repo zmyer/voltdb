@@ -62,6 +62,7 @@ public class Expectation {
 
         assert(table != null);
         int rowCount = table.getRowCount();
+        int colCount = table.getColumnCount();
 
         switch (expectation.m_type) {
         case EXPECT_EMPTY:
@@ -90,7 +91,7 @@ public class Expectation {
             return;
         case EXPECT_SCALAR:
             if (checkScalar(table) == false) {
-                fail(procedureName, stmt, batchIndex, "Expected scalar value");
+                fail(procedureName, stmt, batchIndex, "Expected scalar value, but got " + rowCount + " by " + colCount);
             }
             return;
         case EXPECT_SCALAR_LONG:
