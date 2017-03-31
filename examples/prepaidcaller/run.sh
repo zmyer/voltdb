@@ -25,30 +25,30 @@ SERVERS="localhost"
 
 # remove binaries, logs, runtime artifacts, etc... but keep the jars
 function clean() {
-    rm -rf voltdbroot log procedures/voter/*.class client/voter/*.class *.log
+    rm -rf voltdbroot log procedures/prepaidcaller/*.class client/prepaidcaller/*.class *.log
 }
 
 # remove everything from "clean" as well as the jarfiles
 function cleanall() {
     clean
-    rm -rf voter-procs.jar voter-client.jar
+    rm -rf prepaidcaller-procs.jar prepaidcaller-client.jar
 }
 
 # compile the source code for procedures and the client into jarfiles
 function jars() {
     # compile java source
-    javac -classpath $APPCLASSPATH procedures/voter/*.java
-    javac -classpath $CLIENTCLASSPATH client/voter/*.java
+    javac -classpath $APPCLASSPATH procedures/prepaidcaller/*.java
+    javac -classpath $CLIENTCLASSPATH client/prepaidcaller/*.java
     # build procedure and client jars
-    jar cf voter-procs.jar -C procedures voter
-    jar cf voter-client.jar -C client voter
+    jar cf prepaidcaller-procs.jar -C procedures prepaidcaller
+    jar cf prepaidcaller-client.jar -C client prepaidcaller
     # remove compiled .class files
-    rm -rf procedures/voter/*.class client/voter/*.class
+    rm -rf procedures/prepaidcaller/*.class client/prepaidcaller/*.class
 }
 
 # compile the procedure and client jarfiles if they don't exist
 function jars-ifneeded() {
-    if [ ! -e voter-procs.jar ] || [ ! -e voter-client.jar ]; then
+    if [ ! -e prepaidcaller-procs.jar ] || [ ! -e prepaidcaller-client.jar ]; then
         jars;
     fi
 }
@@ -71,11 +71,11 @@ function init() {
     sqlcmd < ddl.sql
 }
 
-# run the client that drives the example
+# run the simulation
 function client() {
     jars-ifneeded
-    java -classpath voter-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        voter.CellTower $SERVERS
+    java -classpath prepaidcaller-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+        prepaidcaller.CellTower $SERVERS
 }
 
 function help() {

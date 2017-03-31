@@ -25,7 +25,7 @@
 // Initializes the database, pushing the list of contestants and documenting domain data (Area codes and States).
 //
 
-package voter;
+package prepaidcaller;
 
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
@@ -118,10 +118,7 @@ public class Initialize extends VoltProcedure
         }
 
         final long numExistingAccounts = howManyAccountsExist();
-
         accountIDCounter = numExistingAccounts;
-
-        //final int NUM_ACCOUNTS = 1000000;
 
         if (numExistingAccounts == 0){
             // set up account types

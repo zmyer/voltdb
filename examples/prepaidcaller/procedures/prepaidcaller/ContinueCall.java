@@ -21,20 +21,34 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package voter;
+package prepaidcaller;
 
+import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import org.voltdb.VoltProcedure.VoltAbortException;
 
-public class EndCall extends VoltProcedure {
+public class ContinueCall extends VoltProcedure {
 
     // TODO: this needs to be synced with the stored procedures
     public static final byte STORED_PROC_SUCCESS = 1;
 
-    public long run( long uniqueID ) throws VoltAbortException {
+    private static final SQLStmt getAccountIDStmt = new SQLStmt("SELECT account_id FROM phones WHERE phone_number = ?;");
+    private static final SQLStmt getCurrentMinutesStmt = new SQLStmt("SELECT minutes_left FROM accounts_realtime WHERE account_id = ?;");
+    private static final SQLStmt updateCurrentMinutesStmt = new SQLStmt("UPDATE accounts_realtime SET minutes_left = ? WHERE account_id = ?;");
 
-        // TODO this needs to register the end call in the call logs
-        setAppStatusCode(STORED_PROC_SUCCESS);
+    public long run( long phoneNumber ) throws VoltAbortException {
+
+        voltQueueSQL(getAccountIDStmt, EXPECT_SCALAR, phoneNumber);
+        final long accountID = voltExecuteSQL()[0].asScalarLong();
+
+        voltQueueSQL(getCurrentMinutesStmt, EXPECT_SCALAR, accountID);
+        final long currentMinutes = voltExecuteSQL()[0].asScalarLong();
+
+        if (currentMinutes > 0){
+            voltQueueSQL(updateCurrentMinutesStmt, EXPECT_ONE_ROW, currentMinutes - 1, accountID);
+            voltExecuteSQL();
+            setAppStatusCode(STORED_PROC_SUCCESS);
+        }
+
         return 0;
     }
 }

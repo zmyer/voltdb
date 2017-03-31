@@ -90,16 +90,16 @@ AS
 -- Update classes from jar so that the server will know about classes
 -- but not procedures yet.
 -- This command cannot be part of a DDL batch.
-LOAD CLASSES voter-procs.jar;
+LOAD CLASSES prepaidcaller-procs.jar;
 
 -- The following CREATE PROCEDURE statements can all be batched.
 file -inlinebatch END_OF_2ND_BATCH
 
 -- stored procedures
-CREATE PROCEDURE PARTITION ON TABLE phones COLUMN account_id FROM CLASS voter.AuthorizeCall;
-CREATE PROCEDURE PARTITION ON TABLE phones COLUMN account_id FROM CLASS voter.ContinueCall;
-CREATE PROCEDURE PARTITION ON TABLE phones COLUMN account_id FROM CLASS voter.EndCall;
-CREATE PROCEDURE FROM CLASS voter.Initialize;
+CREATE PROCEDURE PARTITION ON TABLE phones COLUMN account_id FROM CLASS prepaidcaller.AuthorizeCall;
+CREATE PROCEDURE PARTITION ON TABLE phones COLUMN account_id FROM CLASS prepaidcaller.ContinueCall;
+CREATE PROCEDURE PARTITION ON TABLE phones COLUMN account_id FROM CLASS prepaidcaller.EndCall;
+CREATE PROCEDURE FROM CLASS prepaidcaller.Initialize;
 
 END_OF_2ND_BATCH
 

@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package voter;
+package prepaidcaller;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -38,6 +38,9 @@ import org.voltdb.client.*;
 
 public class CellTower {
 
+    /** NOTE: One "minute" in the DDL is represented with one second of wall clock time.
+     * This allows the simulation to run much quicker.
+     */
     private static final int MIN_CALL_TIME_SECONDS = 2;
     private static final int MAX_CALL_TIME_SECONDS = 10;
     private static final int MIN_TIME_BETWEEN_CALLS_SECONDS = 2;
@@ -46,26 +49,22 @@ public class CellTower {
 
 
     static enum CallState {
-        // benign states
-        // as long as caller is here, it will continue to make calls
+        // normal states - as long as caller is here, it will continue to make calls
         INACTIVE,
         PENDING,
         ACTIVE,
         ENDING,
-        // benign failure states
-        // no more calls will be placed but the statistics won't count this as a failure
+        // benign failure states - no more calls will be placed
         REJECTED,
-        // error states
-        // if a caller ever ends up in one of these, it does not try to recover
-        FAILED,
         DROPPED,
+        // error states - if a caller ever ends up in one of these, it does not try to recover
+        FAILED,
     };
 
 
     class PrepaidCaller {
         // TODO: this needs to be synced with the stored procedures
         public static final byte STORED_PROC_SUCCESS = 1;
-
 
         private long phoneNumber;
         private volatile CallState state; // modified by current executor, but also read by stats keeper
@@ -83,7 +82,7 @@ public class CellTower {
                     boolean processed = false;
                     try {
                         state = CallState.PENDING; // this has to be set first; callProcedure may return after callback is called.
-                        // FIXME need to add call logging support
+                        // TODO need to add call logging support
                         //processed = voltClient.callProcedure(new CallStartResponse(), "AuthorizeCall", phoneNumber);
                         processed = voltClient.callProcedure(new CallStartResponse(), "ContinueCall", phoneNumber);
                     } catch (IOException e) {
@@ -336,23 +335,6 @@ public class CellTower {
         // final int NUM_CALLERS_PER_EXECUTOR = 500000;
         final int NUM_CALLERS_PER_EXECUTOR = 50000;
         final int TEST_DURATION_SECONDS = 30;
-
-        {
-            final int totalCallers = NUM_VOLT_CLIENTS * NUM_CALLERS_PER_EXECUTOR;
-            System.out.println("Initializing simulation with " + totalCallers + " callers.");
-            try {
-                Client voltClient = ClientFactory.createClient();
-                voltClient.createConnection("localhost");
-                voltClient.callProcedure("Initialize", totalCallers);
-                voltClient.drain();
-                voltClient.close();
-            } catch (IOException | ProcCallException | InterruptedException e) {
-                // Don't run if initialize failed
-                e.printStackTrace();
-                System.exit(1);
-            }
-
-        }
 
         List<CellTower> cellTowerList = new Vector<CellTower>();
 

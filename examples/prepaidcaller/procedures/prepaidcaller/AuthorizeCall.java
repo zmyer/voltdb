@@ -21,16 +21,22 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package voter;
+package prepaidcaller;
 
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
-public class ContinueCall extends VoltProcedure {
+public class AuthorizeCall extends VoltProcedure {
+
+    // FIXME: too much copy and paste from ContinueCall
+
 
     // TODO: this needs to be synced with the stored procedures
     public static final byte STORED_PROC_SUCCESS = 1;
     public static final byte STORED_PROC_FAILURE = -1; // TODO this is not observed by anyone - it's just not 1
+
+
+
 
     private static final SQLStmt getAccountIDStmt = new SQLStmt("SELECT account_id FROM phones WHERE phone_number = ?;");
     private static final SQLStmt getCurrentMinutesStmt = new SQLStmt("SELECT minutes_left FROM accounts_realtime WHERE account_id = ?;");
@@ -38,31 +44,29 @@ public class ContinueCall extends VoltProcedure {
 
     public long run( long phoneNumber ) throws VoltAbortException {
 
-        long accountID = 0;
-        long currentMinutes = -1;
-        try {
-
         voltQueueSQL(getAccountIDStmt, EXPECT_SCALAR_LONG, phoneNumber);
-        //final long
-        accountID = voltExecuteSQL()[0].asScalarLong();
+        final long accountID = voltExecuteSQL()[0].asScalarLong(); // fetchRow(0).getLong("account_id");
 
-        voltQueueSQL(getCurrentMinutesStmt, EXPECT_SCALAR, accountID);
-        //final long
-        currentMinutes = voltExecuteSQL()[0].fetchRow(0).getLong("minutes_left"); // FIXME .asScalarLong();
+        // TODO care about the account type after initialization as the DDL does; right now we rely on "unlimited" being a huge value.
+
+        voltQueueSQL(getCurrentMinutesStmt, EXPECT_SCALAR_LONG, accountID);
+        final long currentMinutes = voltExecuteSQL()[0].asScalarLong();
 
         if (currentMinutes > 0){
-            voltQueueSQL(updateCurrentMinutesStmt, EXPECT_ONE_ROW, currentMinutes - 1, accountID);
+            voltQueueSQL(updateCurrentMinutesStmt, EXPECT_SCALAR_LONG, currentMinutes - 1, accountID);
             voltExecuteSQL();
+
+            // TODO write call log - FIXME this is not in the DDL
+
             setAppStatusCode(STORED_PROC_SUCCESS);
         } else {
             // ran out of minutes
             setAppStatusCode(STORED_PROC_FAILURE);
         }
-        } catch (Throwable t){
-            System.err.println("DEBUG: phoneNumber=" + phoneNumber + " accountID=" + accountID + " currentMinutes=" + currentMinutes);
-            t.printStackTrace();
-        }
 
         return 0; // TODO does it matter what the return code is?
     }
+
 }
+
+
