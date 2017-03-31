@@ -53,25 +53,6 @@ CREATE TABLE account_types
     minutes_per_month integer, -- NULL indicates unlimited
 );
 
-
--- Incident reports are uncommon and best addressed by humans.
--- The 'problem reported' tinyints are 
--- Enterprise Edition users should keep this as a real time export stream.
--- Community Edition users can write a make it a table and query it with 'sqlcmd' (or upgrade)
-
--- CREATE STREAM problem_reports
-CREATE TABLE problem_reports
-(
-    phone_number    bigint        NOT NULL,
-    account_id      integer       NOT NULL PRIMARY KEY,
-    report_time     timestamp     NOT NULL,
-    phone_blocked   tinyint       NOT NULL,
-    account_blocked tinyint       NOT NULL,
-    description     varchar(1000),
-);
-
-PARTITION TABLE problem_reports ON COLUMN account_id;
-
 -- rollup of votes by contestant and state for the heat map and results
 CREATE VIEW active_callers_by_tower
 (
@@ -101,8 +82,11 @@ CREATE PROCEDURE PARTITION ON TABLE phones COLUMN account_id FROM CLASS prepaidc
 CREATE PROCEDURE PARTITION ON TABLE phones COLUMN account_id FROM CLASS prepaidcaller.EndCall;
 CREATE PROCEDURE FROM CLASS prepaidcaller.Initialize;
 
+
+-- FIXME these are for testing bug reproducibility
+CREATE PROCEDURE NewAccount PARTITION ON TABLE accounts_realtime COLUMN account_id AS 
+    INSERT INTO accounts_realtime VALUES (?, ?, ?, 1);
+CREATE PROCEDURE NewPhone PARTITION ON TABLE phones COLUMN account_id PARAMETER 1 AS
+    INSERT INTO phones VALUES (?, ?, null, null, 1);
+
 END_OF_2ND_BATCH
-
--- verify problem reports can be written
-INSERT INTO problem_reports VALUES (0010000000000, 0, CURRENT_TIMESTAMP, 0, 0, 'Benign Test Incident');
-

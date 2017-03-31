@@ -77,6 +77,7 @@ public class Initialize extends VoltProcedure
     private void generateAccount(){
         accountPhoneNumberCounter++;
         if (accountPhoneNumberCounter >= accountMaxPhoneNumbers){
+            accountPhoneNumberCounter = 0;
             accountIDCounter++;  // reserve 0 as an invalid value
 
             Random rng = getSeededRandomNumberGenerator();

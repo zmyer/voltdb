@@ -61,6 +61,13 @@ function simulation() {
         prepaidcaller.CellTower $SERVERS
 }
 
+function simulation2() {
+	echo "Loading schema and procedures"
+    sqlcmd < ddl.sql >/dev/null
+    java -classpath prepaidcaller-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+        prepaidcaller.CellTower2 $SERVERS
+}
+
 function help() {
     echo "Usage: ./run.sh {clean|cleanall|jars|server|simulation}"
 }
