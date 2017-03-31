@@ -334,7 +334,7 @@ public class CellTower {
         // FIXME - w/o data it's fine, but this fills up 32GB for some reason
         // final int NUM_CALLERS_PER_EXECUTOR = 500000;
         final int NUM_CALLERS_PER_EXECUTOR = 50000;
-        final int TEST_DURATION_SECONDS = 30;
+        final int TEST_DURATION_SECONDS = 45;
 
         List<CellTower> cellTowerList = new Vector<CellTower>();
 
