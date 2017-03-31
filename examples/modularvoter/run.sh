@@ -73,79 +73,13 @@ function init() {
 
 # run the client that drives the example
 function client() {
-    async-benchmark
-}
-
-# Asynchronous benchmark sample
-# Use this target for argument help
-function async-benchmark-help() {
-    jars-ifneeded
-    java -classpath voter-client.jar:$CLIENTCLASSPATH voter.AsyncBenchmark --help
-}
-
-# latencyreport: default is OFF
-# ratelimit: must be a reasonable value if lantencyreport is ON
-# Disable the comments to get latency report
-function async-benchmark() {
-    jars-ifneeded
-    java -classpath voter-client.jar:$CLIENTCLASSPATH voter.AsyncBenchmark \
-        --displayinterval=5 \
-        --warmup=5 \
-        --duration=120 \
-        --servers=$SERVERS \
-        --contestants=6 \
-        --maxvotes=2
-}
-
-# trivial client code for illustration purposes
-function simple-benchmark() {
     jars-ifneeded
     java -classpath voter-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        voter.SimpleBenchmark $SERVERS
-}
-
-# Multi-threaded synchronous benchmark sample
-# Use this target for argument help
-function sync-benchmark-help() {
-    jars-ifneeded
-    java -classpath voter-client.jar:$CLIENTCLASSPATH voter.SyncBenchmark --help
-}
-
-function sync-benchmark() {
-    jars-ifneeded
-    java -classpath voter-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        voter.SyncBenchmark \
-        --displayinterval=5 \
-        --warmup=5 \
-        --duration=120 \
-        --servers=$SERVERS \
-        --contestants=6 \
-        --maxvotes=2 \
-        --threads=40
-}
-
-# JDBC benchmark sample
-# Use this target for argument help
-function jdbc-benchmark-help() {
-    jars-ifneeded
-    java -classpath voter-client.jar:$CLIENTCLASSPATH voter.JDBCBenchmark --help
-}
-
-function jdbc-benchmark() {
-    jars-ifneeded
-    java -classpath voter-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        voter.JDBCBenchmark \
-        --displayinterval=5 \
-        --duration=120 \
-        --servers=$SERVERS \
-        --maxvotes=2 \
-        --contestants=6 \
-        --threads=40
+        voter.CellTower $SERVERS
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|cleanall|jars|server|init|client|async-benchmark|aysnc-benchmark-help|...}"
-    echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help|simple-benchmark}"
+    echo "Usage: ./run.sh {clean|cleanall|jars|server|init|client}"
 }
 
 # Run the targets pass on the command line

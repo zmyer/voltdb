@@ -1,3 +1,26 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2017 VoltDB Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+
 package voter;
 
 import java.io.IOException;
@@ -44,7 +67,7 @@ public class CellTower {
         public static final byte STORED_PROC_SUCCESS = 1;
 
 
-        private long uniqueID;
+        private long phoneNumber;
         private volatile CallState state; // modified by current executor, but also read by stats keeper
         private volatile boolean callScheduled; // set to true by scheduleCall(), set to false by CallEndedTask
         private int callSecondsRemaining;
@@ -60,7 +83,9 @@ public class CellTower {
                     boolean processed = false;
                     try {
                         state = CallState.PENDING; // this has to be set first; callProcedure may return after callback is called.
-                        processed = voltClient.callProcedure(new CallStartResponse(), "AuthorizeCall", uniqueID);
+                        // FIXME need to add call logging support
+                        //processed = voltClient.callProcedure(new CallStartResponse(), "AuthorizeCall", phoneNumber);
+                        processed = voltClient.callProcedure(new CallStartResponse(), "ContinueCall", phoneNumber);
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -101,7 +126,7 @@ public class CellTower {
                 if (!m_stop){
                     boolean processed = false;
                     try {
-                        processed = voltClient.callProcedure(new CallContinuationResponse(), "ContinueCall", uniqueID);
+                        processed = voltClient.callProcedure(new CallContinuationResponse(), "ContinueCall", phoneNumber);
                     } catch (IOException e) {
                     }
                     if (!processed){
@@ -147,7 +172,7 @@ public class CellTower {
                 state = CallState.ENDING;
                 boolean processed = false;
                 try {
-                    processed = voltClient.callProcedure(new CallEndedResponse(), "EndCall", uniqueID);
+                    processed = voltClient.callProcedure(new CallEndedResponse(), "EndCall", phoneNumber);
                 } catch (IOException e) {
                 }
                 if (!processed){
@@ -183,8 +208,8 @@ public class CellTower {
         /** Asynchronously queries current state of this caller.
          * @return State of the phone call
          */
-        public PrepaidCaller( long uniqueID ){
-            this.uniqueID = uniqueID;
+        public PrepaidCaller( long phoneNumber ){
+            this.phoneNumber = phoneNumber;
             this.state = CallState.INACTIVE;
             this.callScheduled = false;
             this.callSecondsRemaining = 0;
@@ -201,16 +226,16 @@ public class CellTower {
 
     private final Client voltClient;
     private final ScheduledExecutorService executor;
-    private long uniqueIDCounter;
+    private long phoneNumberCounter;
     private final List<PrepaidCaller> callerList = new Vector<PrepaidCaller>();
     private volatile boolean m_stop = false; // set to true by stop()
     private final ClientStatsContext statistics;
 
 
-    CellTower(Client client, long uniqueIDStart){
+    CellTower(Client client, long phoneNumberStart){
         voltClient = client;
         executor = Executors.newSingleThreadScheduledExecutor();
-        uniqueIDCounter = uniqueIDStart;
+        phoneNumberCounter = phoneNumberStart;
         statistics = client.createStatsContext();
     }
 
@@ -224,7 +249,8 @@ public class CellTower {
 
 
     void addCaller(int totalDurationSeconds){
-        PrepaidCaller caller = new PrepaidCaller( uniqueIDCounter );
+        PrepaidCaller caller = new PrepaidCaller( phoneNumberCounter );
+        phoneNumberCounter++;
         callerList.add(caller);
         caller.scheduleCall();
     }
@@ -246,10 +272,9 @@ public class CellTower {
         try {
             voltClient.drain();
             voltClient.close();
-        } catch (InterruptedException | NoConnectionsException e){
-            // unexpected, therefore crash
+        } catch (InterruptedException | IOException e){
+            // ignore but print an error since this is unexpected
             e.printStackTrace();
-            System.exit(-1);
         }
     }
 
@@ -307,8 +332,27 @@ public class CellTower {
 
     public static void main(String[] args){
         final int NUM_VOLT_CLIENTS = 2;
-        final int NUM_CALLERS_PER_EXECUTOR = 500000;
+        // FIXME - w/o data it's fine, but this fills up 32GB for some reason
+        // final int NUM_CALLERS_PER_EXECUTOR = 500000;
+        final int NUM_CALLERS_PER_EXECUTOR = 50000;
         final int TEST_DURATION_SECONDS = 30;
+
+        {
+            final int totalCallers = NUM_VOLT_CLIENTS * NUM_CALLERS_PER_EXECUTOR;
+            System.out.println("Initializing simulation with " + totalCallers + " callers.");
+            try {
+                Client voltClient = ClientFactory.createClient();
+                voltClient.createConnection("localhost");
+                voltClient.callProcedure("Initialize", totalCallers);
+                voltClient.drain();
+                voltClient.close();
+            } catch (IOException | ProcCallException | InterruptedException e) {
+                // Don't run if initialize failed
+                e.printStackTrace();
+                System.exit(1);
+            }
+
+        }
 
         List<CellTower> cellTowerList = new Vector<CellTower>();
 
@@ -316,17 +360,23 @@ public class CellTower {
             for (int clientIdx = 0; clientIdx < NUM_VOLT_CLIENTS; clientIdx++){
                 Client voltClient = ClientFactory.createClient();
                 voltClient.createConnection("localhost");
-                CellTower cellTower = new CellTower(voltClient, clientIdx * NUM_CALLERS_PER_EXECUTOR);
+                final long startingPhoneNumber = clientIdx * NUM_CALLERS_PER_EXECUTOR + 1; // reserve phone number of 0
+                CellTower cellTower = new CellTower(voltClient, startingPhoneNumber);
                 cellTowerList.add(cellTower);
             }
 
+            final int totalCallers = NUM_VOLT_CLIENTS * NUM_CALLERS_PER_EXECUTOR;
+            System.out.println("Initializing simulation with " + totalCallers + " callers.");
+            cellTowerList.get(0).voltClient.callProcedure("Initialize", totalCallers);
+
+            System.out.println("Simulation initialized - scheduling phone calls");
             for (int i = 0; i < NUM_CALLERS_PER_EXECUTOR; i++){
                 for (CellTower cellTower : cellTowerList){
                     cellTower.addCaller(TEST_DURATION_SECONDS);
                 }
             }
 
-            System.out.println("Running simulation");
+            System.out.println("Simulation running");
             for (int i = 0; i < TEST_DURATION_SECONDS; i++){
                 for (CellTower cellTower : cellTowerList){
                     cellTower.scheduleMoreCalls();
@@ -339,7 +389,6 @@ public class CellTower {
                 System.out.println("Statistics at " + (i + 1) + " of " + TEST_DURATION_SECONDS + " seconds:");
                 printStats(cellTowerList);
             }
-
 
             System.out.println("Waiting for calls to complete");
             for (CellTower cellTower : cellTowerList){

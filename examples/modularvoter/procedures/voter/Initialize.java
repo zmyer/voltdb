@@ -27,85 +27,113 @@
 
 package voter;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
+import java.util.Random;
+
+
 public class Initialize extends VoltProcedure
 {
-    // Check if the database has already been initialized
-    public final SQLStmt checkStmt = new SQLStmt("SELECT COUNT(*) FROM contestants;");
+    // Domain data: number of digits in a US/CA phone number
+    // Our simulation only handles a single area code, for simplicity's sake.
+    public static final long NUM_PHONES_PER_AREA_CODE = 10000000L;
 
-    // Inserts an area code/state mapping
-    public final SQLStmt insertACSStmt = new SQLStmt("INSERT INTO area_code_state VALUES (?,?);");
+    // tuning parameters
+    public static final int MAX_PHONES_PER_ACCOUNT = 4;
 
-    // Inserts a contestant
-    public final SQLStmt insertContestantStmt = new SQLStmt("INSERT INTO contestants (contestant_name, contestant_number) VALUES (?, ?);");
+    static enum AccountType {
+        UNLIMITED      ('U', 0,    true),
+        PREMIUM        ('P', 1000, false),
+        STANDARD       ('S', 200,  false),
+        EMERGENCY_ONLY ('E', 10,   false),
+        RIPOFF         ('R', 0,    false),
+        ;
 
-    // Domain data: matching lists of Area codes and States
-    public static final short[] areaCodes = new short[]{
-        907,205,256,334,251,870,501,479,480,602,623,928,520,341,764,628,831,925,
-        909,562,661,510,650,949,760,415,951,209,669,408,559,626,442,530,916,627,
-        714,707,310,323,213,424,747,818,858,935,619,805,369,720,303,970,719,860,
-        203,959,475,202,302,689,407,239,850,727,321,754,954,927,352,863,386,904,
-        561,772,786,305,941,813,478,770,470,404,762,706,678,912,229,808,515,319,
-        563,641,712,208,217,872,312,773,464,708,224,847,779,815,618,309,331,630,
-        317,765,574,260,219,812,913,785,316,620,606,859,502,270,504,985,225,318,
-        337,774,508,339,781,857,617,978,351,413,443,410,301,240,207,517,810,278,
-        679,313,586,947,248,734,269,989,906,616,231,612,320,651,763,952,218,507,
-        636,660,975,816,573,314,557,417,769,601,662,228,406,336,252,984,919,980,
-        910,828,704,701,402,308,603,908,848,732,551,201,862,973,609,856,575,957,
-        505,775,702,315,518,646,347,212,718,516,917,845,631,716,585,607,914,216,
-        330,234,567,419,440,380,740,614,283,513,937,918,580,405,503,541,971,814,
-        717,570,878,835,484,610,267,215,724,412,401,843,864,803,605,423,865,931,
-        615,901,731,254,325,713,940,817,430,903,806,737,512,361,210,979,936,409,
-        972,469,214,682,832,281,830,956,432,915,435,801,385,434,804,757,703,571,
-        276,236,540,802,509,360,564,206,425,253,715,920,262,414,608,304,307};
+        final char    key;
+        final int     maxMinutes;
 
-    public static final String[] states = new String[] {
-        "AK","AL","AL","AL","AL","AR","AR","AR","AZ","AZ","AZ","AZ","AZ","CA","CA",
-        "CA","CA","CA","CA","CA","CA","CA","CA","CA","CA","CA","CA","CA","CA","CA",
-        "CA","CA","CA","CA","CA","CA","CA","CA","CA","CA","CA","CA","CA","CA","CA",
-        "CA","CA","CA","CA","CO","CO","CO","CO","CT","CT","CT","CT","DC","DE","FL",
-        "FL","FL","FL","FL","FL","FL","FL","FL","FL","FL","FL","FL","FL","FL","FL",
-        "FL","FL","FL","GA","GA","GA","GA","GA","GA","GA","GA","GA","HI","IA","IA",
-        "IA","IA","IA","ID","IL","IL","IL","IL","IL","IL","IL","IL","IL","IL","IL",
-        "IL","IL","IL","IN","IN","IN","IN","IN","IN","KS","KS","KS","KS","KY","KY",
-        "KY","KY","LA","LA","LA","LA","LA","MA","MA","MA","MA","MA","MA","MA","MA",
-        "MA","MD","MD","MD","MD","ME","MI","MI","MI","MI","MI","MI","MI","MI","MI",
-        "MI","MI","MI","MI","MI","MN","MN","MN","MN","MN","MN","MN","MO","MO","MO",
-        "MO","MO","MO","MO","MO","MS","MS","MS","MS","MT","NC","NC","NC","NC","NC",
-        "NC","NC","NC","ND","NE","NE","NH","NJ","NJ","NJ","NJ","NJ","NJ","NJ","NJ",
-        "NJ","NM","NM","NM","NV","NV","NY","NY","NY","NY","NY","NY","NY","NY","NY",
-        "NY","NY","NY","NY","NY","OH","OH","OH","OH","OH","OH","OH","OH","OH","OH",
-        "OH","OH","OK","OK","OK","OR","OR","OR","PA","PA","PA","PA","PA","PA","PA",
-        "PA","PA","PA","PA","RI","SC","SC","SC","SD","TN","TN","TN","TN","TN","TN",
-        "TX","TX","TX","TX","TX","TX","TX","TX","TX","TX","TX","TX","TX","TX","TX",
-        "TX","TX","TX","TX","TX","TX","TX","TX","TX","TX","UT","UT","UT","VA","VA",
-        "VA","VA","VA","VA","VA","VA","VT","WA","WA","WA","WA","WA","WA","WI","WI",
-        "WI","WI","WI","WV","WY"};
+        AccountType( char key, int maxMinutes, boolean isUnlimited ){
+            this.key = key;
+            this.maxMinutes = isUnlimited ? Integer.MAX_VALUE : maxMinutes;
+        }
 
-    public long run(int maxContestants, String contestants) {
+        static AccountType getRandom( Random random ){
+            return AccountType.values()[random.nextInt(AccountType.values().length)];
+        }
+    }
 
-        String[] contestantArray = contestants.split(",");
+    public final SQLStmt getNumPhonesStmt = new SQLStmt("SELECT COUNT(*) FROM phones;");
+    public final SQLStmt getNumAccountsStmt = new SQLStmt("SELECT COUNT(*) FROM accounts_realtime;");
+    public final SQLStmt newAccountTypeStmt = new SQLStmt("INSERT INTO account_types VALUES (?, ?);");
+    public final SQLStmt newAccountStmt = new SQLStmt("INSERT INTO accounts_realtime VALUES (?, ?, ?, 1);");
+    public final SQLStmt newPhoneStmt = new SQLStmt("INSERT INTO phones VALUES (?, ?, null, null, 1);");
 
-        voltQueueSQL(checkStmt, EXPECT_SCALAR_LONG);
-        long existingContestantCount = voltExecuteSQL()[0].asScalarLong();
+    int accountPhoneNumberCounter = 0;
+    int accountMaxPhoneNumbers = 0;
+    long accountIDCounter;
+    AccountType accountType;
 
-        // if the data is initialized, return the contestant count
-        if (existingContestantCount != 0)
-            return existingContestantCount;
+    private void generateAccount(){
+        accountPhoneNumberCounter++;
+        if (accountPhoneNumberCounter >= accountMaxPhoneNumbers){
+            accountIDCounter++;  // reserve 0 as an invalid value
 
-        // initialize the data
+            Random rng = getSeededRandomNumberGenerator();
+            accountMaxPhoneNumbers = rng.nextInt(MAX_PHONES_PER_ACCOUNT);
+            accountType = AccountType.getRandom(rng);
 
-        for (int i=0; i < maxContestants; i++)
-            voltQueueSQL(insertContestantStmt, EXPECT_SCALAR_MATCH(1), contestantArray[i], i+1);
+            voltQueueSQL(newAccountStmt, EXPECT_SCALAR_LONG, accountIDCounter, (byte) accountType.key, accountType.maxMinutes);
+        }
+    }
+
+    private void generatePhone(long phoneNumberIndex){
+        generateAccount();
+        final long phoneNumber = phoneNumberIndex;
+        voltQueueSQL(newPhoneStmt, EXPECT_SCALAR_LONG, phoneNumber, accountIDCounter);
         voltExecuteSQL();
+    }
 
-        for(int i=0;i<areaCodes.length;i++)
-            voltQueueSQL(insertACSStmt, EXPECT_SCALAR_MATCH(1), areaCodes[i], states[i]);
-        voltExecuteSQL();
+    private long howManyAccountsExist(){
+        voltQueueSQL(getNumAccountsStmt, EXPECT_SCALAR_LONG);
+        return voltExecuteSQL()[0].asScalarLong();
+    }
 
-        return maxContestants;
+    private long howManyPhonesExist(){
+        voltQueueSQL(getNumPhonesStmt, EXPECT_SCALAR_LONG);
+        return voltExecuteSQL()[0].asScalarLong();
+    }
+
+
+    public long run(final long numPhones) throws VoltAbortException {
+
+        final long numExistingPhones = howManyPhonesExist();
+        if (numPhones <= numExistingPhones){
+            return 0;
+        }
+        if (numPhones >= NUM_PHONES_PER_AREA_CODE){
+            throw new VoltAbortException(
+                    "LIMITATION: Since generated phone numbers aren't checked for duplicates, " +
+                    "cannot generate more than " + NUM_PHONES_PER_AREA_CODE + " phone numbers.");
+        }
+
+        final long numExistingAccounts = howManyAccountsExist();
+
+        accountIDCounter = numExistingAccounts;
+
+        //final int NUM_ACCOUNTS = 1000000;
+
+        if (numExistingAccounts == 0){
+            // set up account types
+            for (AccountType type : AccountType.class.getEnumConstants()){
+                voltQueueSQL(newAccountTypeStmt, (byte) type.key, type.maxMinutes);
+            }
+            voltExecuteSQL();
+        }
+
+        for (long i = numExistingPhones; i < numPhones; i++){
+            generatePhone(i + 1); // reserve 000-0000 as an invalid value
+        }
+        return numPhones - numExistingPhones;
     }
 }
