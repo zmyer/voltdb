@@ -192,7 +192,7 @@ public abstract class VoltProcedure {
     /**
      * Get a Java RNG seeded with the current transaction id. This will ensure that
      * two procedures for the same transaction, but running on different replicas,
-     * can generate an identical stream of random numbers. This is required to endure
+     * can generate an identical stream of random numbers. This is required to ensure
      * procedures have deterministic behavior. The RNG is memoized so you can invoke this
      * multiple times within a single procedure.
      *

@@ -235,7 +235,7 @@ public abstract class ProcedureCompiler {
         }
         assert(info != null);
 
-        // make sure multi-partition implies no partitoning info
+        // make sure multi-partition implies no partitioning info
         if (info.singlePartition == false) {
             if ((info.partitionInfo != null) && (info.partitionInfo.length() > 0)) {
                 String msg = "Procedure: " + shortName + " is annotated as multi-partition";
@@ -262,9 +262,9 @@ public abstract class ProcedureCompiler {
         try {
             procInstance = (VoltProcedure) procClass.newInstance();
         } catch (InstantiationException e) {
-            throw new RuntimeException("Error instantiating procedure \"%s\"" + procClass.getName(), e);
+            throw new RuntimeException("Error instantiating procedure \"" + procClass.getName() + "\"", e);
         } catch (IllegalAccessException e) {
-            throw new RuntimeException("Error instantiating procedure \"%s\"" + procClass.getName(), e);
+            throw new RuntimeException("Error instantiating procedure \"" + procClass.getName() + "\"", e);
         }
         Map<String, SQLStmt> stmtMap = getValidSQLStmts(compiler, procClass.getSimpleName(), procClass, procInstance, true);
 
