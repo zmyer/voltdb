@@ -130,11 +130,12 @@ def setxml(r,p,v):
     root = r
     level = 0
     if (root.nodeType == Node.DOCUMENT_NODE):
-        root = root.childNodes[0]
+        r = root.getElementsByTagName("deployment")
     for n in props:
         # Check if first element is valid
         if level == 0 and root.nodeType == Node.ELEMENT_NODE:
             if root.tagName == n:
+                DEBUG("Root node is first element.")
                 level = level + 1
                 continue
         level = level + 1
