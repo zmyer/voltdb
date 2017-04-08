@@ -32,12 +32,11 @@
  */
  package org.voltdb.sqlparser.syntax.util;
 
+import org.voltdb.sqlparser.syntax.symtab.ISourceLocation;
+
 /**
  * This contains one error message.  It has a line, a column
  * a severity and the message text.
- *
- * @author bwhite
- *
  */
 public class ErrorMessage {
     public enum Severity {
@@ -51,9 +50,9 @@ public class ErrorMessage {
     String m_msg;
     Severity m_severity;
 
-    public ErrorMessage(int aLine, int aCol, Severity aSeverity, String aMsg) {
-        m_line = aLine;
-        m_col = aCol;
+    public ErrorMessage(ISourceLocation aLocation, Severity aSeverity, String aMsg) {
+        m_line = aLocation.getLineNumber();
+        m_col = aLocation.getColumnNumber();
         m_msg = aMsg;
         m_severity = aSeverity;
     }

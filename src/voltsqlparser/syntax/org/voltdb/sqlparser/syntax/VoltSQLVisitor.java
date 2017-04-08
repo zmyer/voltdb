@@ -73,6 +73,7 @@ import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Where_clauseContext;
 import org.voltdb.sqlparser.syntax.symtab.IColumn;
 import org.voltdb.sqlparser.syntax.symtab.IExpressionParser;
 import org.voltdb.sqlparser.syntax.symtab.IParserFactory;
+import org.voltdb.sqlparser.syntax.symtab.ISourceLocation;
 import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
 import org.voltdb.sqlparser.syntax.symtab.ITable;
 import org.voltdb.sqlparser.syntax.symtab.IType;
@@ -137,12 +138,12 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
         return m_errorMessages.numberErrors() > 0;
     }
 
-    private final void addError(int line, int col, String errorMessageFormat, Object ... args) {
-        m_errorMessages.addError(line, col, errorMessageFormat, args);
+    private final void addError(ISourceLocation location, String errorMessageFormat, Object ... args) {
+        m_errorMessages.addError(location, errorMessageFormat, args);
     }
 
-    private final void addWarning(int line, int col, String errorMessageFormat, Object ... args) {
-        m_errorMessages.addWarning(line, col, errorMessageFormat, args);
+    private final void addWarning(ISourceLocation location, String errorMessageFormat, Object ... args) {
+        m_errorMessages.addWarning(location, errorMessageFormat, args);
     }
 
     public final ErrorMessageSet getErrorMessages() {
@@ -199,7 +200,7 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
         //
         super.visitColumn_definition(ctx);
         if (m_columnType == null) {
-            addError(ctx.start.getLine(), ctx.start.getCharPositionInLine(), "Type expected");
+            addError(m_factory.newSourceLocation(ctx.start.getLine(), ctx.start.getCharPositionInLine()), "Type expected");
             m_columnType = m_factory.getErrorType();
         }
         String colName = ctx.column_name().IDENTIFIER().getText();
@@ -246,7 +247,8 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
     @Override public T visitColumn_default_value(SQLParserParser.Column_default_valueContext ctx) {
         super.visitColumn_default_value(ctx);
         if (m_hasDefaultValue) {
-            addError(ctx.start.getLine(), ctx.start.getCharPositionInLine(), "DEFAULT value specified more than once.");
+            addError(m_factory.newSourceLocation(ctx.start.getLine(), ctx.start.getCharPositionInLine()),
+            		 "DEFAULT value specified more than once.");
         }
         else {
             m_hasDefaultValue = true;
@@ -260,7 +262,8 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
     @Override public T visitColumn_not_null(SQLParserParser.Column_not_nullContext ctx) {
         visitChildren(ctx);
         if ( ! m_isNullable) {
-            addError(ctx.start.getLine(), ctx.start.getCharPositionInLine(), "NOT NULL specified more than once.");
+            addError(m_factory.newSourceLocation(ctx.start.getLine(), ctx.start.getCharPositionInLine()),
+            		 "NOT NULL specified more than once.");
         }
         else {
             m_isNullable = false;
@@ -296,11 +299,11 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
         super.visitChildren(ctx);
         if (ctx.PRIMARY() != null && ctx.KEY() != null) {
             if (m_indexType == IndexType.PRIMARY_KEY) {
-                addError(ctx.start.getLine(), ctx.start.getCharPositionInLine(),
+                addError(m_factory.newSourceLocation(ctx.start.getLine(), ctx.start.getCharPositionInLine()),
                          "PRIMARY KEY specified twice.");
             }
             else if (m_indexType != IndexType.INVALID) {
-                addError(ctx.start.getLine(), ctx.start.getCharPositionInLine(),
+                addError(m_factory.newSourceLocation(ctx.start.getLine(), ctx.start.getCharPositionInLine()),
                          "PRIMARY KEY and %s both specified.",
                          m_indexType.syntaxName());
             }
@@ -310,11 +313,11 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
         }
         if (ctx.UNIQUE() != null) {
             if (m_indexType == IndexType.UNIQUE_KEY) {
-                addError(ctx.start.getLine(), ctx.start.getCharPositionInLine(),
+                addError(m_factory.newSourceLocation(ctx.start.getLine(), ctx.start.getCharPositionInLine()),
                          "UNIQUE KEY specified twice.");
             }
             else if (m_indexType != IndexType.INVALID) {
-                addError(ctx.start.getLine(), ctx.start.getCharPositionInLine(),
+                addError(m_factory.newSourceLocation(ctx.start.getLine(), ctx.start.getCharPositionInLine()),
                          "UNIQUE and %s both specified.",
                          m_indexType.syntaxName());
             }
@@ -323,7 +326,7 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
         }
         if (ctx.ASSUMEUNIQUE() != null) {
             if (m_indexType != IndexType.INVALID) {
-                addError(ctx.start.getLine(), ctx.start.getCharPositionInLine(),
+                addError(m_factory.newSourceLocation(ctx.start.getLine(), ctx.start.getCharPositionInLine()),
                          "ASSUMEUNIQUE and %s both specified.",
                          m_indexType.syntaxName());
             }
@@ -347,8 +350,8 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
         String typeName = ctx.datatype_name().IDENTIFIER().getText();
         m_columnType = m_symbolTable.getType(typeName);
         if (m_columnType == null) {
-            addError(ctx.start.getLine(),
-                     ctx.start.getCharPositionInLine(),
+            addError(m_factory.newSourceLocation(ctx.start.getLine(),
+                     							 ctx.start.getCharPositionInLine()),
                      "The type name %s is not defined.",
                      typeName);
         }
@@ -358,11 +361,10 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
             // precision here.
             //
             if (m_constantIntegerValues.size() > 0) {
-                addWarning(ctx.start.getLine(),
-                           ctx.start.getCharPositionInLine(),
+                addWarning(m_factory.newSourceLocation(ctx.start.getLine(),
+                           							   ctx.start.getCharPositionInLine()),
                            "The fixed point type %s has a fixed scale and precision.  These arguments will be ignored.",
                            m_columnType.getName().toUpperCase());
-
             }
         }
         else if (m_columnType instanceof IStringType
@@ -379,16 +381,16 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
                 size = Long.parseLong(m_constantIntegerValues.get(0));
                 m_columnType = m_columnType.makeInstance(size);
             } else {
-                addError(ctx.start.getLine(),
-                         ctx.start.getCharPositionInLine(),
+                addError(m_factory.newSourceLocation(ctx.start.getLine(),
+                         							 ctx.start.getCharPositionInLine()),
                          "The type %s takes only one size parameter.",
                          m_columnType.getName().toUpperCase());
                 m_columnType = m_factory.getErrorType();
             }
         }
         else if (m_constantIntegerValues.size() > 0) {
-            addError(ctx.start.getLine(),
-                     ctx.start.getCharPositionInLine(),
+            addError(m_factory.newSourceLocation(ctx.start.getLine(),
+                     							 ctx.start.getCharPositionInLine()),
                      "The type %s takes no parameters.",
                      m_columnType.getName());
         }
@@ -419,8 +421,8 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
             String tableName = ctx.table_name().IDENTIFIER().getText();
             ITable table = m_catalog.getTableByName(tableName);
             if (table == null) {
-                addError(ctx.table_name().start.getLine(),
-                         ctx.table_name().start.getCharPositionInLine(),
+                addError(m_factory.newSourceLocation(ctx.table_name().start.getLine(),
+                         							 ctx.table_name().start.getCharPositionInLine()),
                          "Undefined table name %s",
                          tableName);
                 return m_state;
@@ -431,8 +433,8 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
             //
             if (ctx.insert_values().constant_value_expression() == null
                     || ctx.insert_values().constant_value_expression().size() == 0) {
-                addError(ctx.start.getLine(),
-                         ctx.start.getCharPositionInLine(),
+                addError(m_factory.newSourceLocation(ctx.start.getLine(),
+                         							 ctx.start.getCharPositionInLine()),
                          "No values specified.");
                 return m_state;
             }
@@ -442,7 +444,7 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
                     String colName = cnctx.IDENTIFIER().getText();
                     int colLineNo = cnctx.start.getLine();
                     int colColNo = cnctx.start.getCharPositionInLine();
-                    columns.add(m_factory.makeColumnRef(colName, colLineNo, colColNo));
+                    columns.add(m_factory.makeColumnRef(colName, m_factory.newSourceLocation(colLineNo, colColNo)));
                 }
             } else {
                 for (int colIdx = 0; colIdx < table.getColumnCount(); colIdx += 1) {
@@ -465,8 +467,8 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
                 String valStr = val.constant_integer_value().NUMBER().getText();
                 colVals.add(valStr);
             }
-            m_insertStatement.addColumns(ctx.start.getLine(),
-                                         ctx.start.getCharPositionInLine(),
+            m_insertStatement.addColumns(m_factory.newSourceLocation(ctx.start.getLine(),
+                                         						     ctx.start.getCharPositionInLine()),
                                          m_errorMessages,
                                          columns,
                                          colVals);
@@ -832,9 +834,10 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
         } else if (ctx.query_union_op() != null) {
             op = makeQueryOp(ctx.query_union_op());
         } else {
-            addError(ctx.start.getLine(), ctx.start.getCharPositionInLine(),
+            addError(m_factory.newSourceLocation(ctx.start.getLine(), ctx.start.getCharPositionInLine()),
                      "Unknown query set operation.");
         }
+        assert(op != QuerySetOp.INVALID_OP);
         ISelectQuery left = makeQuery(ctx.query_expression_body().get(0));
         ISelectQuery right = makeQuery(ctx.query_expression_body().get(1));
         return m_factory.newCompoundQuery(op, left, right);
@@ -861,8 +864,8 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
         }
         assert(ctx.simple_table() != null);
         if (ctx.simple_table().explicit_table() != null) {
-            addError(ctx.simple_table().start.getLine(),
-                     ctx.simple_table().start.getCharPositionInLine(),
+            addError(m_factory.newSourceLocation(ctx.simple_table().start.getLine(),
+                     							 ctx.simple_table().start.getCharPositionInLine()),
                      "Explict tables are not supported");
         }
         assert(ctx.simple_table().query_specification() != null);
@@ -891,19 +894,19 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
                                                                   ctx.start.getLine(),
                                                                   ctx.start.getCharPositionInLine());
 
-        SetQuantifier q = readSetQuantifier(ctx.set_quantifier());
+        SetQuantifier q = makeSetQuantifier(ctx.set_quantifier());
         assert(ctx.table_expression() != null);
-        readTableExpression(answer, ctx.table_expression());
+        makeTableExpression(answer, ctx.table_expression());
         assert(ctx.select_list() != null);
-        readSelectList(answer, ctx.select_list());
+        makeSelectList(answer, ctx.select_list());
         return answer;
     }
 
-    private void readSelectList(ISelectQuery answer, Select_listContext select_list) {
+    private void makeSelectList(ISelectQuery answer, Select_listContext select_list) {
 
     }
 
-    private void readTableExpression(ISelectQuery answer, Table_expressionContext ctx) {
+    private void makeTableExpression(ISelectQuery answer, Table_expressionContext ctx) {
         assert(ctx.from_clause() != null);
         readFromClause(answer, ctx.from_clause());
         readWhereClause(answer, ctx.where_clause());
@@ -967,7 +970,7 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
             ISemantino condition = readJoinCondition(ctx.join_condition(idx));
             joinTree = m_factory.newJoinTree(op, joinTree, right, condition);
         }
-        return answer;
+        return joinTree;
     }
 
     private ISemantino readJoinCondition(Join_conditionContext join_condition) {
@@ -1002,7 +1005,7 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
         return makeQuery(ctx.table_subquery().subquery().query_specification());
     }
 
-    private SetQuantifier readSetQuantifier(SQLParserParser.Set_quantifierContext ctx) {
+    private SetQuantifier makeSetQuantifier(SQLParserParser.Set_quantifierContext ctx) {
         if (ctx == null) {
             return null;
         }
@@ -1046,7 +1049,7 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
     @Override
     public void syntaxError(Recognizer<?, ?> aArg0, Object aTokObj, int aLine,
                             int aCol, String msg, RecognitionException aArg5) {
-        addError(aLine, aCol, msg);
+        addError(m_factory.newSourceLocation(aLine, aCol), msg);
     }
 
     public final ISelectQuery getSelectQuery() {

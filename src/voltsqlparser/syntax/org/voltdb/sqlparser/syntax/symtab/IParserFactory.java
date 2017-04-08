@@ -335,4 +335,8 @@ public interface IParserFactory {
      * @return
      */
     IJoinTree newDerivedJoinTree(ISelectQuery derivedTable, String tableName);
+    /**
+     * Make a new location.
+     */
+	ISourceLocation newSourceLocation(int aLineNumber, int aColumnNumber);
 }

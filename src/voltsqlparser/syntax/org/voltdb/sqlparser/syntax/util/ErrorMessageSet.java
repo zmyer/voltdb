@@ -35,6 +35,8 @@ package org.voltdb.sqlparser.syntax.util;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+
+import org.voltdb.sqlparser.syntax.symtab.ISourceLocation;
 import org.voltdb.sqlparser.syntax.util.ErrorMessage.Severity;
 
 public class ErrorMessageSet implements Iterable<ErrorMessage> {
@@ -42,23 +44,21 @@ public class ErrorMessageSet implements Iterable<ErrorMessage> {
     int m_numberErrors = 0;
     int m_numberWarnings = 0;
 
-    public void addError(int line,
-                         int col,
-                         String fmt,
-                         Object ... args) {
+    public void addError(ISourceLocation location,
+    				     String fmt,
+    				     Object ...args) {
         String msg = String.format(fmt, args);
-        m_errorMessages.add(new ErrorMessage(line,
-                                             col,
+        m_errorMessages.add(new ErrorMessage(location,
                                              Severity.Error,
                                              msg));
         m_numberErrors += 1;
     }
 
-    public void addWarning(int line, int col, String errorMessageFormat,
-            Object[] args) {
+    public void addWarning(ISourceLocation location,
+    					   String errorMessageFormat,
+    					   Object ...args) {
         String msg = String.format(errorMessageFormat, args);
-        m_errorMessages.add(new ErrorMessage(line,
-                                             col,
+        m_errorMessages.add(new ErrorMessage(location,
                                              Severity.Warning,
                                              msg));
         m_numberWarnings += 1;
