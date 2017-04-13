@@ -1,4 +1,4 @@
-gia#!/usr/bin/env bash
+#!/usr/bin/env bash
 
 # find voltdb binaries
 if [ -e ../../bin/voltdb ]; then
