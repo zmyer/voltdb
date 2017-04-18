@@ -201,6 +201,8 @@ public class AsyncCompilerAgentHelper
                 return retval;
             }
 
+            compilerLog.info("Catalog diff commands:(" + diff.commands() + ")");
+
             // since diff commands can be stupidly big, compress them here
             retval.encodedDiffCommands = Encoder.compressAndBase64Encode(diff.commands());
             retval.tablesThatMustBeEmpty = diff.tablesThatMustBeEmpty();

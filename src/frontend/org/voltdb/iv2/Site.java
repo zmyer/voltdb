@@ -1239,7 +1239,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             return true;
         }
 
+        hostLog.info("original diffCmds:(" + diffCmds + ")");
         diffCmds = CatalogUtil.getDiffCommandsForEE(diffCmds);
+        hostLog.info("diffCmds after skip EE JNI optimization:(" + diffCmds + ")");
+
         if (diffCmds.length() == 0) {
             // empty diff cmds for the EE to apply, so skip the JNI call
             hostLog.info("Skipped applying diff commands on EE.");
