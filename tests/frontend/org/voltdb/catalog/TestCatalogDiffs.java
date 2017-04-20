@@ -124,8 +124,7 @@ public class TestCatalogDiffs extends TestCase {
             assertEquals((boolean)worksWithElastic, diff.worksWithElastic());
         }
         if (expectedNewGeneration != null) {
-            //TODO: Enable real check.
-            assertEquals(true, diff.requiresNewExportGeneration());
+            assertEquals(expectedNewGeneration, diff.requiresNewExportGeneration());
         }
         if (execute) {
             String updatedOriginalSerialized = catOriginal.serialize();

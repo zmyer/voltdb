@@ -531,7 +531,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                  */
                 exportLog.info("Syncing first unpolled USO to " + uso + " for table "
                         + m_tableName + " partition " + m_partitionId);
-                m_firstUnpolledUso = uso;
+                ackImpl(m_firstUnpolledUso);
             }
         }
         if (sync) {
