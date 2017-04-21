@@ -520,6 +520,7 @@ public class ExportGeneration implements Generation {
                     for( ExportDataSource eds:
                         m_dataSourcesByPartition.get( partition).values()) {
                         eds.updateAckMailboxes(Pair.of(m_mbox, mailboxHsids));
+                        eds.forwardLastAckToOtherReplicas(m_mbox, mailboxHsids);
                     }
                 }
             }
@@ -595,6 +596,7 @@ public class ExportGeneration implements Generation {
                             ImmutableList<Long> mailboxHsids = mailboxes.build();
                             for( ExportDataSource eds: m_dataSourcesByPartition.get( partition).values()) {
                                 eds.updateAckMailboxes(Pair.of(m_mbox, mailboxHsids));
+                                eds.forwardLastAckToOtherReplicas(m_mbox, mailboxHsids);
                             }
                         } catch (Throwable t) {
                             VoltDB.crashLocalVoltDB("Error in export ack handling", true, t);
