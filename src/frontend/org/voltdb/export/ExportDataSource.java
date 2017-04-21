@@ -93,6 +93,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private SettableFuture<BBContainer> m_pollFuture;
     private final AtomicReference<Pair<Mailbox, ImmutableList<Long>>> m_ackMailboxRefs =
             new AtomicReference<Pair<Mailbox,ImmutableList<Long>>>(Pair.of((Mailbox)null, ImmutableList.<Long>builder().build()));
+    private long  m_lastForwardedUso = -1;
     private final Semaphore m_bufferPushPermits = new Semaphore(16);
 
     private final int m_nullArrayLength;
@@ -841,7 +842,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    private void forwardAckToOtherReplicas(long uso) {
+    private synchronized void forwardAckToOtherReplicas(long uso) {
         if (m_runEveryWhere && m_replicaRunning) {
            //we dont forward if we are running as replica in replicated export
            return;
@@ -866,6 +867,26 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             for( Long siteId: p.getSecond()) {
                 mbx.send(siteId, bpm);
             }
+        }
+         m_lastForwardedUso = uso;
+    }
+
+    public synchronized void forwardLastAckToOtherReplicas(Mailbox mbox, ImmutableList<Long> mailboxHsids) {
+        if (m_lastForwardedUso == -1) return;
+        final int msgLen = 4 + 4 + m_signatureBytes.length + 8 + 2;
+
+        ByteBuffer buf = ByteBuffer.allocate(msgLen);
+        buf.putInt(m_partitionId);
+        buf.putInt(m_signatureBytes.length);
+        buf.put(m_signatureBytes);
+        buf.putLong(m_lastForwardedUso);
+        buf.putShort((m_runEveryWhere ? (short )1 : (short )0));
+
+
+        BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
+
+        for( Long siteId: mailboxHsids) {
+            mbox.send(siteId, bpm);
         }
     }
 
