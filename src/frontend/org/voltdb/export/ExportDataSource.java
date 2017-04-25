@@ -868,7 +868,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (mbx != null && p.getSecond().size() > 0) {
             // partition:int(4) + length:int(4) +
             // signaturesBytes.length + ackUSO:long(8) + 2 bytes for runEverywhere or not.
-            final int msgLen = 4 + 4 + m_signatureBytes.length + 8 + 2;
+            final int msgLen = 4 + 4 + m_signatureBytes.length + 8 + 8 + 2;
 
             ByteBuffer buf = ByteBuffer.allocate(msgLen);
             buf.putInt(m_partitionId);
@@ -890,7 +890,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public synchronized void forwardLastAckToOtherReplicas(Mailbox mbox, ImmutableList<Long> mailboxHsids) {
         if (m_lastForwardedUso == -1) return;
-        final int msgLen = 4 + 4 + m_signatureBytes.length + 8 + 2;
+        final int msgLen = 4 + 4 + m_signatureBytes.length + 8 + 8 + 2;
 
         ByteBuffer buf = ByteBuffer.allocate(msgLen);
         buf.putInt(m_partitionId);
