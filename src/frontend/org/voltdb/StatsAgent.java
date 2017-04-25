@@ -565,6 +565,9 @@ public class StatsAgent extends OpsAgent
         case DRROLE:
             stats = collectStats(StatsSelector.DRROLE, false);
             break;
+        case GC:
+            stats = collectStats(StatsSelector.GC, interval);
+            break;
         default:
             // Should have been successfully groomed in collectStatsImpl().  Log something
             // for our information but let the null check below return harmlessly
@@ -692,6 +695,19 @@ public class StatsAgent extends OpsAgent
         }
         // reuse existing source
         return existingSource;
+    }
+
+    public void deregisterStatsSource(StatsSelector selector, long siteId, StatsSource source) {
+        assert selector != null;
+        assert source != null;
+        final NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>> siteIdToStatsSources =
+                m_registeredStatsSources.get(selector);
+        assert siteIdToStatsSources != null;
+
+        NonBlockingHashSet<StatsSource> statsSources = siteIdToStatsSources.get(siteId);
+        if (statsSources != null) {
+            statsSources.remove(source);
+        }
     }
 
     public void deregisterStatsSourcesFor(StatsSelector selector, long siteId) {

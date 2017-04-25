@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import junit.framework.TestCase;
 
@@ -542,11 +543,24 @@ public class TestNTProcs extends TestCase {
 
         System.out.println(statsT.toFormattedString());
 
-        Map<String, Long> stats = aggregateProcRow(client, NTProcWithFutures.class.getName());
-        assertEquals(CALL_COUNT + 1, stats.get("INVOCATIONS").longValue());
+        // repeatedly call stats until they match
+        long start = System.currentTimeMillis();
+        boolean found = false;
+        while (System.currentTimeMillis() - start < 20000) {
+            Map<String, Long> stats = aggregateProcRow(client, NTProcWithFutures.class.getName());
+            if ((CALL_COUNT + 1) == stats.get("INVOCATIONS").longValue()) {
+                found = true;
+                break;
+            }
+            Thread.sleep(1000);
+        }
 
         localServer.shutdown();
         localServer.join();
+
+        if (!found) {
+            fail();
+        }
     }
 
     //
@@ -677,6 +691,9 @@ public class TestNTProcs extends TestCase {
     public void testSlamNTProcs() throws Exception {
         ServerThread localServer = start();
 
+        final AtomicLong called = new AtomicLong(0);
+        final AtomicLong responded = new AtomicLong(0);
+
         Client client = ClientFactory.createClient();
         client.createConnection("localhost");
 
@@ -687,6 +704,7 @@ public class TestNTProcs extends TestCase {
         final ProcedureCallback firehoseCallback = new ProcedureCallback() {
             @Override
             public void clientCallback(ClientResponse clientResponse) throws Exception {
+                responded.incrementAndGet();
                 if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
                     ClientResponseImpl cri = (ClientResponseImpl) clientResponse;
                     System.err.println(cri.toJSONString());
@@ -706,7 +724,8 @@ public class TestNTProcs extends TestCase {
                                                      "TestNTProcs$TrivialNTProc",
                                                      new byte[0], // params
                                                      NTProcThatSlams.COLLECT_ASYNC,
-                                                     20);
+                                                     1);
+                        called.incrementAndGet();
                     } catch (IOException e) {
                         // TODO Auto-generated catch block
                         e.printStackTrace();
@@ -720,11 +739,20 @@ public class TestNTProcs extends TestCase {
                 }
             }
         };
+
         firehoseThread.start();
 
+        long nanoTime1 = System.nanoTime();
         Thread.sleep(5000);
+        long nanoTime2 = System.nanoTime();
+        long nowCalled = called.get(); long nowResponsed = responded.get();
+        System.out.printf("Ran for %.2f seconds. Called %d procs with %d responded and %d outstanding.\n",
+                (nanoTime2 - nanoTime1) / 1000000000.0, nowCalled, nowResponsed, nowCalled - nowResponsed);
         keepFirehosing.set(false);
         firehoseThread.join();
+        long nanoTime3 = System.nanoTime();
+        System.out.printf("Drained for %.2f seconds. %d responded.\n",
+                (nanoTime3 - nanoTime2) / 1000000000.0, nowCalled - nowResponsed);
 
         // CHECK STATS
         VoltTable statsT = getStats(client, "PROCEDURE");

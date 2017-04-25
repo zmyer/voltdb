@@ -35,6 +35,7 @@ import java.util.NavigableSet;
 import java.util.Queue;
 import java.util.TimeZone;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.SSLContext;
 
@@ -64,6 +65,7 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.net.HostAndPort;
+import org.voltdb.utils.VoltTrace;
 
 /**
  * VoltDB provides main() for the VoltDB server
@@ -978,6 +980,9 @@ public class VoltDB {
         }
 
         public static String getPathToCatalogForTest(String jarname) {
+            if (jarname == null) {
+                return null; // NewCLI tests that init with schema do not want a pre-compiled catalog
+            }
 
             // first try to get the "right" place to put the thing
             if (System.getenv("TEST_DIR") != null) {
@@ -1213,6 +1218,12 @@ public class VoltDB {
                 if (!turnOffClientInterface()) {
                     return; // this will jump to the finally block and die faster
                 }
+
+                // Flush trace files
+                try {
+                    VoltTrace.closeAllAndShutdown(new File(instance().getVoltDBRootPath(), "trace_logs").getAbsolutePath(),
+                                                  TimeUnit.SECONDS.toMillis(10));
+                } catch (IOException e) {}
 
                 // Even if the logger is null, don't stop.  We want to log the stack trace and
                 // any other pertinent information to a .dmp file for crash diagnosis
