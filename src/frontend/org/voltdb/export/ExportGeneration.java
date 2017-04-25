@@ -444,8 +444,13 @@ public class ExportGeneration implements Generation {
                     buf.get(stringBytes);
                     String signature = new String(stringBytes, Constants.UTF8ENCODING);
                     final long ackUSO = buf.getLong();
+                    final long generation = buf.getLong();
                     final boolean runEveryWhere = (buf.getShort() == (short )1);
 
+                    if (generation != m_timestamp) {
+                        exportLog.error("Received an export ack for generation " + generation +
+                                " which is not current generation = " + m_timestamp);
+                    }
                     final Map<String, ExportDataSource> partitionSources = m_dataSourcesByPartition.get(partition);
                     if (partitionSources == null) {
                         exportLog.error("Received an export ack for partition " + partition +

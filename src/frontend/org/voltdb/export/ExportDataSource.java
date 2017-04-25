@@ -875,6 +875,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             buf.putInt(m_signatureBytes.length);
             buf.put(m_signatureBytes);
             buf.putLong(uso);
+            buf.putLong(m_generation);
             buf.putShort((m_runEveryWhere ? (short )1 : (short )0));
 
 
@@ -896,6 +897,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         buf.putInt(m_signatureBytes.length);
         buf.put(m_signatureBytes);
         buf.putLong(m_lastForwardedUso);
+        buf.putLong(m_generation);
         buf.putShort((m_runEveryWhere ? (short )1 : (short )0));
 
 
