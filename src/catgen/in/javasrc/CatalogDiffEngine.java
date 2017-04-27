@@ -446,6 +446,7 @@ public class CatalogDiffEngine {
         if (suspect instanceof User ||
             suspect instanceof Group ||
             suspect instanceof Procedure ||
+            suspect instanceof Function ||
             suspect instanceof SnapshotSchedule ||
             // refs are safe to add drop if the thing they reference is
             suspect instanceof ConstraintRef ||
@@ -1545,6 +1546,7 @@ public class CatalogDiffEngine {
      */
     enum DiffClass {
         PROC (Procedure.class),
+        FUNC (Function.class),
         TABLE (Table.class),
         USER (User.class),
         GROUP (Group.class),
@@ -1679,6 +1681,9 @@ public class CatalogDiffEngine {
             }
         };
         wroteChanges |= basicMetaChangeDesc(sb, "PROCEDURE CHANGES:", DiffClass.PROC, crudProcFilter, null);
+
+        // DESCRIBE FUNCTION CHANGES
+        wroteChanges |= basicMetaChangeDesc(sb, "FUNCTION CHANGES:", DiffClass.FUNC, null, null);
 
         // DESCRIBE GROUP CHANGES
         wroteChanges |= basicMetaChangeDesc(sb, "GROUP CHANGES:", DiffClass.GROUP, null, null);
