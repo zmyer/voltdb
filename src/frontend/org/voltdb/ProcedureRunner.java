@@ -381,6 +381,8 @@ public class ProcedureRunner {
                         results = new VoltTable[] { table };
                     }
                     else {
+                        /* For debug only, attach sql statement onto client response */
+                        m_appStatusString = m_cachedSingleStmt.stmt.getText() + "(" + m_cachedSingleStmt.params.toString() + ")";
                         m_batch.add(m_cachedSingleStmt);
                         results = voltExecuteSQL(true);
                     }

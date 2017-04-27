@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.utils.MiscUtils;
@@ -42,8 +43,8 @@ public class SysProcDuplicateCounter extends DuplicateCounter
     SysProcDuplicateCounter(
             long destinationHSId,
             long realTxnId,
-            List<Long> expectedHSIds, String procName)    {
-        super(destinationHSId, realTxnId, expectedHSIds, procName);
+            List<Long> expectedHSIds, StoredProcedureInvocation invocation)    {
+        super(destinationHSId, realTxnId, expectedHSIds, invocation);
     }
 
     /**

@@ -26,6 +26,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -48,30 +49,22 @@ public class DuplicateCounter
     protected VoltTable m_lastResultTables[] = null;
     final List<Long> m_expectedHSIds;
     final long m_txnId;
-    private final String m_storedProcName;
+    private final StoredProcedureInvocation m_invocation;
 
     DuplicateCounter(
             long destinationHSId,
             long realTxnId,
-            List<Long> expectedHSIds, String procName)    {
+            List<Long> expectedHSIds,
+            StoredProcedureInvocation invocation)    {
         m_destinationId = destinationHSId;
         m_txnId = realTxnId;
         m_expectedHSIds = new ArrayList<Long>(expectedHSIds);
-        m_storedProcName = procName;
+        m_invocation = invocation;
     }
 
     long getTxnId()
     {
         return m_txnId;
-    }
-
-    /**
-     * Return stored procedure name for the transaction.
-     *
-     * @return
-     */
-    public String getStoredProcedureName() {
-        return m_storedProcName;
     }
 
     int updateReplicas(List<Long> replicas) {
@@ -92,7 +85,7 @@ public class DuplicateCounter
                 m_responseHash = Long.valueOf(hash);
             }
             else if (!m_responseHash.equals(hash)) {
-                tmLog.fatal("Stored procedure " + getStoredProcedureName()
+                tmLog.fatal("Stored procedure " + m_invocation == null? "MP_DETERMINISM_ERROR" : m_invocation.toString()
                         + " generated different SQL queries at different partitions."
                         + " Shutting down to preserve data integrity.");
                 String msg = String.format("HASH MISMATCH COMPARING: %d to %d\n"
