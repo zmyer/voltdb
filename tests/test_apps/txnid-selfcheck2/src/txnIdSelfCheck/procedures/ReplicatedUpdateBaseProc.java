@@ -41,7 +41,7 @@ public class ReplicatedUpdateBaseProc extends UpdateBaseProc {
             "INSERT INTO replicated (txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocinc, adhocjmp, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
     public final SQLStmt r_export = new SQLStmt(
-            "INSERT INTO replicated_export (txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocinc, adhocjmp, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+            "INSERT INTO replicated_export (txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocinc, adhocjmp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
     public final SQLStmt r_getViewData = new SQLStmt(
             "SELECT * FROM replview WHERE cid=? ORDER BY cid DESC;");
