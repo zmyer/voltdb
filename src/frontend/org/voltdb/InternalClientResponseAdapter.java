@@ -126,6 +126,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                 //Handle failure of transaction due to node kill
                 // JHH: I feel like this needs more explanation. Are we
                 // just restarting the transaction here? Why? Safe?
+                // BSDBG if this fails, we aren't doing anything at all (including call the callback). This was logged in the stats as a retry.
                 createTransaction(
                         m_kattrs,
                         m_task.getProcName(),
@@ -258,6 +259,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             synchronized (this) {
                 final int serializedSize = ds.getSerializedSize();
                 if (serializedSize <= 0) {
+                    rateLimitedLog(Level.WARN, null, "BSDBG: InternalClientResponseAdapter.enqueue() ignoring bad transaction");
                     //Bad ignored transacton.
                     return;
                 }

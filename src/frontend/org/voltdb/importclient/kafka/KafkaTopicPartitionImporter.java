@@ -734,6 +734,9 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             final int maxAttempts = (int) (TimeUnit.SECONDS.toMillis(KAFKA_IMPORTER_MAX_SHUTDOWN_WAIT_TIME_SECONDS) / attemptIntervalMs);
             int attemptCount = 0;
             while (m_workProduced != m_workConsumed.longValue() && attemptCount < maxAttempts) {
+                if (m_workProduced < m_workConsumed.longValue()) {
+                     warn("BSDBG: workProduced (" + m_workProduced + ") < workConsumed (" + m_workConsumed.longValue() + ")");
+                }
                 try {
                     Thread.sleep(attemptIntervalMs);
                 } catch (InterruptedException unexpected) {
@@ -803,7 +806,11 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
 
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
-
+            // BSDBG: RESPONSE_UNKNOWN indicates that procedure will be retried. A new callback will be called for that procedure.
+            if (response.getStatus() == ClientResponse.RESPONSE_UNKNOWN) {
+                rateLimitedLog("BSDBG: got RESPONSE_UNKNOWN in importer callback");
+            }
+      //      if (response.getStatus() != ClientResponse.RESPONSE_UNKNOWN) {
             m_callbackTracker.consumeWork();
             if (!m_dontCommit.get() && response.getStatus() != ClientResponse.SERVER_UNAVAILABLE) {
                 m_tracker.commit(m_nextoffset);
@@ -811,6 +818,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             if (response.getStatus() == ClientResponse.SERVER_UNAVAILABLE) {
                 m_pauseOffset.accumulateAndGet(m_offset, new PausedOffsetCalculator());
             }
+       //     }
         }
     }
 }

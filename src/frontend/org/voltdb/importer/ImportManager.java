@@ -95,6 +95,7 @@ public class ImportManager implements ChannelChangeCallback {
      * @throws org.osgi.framework.BundleException
      * @throws java.io.IOException
      */
+    // BSDBG: do-once work followed by a call to create()
     public static synchronized void initialize(int myHostId, CatalogContext catalogContext, HostMessenger messenger) throws BundleException, IOException {
         ImporterStatsCollector statsCollector = new ImporterStatsCollector(myHostId);
         ImportManager em = new ImportManager(myHostId, messenger, statsCollector);
@@ -112,6 +113,7 @@ public class ImportManager implements ChannelChangeCallback {
      * @param myHostId
      * @param catalogContext
      */
+    // BSDBG: launches importers
     private synchronized void create(int myHostId, CatalogContext catalogContext) {
         try {
             ImportType importElement = catalogContext.getDeployment().getImport();
