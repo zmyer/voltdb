@@ -127,7 +127,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                 // JHH: I feel like this needs more explanation. Are we
                 // just restarting the transaction here? Why? Safe?
                 // BSDBG if this fails, we aren't doing anything at all (including call the callback). This was logged in the stats as a retry.
-                createTransaction(
+                boolean result = createTransaction(
                         m_kattrs,
                         m_task.getProcName(),
                         m_proc, m_cb,
@@ -137,6 +137,11 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                         m_partition,
                         false,
                         null);
+                if (result){
+                    rateLimitedLog(Level.WARN, null, "BSDBG: Retried RESPONSE_UNKNOWN txn successfully");
+                } else {
+                    rateLimitedLog(Level.WARN, null, "BSDBG: Retried RESPONSE_UNKNOWN txn and it failed!");
+                }
             }
         }
 
