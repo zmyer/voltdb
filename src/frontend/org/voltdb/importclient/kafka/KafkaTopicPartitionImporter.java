@@ -716,7 +716,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
      * Allows any number of consumers.
      * Allows reporting of the number of work items consumed as a statistic.
      */
-    private static class PendingWorkTracker {
+    private class PendingWorkTracker {
         private volatile long m_workProduced = 0;
         private LongAdder     m_workConsumed = new LongAdder();
 
@@ -735,7 +735,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             int attemptCount = 0;
             while (m_workProduced != m_workConsumed.longValue() && attemptCount < maxAttempts) {
                 if (m_workProduced < m_workConsumed.longValue()) {
-                     warn("BSDBG: workProduced (" + m_workProduced + ") < workConsumed (" + m_workConsumed.longValue() + ")");
+                     warn(null, "BSDBG: workProduced (" + m_workProduced + ") < workConsumed (" + m_workConsumed.longValue() + ")");
                 }
                 try {
                     Thread.sleep(attemptIntervalMs);
@@ -767,9 +767,20 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     {
     }
 
+    private static class PausedOffsetCalculator implements LongBinaryOperator {
+        @Override
+        public long applyAsLong(long currentValue, long givenUpdate) {
+            if (currentValue == -1){
+                return givenUpdate;
+            } else {
+                return Math.min(currentValue, givenUpdate);
+            }
+        }
+    }
+
     //Per topic per partition that we are responsible for.
     //Callback for each invocation we have submitted.
-    private final static class TopicPartitionInvocationCallback implements ProcedureCallback
+    private final class TopicPartitionInvocationCallback implements ProcedureCallback
     {
         private final long m_nextoffset;
         private final long m_offset;
@@ -793,22 +804,11 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             m_pauseOffset = pauseOffset;
         }
 
-        private static class PausedOffsetCalculator implements LongBinaryOperator {
-            @Override
-            public long applyAsLong(long currentValue, long givenUpdate) {
-                if (currentValue == -1){
-                    return givenUpdate;
-                } else {
-                    return Math.min(currentValue, givenUpdate);
-                }
-            }
-        }
-
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
             // BSDBG: RESPONSE_UNKNOWN indicates that procedure will be retried. A new callback will be called for that procedure.
             if (response.getStatus() == ClientResponse.RESPONSE_UNKNOWN) {
-                rateLimitedLog("BSDBG: got RESPONSE_UNKNOWN in importer callback");
+                rateLimitedLog(Level.WARN, null, "BSDBG: got RESPONSE_UNKNOWN in importer callback");
             }
       //      if (response.getStatus() != ClientResponse.RESPONSE_UNKNOWN) {
             m_callbackTracker.consumeWork();
