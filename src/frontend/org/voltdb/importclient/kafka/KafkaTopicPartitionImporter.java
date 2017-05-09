@@ -104,7 +104,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         if (m_config.getCommitPolicy() == KafkaImporterCommitPolicy.TIME && m_config.getTriggerValue() > 0)
             m_gapTracker = new SimpleTracker();
         else
-            m_gapTracker = new DurableTracker(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768));
+            m_gapTracker = new DurableTracker(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 500_000)); //32_768)); // BSDBG: Sacrifice performance to see if eliminating overflows fixes the test
     }
 
     @Override

@@ -716,6 +716,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 }
                 // wait for the last write to complete
                 for (SetNodeChannels setter: setters) {
+                    // BSDBG: is this a problem? The whole job gets rerun if any part fails, but all it does is set directories in Zookeeper.
                     if (setter.getCallbackCode() != Code.OK && !m_done.get()) {
                         LOG.warn(
                                 "LEADER (" + m_hostId
