@@ -195,19 +195,10 @@ class CSVFileReader implements Runnable {
                     return false;
                 }
             }
-            // whether column num matches.
-            if (headerlen < m_columnCount) {
-                return false;
-            } else {
-                // whether column name has according table column.
-                int matchColCount = 0;
-                for (String name : firstset) {
-                    if (colNames.containsValue(name.trim())) {
-                        matchColCount++;
-                    }
-                }
-                if (matchColCount != m_columnCount) {
-                    return false;
+            int matchColCount = 0;
+            for (String name : firstset) {
+                if (colNames.containsValue(name.trim())) {
+                    matchColCount++;
                 }
             }
             // get the mapping from file column num to table column num.
