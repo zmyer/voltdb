@@ -1386,17 +1386,91 @@ public class TestCSVLoader {
                 "--header",
                 "BlAh"
         };
-        // This data is missing a few columns. That's OK, we'll just insert the columns we have in the CSV
+        // This data is missing a few columns. That's OK, we'll just insert the columns we have in the CSV. Note: If we don't supply clm_integer,
+        // the insert will be rejected due to a column constraint violation ("not null").
         String []myData = {
-                "clm_tinyint,clm_string,clm_decimal,clm_float,clm_point,clm_geography",
+                "clm_integer, clm_string,clm_decimal,clm_float,clm_point,clm_geography",
                 "1,first,1.10,1.11,POINT(1 1),\"POLYGON((0 0, 1 0, 0 1, 0 0))\"",
                 "2,second,3.30,NULL,POINT(2 2),\"POLYGON((0 0, 2 0, 0 2, 0 0))\"",
                 "3, third ,NULL, 3.33,POINT(3 3),\"POLYGON((0 0, 3 0, 0 3, 0 0))\"",
                 "4, NULL ,4.40 ,4.44,POINT(4 4),\"POLYGON((0 0, 4 0, 0 4, 0 0))\"",
                 "5,  \"abcde\"g, 5.50, 5.55,POINT(5 5),\"POLYGON((0 0, 5 0, 0 5, 0 0))\"",
                 "6, sixth, 6.60, 6.66,POINT(6 6),\"POLYGON((0 0, 6 0, 0 6, 0 0))\"",
-                "NULL, seventh, 7.70, 7.77,POINT(7 7),\"POLYGON((0 0, 7 0, 0 7, 0 0))\"",
-                "1,first,1.10,1.11,POINT(1 1),\"POLYGON((0 0, 8 0, 0 8, 0 0))\"",
+                "7, seventh, 7.70, 7.77,POINT(7 7),\"POLYGON((0 0, 7 0, 0 7, 0 0))\"",
+                "8,eighth,1.10,1.11,POINT(1 1),\"POLYGON((0 0, 8 0, 0 8, 0 0))\"",
+        };
+        int invalidLineCnt = 0;
+        int validLineCnt = 8;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
+    }
+
+    @Test
+    public void testHeaderColumnMissingOutOfOrder() throws Exception
+    {
+        // ENG-11098: csvloader --header doesn't work if the CSV is missing columns from the schema.
+
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--maxerrors=50",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--limitrows=100",
+                "--header",
+                "BlAh"
+        };
+        // This data is missing a few columns. That's OK, we'll just insert the columns we have in the CSV. Note: If we don't supply clm_integer,
+        // the insert will be rejected due to a column constraint violation ("not null").
+        String []myData = {
+                "clm_string, clm_integer, clm_decimal",
+                "first, 1, 1.10",
+                "second, 2, 3.30",
+                "third, 3, NULL",
+                "NULL, 4, 4.40",
+                "\"abcde\"g, 5, 5.50",
+                "sixth, 6, 6.60",
+                "seventh, 7, 7.70",
+                "eighth, 8, 1.10",
+        };
+        int invalidLineCnt = 0;
+        int validLineCnt = 8;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
+    }
+
+    @Test
+    public void testHeaderColumnMissingNotNullColumn() throws Exception
+    {
+        // ENG-11098: csvloader --header doesn't work if the CSV is missing columns from the schema.
+
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--maxerrors=50",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--limitrows=100",
+                "--header",
+                "BlAh"
+        };
+        // The fact that clm_integer, a required not-null column, is missing means that no data will be imported.
+        String []myData = {
+                "clm_string, clm_decimal",
+                "first, 1.10",
+                "second, 3.30",
+                "third, NULL",
+                "NULL, 4.40",
+                "\"abcde\"g, 5.50",
+                "sixth, 6.60",
+                "seventh, 7.70",
+                "eighth, 1.10",
         };
         int invalidLineCnt = 8;
         int validLineCnt = 0;
