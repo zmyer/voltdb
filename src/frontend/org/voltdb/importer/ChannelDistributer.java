@@ -716,7 +716,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 }
                 // wait for the last write to complete
                 for (SetNodeChannels setter: setters) {
-                    // BSDBG: is this a problem? The whole job gets rerun if any part fails, but all it does is set directories in Zookeeper.
+                    // BSDBG: this is the problem? The whole job gets rerun if any part fails, resulting in the assignments being seen twice.
                     if (setter.getCallbackCode() != Code.OK && !m_done.get()) {
                         LOG.warn(
                                 "LEADER (" + m_hostId
@@ -1251,7 +1251,11 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
                 } while (!m_specs.compareAndSet(prev, mbldr.build(), sstamp[0], sstamp[0]+1));
 
+                // BSDBG: CAS+Stamp has guaranteed ordering of the map, but what happens if the code AFTER this runs out of order?
+
                 if (hval.equals(m_hostId) && !m_done.get()) {
+                    // BSDBG: This is the only place a new ImporterChannelAssignment is created.
+                    // Start here when pulling apart code.
                     ChannelAssignment assignment = new ChannelAssignment(
                             oldspecs, nspecs, stat.getVersion()
                             );
