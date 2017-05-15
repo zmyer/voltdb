@@ -96,3 +96,6 @@ SELECT VCHAR likeQ23 FROM @fromtables WHERE VCHAR _maybe LIKE _patterns3 ESCAPE 
 SELECT VCHAR likeQ24 FROM @fromtables WHERE VCHAR _maybe LIKE _patterns4 ESCAPE '!'
 SELECT VCHAR likeQ25 FROM @fromtables WHERE VCHAR _maybe LIKE _patterns5 ESCAPE '!'
 SELECT VCHAR likeQ26 FROM @fromtables WHERE VCHAR _maybe LIKE _patterns6 ESCAPE '!'
+
+<advanced-update.sql>
+<advanced-delete.sql>
