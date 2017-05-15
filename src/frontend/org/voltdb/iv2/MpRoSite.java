@@ -39,6 +39,7 @@ import org.voltdb.PartitionDRGateway;
 import org.voltdb.PostGISBackend;
 import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
+import org.voltdb.SQLStmt;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
 import org.voltdb.StatsSelector;
@@ -56,6 +57,7 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 
@@ -227,7 +229,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context,
-                CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation, long uniqueId, long spHandle)
+                CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation, long uniqueId, long spHandle,
+                boolean requireCatalogDiffCmdsApplyToEE, boolean requiresNewExportGeneration)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -288,6 +291,16 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
+        public void resetDrAppliedTracker(byte clusterId) {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
+        public boolean hasRealDrAppliedTracker(byte clusterId) {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
         public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap) {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -297,6 +310,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
+
         @Override
         public Pair<Long, Long> getDrLastAppliedUniqueIds()
         {
@@ -396,11 +410,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         m_shouldContinue = false;
     }
 
-    void shutdown()
-    {
-        if (m_non_voltdb_backend != null) {
-            m_non_voltdb_backend.shutdownInstance();
-        }
+    void shutdown() {
     }
 
     //
@@ -570,19 +580,26 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public VoltTable[] executePlanFragments(
+    public FastDeserializer executePlanFragments(
             int numFragmentIds,
             long[] planFragmentIds,
             long[] inputDepIds,
             Object[] parameterSets,
-            String[] sqlTexts,
+            DeterminismHash determinismHash,
+            SQLStmt[] stmts,
             long txnId,
             long spHandle,
             long uniqueId,
-            boolean readOnly)
+            boolean readOnly,
+            boolean traceOn)
             throws EEException
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
+    public boolean usingFallbackBuffer() {
+        return false;
     }
 
     @Override

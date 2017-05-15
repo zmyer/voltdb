@@ -233,6 +233,7 @@ public class AsyncCompilerAgentHelper
             String commands = diff.commands();
             compilerLog.info(diff.getDescriptionOfChanges(updatedClass));
 
+            retval.requireCatalogDiffCmdsApplyToEE = diff.requiresCatalogDiffCmdsApplyToEE();
             // since diff commands can be stupidly big, compress them here
             retval.encodedDiffCommands = Encoder.compressAndBase64Encode(commands);
             retval.diffCommandsLength = commands.length();
@@ -242,6 +243,7 @@ public class AsyncCompilerAgentHelper
             retval.tablesThatMustBeEmpty = emptyTablesAndReasons[0];
             retval.reasonsForEmptyTables = emptyTablesAndReasons[1];
             retval.requiresSnapshotIsolation = diff.requiresSnapshotIsolation();
+            retval.requiresNewExportGeneration = diff.requiresNewExportGeneration();
             retval.worksWithElastic = diff.worksWithElastic();
         }
         catch (Exception e) {

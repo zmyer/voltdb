@@ -126,9 +126,13 @@ public class CatalogDiffEngine {
     // true if the difference is allowed in a running system
     private boolean m_supported;
 
+    private boolean m_requiresCatalogDiffCmdsApplyToEE = false;
+
     // true if table changes require the catalog change runs
     // while no snapshot is running
     private boolean m_requiresSnapshotIsolation = false;
+    // true if export needs new generation.
+    private boolean m_requiresNewExportGeneration = false;
 
     private final SortedMap<String, TablePopulationRequirements> m_tablesThatMustBeEmpty = new TreeMap<>();
 
@@ -208,12 +212,24 @@ public class CatalogDiffEngine {
         return m_supported;
     }
 
+    public boolean requiresCatalogDiffCmdsApplyToEE() {
+        return m_requiresCatalogDiffCmdsApplyToEE;
+    }
+
     /**
      * @return true if table changes require the catalog change runs
      * while no snapshot is running.
      */
     public boolean requiresSnapshotIsolation() {
         return m_requiresSnapshotIsolation;
+    }
+
+    /**
+     * @return true if changes require export generation to be updated.
+     */
+    public boolean requiresNewExportGeneration() {
+        // TODO: return m_requiresNewExportGeneration;
+        return true;
     }
 
     public String[][] tablesThatMustBeEmpty() {
@@ -417,23 +433,6 @@ public class CatalogDiffEngine {
     }
 
     /**
-     * If it is not a new table make sure that the soon to be exported
-     * table is empty or has no tuple allocated memory associated with it
-     *
-     * @param tName table name
-     */
-    private void trackExportOfAlreadyExistingTables(String tName) {
-        if (tName == null || tName.trim().isEmpty()) return;
-        if (!m_newTablesForExport.contains(tName)) {
-            String errorMessage = String.format(
-                    "Unable to change table %s to an export table because the table is not empty",
-                    tName
-                    );
-            m_tablesThatMustBeEmpty.put(tName, new TablePopulationRequirements(tName, tName, errorMessage));
-        }
-    }
-
-    /**
      * Check if an addition or deletion can be safely completed
      * in any database state.
      *
@@ -454,6 +453,7 @@ public class CatalogDiffEngine {
         if (suspect instanceof User ||
             suspect instanceof Group ||
             suspect instanceof Procedure ||
+            suspect instanceof Function ||
             suspect instanceof SnapshotSchedule ||
             // refs are safe to add drop if the thing they reference is
             suspect instanceof ConstraintRef ||
@@ -472,6 +472,10 @@ public class CatalogDiffEngine {
 
         else if (suspect instanceof Table) {
             if (ChangeType.DELETION == changeType) {
+                Table tbl = (Table)suspect;
+                if (CatalogUtil.isTableExportOnly((Database)tbl.getParent(), tbl)) {
+                    m_requiresNewExportGeneration = true;
+                }
                 // No special guard against dropping a table or view
                 // (although some procedures may fail to plan)
                 return null;
@@ -485,6 +489,7 @@ public class CatalogDiffEngine {
             if (CatalogUtil.isTableExportOnly((Database)tbl.getParent(), tbl)) {
                 // Remember that it's a new export table.
                 m_newTablesForExport.add(tbl.getTypeName());
+                m_requiresNewExportGeneration = true;
             }
 
             String viewName = null;
@@ -519,22 +524,17 @@ public class CatalogDiffEngine {
         }
 
         else if (suspect instanceof Connector) {
-            if (ChangeType.ADDITION == changeType) {
-                for (ConnectorTableInfo cti: ((Connector)suspect).getTableinfo()) {
-                    trackExportOfAlreadyExistingTables(cti.getTable().getTypeName());
-                }
-            }
+            m_requiresNewExportGeneration = true;
             return null;
         }
 
         else if (suspect instanceof ConnectorTableInfo) {
-            if (ChangeType.ADDITION == changeType) {
-                trackExportOfAlreadyExistingTables(((ConnectorTableInfo)suspect).getTable().getTypeName());
-            }
+            m_requiresNewExportGeneration = true;
             return null;
         }
 
         else if (suspect instanceof ConnectorProperty) {
+            m_requiresNewExportGeneration = true;
             return null;
         }
 
@@ -585,12 +585,20 @@ public class CatalogDiffEngine {
         // of certain unique indexes that might fail if created
         else if (suspect instanceof Index) {
             Index index = (Index) suspect;
-            if (!index.m_unique) {
+
+            // it's cool to remove indexes
+            if (changeType == ChangeType.DELETION) {
                 return null;
             }
 
-            // it's cool to remove unique indexes
-            if (changeType == ChangeType.DELETION) {
+            if (! index.getIssafewithnonemptysources()) {
+                return "Unable to create index " + index.getTypeName() +
+                       " while the table contains data." +
+                       " The index definition uses operations that cannot be applied " +
+                       "if table " + index.getParent().getTypeName() + " is not empty.";
+            }
+
+            if (! index.getUnique()) {
                 return null;
             }
 
@@ -656,17 +664,24 @@ public class CatalogDiffEngine {
         // handle adding an index - presumably unique
         if (suspect instanceof Index) {
             Index idx = (Index) suspect;
-            assert(idx.getUnique());
-
             String indexName = idx.getTypeName();
             retval = new TablePopulationRequirements(indexName);
             String tableName = idx.getParent().getTypeName();
             retval.addTableName(tableName);
-            retval.setErrorMessage(
-                    String.format(
-                            "Unable to add unique index %s because table %s is not empty.",
-                            indexName,
-                            tableName));
+
+            if (! idx.getIssafewithnonemptysources()) {
+                retval.setErrorMessage("Unable to create index " + indexName +
+                                       " while the table contains data." +
+                                       " The index definition uses operations that cannot be applied " +
+                                       "if table " + tableName + " is not empty.");
+            }
+            else if (idx.getUnique()) {
+                retval.setErrorMessage(
+                        String.format(
+                                "Unable to add unique index %s because table %s is not empty.",
+                                indexName,
+                                tableName));
+            }
             return retval;
         }
 
@@ -886,6 +901,8 @@ public class CatalogDiffEngine {
             return null;
         if (suspect instanceof Cluster && field.equals("drConsumerEnabled"))
             return null;
+        if (suspect instanceof Cluster && field.equals("preferredSource"))
+            return null;
         if (suspect instanceof Connector && "enabled".equals(field))
             return null;
         if (suspect instanceof Connector && "loaderclass".equals(field))
@@ -1062,6 +1079,7 @@ public class CatalogDiffEngine {
             }
             // allow export connector property changes
             if (parent instanceof Connector && suspect instanceof ConnectorProperty) {
+                m_requiresNewExportGeneration = true;
                 return null;
             }
 
@@ -1223,6 +1241,10 @@ public class CatalogDiffEngine {
             processModifyResponses(errorMessage, responseList);
         }
 
+        if (! m_requiresCatalogDiffCmdsApplyToEE && checkCatalogDiffShouldApplyToEE(newType)) {
+            m_requiresCatalogDiffCmdsApplyToEE = true;
+        }
+
         // write the commands to make it so
         // they will be ignored if the change is unsupported
         newType.writeCommandForField(m_sb, field, true);
@@ -1236,6 +1258,57 @@ public class CatalogDiffEngine {
         }
         CatalogChangeGroup cgrp = m_changes.get(DiffClass.get(newType));
         cgrp.processChange(newType, prevType, field);
+    }
+
+    /**
+     * Our EE has a list of Catalog items that are in use, but Java catalog contains much more.
+     * Some of the catalog diff commands will only be useful to Java. So this function will
+     * decide whether the @param suspect catalog item will be used in EE or not.
+     * @param suspect
+     * @param prevType
+     * @param field
+     * @return true if the suspect catalog will be updated in EE, false otherwise.
+     */
+    protected static boolean checkCatalogDiffShouldApplyToEE(final CatalogType suspect)
+    {
+        // Warning:
+        // This check list should be consistent with catalog items defined in EE
+        // Once a new catalog type is added in EE, we should add it here.
+
+        if (suspect instanceof Cluster || suspect instanceof Database) {
+            return true;
+        }
+
+        if (suspect instanceof Table ||
+                suspect instanceof Column || suspect instanceof ColumnRef ||
+                suspect instanceof Index || suspect instanceof IndexRef ||
+                suspect instanceof Constraint || suspect instanceof ConstraintRef ||
+                suspect instanceof MaterializedViewInfo) {
+            return true;
+        }
+
+        // Statement can be children of Table or MaterilizedViewInfo, which should apply to EE
+        // But if they are under Procedure, we can skip them.
+        if (suspect instanceof Statement && (suspect.getParent() instanceof Procedure == false)) {
+            return true;
+        }
+
+        // PlanFragment is a similar case like Statement
+        if (suspect instanceof PlanFragment && suspect.getParent() instanceof Statement &&
+                (suspect.getParent().getParent() instanceof Procedure == false)) {
+            return true;
+        }
+
+        if (suspect instanceof Connector ||
+                suspect instanceof ConnectorProperty ||
+                suspect instanceof ConnectorTableInfo) {
+            // export table related change, should not skip EE
+            return true;
+        }
+
+        // The other changes in the catalog will not be applied to EE,
+        // including User, Group, Procedures, etc
+        return false;
     }
 
     /**
@@ -1299,6 +1372,10 @@ public class CatalogDiffEngine {
             processModifyResponses(errorMessage, responseList);
         }
 
+        if (! m_requiresCatalogDiffCmdsApplyToEE && checkCatalogDiffShouldApplyToEE(prevType)) {
+            m_requiresCatalogDiffCmdsApplyToEE = true;
+        }
+
         // write the commands to make it so
         // they will be ignored if the change is unsupported
         m_sb.append("delete ").append(prevType.getParent().getCatalogPath()).append(" ");
@@ -1331,10 +1408,14 @@ public class CatalogDiffEngine {
             processModifyResponses(errorMessage, responseList);
         }
 
+        if (! m_requiresCatalogDiffCmdsApplyToEE && checkCatalogDiffShouldApplyToEE(newType)) {
+            m_requiresCatalogDiffCmdsApplyToEE = true;
+        }
+
         // write the commands to make it so
         // they will be ignored if the change is unsupported
         newType.writeCreationCommand(m_sb);
-        newType.writeFieldCommands(m_sb);
+        newType.writeFieldCommands(m_sb, null);
         newType.writeChildCommands(m_sb);
 
         // add it to the set of additions to later compute descriptive text
@@ -1537,6 +1618,7 @@ public class CatalogDiffEngine {
      */
     enum DiffClass {
         PROC (Procedure.class),
+        FUNC (Function.class),
         TABLE (Table.class),
         USER (User.class),
         GROUP (Group.class),
@@ -1671,6 +1753,9 @@ public class CatalogDiffEngine {
             }
         };
         wroteChanges |= basicMetaChangeDesc(sb, "PROCEDURE CHANGES:", DiffClass.PROC, crudProcFilter, null);
+
+        // DESCRIBE FUNCTION CHANGES
+        wroteChanges |= basicMetaChangeDesc(sb, "FUNCTION CHANGES:", DiffClass.FUNC, null, null);
 
         // DESCRIBE GROUP CHANGES
         wroteChanges |= basicMetaChangeDesc(sb, "GROUP CHANGES:", DiffClass.GROUP, null, null);
