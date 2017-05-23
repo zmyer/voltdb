@@ -466,7 +466,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         Invocation invocation = new Invocation(m_config.getProcedure(), formatter.transform(line));
                         TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(
                                 messageAndOffset.nextOffset(), cbcnt, m_gapTracker, m_dead);
-                         if (!noTransaction && !callProcedureWithPartitionValue(invocation, cb, messageAndOffset.offset())) {
+                         if (!noTransaction && !callProcedure(invocation, cb)) {
                               if (isDebugEnabled()) {
                                  debug(null, "Failed to process Invocation possibly bad data: " + line);
                               }
