@@ -115,28 +115,6 @@ public abstract class AbstractImporter
     }
 
     /**
-     * This should be used importer implementations to execute a stored procedure.
-     *
-     * @param invocation Invocation object with procedure name and parameter information
-     * @param callback the callback that will receive procedure invocation status
-     * @return returns true if the procedure execution went through successfully; false otherwise
-     */
-    protected final boolean callProcedureWithPartitionValue(Invocation invocation, ProcedureCallback callback, long pval)
-    {
-        try {
-            boolean result = m_importServerAdapter.callProcedureWithPartitionValue(this,
-                                                                 m_backPressurePredicate,
-                                                                 callback, pval, invocation.getProcedure(), invocation.getParams());
-            reportStat(result, invocation.getProcedure());
-            return result;
-        } catch (Exception ex) {
-            rateLimitedLog(Level.ERROR, ex, "%s: Error trying to import", getName());
-            reportFailureStat(invocation.getProcedure());
-            return false;
-        }
-    }
-
-    /**
      * Called to stop the importer from processing more data.
      */
     public void stopImporter()

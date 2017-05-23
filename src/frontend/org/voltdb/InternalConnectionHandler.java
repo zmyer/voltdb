@@ -169,6 +169,7 @@ public class InternalConnectionHandler {
             m_failedCount.incrementAndGet();
             return false;
         }
+
         final InternalClientResponseAdapter adapter = m_adapters.get(partition);
         InternalAdapterTaskAttributes kattrs = new InternalAdapterTaskAttributes(caller,  adapter.connectionId());
 
@@ -181,52 +182,4 @@ public class InternalConnectionHandler {
         m_submitSuccessCount.incrementAndGet();
         return true;
     }
-
-    // Use backPressureTimeout value <= 0  for no back pressure timeout
-    public boolean callProcedureWithPartitionValue(InternalConnectionContext caller,
-                                 Function<Integer, Boolean> backPressurePredicate,
-                                 InternalConnectionStatsCollector statsCollector,
-                                 ProcedureCallback procCallback, long pval, String proc, Object... fieldList) {
-        Procedure catProc = InvocationDispatcher.getProcedureFromName(proc, getCatalogContext());
-        if (catProc == null) {
-            String fmt = "Cannot invoke procedure %s from streaming interface %s. Procedure not found.";
-            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, null, fmt, proc, caller);
-            m_failedCount.incrementAndGet();
-            return false;
-        }
-
-        StoredProcedureInvocation task = new StoredProcedureInvocation();
-
-        task.setProcName(proc);
-        task.setParams(fieldList);
-        try {
-            task = MiscUtils.roundTripForCL(task);
-        } catch (Exception e) {
-            String fmt = "Cannot invoke procedure %s from streaming interface %s. failed to create task.";
-            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, null, fmt, proc, caller);
-            m_failedCount.incrementAndGet();
-            return false;
-        }
-        int partition = -1;
-        try {
-            partition = TheHashinator.getPartitionForParameter(VoltType.BIGINT, pval);
-        } catch (Exception e) {
-            String fmt = "Can not invoke procedure %s from streaming interface %s. Partition not found.";
-            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, e, fmt, proc, caller);
-            m_failedCount.incrementAndGet();
-            return false;
-        }
-        final InternalClientResponseAdapter adapter = m_adapters.get(partition);
-        InternalAdapterTaskAttributes kattrs = new InternalAdapterTaskAttributes(caller,  adapter.connectionId());
-
-        final AuthUser user = getCatalogContext().authSystem.getImporterUser();
-
-        if (!adapter.createTransaction(kattrs, proc, catProc, procCallback, statsCollector, task, user, partition, backPressurePredicate)) {
-            m_failedCount.incrementAndGet();
-            return false;
-        }
-        m_submitSuccessCount.incrementAndGet();
-        return true;
-    }
-
 }

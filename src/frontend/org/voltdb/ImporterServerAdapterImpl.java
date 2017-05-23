@@ -48,12 +48,6 @@ public class ImporterServerAdapterImpl implements ImporterServerAdapter {
                 .callProcedure(importer, backPressurePredicate, m_statsCollector, procCallback, proc, fieldList);
     }
 
-    @Override
-    public boolean callProcedureWithPartitionValue(AbstractImporter importer, Function<Integer, Boolean> backPressurePredicate, ProcedureCallback procCallback, long pval, String proc, Object... fieldList) {
-        return getInternalConnectionHandler()
-                .callProcedureWithPartitionValue(importer, backPressurePredicate, m_statsCollector, procCallback, pval, proc, fieldList);
-    }
-
     private InternalConnectionHandler getInternalConnectionHandler() {
         return VoltDB.instance().getClientInterface().getInternalConnectionHandler();
     }
