@@ -46,6 +46,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * A very simple adapter for import handler that deserializes bytes into client responses.
@@ -192,10 +193,16 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                     submitTransaction();
                 }
                 public boolean submitTransaction() {
+                    StoredProcedureInvocation ftask;
+                    try {
+                        ftask = MiscUtils.roundTripForCL(task);
+                    } catch (Exception e) {
+                        return false;
+                    }
                     final long handle = nextHandle();
                     task.setClientHandle(handle);
                     final InternalCallback cb = new InternalCallback(
-                            kattrs, catProc, task, procName, partition, proccb, statsCollector, user, handle);
+                            kattrs, catProc, ftask, procName, partition, proccb, statsCollector, user, handle);
                     m_callbacks.put(handle, cb);
 
                     ClientResponseImpl r = dispatcher.dispatch(task, kattrs, InternalClientResponseAdapter.this, user, null);

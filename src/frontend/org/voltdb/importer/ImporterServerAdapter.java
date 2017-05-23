@@ -50,6 +50,25 @@ public interface ImporterServerAdapter {
     public boolean callProcedure(AbstractImporter importer, Function<Integer, Boolean> backPressurePredicate, ProcedureCallback callback, String proc, Object... fieldList);
 
     /**
+     * This is used by importers to execute procedures in the server.
+     *
+     * @param importer the calling importer instance. This may be used by the importer framework
+     * to report back pressure.
+     * @param backPressurePredicate the predicate to check when the partition is
+     *                              on back pressure for over a certain amount
+     *                              of time. The partition ID will be passed to
+     *                              the predicate. If the predicate evaluates to
+     *                              true, it keeps waiting for back pressure to
+     *                              be relieved. Otherwise, it ignores back
+     *                              pressure and initiates the transaction.
+     * @param callback the callback object that will receive procedure execution status
+     * @param proc the name of the procedure that is to be executed
+     * @param fieldList the parameters to be passed in to the procedure
+     * @return returns true if the procedure execution was queued successfully; false otherwise.
+     */
+    public boolean callProcedureWithPartitionValue(AbstractImporter importer, Function<Integer, Boolean> backPressurePredicate, ProcedureCallback callback, long pval, String proc, Object... fieldList);
+
+    /**
      * This should be used by importers to report failure while trying to execute a procedure.
      *
      * @param importerName the name of the importer

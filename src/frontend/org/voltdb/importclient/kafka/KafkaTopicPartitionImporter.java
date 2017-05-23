@@ -88,13 +88,15 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     boolean noTransaction = false;
     //Counters for commit policies.
     private long m_lastCommitTime = 0;
+    private final String m_clientId;
 
     public KafkaTopicPartitionImporter(KafkaStreamImporterConfig config)
     {
         m_config = config;
         m_coordinator = m_config.getPartitionLeader();
         m_topicAndPartition = new TopicAndPartition(config.getTopic(), config.getPartition());
-        m_fetchRequestBuilder = new FetchRequestBuilder().clientId(KafkaStreamImporterConfig.CLIENT_ID);
+        m_clientId = config.getTopic() + "-" + config.getPartition();
+        m_fetchRequestBuilder = new FetchRequestBuilder().clientId(m_clientId);
         if (m_config.getCommitPolicy() == KafkaImporterCommitPolicy.TIME && m_config.getTriggerValue() > 0)
             m_gapTracker = new SimpleTracker();
         else
@@ -191,7 +193,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                             m_config.getGroupId(),
                             ConsumerMetadataRequest.CurrentVersion(),
                             nextCorrelationId(),
-                            KafkaStreamImporterConfig.CLIENT_ID
+                            m_clientId
                             ));
                     ConsumerMetadataResponse metadataResponse = ConsumerMetadataResponse.readFrom(channel.receive().buffer());
                     if (metadataResponse.errorCode() == ErrorMapping.NoError()) {
@@ -241,7 +243,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
 
         kafka.javaapi.OffsetRequest earlyRq = new kafka.javaapi.OffsetRequest(
                 singletonMap(m_topicAndPartition, pori),
-                kafka.api.OffsetRequest.CurrentVersion(), KafkaStreamImporterConfig.CLIENT_ID
+                kafka.api.OffsetRequest.CurrentVersion(), m_clientId
                 );
         OffsetResponse response = null;
         Throwable fault = null;
@@ -278,7 +280,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                     m_config.getGroupId(),
                     singletonList(m_topicAndPartition),
                     version, nextCorrelationId(),
-                    KafkaStreamImporterConfig.CLIENT_ID
+                    m_clientId
                     );
             BlockingChannel channel = m_offsetManager.get();
             channel.send(rq.underlying());
@@ -366,7 +368,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         }
         m_consumer = new SimpleConsumer(
                 leaderBroker.getHost(), leaderBroker.getPort(),
-                m_config.getSocketTimeout(), m_config.getFetchSize(), KafkaStreamImporterConfig.CLIENT_ID
+                m_config.getSocketTimeout(), m_config.getFetchSize(), m_clientId
                 );
     }
 
@@ -464,7 +466,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         Invocation invocation = new Invocation(m_config.getProcedure(), formatter.transform(line));
                         TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(
                                 messageAndOffset.nextOffset(), cbcnt, m_gapTracker, m_dead);
-                         if (!noTransaction && !callProcedure(invocation, cb)) {
+                         if (!noTransaction && !callProcedureWithPartitionValue(invocation, cb, messageAndOffset.offset())) {
                               if (isDebugEnabled()) {
                                  debug(null, "Failed to process Invocation possibly bad data: " + line);
                               }
@@ -550,7 +552,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                             m_config.getGroupId(),
                             singletonMap(m_topicAndPartition, new OffsetAndMetadata(safe, "commit", now)),
                             nextCorrelationId(),
-                            KafkaStreamImporterConfig.CLIENT_ID,
+                            m_clientId,
                             version
                             );
                     channel.send(offsetCommitRequest.underlying());
