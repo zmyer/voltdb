@@ -199,6 +199,14 @@ public class InternalConnectionHandler {
 
         task.setProcName(proc);
         task.setParams(fieldList);
+        try {
+            task = MiscUtils.roundTripForCL(task);
+        } catch (Exception e) {
+            String fmt = "Cannot invoke procedure %s from streaming interface %s. failed to create task.";
+            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, null, fmt, proc, caller);
+            m_failedCount.incrementAndGet();
+            return false;
+        }
         int partition = -1;
         try {
             partition = TheHashinator.getPartitionForParameter(VoltType.BIGINT, pval);
