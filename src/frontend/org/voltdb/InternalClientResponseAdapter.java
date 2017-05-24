@@ -275,32 +275,15 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         } catch (IOException ex) {
             VoltDB.crashLocalVoltDB("enqueue() in InternalClientResponseAdapter throw an exception", true, ex);
         }
-        final Callback callback = m_callbacks.get(resp.getClientHandle());
-        if (!m_partitionExecutor.containsKey(callback.getPartitionId())) {
-            m_logger.error("Invalid partition response recieved for sending internal client response.");
-            return;
-        }
-        ExecutorService executor = m_partitionExecutor.get(callback.getPartitionId());
+        final Callback callback = m_callbacks.remove(resp.getClientHandle());
         try {
-            executor.submit(new Runnable() {
-                @Override
-                public void run() {
-                    handle();
-                }
-
-                public void handle() {
-                    try {
-                        callback.handleResponse(resp);
-                    } catch (Exception ex) {
-                        m_logger.error("Failed to process callback.", ex);
-                    } finally {
-                        m_callbacks.remove(resp.getClientHandle());
-                        m_permits.release();
-                    }
-                }
-            });
-        } catch (RejectedExecutionException ex) {
-            m_logger.error("Failed to submit callback to the response processing queue.", ex);
+            if (callback != null) {
+                callback.handleResponse(resp);
+            }
+        } catch (Exception ex) {
+            m_logger.error("Failed to process callback.", ex);
+        } finally {
+            m_permits.release();
         }
     }
 
