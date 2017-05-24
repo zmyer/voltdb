@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import java.util.Random;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.AuthSystem.AuthUser;
@@ -46,6 +47,7 @@ public class InternalConnectionHandler {
     private final AtomicLong m_failedCount = new AtomicLong();
     private final AtomicLong m_submitSuccessCount = new AtomicLong();
     private volatile Map<Integer, InternalClientResponseAdapter> m_adapters = ImmutableMap.of();
+    private final Random m_random = new Random();
 
     // Synchronized in case multiple partitions are added concurrently.
     public synchronized void addAdapter(int pid, InternalClientResponseAdapter adapter)
@@ -141,7 +143,7 @@ public class InternalConnectionHandler {
                                  InternalConnectionStatsCollector statsCollector,
                                  ProcedureCallback procCallback, String proc, Object... fieldList) {
         Procedure catProc = InvocationDispatcher.getProcedureFromName(proc, getCatalogContext());
-        if (catProc == null) {
+        if (catProc == null || (m_adapters.size() == 0)) {
             String fmt = "Cannot invoke procedure %s from streaming interface %s. Procedure not found.";
             m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, null, fmt, proc, caller);
             m_failedCount.incrementAndGet();
@@ -160,17 +162,13 @@ public class InternalConnectionHandler {
             m_failedCount.incrementAndGet();
             return false;
         }
-        int partition = -1;
-        try {
-            partition = InvocationDispatcher.getPartitionForProcedure(catProc, task);
-        } catch (Exception e) {
-            String fmt = "Can not invoke procedure %s from streaming interface %s. Partition not found.";
-            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, e, fmt, proc, caller);
-            m_failedCount.incrementAndGet();
+        int partition = m_random.nextInt(m_adapters.size()-1);
+        final InternalClientResponseAdapter adapter = m_adapters.get(partition);
+        if (adapter == null) {
+            String fmt = "Cannot invoke procedure %s from streaming interface %s. failed to get adapter. " + m_adapters.size();
+            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, null, fmt, proc, caller);
             return false;
         }
-
-        final InternalClientResponseAdapter adapter = m_adapters.get(partition);
         InternalAdapterTaskAttributes kattrs = new InternalAdapterTaskAttributes(caller,  adapter.connectionId());
 
         final AuthUser user = getCatalogContext().authSystem.getImporterUser();
