@@ -21,7 +21,9 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.Socket;
+import java.net.SocketException;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -87,7 +89,12 @@ public class ServerSocketImporter extends AbstractImporter {
                 ch.start();
             }
         } catch(IOException e) {
-           warn(e, "Unexpected error accepting client connections for " + getName() + " on port " + m_config.getPort());
+            if (e instanceof SocketException && m_config.getServerSocket().isClosed() && !shouldRun()) {
+                warn(null, "Client connection request for " + getName() + " on port " + m_config.getPort()
+                    + " failed as socket was closed during importer shutdown");
+            } else {
+                warn(e, "Unexpected error accepting client connections for " + getName() + " on port " + m_config.getPort());
+            }
         }
     }
 
@@ -109,13 +116,15 @@ public class ServerSocketImporter extends AbstractImporter {
             try {
                 BufferedReader in = new BufferedReader(
                         new InputStreamReader(m_clientSocket.getInputStream()));
-                Formatter<String> formatter = (Formatter<String>) m_config.getFormatterBuilder().create();
+                Formatter formatter = m_config.getFormatterBuilder().create();
+                Object params[] = null;
                 while (shouldRun()) {
                     String line = in.readLine();
-                    //You should convert your data to params here.
-                    if (line == null) continue;
                     try{
-                        Invocation invocation = new Invocation(m_procedure, formatter.transform(line));
+                        params = formatter.transform(ByteBuffer.wrap(line.getBytes()));
+                        //You should convert your data to params here.
+                        if (params == null) continue;
+                        Invocation invocation = new Invocation(m_procedure, params);
                         if (!callProcedure(invocation)) {
                             rateLimitedLog(Level.ERROR, null, "Socket importer insertion failed");
                         }

@@ -492,7 +492,8 @@ public class MockVoltDB implements VoltDBInterface
     public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands,
             byte[] catalogBytes, byte[] catalogHash, int expectedCatalogVersion,
             long currentTxnId, long currentTxnTimestamp, byte[] deploymentBytes,
-            byte[] deploymentHash)
+            byte[] deploymentHash, boolean requireCatalogDiffCmdsApplyToEE,
+            boolean hasSchemaChange, boolean requiresNewExportGeneration)
     {
         throw new UnsupportedOperationException("unimplemented");
     }
@@ -679,7 +680,17 @@ public class MockVoltDB implements VoltDBInterface
             }
 
             @Override
-            public boolean isTrial() {
+            public boolean isAnyKindOfTrial() {
+                return false;
+            }
+
+            @Override
+            public boolean isProTrial() {
+                return false;
+            }
+
+            @Override
+            public boolean isEnterpriseTrial() {
                 return false;
             }
 
@@ -832,5 +843,9 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public SnmpTrapSender getSnmpTrapSender() {
         return new DummySnmpTrapSender();
+    }
+
+    @Override
+    public void swapTables(String oneTable, String otherTable) {
     }
 }

@@ -20,8 +20,8 @@ package org.voltdb;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Array;
+import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.util.Date;
 import java.util.regex.Pattern;
 
@@ -532,6 +532,11 @@ public class ParameterConverter {
                 return String.valueOf(param);
             }
         }
+        // this is for NT sysprocs with variable arguments
+        // they do their own validation
+        else if (expectedClz == ParameterSet.class && inputClz == ParameterSet.class) {
+            return param;
+        }
 
         // handle SystemProcedureExecutionContext without linking to it
         // these are used by system procedures and are ignored here
@@ -544,5 +549,41 @@ public class ParameterConverter {
         throw new VoltTypeException(
                 "tryToMakeCompatible: The provided value: (" + param.toString() + ") of type: " + inputClz.getName() +
                 " is not a match or is out of range for the target parameter type: " + expectedClz.getName());
+    }
+
+    /**
+     * Given the results of a procedure, convert it into a sensible array of VoltTables.
+     * @throws InvocationTargetException
+     */
+    final static public VoltTable[] getResultsFromRawResults(String procedureName, Object result) throws InvocationTargetException {
+        if (result == null) {
+            return new VoltTable[0];
+        }
+        if (result instanceof VoltTable[]) {
+            VoltTable[] retval = (VoltTable[]) result;
+            for (VoltTable table : retval) {
+                if (table == null) {
+                    Exception e = new RuntimeException("VoltTable arrays with non-zero length cannot contain null values.");
+                    throw new InvocationTargetException(e);
+                }
+                // Make sure this table does not use an ee cache buffer
+                table.convertToHeapBuffer();
+            }
+
+            return retval;
+        }
+        if (result instanceof VoltTable) {
+            VoltTable vt = (VoltTable) result;
+            // Make sure this table does not use an ee cache buffer
+            vt.convertToHeapBuffer();
+            return new VoltTable[] { vt };
+        }
+        if (result instanceof Long) {
+            VoltTable t = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));
+            t.addRow(result);
+            return new VoltTable[] { t };
+        }
+        throw new RuntimeException(String.format("Procedure %s unsupported procedure return type %s.",
+                procedureName, result.getClass().getSimpleName()));
     }
 }
