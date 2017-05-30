@@ -32,6 +32,7 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import java.util.Random;
 
 /**
  * This class packs the parameters and dispatches the transactions.

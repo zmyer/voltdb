@@ -24,22 +24,17 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 
-import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
 import org.voltcore.network.NIOReadStream;
-import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.network.WriteStream;
-import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
@@ -70,10 +65,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     private final AtomicLong m_handles = new AtomicLong();
     private final AtomicLong m_failures = new AtomicLong(0);
     private final ConcurrentMap<Long, InternalCallback> m_callbacks = new ConcurrentHashMap<>(2048, .75f, 128);
-    private final ConcurrentMap<Integer, ExecutorService> m_partitionExecutor = new NonBlockingHashMap<>();
-    // Maintain internal connection ids per caller id. This is useful when collecting statistics
-    // so that information can be grouped per user of this Connection.
-    private final ConcurrentMap<String, Long> m_internalConnectionIds = new NonBlockingHashMap<>();
     public final Semaphore m_permits =
         new Semaphore(Integer.getInteger("INTERNAL_MAX_PENDING_TRANSACTION_PER_PARTITION", 500));
 
@@ -169,10 +160,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             final int partition,
             final boolean ntPriority,
             final Function<Integer, Boolean> backPressurePredicate) {
-        if (!m_partitionExecutor.containsKey(partition)) {
-            m_partitionExecutor.putIfAbsent(partition, CoreUtils.getSingleThreadExecutor("InternalHandlerExecutor - " + partition));
-        }
-
         if (backPressurePredicate != null) {
             try {
                 do {
@@ -184,45 +171,24 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         }
 
         final InvocationDispatcher dispatcher = getClientInterface().getDispatcher();
+        final long handle = nextHandle();
+        task.setClientHandle(handle);
+        final InternalCallback cb = new InternalCallback(
+                kattrs, catProc, task, procName, partition, proccb, statsCollector, user, handle);
 
-        ExecutorService executor = m_partitionExecutor.get(partition);
-        try {
-            executor.submit(new Runnable() {
-                @Override
-                public void run() {
-                    if (!m_internalConnectionIds.containsKey(kattrs.getName())) {
-                        m_internalConnectionIds.putIfAbsent(kattrs.getName(), VoltProtocolHandler.getNextConnectionId());
-                    }
-                    submitTransaction();
-                }
-                public boolean submitTransaction() {
-                    final long handle = nextHandle();
-                    task.setClientHandle(handle);
-                    final InternalCallback cb = new InternalCallback(
-                            kattrs, catProc, task, procName, partition, proccb, statsCollector, user, handle);
+        m_callbacks.put(handle, cb);
 
-                    m_callbacks.put(handle, cb);
-
-                    ClientResponseImpl r = dispatcher.dispatch(task, kattrs, InternalClientResponseAdapter.this, user, null, ntPriority);
-                    if (r != null) {
-                        try {
-                            cb.handleResponse(r);
-                        } catch (Exception e) {
-                            m_logger.error("failed to process dispatch response " + r.getStatusString(), e);
-                        } finally {
-                            m_callbacks.remove(handle);
-                            m_permits.release();
-                        }
-                        return r.getStatus() == ClientResponse.SUCCESS;
-                    }
-
-                    return true;
-                }
-            });
-        } catch (RejectedExecutionException ex) {
-            m_logger.error("Failed to submit transaction to the partition queue.", ex);
-            m_permits.release();
-            return false;
+        ClientResponseImpl r = dispatcher.dispatch(task, kattrs, InternalClientResponseAdapter.this, user, null, ntPriority);
+        if (r != null) {
+            try {
+                cb.handleResponse(r);
+            } catch (Exception e) {
+                m_logger.error("failed to process dispatch response " + r.getStatusString(), e);
+            } finally {
+                m_callbacks.remove(handle);
+                m_permits.release();
+            }
+            return r.getStatus() == ClientResponse.SUCCESS;
         }
 
         return true;
@@ -389,21 +355,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
 
     @Override
     public long connectionId(long clientHandle) {
-        InternalCallback callback = m_callbacks.get(clientHandle);
-        if (callback==null) {
-            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.WARN, null,
-                    "Could not find caller details for client handle %d. Using internal adapter level connection id", clientHandle);
-            return connectionId();
-        }
-
-        Long internalId = m_internalConnectionIds.get(callback.getInternalContext().getName());
-        if (internalId==null) {
-            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.WARN, null,
-                "Could not find internal connection id for client handle %d. Using internal adapter level connection id", clientHandle);
-            return connectionId();
-        } else {
-            return internalId;
-        }
+        return connectionId();
     }
 
     @Override
