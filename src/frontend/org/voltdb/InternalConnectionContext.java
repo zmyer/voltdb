@@ -24,4 +24,6 @@ package org.voltdb;
 public interface InternalConnectionContext
 {
     public String getName();
+    //Return a consistent Id for pegging transactions to an adapter.
+    public int getId();
 }

@@ -66,6 +66,11 @@ final class InternalAdapterTaskAttributes implements InvocationClientHandler, In
     }
 
     @Override
+    public int getId() {
+        return hashCode();
+    }
+
+    @Override
     public int hashCode() {
         final int prime = 31;
         int result = 1;

@@ -56,6 +56,11 @@ public class Log4jSocketHandlerImporter extends AbstractImporter
     }
 
     @Override
+    public int getId() {
+        return m_config.getResourceID().hashCode();
+    }
+
+    @Override
     public void accept()
     {
         /*

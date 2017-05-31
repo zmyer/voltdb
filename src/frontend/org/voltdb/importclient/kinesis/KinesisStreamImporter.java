@@ -115,6 +115,11 @@ public class KinesisStreamImporter extends AbstractImporter {
         return KinesisStreamImporterConfig.APP_NAME;
     }
 
+    @Override
+    public int getId() {
+        return m_workerId.hashCode();
+    }
+
     /**
      * Create AWSCredentialsProvider with access key id and secret key for the
      * user. The user should have read/write permission to Kinesis Stream and DynamoDB

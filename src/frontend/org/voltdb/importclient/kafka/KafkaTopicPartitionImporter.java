@@ -755,6 +755,11 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     }
 
     @Override
+    public int getId() {
+        return m_topicAndPartition.hashCode();
+    }
+
+    @Override
     public String getTaskThreadName() {
         return getName() + " - " + (m_topicAndPartition == null ? "Unknown" : m_topicAndPartition.toString());
     }

@@ -73,6 +73,11 @@ public class PullSocketImporter extends AbstractImporter {
         return "PullSocketImporter";
     }
 
+    @Override
+    public int getId() {
+        return m_config.getResourceID().hashCode();
+    }
+
     private void susceptibleRun() {
         if (m_eos.get()) return;
 

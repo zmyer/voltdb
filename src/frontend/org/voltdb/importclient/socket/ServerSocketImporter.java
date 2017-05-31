@@ -60,6 +60,11 @@ public class ServerSocketImporter extends AbstractImporter {
     }
 
     @Override
+    public int getId() {
+        return m_config.getResourceID().hashCode();
+    }
+
+    @Override
     protected void accept()
     {
         startListening();

@@ -150,9 +150,17 @@ public class InternalConnectionHandler {
         return true;
     }
 
+    public boolean callProcedure(InternalConnectionContext caller,
+                                 Function<Integer, Boolean> backPressurePredicate,
+                                 InternalConnectionStatsCollector statsCollector,
+                                 ProcedureCallback procCallback, String proc, Object... fieldList) {
+        return callProcedure(caller, backPressurePredicate, false, statsCollector, procCallback, proc, fieldList);
+    }
+
     // Use null backPressurePredicate for no back pressure
     public boolean callProcedure(InternalConnectionContext caller,
                                  Function<Integer, Boolean> backPressurePredicate,
+                                 boolean idempotent,
                                  InternalConnectionStatsCollector statsCollector,
                                  ProcedureCallback procCallback, String proc, Object... fieldList) {
         Procedure catProc = InvocationDispatcher.getProcedureFromName(proc, getCatalogContext());
@@ -175,7 +183,12 @@ public class InternalConnectionHandler {
             m_failedCount.incrementAndGet();
             return false;
         }
-        int partition = m_random.nextInt(m_adapters.size()-1);
+        int partition;
+        if (idempotent) {
+            partition = m_random.nextInt(m_adapters.size()-1);
+        } else {
+            partition = caller.getId() % m_adapters.size();
+        }
         final InternalClientResponseAdapter adapter = m_adapters.get(partition);
         if (adapter == null) {
             String fmt = "Cannot invoke procedure %s from streaming interface %s. failed to get adapter. " + m_adapters.size();
