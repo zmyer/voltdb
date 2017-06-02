@@ -29,10 +29,10 @@ import org.voltdb.VoltTable;
 
 public class DeleteOnlyLoadTableSP extends VoltProcedure {
 
-    private final SQLStmt deleteStmt = new SQLStmt("DELETE FROM loadp WHERE cid=?;");
+    private final SQLStmt deleteStmt = new SQLStmt("DELETE FROM T_PAYMENT50 WHERE pid=? and seq_no=?;");
 
-    public VoltTable[] run(long cid) {
-        voltQueueSQL(deleteStmt, cid);
+    public VoltTable[] run(String cid, String seq_no) {
+        voltQueueSQL(deleteStmt, cid, seq_no);
         return voltExecuteSQL();
     }
 }

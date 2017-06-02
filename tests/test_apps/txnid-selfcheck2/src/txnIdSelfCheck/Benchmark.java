@@ -552,7 +552,7 @@ public class Benchmark {
     TruncateTableLoader replTrunclt = null;
     CappedTableLoader partCappedlt = null;
     CappedTableLoader replCappedlt = null;
-    LoadTableLoader partLoadlt = null;
+    WLoadTableLoader partLoadlt = null;
     LoadTableLoader replLoadlt = null;
     ReadThread readThread = null;
     AdHocMayhemThread adHocMayhemThread = null;
@@ -703,8 +703,8 @@ public class Benchmark {
         }
 
         if (!(config.disabledThreads.contains("partLoadlt") || config.disabledThreads.contains("Loadlt"))) {
-            partLoadlt = new LoadTableLoader(client, "loadp",
-                (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits, false, 0);
+            partLoadlt = new WLoadTableLoader(client, "T_PAYMENT50",
+                (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits, false, 1);
             partLoadlt.start();
         }
         replLoadlt = null;
