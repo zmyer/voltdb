@@ -68,7 +68,7 @@ public class WLoadTableLoader extends BenchmarkThread {
     //proc name
     final String m_procName;
     //proc name for load table row delete
-    final String m_onlydelprocName;
+    private String m_onlydelprocName;
     //Table that keeps building.
     final VoltTable m_table;
     final Random m_random;
@@ -508,23 +508,22 @@ public class WLoadTableLoader extends BenchmarkThread {
         return String.format("%032d", seq_no);
     }
 
-    private ArrayList<Object> nextRow() {
-        m_seqno++;
+    private ArrayList<Object> nextRow(long seq) {
         ArrayList<Object> newRow = new ArrayList<Object>();
-        m_random.setSeed(m_seqno);
+        m_random.setSeed(seq);
         for (int i = 0; i< m_col_len.length; i++) {
             if (m_col_len[i] > 0) {
                 if (i == 0)
-                    newRow.add(formatSeqNo(m_seqno));
+                    newRow.add(formatSeqNo(seq));
                 else {
                     int origin = m_random.nextInt(m_randomString.length() - m_col_len[i]);
                     newRow.add((String) m_randomString.substring(origin, origin + m_col_len[i]));
                 }
             }
             else if (m_col_len[i] == -1)
-                newRow.add(new Long(1496415440));  // temporary
+                newRow.add(new Long(seq));
             else if (m_col_len[i] == -2)
-                newRow.add( new BigDecimal(1234567890.9876));  // temporary
+                newRow.add( new BigDecimal(seq));
         }
         return newRow;
     }
@@ -566,7 +565,7 @@ public class WLoadTableLoader extends BenchmarkThread {
                     p++;
                     long nanotime = System.nanoTime();
                     //m_table.addRow(p, p + nanotime, nanotime);
-                    ArrayList<Object> nextrow = nextRow();
+                    ArrayList<Object> nextrow = nextRow(++m_seqno);
                     m_table.addRow(nextrow.toArray(new Object[nextrow.size()]));
                     //p = m_table.fetchRow(0).get(m_partitionedColumnIndex, VoltType.STRING).toString();
                     cidList.add(p);
@@ -683,11 +682,17 @@ public class WLoadTableLoader extends BenchmarkThread {
                     onlyDelQueue.drainTo(workList);
                     log.debug("from deleteonly to delete: " + workList.toString());
                     CountDownLatch odlatch = new CountDownLatch(workList.size());
+                    VoltTable vtable = new VoltTable(m_colInfo);
                     for (Long lcid : workList) {
+                        ArrayList<Object> row = nextRow(lcid);
+                        vtable.clearRowData();
+                        vtable.addRow(row.toArray(new Object[row.size()]));
                         try {
                             boolean success;
                             log.debug("delete: " + lcid + " " + getKey(lcid));
-                            success = client.callProcedure(new DeleteCallback(odlatch, lcid, onlyDelQueue, unkQueue, null, delUnkQueue, 1, (byte)1), m_onlydelprocName, getKey(lcid), formatSeqNo(lcid));
+                            success = client.callProcedure(new DeleteCallback(odlatch, lcid, onlyDelQueue, unkQueue,
+                                    null, delUnkQueue, 1, (byte)1), m_onlydelprocName, getKey(lcid),
+                                    formatSeqNo(lcid), vtable);
                             if (!success) {
                                 hardStop("Failed to invoke delete for: " + lcid);
                             }

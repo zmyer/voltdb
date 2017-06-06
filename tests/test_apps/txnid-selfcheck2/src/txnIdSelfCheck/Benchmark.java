@@ -553,7 +553,7 @@ public class Benchmark {
     CappedTableLoader partCappedlt = null;
     CappedTableLoader replCappedlt = null;
     WLoadTableLoader partLoadlt = null;
-    LoadTableLoader replLoadlt = null;
+    WLoadTableLoader replLoadlt = null;
     ReadThread readThread = null;
     AdHocMayhemThread adHocMayhemThread = null;
     InvokeDroppedProcedureThread idpt = null;

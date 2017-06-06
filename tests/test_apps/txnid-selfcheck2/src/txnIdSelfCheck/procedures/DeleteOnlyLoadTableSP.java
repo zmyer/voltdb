@@ -26,13 +26,41 @@ package txnIdSelfCheck.procedures;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
+import org.voltdb.VoltType;
 
 public class DeleteOnlyLoadTableSP extends VoltProcedure {
 
+    private final SQLStmt selectStmt = new SQLStmt("select * FROM T_PAYMENT50 WHERE pid=? and seq_no=?;");
     private final SQLStmt deleteStmt = new SQLStmt("DELETE FROM T_PAYMENT50 WHERE pid=? and seq_no=?;");
 
-    public VoltTable[] run(String cid, String seq_no) {
+    public VoltTable[] run(String cid, String seq_no, VoltTable vt) {
+        if (vt.getRowCount() != 1)
+            throw new VoltAbortException("expected data exception");
+        VoltTableRow vtrow = vt.fetchRow(0);
+        if (!vtrow.getString(1).equals(cid))
+            throw new VoltAbortException("partition check exception " + cid + " " + vtrow.getString(1));
+        if (!vtrow.getString(0).equals(seq_no))
+            throw new VoltAbortException("seq_no check exception " + seq_no + " " + vtrow.getString(0));
+        voltQueueSQL(selectStmt, cid, seq_no);
+        VoltTable[] results = voltExecuteSQL(false);
+        if (results.length != 1)
+            throw new VoltAbortException("length exception");
+        VoltTable data = results[0];
+        if (data.getRowCount() != 1)
+            throw new VoltAbortException("rowcount exception");
+        VoltTableRow row = data.fetchRow(0);
+        int ncol = row.getColumnCount();
+        if (vtrow.getColumnCount() != ncol)
+            throw new VoltAbortException("column count exception expected: " + vtrow.getColumnCount() + " actual: " + ncol);
+        for (int c = 0; c < ncol; c++) {
+            VoltType vtype = vtrow.getColumnType(c);
+            Object expected = vtrow.get(c, vtype);
+            Object actual = row.get(c, vtype);
+            if (!expected.equals(actual))
+                throw new VoltAbortException("actual data wrong column " + c + " expected: " + expected.toString() + " actual: " + actual.toString());
+            }
         voltQueueSQL(deleteStmt, cid, seq_no);
-        return voltExecuteSQL();
+        return voltExecuteSQL(true);
     }
 }
