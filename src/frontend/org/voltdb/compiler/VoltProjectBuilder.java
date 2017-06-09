@@ -768,6 +768,11 @@ public class VoltProjectBuilder {
         m_drProducerEnabled = false;
     }
 
+    public boolean hasSetDrProducerDisabled()
+    {
+        return (m_drProducerEnabled != null) && !m_drProducerEnabled;
+    }
+
     public void setDrNone() {
         m_drRole = DrRoleType.NONE;
     }

@@ -208,11 +208,13 @@ public class LeaderAppointer implements Promotable
                                              false, null);
                 }
                 // If we are still a DR replica (not promoted) and starting from a snapshot,
-                // check if that has completed
+                // check if that has completed if this is not a new replica
                 if (VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA &&
-                    m_expectingDrSnapshot && m_snapshotSyncComplete.get() == false) {
+                    m_expectingDrSnapshot && m_snapshotSyncComplete.get() == false
+                        && !(m_currentLeader == Long.MAX_VALUE && !updatedHSIds.isEmpty()))  {
                     VoltDB.crashGlobalVoltDB("Detected node failure before DR sync snapshot completes. Cluster will shut down.",
                                              false, null);
+
                 }
                 // If we survived the above gauntlet of fail, appoint a new leader for this partition.
                 if (missingHSIds.contains(m_currentLeader)) {

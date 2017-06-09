@@ -2109,7 +2109,7 @@ public class LocalCluster extends VoltServerConfig {
                                                   DrRoleType drRole, boolean hasLocalServer, VoltProjectBuilder builder,
                                                   String callingMethodName) throws IOException {
         LocalCluster lc = compileBuilder(schemaDDL, siteCount, hostCount, kfactor, clusterId,
-                replicationPort, remoteReplicationPort, pathToVoltDBRoot, jar, drRole, builder, callingMethodName);
+                replicationPort, remoteReplicationPort, pathToVoltDBRoot, jar, drRole, builder, callingMethodName, builder.hasSetDrProducerDisabled());
 
         System.out.println("Starting local cluster.");
         lc.setHasLocalServer(hasLocalServer);
@@ -2139,13 +2139,28 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     public static LocalCluster compileBuilder(String schemaDDL, int siteCount, int hostCount,
+                                              int kfactor, int clusterId, int replicationPort,
+                                              int remoteReplicationPort, String pathToVoltDBRoot, String jar,
+                                              DrRoleType drRole, VoltProjectBuilder builder,
+                                              String callingMethodName) throws IOException {
+        return compileBuilder(schemaDDL, siteCount, hostCount,
+                kfactor, clusterId, replicationPort,
+                remoteReplicationPort, pathToVoltDBRoot, jar,
+                drRole, builder,
+                callingMethodName, false);
+    }
+
+    public static LocalCluster compileBuilder(String schemaDDL, int siteCount, int hostCount,
                                        int kfactor, int clusterId, int replicationPort,
                                        int remoteReplicationPort, String pathToVoltDBRoot, String jar,
                                        DrRoleType drRole, VoltProjectBuilder builder,
-                                       String callingMethodName)
-        throws IOException {
+                                       String callingMethodName, boolean disableProducer) throws IOException {
         builder.addLiteralSchema(schemaDDL);
-        builder.setDrProducerEnabled();
+        if (disableProducer) {
+            builder.setDrProducerDisabled();
+        } else {
+            builder.setDrProducerEnabled();
+        }
         if (drRole == DrRoleType.REPLICA) {
             builder.setDrReplica();
         } else if (drRole == DrRoleType.XDCR) {
