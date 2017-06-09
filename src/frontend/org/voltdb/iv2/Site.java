@@ -1712,6 +1712,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public void setDRStreamEnd(long spHandle, long uniqueId) {
         generateDREvent(
                 EventType.DR_STREAM_END, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("Generated DR_STREAM_END event.");
+        }
     }
 
     /**
