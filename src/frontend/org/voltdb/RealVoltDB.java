@@ -894,6 +894,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 if (stagedCatalogLocation.isFile()) {
                     hostLog.warn("Initialized schema is present, but is being ignored and may be removed.");
                 }
+            } else {
+                assert (config.m_startAction == StartAction.PROBE);
+                if (stagedCatalogLocation.isFile()) {
+                    config.m_pathToCatalog = stagedCatalogLocation.getAbsolutePath();
+                }
             }
 
             List<String> failed = m_nodeSettings.ensureDirectoriesExist();
