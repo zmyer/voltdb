@@ -708,14 +708,20 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 for (String host: hosts.navigableKeySet()) {
                     previous = Maps.filterValues(specs,equalTo(host)).navigableKeySet();
                     needed = byhost.get(host);
-                    if (!needed.equals(previous)) {
+                    //if (!needed.equals(previous)) { // BSDBG this may make testing easier
                         int version = hosts.get(host).get();
                         byte [] nodedata = asHostData(needed);
                         setters.add(new SetNodeChannels(joinZKPath(HOST_DN, host), version, nodedata));
-                    }
+                    //}
                 }
                 // wait for the last write to complete
                 for (SetNodeChannels setter: setters) {
+                    // TODO this is the logic which is causing a problem.
+                    // TODO a bad version error from Zookeeper causes this to retry even those it already has tried.
+                    // TODO I should make channel assignments idempotent - allow them to run twice.
+
+                    // TODO do I have a guarantee that the retry produces the same assignment?
+                    // TODO I don't think so - a node is getting killed - but if I do, a partial retry will work.
                     if (setter.getCallbackCode() != Code.OK && !m_done.get()) {
                         LOG.warn(
                                 "LEADER (" + m_hostId
@@ -1240,6 +1246,8 @@ public class ChannelDistributer implements ChannelChangeCallback {
                     }
 
                     prev = m_specs.get(sstamp);
+                    // TODO BSDBG: if AssignChannels gets retried, is oldspecs stale?
+                    // TODO If we compute based on the latest that was successfully committed, this may allow idempotency?
                     oldspecs = Maps.filterEntries(prev, thisHost).navigableKeySet();
                     // rebuild the assigned channel spec list
                     mbldr = ImmutableSortedMap.naturalOrder();

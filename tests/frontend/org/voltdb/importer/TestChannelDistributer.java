@@ -170,6 +170,8 @@ public class TestChannelDistributer extends ZKTestBase {
         assertEquals(1, leaderCount);
     }
 
+    // TODO: Can I amend this test and turn it into a bug reproducer?
+    // TODO: If so, that will go a LONG way towards proving it's fixed.
     @Test
     public void testHostFailure() throws Exception {
         Set<URI> uris = generateURIs(9);
@@ -200,6 +202,48 @@ public class TestChannelDistributer extends ZKTestBase {
         assertTrue(inZERO.size() > 0);
 
         zks.get(ZERO).close();
+
+        actual = getAdded(inZERO.size());
+        assertEquals(inZERO, asSpecs(actual));
+    }
+
+    @Test
+    public void testMultipleHostFailure() throws Exception {
+        Set<URI> uris = generateURIs(9);
+        Set<URI> expected = uris;
+        // add nine
+        distributers.get(UNO).registerChannels(YO, uris);
+        Set<URI> actual = getAdded(9);
+
+        assertEquals(expected, actual);
+
+        // let's wait for the mesh to settle
+        int attempts = 4;
+        boolean settled = false;
+        while (!settled && --attempts >=0) {
+            Thread.sleep(50);
+            settled = true;
+            int stamp = distributers.get(ZERO).m_specs.getStamp();
+            for (ChannelDistributer distributer: distributers.values()) {
+                settled = settled && stamp == distributer.m_specs.getStamp();
+            }
+        }
+        assertTrue(settled);
+
+        Set<ChannelSpec> inZERO = Maps.filterValues(
+                distributers.get(DUE).m_specs.getReference(),
+                equalTo(ZERO))
+                .navigableKeySet();
+        assertTrue(inZERO.size() > 0);
+
+        Set<ChannelSpec> inUNO = Maps.filterValues(
+                distributers.get(DUE).m_specs.getReference(),
+                equalTo(UNO))
+                .navigableKeySet();
+        assertTrue(inUNO.size() > 0);
+
+        zks.get(ZERO).close();
+        zks.get(UNO).close();
 
         actual = getAdded(inZERO.size());
         assertEquals(inZERO, asSpecs(actual));

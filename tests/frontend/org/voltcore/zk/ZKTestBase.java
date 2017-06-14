@@ -57,7 +57,7 @@ public class ZKTestBase {
         m_clients = new ArrayList<ZooKeeper>();
         m_messengers = new ArrayList<HostMessenger>();
         String [] coordinators = IntStream.range(0, sites)
-                .mapToObj(i -> ":" + (i+Constants.DEFAULT_INTERNAL_PORT))
+                .mapToObj(i -> "localhost:" + (i+Constants.DEFAULT_INTERNAL_PORT))
                 .toArray(s -> new String[s]);
         for (int ii = 0; ii < sites; ii++) {
             HostMessenger.Config config = new HostMessenger.Config();
