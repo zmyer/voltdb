@@ -708,13 +708,14 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 for (String host: hosts.navigableKeySet()) {
                     previous = Maps.filterValues(specs,equalTo(host)).navigableKeySet();
                     needed = byhost.get(host);
-                    //if (!needed.equals(previous)) { // BSDBG this may make testing easier
+                    if (!needed.equals(previous)) { // BSDBG this may make testing easier
                         int version = hosts.get(host).get();
                         byte [] nodedata = asHostData(needed);
                         setters.add(new SetNodeChannels(joinZKPath(HOST_DN, host), version, nodedata));
-                    //}
+                    }
                 }
                 // wait for the last write to complete
+                int countdown_to_doom = -1;
                 for (SetNodeChannels setter: setters) {
                     // TODO this is the logic which is causing a problem.
                     // TODO a bad version error from Zookeeper causes this to retry even those it already has tried.
@@ -722,7 +723,8 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
                     // TODO do I have a guarantee that the retry produces the same assignment?
                     // TODO I don't think so - a node is getting killed - but if I do, a partial retry will work.
-                    if (setter.getCallbackCode() != Code.OK && !m_done.get()) {
+                     if (countdown_to_doom++ == 0) {
+                    //if (setter.getCallbackCode() != Code.OK && !m_done.get()) {
                         LOG.warn(
                                 "LEADER (" + m_hostId
                                 + ") Retrying channel assignment because write attempt to "
@@ -1259,6 +1261,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 } while (!m_specs.compareAndSet(prev, mbldr.build(), sstamp[0], sstamp[0]+1));
 
                 if (hval.equals(m_hostId) && !m_done.get()) {
+                    // BSDBG
                     ChannelAssignment assignment = new ChannelAssignment(
                             oldspecs, nspecs, stat.getVersion()
                             );
