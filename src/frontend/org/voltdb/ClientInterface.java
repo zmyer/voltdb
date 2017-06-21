@@ -89,6 +89,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
@@ -1198,6 +1199,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         assert (procedure != null);
                     }
 
+                    if (clog.isDebugEnabled()) {
+                        if (TxnEgo.getPartitionId(response.getTxnId()) > 10000 ||
+                                CoreUtils.getHostIdFromHSId(response.getInitiatorHSId()) < 0) {
+                            clog.debug("Abnormal TxnId or InitiatorHSId, invocation: " + response.getInvocation() +
+                                    ((cihm != null) ? (", cihm: " + cihm.connection.connectionId()) : ""), new RuntimeException());
+                        }
+                    }
+
                     //Can be null on hangup
                     if (cihm != null) {
                         //Pass it to the network thread like a ninja
@@ -1340,6 +1349,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             buf.putInt(buf.capacity() - 4);
             response.flattenToBuffer(buf);
             buf.flip();
+            if (clog.isDebugEnabled()) {
+                clog.debug("Sending transaction dropped response for partition " + partitionId +
+                    " clientHandle " + inFlight.m_clientHandle + " ciHandle " + inFlight.m_ciHandle +
+                    " initiatorHSId " + inFlight.m_initiatorHSId + " procName " + inFlight.m_procName +
+                    " to connection " + c.connectionId());
+            }
             c.writeStream().enqueue(buf);
         }
 
