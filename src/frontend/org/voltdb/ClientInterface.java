@@ -1202,7 +1202,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     if (clog.isDebugEnabled()) {
                         if (TxnEgo.getPartitionId(response.getTxnId()) > 10000 ||
                                 CoreUtils.getHostIdFromHSId(response.getInitiatorHSId()) < 0) {
-                            clog.debug("Abnormal TxnId or InitiatorHSId, invocation: " + response.getInvocation() +
+                            clog.debug("Abnormal TxnId or InitiatorHSId, invocation: " + response +
                                     ((cihm != null) ? (", cihm: " + cihm.connection.connectionId()) : ""), new RuntimeException());
                         }
                     }

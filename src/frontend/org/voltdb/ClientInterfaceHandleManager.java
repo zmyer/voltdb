@@ -43,6 +43,7 @@ import com.google_voltpatches.common.collect.ImmutableMap.Builder;
  */
 public class ClientInterfaceHandleManager
 {
+    private static final VoltLogger clog = new VoltLogger("CIHM");
     private static final VoltLogger tmLog = new VoltLogger("TM");
 
     static final long READ_BIT = 1L << 63;
@@ -251,6 +252,11 @@ public class ClientInterfaceHandleManager
 
         m_outstandingTxns++;
         m_acg.increaseBackpressure(messageSize);
+
+        if (clog.isDebugEnabled()) {
+            clog.debug("getHandle() returned " + ciHandle, new RuntimeException());
+        }
+
         return ciHandle;
     }
 
