@@ -84,6 +84,7 @@ public final class InvocationDispatcher {
     private static final VoltLogger authLog = new VoltLogger("AUTH");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
+    private static final VoltLogger clog = new VoltLogger("CIHM");
 
     public enum OverrideCheck {
         NONE(false, false, false),
@@ -745,6 +746,10 @@ public final class InvocationDispatcher {
         // do at the top of this method won't release any backpressure accounting.
 
         // actually kick off the NT proc
+        if (clog.isDebugEnabled()) {
+            clog.debug("JUNK_ID cihm connection id: " + connectionId + ", ccxn connection id: " + ccxn.connectionId() +
+                ", task: " + task);
+        }
         m_NTProcedureService.callProcedureNT(handle,
                                              user,
                                              ccxn,

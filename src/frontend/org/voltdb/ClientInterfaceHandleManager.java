@@ -254,7 +254,7 @@ public class ClientInterfaceHandleManager
         m_acg.increaseBackpressure(messageSize);
 
         if (clog.isDebugEnabled()) {
-            clog.debug("getHandle() returned " + ciHandle, new RuntimeException());
+            clog.debug("getHandle() returned " + ciHandle + ", cihm: " + connection.connectionId(), new RuntimeException());
         }
 
         return ciHandle;

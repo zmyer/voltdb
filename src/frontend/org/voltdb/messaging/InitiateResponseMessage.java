@@ -20,6 +20,7 @@ package org.voltdb.messaging;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
@@ -37,6 +38,7 @@ import org.voltdb.iv2.TxnEgo;
  */
 public class InitiateResponseMessage extends VoltMessage {
 
+    private static final VoltLogger clog = new VoltLogger("CIHM");
     private long m_txnId;
     private long m_spHandle;
     private long m_initiatorHSId;
@@ -65,6 +67,9 @@ public class InitiateResponseMessage extends VoltMessage {
                                                                    long connectionId,
                                                                    ClientResponseImpl response)
     {
+        if (clog.isDebugEnabled()) {
+            clog.debug("messageForNTProcResponse() called", new RuntimeException());
+        }
         InitiateResponseMessage irm = new InitiateResponseMessage();
         irm.m_txnId = -2;
         irm.m_spHandle = -2;
