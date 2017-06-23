@@ -99,6 +99,9 @@ public enum TxnId2Utils {;
                 cr = e.getClientResponse();
                 String ss = cr.getStatusString();
                 log.debug(ss);
+                if (proc.equals("@AdHoc")) {
+                    log.info("doProcCall: Param: " + parms[0] + ", status: " + ss);
+                }
                 if (isConnectionTransactionOrCatalogIssue(ss)
                     ) { /* continue */ }
                 else if (isServerUnavailableIssue(ss)) {
