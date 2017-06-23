@@ -102,6 +102,10 @@ public class ClientInterfaceHandleManager
         return "(pid " + getPartIdFromHandle(handle) + " seq " + getSeqNumFromHandle(handle) + ")";
     }
 
+    private boolean isShortCircuitReadHandle(long handle) {
+        return (handle >> PART_ID_SHIFT) == SHORT_CIRCUIT_PART_ID;
+    }
+
     static class Iv2InFlight
     {
         final long m_ciHandle;
@@ -293,6 +297,12 @@ public class ClientInterfaceHandleManager
             m_outstandingTxns--;
             return inflight;
         }
+        else if (isShortCircuitReadHandle(ciHandle)) {
+            if (clog.isDebugEnabled()) {
+                clog.debug("findHandle(): Tolerate missing short circuit read CI handle " + ciHandle);
+            }
+            return null;
+        }
 
         /*
          * Not a short circuit read, check the partition specific
@@ -362,6 +372,12 @@ public class ClientInterfaceHandleManager
             m_acg.reduceBackpressure(inflight.m_messageSize);
             m_outstandingTxns--;
             return inflight;
+        }
+        else if (isShortCircuitReadHandle(ciHandle)) {
+            if (clog.isDebugEnabled()) {
+                clog.debug("removeHandle(): Tolerate missing short circuit read CI handle " + ciHandle);
+            }
+            return null;
         }
 
         /*
