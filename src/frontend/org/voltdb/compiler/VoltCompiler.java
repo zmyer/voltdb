@@ -24,6 +24,7 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -68,6 +69,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
 import org.voltdb.compilereport.ReportMaker;
+import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.utils.CatalogSchemaTools;
@@ -156,6 +158,9 @@ public class VoltCompiler {
     private final HashSet<Class<?>> m_cachedAddedClasses = new HashSet<>();
 
     private final boolean m_isXDCR;
+
+    // Whether or not to use SQLCommand as a pre-processor for DDL (in voltdb init --classes). Default is false.
+    private boolean m_filterWithSQLCommand = false;
 
     /**
      * Represents output from a compile. This works similarly to Log4j; there
@@ -401,10 +406,7 @@ public class VoltCompiler {
      * @return true if successful
      * @throws VoltCompilerException
      */
-    public boolean compileFromDDL(
-            final String jarOutputPath,
-            final String... ddlFilePaths)
-    {
+    public boolean compileFromDDL(final String jarOutputPath, final String... ddlFilePaths) {
         if (ddlFilePaths.length == 0) {
             compilerLog.error("At least one DDL file is required.");
             return false;
@@ -418,6 +420,58 @@ public class VoltCompiler {
             return false;
         }
         return compileInternalToFile(jarOutputPath, null, null, ddlReaderList, null);
+    }
+
+    /** Compiles a catalog from a user provided schema and (optional) jar file. */
+    public boolean compileFromSchemaAndClasses(
+            final File schemaPath,
+            final File classesJarPath,
+            final File catalogOutputPath)
+    {
+        if (schemaPath == null || !schemaPath.exists()) {
+            compilerLog.error("Cannot compile nonexistent or missing schema.");
+            return false;
+        }
+
+        List<VoltCompilerReader> ddlReaderList;
+        try {
+            ddlReaderList = DDLPathsToReaderList(schemaPath.getAbsolutePath());
+        }
+        catch (VoltCompilerException e) {
+            compilerLog.error("Unable to open schema file \"" + schemaPath + "\"", e);
+            return false;
+        }
+
+        InMemoryJarfile inMemoryUserJar = null;
+        ClassLoader originalClassLoader = m_classLoader;
+        try {
+            if (classesJarPath != null && classesJarPath.exists()) {
+                // Make user's classes available to the compiler and add all VoltDB artifacts to theirs (overwriting any existing VoltDB artifacts).
+                // This keeps all their resources because stored procedures may depend on them.
+                inMemoryUserJar = new InMemoryJarfile(classesJarPath);
+                m_classLoader = inMemoryUserJar.getLoader();
+            } else {
+                inMemoryUserJar = new InMemoryJarfile();
+            }
+            if (compileInternal(null, null, ddlReaderList, inMemoryUserJar) == null) {
+                return false;
+            }
+        } catch (IOException e) {
+            compilerLog.error("Could not load classes from user supplied jar file", e);
+            return false;
+        } finally {
+            m_classLoader = originalClassLoader;
+        }
+
+        try {
+            inMemoryUserJar.writeToFile(catalogOutputPath).run();
+            return true;
+        }
+        catch (final Exception e) {
+            e.printStackTrace();
+            addErr("Error writing catalog jar to disk: " + e.getMessage());
+            return false;
+        }
     }
 
     /**
@@ -957,7 +1011,6 @@ public class VoltCompiler {
         if (cannonicalDDLIfAny != null) {
             // add the file object's path to the list of files for the jar
             m_ddlFilePaths.put(cannonicalDDLIfAny.getName(), cannonicalDDLIfAny.getPath());
-
             ddlcompiler.loadSchema(cannonicalDDLIfAny, db, whichProcs);
         }
 
@@ -972,7 +1025,13 @@ public class VoltCompiler {
                 // add the file object's path to the list of files for the jar
                 m_ddlFilePaths.put(schemaReader.getName(), schemaReader.getPath());
 
-                ddlcompiler.loadSchema(schemaReader, db, whichProcs);
+                if (m_filterWithSQLCommand) {
+                    SQLParser.FileInfo fi = new SQLParser.FileInfo(schemaReader.getPath());
+                    ddlcompiler.loadSchemaWithFiltering(schemaReader, db, whichProcs, fi);
+                }
+                else {
+                    ddlcompiler.loadSchema(schemaReader, db, whichProcs);
+                }
             }
             finally {
                 m_currentFilename = origFilename;
@@ -1655,6 +1714,10 @@ public class VoltCompiler {
         m_procInfoOverrides = procInfoOverrides;
     }
 
+    public void setInitializeDDLWithFiltering(boolean flag) {
+        m_filterWithSQLCommand = flag;
+    }
+
     /**
      * Helper enum that scans sax exception messages for deprecated xml elements
      *
@@ -1794,7 +1857,9 @@ public class VoltCompiler {
             String path = entry.getKey();
             // SOMEDAY: It would be better to have a manifest that explicitly lists
             // ddl files instead of using a brute force *.sql glob.
-            if (path.toLowerCase().endsWith(".sql")) {
+            // Ignore non-root level sql
+            boolean isRootFile = Paths.get(path).getNameCount() == 1;
+            if (isRootFile && path.toLowerCase().endsWith(".sql")) {
                 ddlReaderList.add(new VoltCompilerJarFileReader(jarfile, path));
                 compilerLog.trace("Added SQL file from jarfile to compilation: " + path);
             }

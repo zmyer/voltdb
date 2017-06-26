@@ -53,6 +53,8 @@ def init(runner):
         runner.args.extend(['force'])
     if runner.opts.schema:
         runner.args.extend(['schema', runner.opts.schema])
+    if runner.opts.classes_jarfile:
+        runner.args.extend(['classes', runner.opts.classes_jarfile])
 
     args = runner.args
     if runner.opts.classes_jarfile:

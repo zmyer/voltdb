@@ -115,7 +115,9 @@ public interface SiteProcedureConnection {
             long[] inputDepIds,
             Object[] parameterSets,
             DeterminismHash determinismHash,
-            SQLStmt[] stmts,
+            String[] sqlTexts,
+            boolean[] isWriteFrags,
+            int[] sqlCRCs,
             long txnId,
             long spHandle,
             long uniqueId,
@@ -231,4 +233,6 @@ public interface SiteProcedureConnection {
      * binary log stream when we set protocol version.
      */
     public void setDRProtocolVersion(int drVersion, long spHandle, long uniqueId);
+
+    public void setDRStreamEnd(long spHandle, long uniqueId);
 }

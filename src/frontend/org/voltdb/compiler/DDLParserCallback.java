@@ -15,18 +15,14 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.processtools;
-
-import org.voltdb.processtools.ProcessData.OutputLine;
+package org.voltdb.compiler;
 
 /**
- * Implement this interface to handle output for a process.
+ * Callback interface for filtering during parsing operations.
  *
+ * @author jcrump
  */
-public interface OutputHandler {
-    /**
-     * Called when a new line from standard output or error is available.
-     * @param line
-     */
-    public void update(OutputLine line);
+public interface DDLParserCallback {
+    public void statement(String statement, int lineNum) throws VoltCompiler.VoltCompilerException;
+    public void batch(String batch, int batchEndLineNum) throws VoltCompiler.VoltCompilerException;
 }

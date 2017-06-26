@@ -3,6 +3,7 @@
 	<classpathentry kind="src" path="src/frontend"/>
 	<classpathentry kind="src" path="tests/frontend"/>
 	<classpathentry kind="src" path="tests/testprocs"/>
+	<classpathentry kind="src" path="tests/testfuncs"/>
 	<classpathentry kind="src" path="tests/hsqldb"/>
 	<classpathentry kind="src" path="src/hsqldb19b3"/>
 	<classpathentry kind="src" path="third_party/java/src"/>
@@ -30,7 +31,6 @@
 	<classpathentry kind="lib" path="lib/jna.jar"/>
 	<classpathentry kind="lib" path="lib/protobuf-java-3.1.0.jar"/>
 	<classpathentry kind="lib" path="lib/snappy-java-1.1.1.7.jar"/>
-	<classpathentry kind="lib" path="lib/jsch-0.1.51.jar"/>
 	<classpathentry kind="lib" path="lib/super-csv-2.1.0.jar"/>
 	<classpathentry kind="lib" path="lib/owner-1.0.9.jar"/>
 	<classpathentry kind="lib" path="lib/owner-java8-1.0.9.jar"/>

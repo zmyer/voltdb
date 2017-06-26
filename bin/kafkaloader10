@@ -69,20 +69,12 @@ done
 this="$(pwd -P)/$this"
 popd > /dev/null
 # the root of the VoltDB installation
-export VOLTDB_HOME=$(dirname $(dirname "$this"))
+VOLTDB_HOME=$(dirname $(dirname "$this"))
 
-# detect and adjust for Linux package installation vs. VoltDB distribution
-if [ -d $VOLTDB_HOME/../../lib/voltdb ]; then
-    # Linux package installation puts all libraries in /usr/lib/voltdb
-    VOLTDB_VOLTDB=$(dirname $(dirname "$VOLTDB_HOME"))/lib/voltdb
-    VOLTDB_LIB=$VOLTDB_VOLTDB
-    BUNDLES_DIR=$(dirname $(dirname "$VOLTDB_HOME"))/bundles
-else
-    # distribution puts third party jars in lib and voltdb libraries in voltdb
-    VOLTDB_VOLTDB=$VOLTDB_HOME/voltdb
-    VOLTDB_LIB=$VOLTDB_HOME/lib
-    BUNDLES_DIR=$VOLTDB_HOME/bundles
-fi
+# path to voltdb and bundle jars
+VOLTDB_VOLTDB=$VOLTDB_HOME/voltdb
+BUNDLES_DIR=$VOLTDB_HOME/bundles
+VOLTDB_LIB=$VOLTDB_HOME/lib
 
 JAVA=`which java`
 if [ x"$JAVA_HEAP_MAX" = "x" ]
@@ -131,16 +123,17 @@ else
   exit 1
 fi
 
-# add libs to CLASSPATH
-for f in $VOLTDB_LIB/*.jar; do
-  CLASSPATH=${CLASSPATH}:$f;
-done
+SUPERCSV=$VOLTDB_LIB/super-csv-2.1.0.jar
+if [ ! -f ${SUPERCSV} ]; then
+  echo "Couldn't find ${SUPERCSV} jar file."
+  exit 1
+fi
+CLASSPATH=${CLASSPATH}:${SUPERCSV}
 
-# Add formatter lib if using --formatter option.
+# add formatter lib if using --formatter option.
 for f in $FORMATTER_LIB/*.jar; do
   CLASSPATH=${CLASSPATH}:$f;
 done
-
 
 # run it
 export CMDVAL="$JAVA -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Djava.awt.headless=true $JAVA_HEAP_MAX $VOLTDB_OPTS -Dlog4j.configuration=file://${LOG4J_CONFIG_PATH} "
