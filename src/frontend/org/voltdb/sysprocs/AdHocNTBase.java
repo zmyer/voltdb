@@ -405,7 +405,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
      * Take a set of adhoc plans and pass them off to the right transactional
      * adhoc variant.
      */
-    private final CompletableFuture<ClientResponse> createAdHocTransaction(
+    protected final CompletableFuture<ClientResponse> createAdHocTransaction(
             final AdHocPlannedStmtBatch plannedStmtBatch,
             final boolean isSwapTables)
                     throws VoltTypeException

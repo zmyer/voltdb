@@ -481,4 +481,8 @@ public class CatalogContext {
     public InMemoryJarfile getCatalogJar() {
         return m_jarfile;
     }
+
+    public Table getTable(String tableName) {
+        return tables.get(tableName);
+    }
 }
