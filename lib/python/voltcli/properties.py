@@ -20,7 +20,136 @@ class property_def():
         self.name = name
         self.multi = repeatable
         self.uniquechild = uniquechild
-
+class global_property_def():
+    def __init__(self,name,deftype,savefile,settype,setdef,allowed):
+        self.definition = name.strip()
+        self.type = deftype.strip()
+        self.savefile = savefile.strip()
+        self.settype = settype.strip()
+        self.setdef = setdef.strip()
+        self.allowed = allowed.strip()
+        
+class property_instance():
+    def __init__(self,definition,value,uniqueIDs):
+        self.definition = definition
+        self.value = value
+        self.uniqueIDs = uniqueIDs
+        self.setdef = None
+        DEBUG("Defining property instance:\n" + self.definition \
+        + "\n" + self.value)
+        
+        
+    def validate(self, condition):
+        global PROPERTY_DEFS
+        
+        # Look for a matching property
+        property = None
+        for p in PROPERTY_DEFS:
+            #DEBUG("Matching " + self.definition + " to " + p.definition)
+            if p.definition == self.definition:
+                property = p
+                break
+                
+        # If no property found, undefined
+        if property is None:
+            WARNING("Unrecognized property name: " + self.definition)
+            return False
+            
+        # Store the set definition for later
+        self.setdef = property.setdef
+        
+        # If condition is not allowed, false
+        allowed = property.allowed
+        #DEBUG   ("Checking [" + allowed + "] for condition " + str(condition) + " (" + allowed[condition-1:condition] + ")")
+        if allowed[condition-1:condition] == "0":
+            WARNING("The property " + self.definition + " cannot be set at this time.")
+            return False
+            
+        return True
+        
+    def get_xmldef():
+        global PROPERTY_DEFS
+        
+        
+class tokenizer():
+    def __init__(self,input):
+        self.buffer = input
+        
+    def gettoken(self):
+        # first trim the string
+        self.buffer = self.buffer.strip()
+        
+        # return nothing if we are at the end of the buffer
+        if len(self.buffer) == 0: return None
+        
+        #Check to see if this is quoted
+        quoted = self.pullquote()
+        if quoted: return quoted
+        
+        # Look for valid tokens
+        token = ""
+        p = [-1,-1,-1,-1,-1,-1]
+        p[0] = self.buffer.find(".")
+        p[1] = self.buffer.find("\"")
+        p[2] = self.buffer.find("(")
+        p[3] = self.buffer.find(")")
+        p[4] = self.buffer.find(":")
+        p[5] = self.buffer.find("*")
+        nexttoken = -1
+        for i in range(0,len(p)):
+            if p[i] == 0:
+                retval = self.buffer[0:1]
+                self.buffer = self.buffer[1:]
+                return retval
+            if nexttoken < 0: nexttoken = p[i]
+            if p[i] > 0 and p[i] < nexttoken: nexttoken = p[i]
+        
+        # if the next character is not a valid token, return the string
+        # up to the next token
+        if nexttoken > 0:
+            retval = self.buffer[0:nexttoken].strip()
+            self.buffer = self.buffer[nexttoken:]
+        else:
+            retval = self.buffer.strip()
+            self.buffer = ""
+        return retval
+                
+        
+    def getremainder(self):
+        return self.buffer
+    def gettotoken(self,token):
+        p = self.buffer.find(token)
+        if p < 0: return None
+        retval = self.buffer[:p]
+        self.buffer = self.buffer[p+1:]
+        return retval
+        
+    def pullquote(self):
+    # See if the next token is quoted
+        if self.buffer[0:1] is not "\"": return None
+        buff = self.buffer
+        retval = ""
+        state = 0
+        for i in range(0,len(buff)):
+            if state == 0:
+                if buff[i,i+1] == "\"":
+                    # end of quote
+                    self.buffer = buff[1:]
+                    return retval
+                if buff[i,i+1] == "\\":
+                    # escape next character
+                    retval = retval + buff[1:2]
+                    buff = buff[2:]
+            else:
+                retval = retval + buff[0:1]
+                buff = buff [1:]
+        
+        # If we get here, the quote is unfinished
+        FATAL("Unmatched quotation marks.")
+        return None
+            
+        
+        
 ############# INTERNAL FUNCTIONS
 
 def ttype(t):
@@ -120,9 +249,79 @@ def load_property_defs():
     
     pass
     # This still needs to be defined.
+
+def load_global_property_defs():
+    # This function loads all property definitions,
+    # including  properties and XML equivalents
+    global PROPDEFROOT
+    global PROPERTY_DEFS
+    SET_DEBUG(True)
+
+    filename = PROPDEFROOT + "properties-model.csv"
+    try:
+        f = open(os.path.abspath(os.path.expanduser(filename)),"r")
+    except Exception as e:
+        FATAL("Cannot read properties definition file " + filename + "\n" + str(e))
+        
+    property_file_lines = f.readlines()
+    #DEBUG("Properties file length: " + str(len(property_file_lines)))
+
+    PROPERTY_DEFS = []
+    linecount = 0
+    for line in property_file_lines:
+        linecount = linecount + 1
+        tokens = line.split(",")
+        if len(tokens) == 1 and len(tokens[0].strip()) == 0: 
+            #DEBUG("Blank line")
+            continue
+        if tokens[0].strip()[0:1] == "#": 
+            #DEBUG("Comment")
+            continue
+        if len(tokens) < 6:  FATAL("Invalid property definition in properties model. only " \
+            + str(len(tokens)) + " elements on line " + str(linecount) )
+        PROPERTY_DEFS.append(global_property_def(tokens[0],tokens[1],tokens[2],tokens[3],tokens[4],tokens[5]))
+        
+    DEBUG(str(len(PROPERTY_DEFS)) + " properties defined.")
+    
     
 ###############     EXTERNAL FUNCTIONS
 
+def load_property_instance(text):
+    definition = ""
+    value = None
+    uniqueID = []
+    t = tokenizer(text)
+    state = 0  # wait for token
+    
+    while state < 99:
+        if state == 0:
+            name = t.gettoken()
+            #INFO("Token [" + name + "]")
+            
+            if name == "(":
+                unique = t.gettotoken(")").strip()
+                definition = definition + "(*)"
+                if  uniqueID is None:
+                    FATAL("Invalid property definition. Mismatched parentheses.")
+                    return None
+                else:
+                    uniqueID.append(unique)
+                continue
+                
+            if name == ":":
+                #declaration is complete, now for value
+                value = t.getremainder().strip()
+                state = 99
+                continue
+                
+            if name is None:
+                WARNING("Incomplete property definition ignored: " + text)
+                return None
+            definition = definition + name.strip()
+            
+    # If no qualifiers, set it to null
+    if len(uniqueID) == 0: uniqueID = None
+    return property_instance(definition,value,uniqueID)
 
 def load(filename):
     global property_file_lines, tokens, t

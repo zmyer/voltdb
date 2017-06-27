@@ -2,7 +2,7 @@ import  os, sys
 #import xml.etree.ElementTree as ET
 #from lxml import etree as ET
 import xml.dom.minidom
-from xml.dom.minidom import parse,Node
+from xml.dom.minidom import parse,parseString,Node
 
 from proputils import INFO, WARNING, ERROR, FATAL,DEBUG, SET_DEBUG
 import properties
@@ -46,26 +46,15 @@ def loadxmlstring(text):
     DEBUG("READ DEPLOYMENT STRING")
     tree = None
     try:
-        tree = parseString(filename)
+        tree = parseString(text)
     except Exception as e:
-        FATAL("Cannot parse deployment file " + filename + ". " + str(e))
+        FATAL("Cannot parse configuration file text. " + str(e))
         
     return tree
 
-def getxmlnode(root,xmlprop):
-    searchfor = prop2xmlsearch(xmlprop)
-    DEBUG('GET XML NODE ' + xmlprop)
-    pass
+def getxmldom(root):
 
-def setxmlnode(root,xmlprop):
-    searchfor = prop2xmlsearch(xmlprop)
-    DEBUG('GET XML NODE ' + xmlprop)
-    pass
-    
-def writexmlfile(root,filename):
-    DEBUG('GET XML NODE ' + xmlprop)
-    pass
-
+        return root.toxml()
 
 def walktree(xml,root):
     global deployprops, deploypropsdict
@@ -92,7 +81,7 @@ def walktree(xml,root):
             INFO("NODE " + newroot)
             walktree (child, newroot) 
        
-def getxml(r,p):
+def getxml(r,p,uniqueIDs):
     props = p.split(".")
 
     root = r
@@ -124,13 +113,13 @@ def getxml(r,p):
         if c.nodeType == Node.TEXT_NODE: return c.data
     return "[no value]"
                 
-def setxml(r,p,v):
+def setxml(r,p,v,uniqueIDs):
 
     props = p.split(".")
     root = r
     level = 0
     if (root.nodeType == Node.DOCUMENT_NODE):
-        r = root.getElementsByTagName("deployment")
+        root = root.getElementsByTagName("deployment")[0]
     for n in props:
         # Check if first element is valid
         if level == 0 and root.nodeType == Node.ELEMENT_NODE:
@@ -162,7 +151,7 @@ def setxml(r,p,v):
             else:
                 # Need to create a node etc.
                 newroot = r.createElement(n)
-                root.appendNode(newroot)
+                root.appendChild(newroot)
                 root = newroot
     # If we get here, we ned to add a text node
     return "[no value]"

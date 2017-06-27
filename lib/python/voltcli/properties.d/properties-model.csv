@@ -1,8 +1,55 @@
-PropertyName,Type,Multiples,Required,Default,WhenAllowed,WhenDisallowed
-# ,Type values: tbd,,,,,
-# ,"Multiples, required values: 0 = no, 1 = yes",,,,,
-# ,Default values: any string,,,,,
-# ,"WhenAllowed, WhenDisallowed values: n.n.n.n where n is 1 for true, 0 for false in this order: init, running, recover, restart",,,,,
-# ,Type values: tbd,,,,,
-port.http,,0,0,8080,1.0.1.1,0.1.0.0
-port.internal,,0,0,3021,1.0.1.1,0.1.0.0
+#PropertyName,SaveType,SaveLocation,SetType,SetDefinition,Allowed
+# SaveType: property,xml
+# SaveLocation: name/location of property file where stored on init or start
+# SetType: cli,xml
+# SetDefinition: either xml-definition or CLI-Definition
+# Allowed: four digits, zero or one, indicating changes allowed on:
+#   1st: init
+#   2nd: Fresh start (no cmd logs)
+#   3rd: Start with cmd logs
+#   4th: Update on running database
+port.http,property,ports.conf,cli,httpport *,1110
+port.client,property,ports.conf,cli,clientport *,1110
+port.admin,property,ports.conf,cli,adminport *,1110
+port.internal,property,ports.conf,cli,internalport *,1110
+
+
+sitesperhost,xml,,xml,cluster.:sitesperhost,1100
+kfactor,xml,,xml,cluster.:kfactor,1100
+
+heartbeat.timeout,xml,,xml,heartbeat.:timeout,1111
+query.timeout,xml,,xml,systemsettings.query.:timeout,1111
+
+
+partition_detection.enabled,xml,,xml,partition_detection.enabled,1100
+
+
+commandlog.synchronous,xml,,xml,cluster.:sitesperhost,1100
+commandlog.frequency.time,xml,,xml,cluster.:sitesperhost,1100
+
+dr.id,xml,,xml,dr.:id,1100
+dr.connection,xml,,xml,dr.connection.:source,1111
+
+
+
+# Turn on security
+security,xml,,xml,security.:enabled,1111
+
+# Define new set of users
+users.user(*).password,xml,,xml,users.user.:username(*).:password,1111
+users.user(*).roles,xml,,xml,users.user.:username(*).:roles,1111
+
+
+
+# resource monitoring
+monitor.frequency,xml,,xml,systemsettings.resourcemonitor.:frequency,1111
+monitor.disk.snapshots.size,xml,,xml,systemsettings.resourcemonitor.disklimit.feature.:name(snapshots).:size,1111
+monitor.disk.snapshots.alert,xml,,xml,systemsettings.resourcemonitor.disklimit.feature.:name(snapshots).:alert,1111
+monitor.disk.commandlog.size,xml,,xml,systemsettings.resourcemonitor.disklimit.feature.:name(commandlog).:size,1111
+monitor.disk.commandlog.alert,xml,,xml,systemsettings.resourcemonitor.disklimit.feature.:name(commandlog).:alert,1111
+monitor.disk.commandlog,xml,,xml,systemsettings.resourcemonitor.frequency,1111
+monitor.memory.size,xml,,xml,systemsettings.resourcemonitor.memorylimit.:size,1111
+monitor.memory.alert,xml,,xml,systemsettings.resourcemonitor.memorylimit.:alert,1111
+
+#Special
+remove,,,special,,1111
