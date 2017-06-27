@@ -404,13 +404,13 @@ class VerbRunner(object):
         utility.verbose_info(response)
         return utility.VoltResponseWrapper(response)
 
-    def java_execute(self, java_class, java_opts_override, *args, **kwargs):
+    def java_execute(self, java_class, java_opts_override, uses_hugepages, *args, **kwargs):
         """
         Execute a Java program.
         """
         if utility.kwargs_get_boolean(kwargs, 'daemon', default=False):
             kwargs['daemonizer'] = self._get_daemonizer(**kwargs)
-        self.java.execute(java_class, java_opts_override, *args, **kwargs)
+        self.java.execute(java_class, java_opts_override, uses_hugepages, *args, **kwargs)
 
     def setup_daemon_kwargs(self, kwargs, name=None, description=None, output=None):
         """
