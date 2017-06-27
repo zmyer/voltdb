@@ -29,6 +29,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.regex.Matcher;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CatalogContext;
@@ -55,50 +56,76 @@ public class NibbleDeletes extends AdHocNTBase {
 
     public static Integer BATCH_DELETE_TUPLE_COUNT = 1; // batch size of a SP transaction to delete tuples
 
-    /**
-     * TODO(xin):
-     * @param deleteQuery
-     * @return quick error response or null as valid supported query
-     */
-    private CompletableFuture<ClientResponse> checkQuery(String deleteQuery) {
-        if (deleteQuery != null) return null;
+    // DELETE FROM table WHERE clause
+    // No support of ORDER BY LIMIT OFFSET
+    static class DeleteQueryInfo {
+        String normalizedQuery = null;
+        String tableName = null;
+        String whereClause = null;
 
+        public boolean isValidQuery() {
+            if (normalizedQuery == null || tableName == null || whereClause == null) {
+                return false;
+            }
+            return true;
+        }
+    }
+
+    static private DeleteQueryInfo generateQueryInfo(String deleteQuery) {
         if (deleteQuery == null) {
-            return makeQuickResponse(
-                    ClientResponse.GRACEFUL_FAILURE,
-                    "No SQL statement provided for @NibbleDeletes");
+            throw new RuntimeException("No SQL statement provided for @NibbleDeletes");
         }
 
         final List<String> sqlStatements = SQLLexer.splitStatements(deleteQuery);
         if (sqlStatements.size() != 1) {
-            return makeQuickResponse(
-                    ClientResponse.GRACEFUL_FAILURE,
-                    "Only one DELETE query is supported for @NibbleDeletes, but gets " + sqlStatements.size()
-                    + " statements: " + Arrays.toString(sqlStatements.toArray()));
+            throw new RuntimeException("Only one DELETE query is supported for @NibbleDeletes, but gets " + sqlStatements.size()
+            + " statements: " + Arrays.toString(sqlStatements.toArray()));
         }
+
+        String normalizedQuery = sqlStatements.get(0);
 
         // validate Delete Query Type
-        if (checkQuery(deleteQuery) != null) {
-            return makeQuickResponse(
-                    ClientResponse.GRACEFUL_FAILURE,
-                    "Only one DELETE query is supported for @NibbleDeletes");
+        Matcher matcher = SQLLexer.matchDeleteStatement(normalizedQuery);
+        if (!matcher.find()) {
+            throw new RuntimeException("Only DELETE query with WHERE clause is supported for @NibbleDeletes, but received: " + deleteQuery);
         }
 
-        return null;
+        DeleteQueryInfo queryInfo = new DeleteQueryInfo();
+
+        int groupsize = matcher.groupCount();
+        for (int i = 0; i < groupsize; i++) {
+//            System.err.println("group " + i + " -> " + matcher.group(i));
+
+            queryInfo.normalizedQuery= matcher.group(0);
+            queryInfo.tableName = matcher.group(1);
+            queryInfo.whereClause = matcher.group(2);
+            Matcher orderby = SQLLexer.matchOrderbyStatement(queryInfo.whereClause);
+            if (orderby.find()) {
+                throw new RuntimeException("ORDER BY clause is not supported for @NibbleDeletes: " + deleteQuery);
+            }
+            // If the query has a limit
+            // it should generate non-content deterministic error
+        }
+
+        if (! queryInfo.isValidQuery()) {
+            throw new RuntimeException("DELETE query is not supported for @NibbleDeletes: " + deleteQuery);
+        }
+
+        return queryInfo;
     }
 
-    private static String generateOrderbyLimitClause(String query, CatalogContext context) {
-        // generate order by columns
-        // generate limit statement
-
-        Table table = context.getTable("P1");
-
+    // generate order by columns
+    // generate limit statement
+    private static String generateOrderbyLimitClause(Table table) {
         Index uniqueIndex = null;
         Index uniqueExpressionIndex = null;
         // find primary key or unique index
         for (Index index: table.getIndexes()) {
+            if (! index.getPredicatejson().isEmpty()) {
+                // skip predicate index
+                continue;
+            }
             if (index.getUnique()) {
-                // TODO(xin): check predicate index as well
                 if (index.getExpressionsjson().isEmpty()) {
                     uniqueIndex = index;
                     break;
@@ -110,8 +137,6 @@ public class NibbleDeletes extends AdHocNTBase {
         if (uniqueIndex != null) {
             List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(uniqueIndex.getColumns(), "index");
 
-            // TODO(xin): check for existing order by statement
-
             String orderByStmt = " order by ";
             for (int i = 0; i < indexedColRefs.size(); i++) {
                 ColumnRef cr = indexedColRefs.get(i);
@@ -120,15 +145,14 @@ public class NibbleDeletes extends AdHocNTBase {
                     orderByStmt += ", ";
                 }
             }
-            return query + orderByStmt + " limit " + BATCH_DELETE_TUPLE_COUNT + ";";
+            return orderByStmt + " limit " + BATCH_DELETE_TUPLE_COUNT + ";";
         }
         assert(uniqueIndex == null);
         if (uniqueExpressionIndex == null) {
             throw new RuntimeException("At leaset one unique index is needed, but found nothing");
         }
 
-        // TODO:
-        // generate an ORDER BY statement based on expression unique
+        // TODO: generate an ORDER BY statement based on expression unique
         throw new RuntimeException("Unique expression index is not supported right now");
     }
 
@@ -154,7 +178,6 @@ public class NibbleDeletes extends AdHocNTBase {
         return partitionKeys;
     }
 
-
     // TODO: use same input as AdHoc
     public CompletableFuture<ClientResponse> run(ParameterSet params) throws InterruptedException, ExecutionException {
         if (params.size() < 1) {
@@ -166,21 +189,27 @@ public class NibbleDeletes extends AdHocNTBase {
         String deleteQuery = (String) paramArray[0];
 
         // check input query
-        CompletableFuture<ClientResponse> resultFuture = checkQuery(deleteQuery);
-        if (resultFuture != null) {
-            return resultFuture;
+        DeleteQueryInfo queryInfo = null;
+        try {
+            queryInfo = generateQueryInfo(deleteQuery);
+        } catch (RuntimeException ex) {
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, ex.getMessage());
         }
+
+        CatalogContext context = VoltDB.instance().getCatalogContext();
+        Table table = context.getTable(queryInfo.tableName);
+        if (table.getIsreplicated()) {
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
+                    "DELETE statement for replicated table " + queryInfo.tableName + " is not supported for @NibbleDeletes");
+        }
+        // generate nibble delete query information
+        String nibbleDeleteQuery = queryInfo.normalizedQuery + generateOrderbyLimitClause(table);
+        System.err.println(nibbleDeleteQuery);
 
         Object[] userParams = null;
         if (paramArray.length > 1) {
             userParams = Arrays.copyOfRange(paramArray, 1, paramArray.length);
         }
-
-        CatalogContext context = VoltDB.instance().getCatalogContext();
-        // table?
-        // generate nibble delete query information
-        String nibbleDeleteQuery = generateOrderbyLimitClause(deleteQuery, context);
-        System.err.println(nibbleDeleteQuery);
 
         // plan force SP AdHoc query
         AdHocPlannedStatement result = null;

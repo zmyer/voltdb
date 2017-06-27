@@ -62,7 +62,7 @@ public class TestNibbleDeletes extends RegressionSuite {
         VoltTable vt;
 //        vt = client.callProcedure("@AdHoc", "delete from p1 where points > 3;").getResults()[0];
 
-        vt = client.callProcedure("@NibbleDeletes", "delete from p1 where points > 3").getResults()[0];
+        vt = client.callProcedure("@NibbleDeletes", "delete from p1 where points > 3;").getResults()[0];
         System.err.println(vt);
 
         vt = client.callProcedure("@AdHoc", "select * from P1;").getResults()[0];

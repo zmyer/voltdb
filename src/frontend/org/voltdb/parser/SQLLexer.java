@@ -129,6 +129,23 @@ public class SQLLexer extends SQLPatternFactory
             SPF.token("select")
         ).compile("PAT_SELECT_STATEMENT_PREAMBLE");
 
+    // Matches the start of a DELETE FROM table_name WHERE statement
+    private static final Pattern PAT_DELETE_WITH_WHERE_STATEMENT_PREAMBLE =
+        SPF.statementLeader(
+            SPF.token("delete"),
+            SPF.token("from"),
+            SPF.capture(SPF.databaseObjectName()),
+            SPF.token("where"),
+            SPF.capture(SPF.anyClause())
+        ).compile("PAT_DELETE_WITH_WHERE_STATEMENT_PREAMBLE");
+
+    public static final Pattern PAT_ORDER_BY_STATEMENT =
+        SPF.statement(
+            SPF.token("order"),
+            SPF.token("by"),
+            SPF.capture(SPF.anyClause())
+        ).compile("PAT_DELETE_WITH_WHERE_STATEMENT_PREAMBLE");
+
     // Capture group number defns for regex below.
     // Don't use capture labels because it is not supported in 1.6
     // and this class needs to compile in 1.6.
@@ -446,6 +463,15 @@ public class SQLLexer extends SQLPatternFactory
         return PAT_SELECT_STATEMENT_PREAMBLE.matcher(statement).matches();
     }
 
+    public static Matcher matchDeleteStatement(String statement)
+    {
+        return PAT_DELETE_WITH_WHERE_STATEMENT_PREAMBLE.matcher(statement);
+    }
+
+    public static Matcher matchOrderbyStatement(String statement)
+    {
+        return PAT_ORDER_BY_STATEMENT.matcher(statement);
+    }
     //========== Private ==========
 
     /**
