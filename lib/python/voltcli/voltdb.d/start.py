@@ -60,9 +60,9 @@ def start(runner):
     if runner.opts.enableadd:
         runner.args.extend(['enableadd'])
     os.environ['LD_PRELOAD'] = 'libhugetlbfs.so'
-    os.environ['HUGETLB_MORECORE'] = 'yes'
+    #os.environ['HUGETLB_MORECORE'] = 'yes'
     #os.environ['HUGETLB_MORECORE'] = '1G'
-    os.environ['HUGETLB_PATH'] = '/mnt/hugetlbfs'
-    os.environ['HUGETLB_VERBOSE'] = '3'
-    os.environ['HUGETLB_DEBUG'] = 'yes'
+    #os.environ['HUGETLB_PATH'] = '/mnt/hugetlbfs'
+    #os.environ['HUGETLB_VERBOSE'] = '2'
+    #os.environ['HUGETLB_DEBUG'] = 'yes'
     runner.go()

@@ -33,4 +33,5 @@
     hideverb=True
 )
 def recover(runner):
+    os.environ['LD_PRELOAD'] = 'libhugetlbfs.so'
     runner.go()

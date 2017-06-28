@@ -34,4 +34,5 @@
     hideverb=True
 )
 def create(runner):
+    os.environ['LD_PRELOAD'] = 'libhugetlbfs.so'
     runner.go()
