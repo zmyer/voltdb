@@ -610,10 +610,12 @@ public abstract class TheHashinator {
                 new VoltTable.ColumnInfo(CNAME_PARTITION_KEY, type)});
 
         synchronized (result) {
+            vt.resetRowPosition();
             int rowCount = vt.getRowCount();
             for (int i = 0; i < rowCount; i++) {
                 result.add(vt.fetchRow(i));
             }
+            vt.resetRowPosition();
         }
 
         return result;
