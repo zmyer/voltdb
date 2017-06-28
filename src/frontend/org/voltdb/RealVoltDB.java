@@ -1014,7 +1014,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             m_config.m_startAction = determination.startAction;
             m_config.m_hostCount = determination.hostCount;
-
+            m_config.m_missingHostCount = determination.hostCount - determination.joinHostCount;
             m_terminusNonce = determination.terminusNonce;
 
             // determine if this is a rejoining node
@@ -2846,6 +2846,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         hostLog.info(String.format("Host id of this node is: %d", m_myHostId));
         consoleLog.info(String.format("Host id of this node is: %d", m_myHostId));
 
+        criteria.determineFinalStartActionIfNeeded();
         MeshProber.Determination determination = criteria.waitForDetermination();
 
         // paused is determined in the mesh formation exchanged

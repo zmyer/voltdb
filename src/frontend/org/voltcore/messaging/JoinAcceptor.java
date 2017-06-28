@@ -84,6 +84,11 @@ public interface JoinAcceptor extends JSONString {
     public void detract(Set<Integer> hostIds);
 
     /**
+     * make final attempt to determine START action
+     */
+    public void determineFinalStartActionIfNeeded();
+
+    /**
      * On accepting a connection the acceptor is queried whether or
      * not the mesh plea should be accepted or not, and if it is not
      * if it can be retried

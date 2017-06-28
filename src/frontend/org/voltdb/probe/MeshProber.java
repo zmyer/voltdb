@@ -92,6 +92,7 @@ public class MeshProber implements JoinAcceptor {
     private static final String ENTERPRISE = "enterprise";
     private static final String TERMINUS_NONCE = "terminusNonce";
     private static final String MISSING_HOST_COUNT = "missingHostCount";
+    private static final int MISSING_NODE_OPTION_WAIT = Integer.getInteger("MISSING_NODE_OPTION_WAIT", 20) * 1000;
 
     private static final VoltLogger m_networkLog = new VoltLogger("NETWORK");
 
@@ -199,6 +200,7 @@ public class MeshProber implements JoinAcceptor {
     protected final String m_terminusNonce;
     protected final int m_missingHostCount;
     protected final HostCriteriaRef m_hostCriteria = new HostCriteriaRef();
+
     /*
      * on probe startup mode this future is set when there are enough
      * hosts to matched the configured cluster size
@@ -242,7 +244,6 @@ public class MeshProber implements JoinAcceptor {
         this.m_safeMode = safeMode;
         this.m_terminusNonce = terminusNonce;
         this.m_missingHostCount = missingHostCount;
-
         this.m_meshHash = Digester.md5AsUUID("hostCount="+ hostCountSupplier.get() + '|' + this.m_coordinators.toString());
     }
 
@@ -385,7 +386,6 @@ public class MeshProber implements JoinAcceptor {
     public JoinAcceptor.PleaDecision considerMeshPlea(ZooKeeper zk, int hostId, JSONObject jo) {
         checkArgument(zk != null, "zookeeper is null");
         checkArgument(jo != null, "json object is null");
-
         if (!HostCriteria.hasCriteria(jo)) {
             return new JoinAcceptor.PleaDecision(
                     String.format("Joining node version %s is incompatible with this node verion %s",
@@ -397,7 +397,6 @@ public class MeshProber implements JoinAcceptor {
 
         HostCriteria hc = new HostCriteria(jo);
         Map<Integer,HostCriteria> hostCriteria = m_hostCriteria.get();
-
         // host criteria must be strictly compatible only if no node is operational (i.e.
         // when the cluster is forming anew)
         if (   !getNodeState().operational()
@@ -467,26 +466,22 @@ public class MeshProber implements JoinAcceptor {
 
         HostCriteria hc = new HostCriteria(jo);
         checkArgument(!hc.isUndefined(), "json object does not contain host prober fields");
-
         Map<Integer,HostCriteria> expect;
         Map<Integer,HostCriteria> update;
-
         do {
             expect = m_hostCriteria.get();
             update = ImmutableMap.<Integer, HostCriteria>builder()
                 .putAll(Maps.filterKeys(expect, not(equalTo(hostId))))
                 .put(hostId, hc)
                 .build();
-
         } while (!m_hostCriteria.compareAndSet(expect, update));
 
-        determineStartActionIfNecessary(update);
+        determineStartActionIfNecessary(update, false);
     }
 
     @Override
     public void accrue(Map<Integer, JSONObject> jos) {
         checkArgument(jos != null, "map of host ids and json object is null");
-
         ImmutableMap.Builder<Integer, HostCriteria> hcb = ImmutableMap.builder();
         for (Map.Entry<Integer, JSONObject> e: jos.entrySet()) {
             HostCriteria hc = new HostCriteria(e.getValue());
@@ -504,17 +499,27 @@ public class MeshProber implements JoinAcceptor {
                 .putAll(Maps.filterKeys(expect, not(in(additions.keySet()))))
                 .putAll(additions)
                 .build();
-
         } while (!m_hostCriteria.compareAndSet(expect, update));
 
-        determineStartActionIfNecessary(update);
+        determineStartActionIfNecessary(update, false);
     }
 
+    @Override
+    public void determineFinalStartActionIfNeeded() {
+        Map<Integer,HostCriteria> update = m_hostCriteria.get();
+        if (m_missingHostCount > 0 && update.size() < getHostCount()) {
+            try {
+                Thread.sleep(MISSING_NODE_OPTION_WAIT);
+            } catch (InterruptedException e) {
+            }
+        }
+        determineStartActionIfNecessary(m_hostCriteria.get(), true);
+    }
     /**
      * Check to see if we have enough {@link HostCriteria} gathered to make a
      * start action {@link Determination}
      */
-    private void determineStartActionIfNecessary(Map<Integer, HostCriteria> hostCriteria) {
+    private void determineStartActionIfNecessary(Map<Integer, HostCriteria> hostCriteria, boolean skipMissingHostCount) {
         // already made a determination
         if (m_probedDetermination.isDone()) {
             return;
@@ -557,18 +562,23 @@ public class MeshProber implements JoinAcceptor {
                 ++haveTerminus;
             }
         }
-        int expectedHostCount = hostCount - missingHostCount;
+
+        int currentCount = hostCriteria.size();
+        int expectedHostCount = hostCount;
+        if (skipMissingHostCount) {
+            expectedHostCount -= missingHostCount;
+        }
+
         // not enough host criteria to make a determination
-        if (hostCriteria.size() < expectedHostCount && operational == 0) {
+        if (currentCount < expectedHostCount && operational == 0) {
             m_networkLog.debug("have yet to receive all the required host criteria");
             return;
         }
         // handle add (i.e. join) cases too
-        if (hostCount < getHostCount() && hostCriteria.size() <= expectedHostCount) {
+        if (hostCount < getHostCount() && currentCount < expectedHostCount) {
             m_networkLog.debug("have yet to receive all the required host criteria");
             return;
         }
-
         m_networkLog.debug("Received all the required host criteria");
 
         safemode = safemode && operational == 0 && bare < ksafety; // kfactor + 1
@@ -594,7 +604,7 @@ public class MeshProber implements JoinAcceptor {
 
         if (getStartAction() != StartAction.PROBE) {
             m_probedDetermination.set(new Determination(
-                    getStartAction(), getHostCount(), paused, terminusNonce));
+                    getStartAction(), getHostCount(), paused, terminusNonce, currentCount));
             return;
         }
 
@@ -623,7 +633,7 @@ public class MeshProber implements JoinAcceptor {
             return;
         }
 
-        final Determination dtrm = new Determination(determination, hostCount, paused, terminusNonce);
+        final Determination dtrm = new Determination(determination, hostCount, paused, terminusNonce, currentCount);
         if (m_networkLog.isDebugEnabled()) {
             m_networkLog.debug("made the following " + dtrm);
         }
@@ -639,7 +649,7 @@ public class MeshProber implements JoinAcceptor {
                     "interrupted while waiting to determine the cluster start action",
                     false, e);
         }
-        return new Determination(null,-1, false, null);
+        return new Determination(null,-1, false, null, 0);
     }
 
     @Generated("by eclipse's equals and hashCode source generators")
@@ -693,13 +703,14 @@ public class MeshProber implements JoinAcceptor {
         public final int hostCount;
         public final boolean paused;
         public final String terminusNonce;
-
+        public final int joinHostCount;
         private Determination(StartAction startAction, int hostCount,
-                boolean paused, String terminusNonce) {
+                boolean paused, String terminusNonce, int joinHostCount) {
             this.startAction = startAction;
             this.hostCount = hostCount;
             this.paused = paused;
             this.terminusNonce = terminusNonce;
+            this.joinHostCount = joinHostCount;
         }
 
         @Override @Generated("by eclipse's equals and hashCode source generators")

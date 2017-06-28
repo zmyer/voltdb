@@ -1295,6 +1295,15 @@ public class TestHostMessenger {
             @Override
             public void accrue(int hostId, JSONObject jo) {
             }
+
+            @Override
+            public String toJSONString() {
+                return null;
+            }
+
+            @Override
+            public void determineFinalStartActionIfNeeded() {
+            }
         };
 
         HostMessenger hm1 = createHostMessenger(0, jcb.prober(jc1).build(), false);
