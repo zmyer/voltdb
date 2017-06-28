@@ -115,7 +115,10 @@ def getxml(r,p,uniqueIDs):
                 
 def setxml(r,p,v,uniqueIDs):
 
+    # Need to rewrite this as a separate routine to catch quoted attribute values
     props = p.split(".")
+    
+    uniquepointer = 0
     root = r
     level = 0
     if (root.nodeType == Node.DOCUMENT_NODE):
@@ -128,33 +131,73 @@ def setxml(r,p,v,uniqueIDs):
                 level = level + 1
                 continue
         level = level + 1
+        
             
-        INFO("Looking for " + n  + "...")
+        DEBUG("Looking for " + n  + "...")
         if n[0:1] == ":":   #Attribute
             a = n[1:]
+            # This is an endpoint
             att = root.attributes[a] = v
             return 
         else:               #Node
             if root.nodeType is not Node.ELEMENT_NODE:
                 WARNING("Root is not an element? " + str(root.nodeType))
                 return
+            # Check for required attribute
+            attloc = n.find(":")
+            attribute =[None,None]
+            if attloc >= 0:
+                a = n[attloc+1:]
+                n = n[0:attloc]
+                attloc = a.find("(")
+                if attloc > -1:
+                    attribute[0] = a[0:attloc]
+                    a = a[attloc+1:]
+                    attloc = a.find(")")
+                    #We now assume the attribute value is the end of the attribute
+                    if attloc < 0: FATAL("unmatched parenthesis")
+                    if attloc < len(a) -1: WARNING("Ignoring text after attribute value")
+                    attribute[1] = a[0:attloc]
+                    # Finally, do replacement for wildcard attributes
+                    if attribute[1] == "*":
+                        if uniquepointer > len(uniqueIDs) -1:
+                            FATAL("Internal error. Not enough unique IDs for XML definition.")
+                        attribute[1] = uniqueIDs[uniquepointer]
+                        uniquepointer = uniquepointer + 1
+                    
             DEBUG("Looking for element " + n  + "...")
+            if attribute[0]: DEBUG("Attribute " + attribute[0] + "=" + attribute[1])
             children = root.childNodes
             newroot = None
             for c in children:
                 if c.nodeType is not Node.ELEMENT_NODE: 
                     #DEBUG("node is not an element...")
                     continue
-                if (c.tagName == n): newroot = c
+                if (c.tagName == n): 
+                    # if the tag name matches, see if the attribute matches
+                    if attribute[0]:
+                        DEBUG("Current attribute value for " + attribute[0] + " is [" + c.attributes[attribute[0]].value + "]")
+                        if c.attributes[attribute[0]].value == attribute[1]:
+                            #Success! This is our new root
+                            DEBUG("Success! Found tag and attribute!")
+                            newroot = c
+                            break
+                    else:
+                        newroot = c
+                        break
             if newroot: 
                 root = newroot
             else:
                 # Need to create a node etc.
                 newroot = r.createElement(n)
+                # add the required attribute if it exists
+                if attribute[0]: newroot.attributes[attribute[0]] = attribute[1]
                 root.appendChild(newroot)
                 root = newroot
     # If we get here, we ned to add a text node
-    return "[no value]"
+    docnode = root.createElement(v)
+    root.appendChild(v)
+    return
                 
       
 def writedeploymentfile (config, filespec, hostcount):

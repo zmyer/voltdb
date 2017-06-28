@@ -149,7 +149,7 @@ class tokenizer():
         return None
             
         
-        
+ ########################## TO BE DELETED ####################       
 ############# INTERNAL FUNCTIONS
 
 def ttype(t):
@@ -250,12 +250,16 @@ def load_property_defs():
     pass
     # This still needs to be defined.
 
+    
+    
+###############     EXTERNAL FUNCTIONS
+
 def load_global_property_defs():
     # This function loads all property definitions,
     # including  properties and XML equivalents
     global PROPDEFROOT
     global PROPERTY_DEFS
-    SET_DEBUG(True)
+    SET_DEBUG(False)
 
     filename = PROPDEFROOT + "properties-model.csv"
     try:
@@ -282,10 +286,9 @@ def load_global_property_defs():
         PROPERTY_DEFS.append(global_property_def(tokens[0],tokens[1],tokens[2],tokens[3],tokens[4],tokens[5]))
         
     DEBUG(str(len(PROPERTY_DEFS)) + " properties defined.")
-    
-    
-###############     EXTERNAL FUNCTIONS
 
+# Load a single property declaration as a string
+# return a property instance
 def load_property_instance(text):
     definition = ""
     value = None
@@ -322,6 +325,27 @@ def load_property_instance(text):
     # If no qualifiers, set it to null
     if len(uniqueID) == 0: uniqueID = None
     return property_instance(definition,value,uniqueID)
+
+# Load a file of property declarations.
+# return an array of property instances
+def load_file(filename):
+
+    properties = []
+    
+    try:
+        f = open(os.path.abspath(os.path.expanduser(filename)),"r")
+    except Exception as e:
+        FATAL("Cannot read file " + filename + "\n" + str(e))
+        
+    property_file_lines = f.readlines()
+    linecount = 0
+    for line in property_file_lines:
+        linecount = linecount + 1
+        p = load_property_instance(line)
+        if p: properties.append(p)
+        
+    return properties
+
 
 def load(filename):
     global property_file_lines, tokens, t

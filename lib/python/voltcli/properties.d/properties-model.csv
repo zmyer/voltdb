@@ -36,17 +36,17 @@ dr.connection,xml,,xml,dr.connection.:source,1111
 security,xml,,xml,security.:enabled,1111
 
 # Define new set of users
-users.user(*).password,xml,,xml,users.user.:username(*).:password,1111
-users.user(*).roles,xml,,xml,users.user.:username(*).:roles,1111
+user(*).password,xml,,xml,users.user:name(*).:password,1111
+user(*).roles,xml,,xml,users.user:name(*).:roles,1111
 
 
 
 # resource monitoring
 monitor.frequency,xml,,xml,systemsettings.resourcemonitor.:frequency,1111
-monitor.disk.snapshots.size,xml,,xml,systemsettings.resourcemonitor.disklimit.feature.:name(snapshots).:size,1111
-monitor.disk.snapshots.alert,xml,,xml,systemsettings.resourcemonitor.disklimit.feature.:name(snapshots).:alert,1111
-monitor.disk.commandlog.size,xml,,xml,systemsettings.resourcemonitor.disklimit.feature.:name(commandlog).:size,1111
-monitor.disk.commandlog.alert,xml,,xml,systemsettings.resourcemonitor.disklimit.feature.:name(commandlog).:alert,1111
+monitor.disk.snapshots.size,xml,,xml,systemsettings.resourcemonitor.disklimit.feature:name(snapshots).:size,1111
+monitor.disk.snapshots.alert,xml,,xml,systemsettings.resourcemonitor.disklimit.feature:name(snapshots).:alert,1111
+monitor.disk.commandlog.size,xml,,xml,systemsettings.resourcemonitor.disklimit.feature:name(commandlog).:size,1111
+monitor.disk.commandlog.alert,xml,,xml,systemsettings.resourcemonitor.disklimit.feature:name(commandlog).:alert,1111
 monitor.disk.commandlog,xml,,xml,systemsettings.resourcemonitor.frequency,1111
 monitor.memory.size,xml,,xml,systemsettings.resourcemonitor.memorylimit.:size,1111
 monitor.memory.alert,xml,,xml,systemsettings.resourcemonitor.memorylimit.:alert,1111

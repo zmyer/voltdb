@@ -26,32 +26,39 @@ import base64
 @VOLT.Command(
     bundles=VOLT.AdminBundle(),
     description='Set a configuration property on a running database.',
-    description2='Specify the property name and its value.',
+    options = (
+        VOLT.BooleanOption('-f', '--file', 'propfile',
+                           'read a file of properties',
+                           default = False)
+    ),
     arguments=(
         VOLT.StringArgument(
             'property',
-            'the property name',
+            'the property or file name',
             min_count=1, max_count=1),
         VOLT.StringArgument(
             'value',
-            'the new value for the property',
-            min_count=1, max_count=1),
+            'the value for the property, when settng a single property',
+            optional=True)
     )
 )
 def set(runner):
 
+    # See if we are processing a file or a single property (validate UI)
+    if runner.opts.propfile:
+        isfile = True
+        if runner.opts.value:
+            runner.abort("Too many arguments. Only one file name allowed with --file option.")
+            
+    else:
+        isfile = False
+        if not runner.opts.value:
+            runner.abort("Too few arguments. Must specify both a property name and value.")
+
+
+        
     # Set up the properties
     properties.load_global_property_defs()
-
-    # First parse the property and see if it makes sense.
-    property_string = runner.opts.property + ": " + str(runner.opts.value)
-    prop = properties.load_property_instance(property_string)
-    
-    if not prop.validate(4):    # condition 4= running database
-        runner.abort("Cannot set the specified property.")
-    
-    print prop.definition
-    print prop.value
     
     # Next, connect to the server and get the deployment file
 
@@ -59,19 +66,35 @@ def set(runner):
     if not xmltext: runner.abort("Cannot retrieve current configuration.")
     
     xml = xmlproperties.loadxmlstring(xmltext)
+
+    # The following depends on whether we are setting a single property or reading 
+    # A properties file. No matter what, set up an array
     
-    # Set the property
-    xmlproperties.setxml(xml,"deployment." + prop.setdef, prop.value, prop.uniqueIDs)
+    props = []
+    
+    if isfile:
+        props = properties.load_file(runner.opts.property)
+    
+    else:
+     
+        # First parse the property and see if it makes sense.
+        property_string = runner.opts.property + ": " + str(runner.opts.value)
+        prop = properties.load_property_instance(property_string)
+        props.append(prop)
+    
+    
+    for p in props:
+        if not p.validate(4):    # condition 4= running database
+            runner.abort("Cannot set the specified property.")
+    
+        # Set the property
+        xmlproperties.setxml(xml,"deployment." + p.setdef, p.value, p.uniqueIDs)
     
     # Now reverse the process
     xmltext2 = xmlproperties.getxmldom(xml)
-    print "DOM returned as:\n" + xmltext2
+    #print ( "DOM returned as:\n" + xmltext2)
 
-    #Apply the property
-
-
-
-    # All the rest of this is what was left over from update...    
+    # Now set the deployment changes on the server  
     columns = [VOLT.FastSerializer.VOLTTYPE_NULL, VOLT.FastSerializer.VOLTTYPE_STRING]
     catalog = None
     deployment = xmltext2
@@ -125,7 +148,7 @@ def getCurrentDeploymentFile(runner):
         else:
             response = urlopen(request, context=sslContext)
     except URLError, e:
-        runner.abort("Failed to get deployment file from %s " % (runner.opts.host.host))
+        runner.abort("Failed to get deployment file from %s because %s" % (runner.opts.host.host,str(e)))
 
     return response.read()
     
