@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.logging.VoltLogger;
@@ -517,6 +518,10 @@ public class ProcedureRunnerNT {
         m_appStatusString = statusString;
     }
 
+    public String getProcedureName() {
+        return m_procedureName;
+    }
+
     // BELOW TO SUPPORT NT SYSPROCS
 
     protected String getHostname() {
@@ -541,5 +546,15 @@ public class ProcedureRunnerNT {
 
     protected void noteRestoreCompleted() {
         m_ntProcService.isRestoring = false;
+    }
+
+    protected Future<?> m_future;
+
+    public void setFuture(Future<?> future) {
+        m_future = future;
+    }
+
+    protected boolean isCancelled() {
+        return m_future != null && m_future.isCancelled();
     }
 }

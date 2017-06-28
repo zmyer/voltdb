@@ -28,6 +28,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -40,6 +41,7 @@ import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.InitiateResponseMessage;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -93,7 +95,10 @@ public class NTProcedureService {
     ImmutableMap<String, ProcedureRunnerNTGenerator> m_sysProcs = ImmutableMap.<String, ProcedureRunnerNTGenerator>builder().build();
 
     // A tracker of currently executing procedures by id, where id is a long that increments with each call
-    Map<Long, ProcedureRunnerNT> m_outstanding = new ConcurrentHashMap<>();
+    Map<Long, ProcedureRunnerNT> m_outstandingRunner = new ConcurrentHashMap<>();
+    // A tracker of Future of currently executing procedures by id
+    Map<Long, Future<?>> m_outstandingFuture = new ConcurrentHashMap<>();
+
     // This lets us respond over the network directly
     final LightweightNTClientResponseAdapter m_internalNTClientAdapter;
     // Mailbox for the client interface is used to send messages directly to other nodes (sysprocs only)
@@ -153,7 +158,12 @@ public class NTProcedureService {
 
         ProcedureRunnerNTGenerator(Class<? extends VoltNonTransactionalProcedure> clz) {
             m_procClz = clz;
-            m_procedureName = m_procClz.getSimpleName();
+
+            if (VoltNTSystemProcedure.class.isAssignableFrom(clz)) {
+                m_procedureName = "@" + clz.getSimpleName();
+            } else {
+                m_procedureName = clz.getSimpleName();
+            }
 
             // reflect
             Method procMethod = null;
@@ -358,6 +368,31 @@ public class NTProcedureService {
         m_pendingInvocations.clear();
     }
 
+    private void deliverResponseForNTProcedure(byte status, String msg, long clientHandle, long ciHandle, long connectionId) {
+        ClientResponseImpl response = new ClientResponseImpl(status,
+                                                             new VoltTable[0],
+                                                             msg,
+                                                             clientHandle);
+        InitiateResponseMessage irm = InitiateResponseMessage.messageForNTProcResponse(ciHandle,
+                                                                                       connectionId,
+                                                                                       response);
+        m_mailbox.deliver(irm);
+        return;
+
+    }
+
+    private ProcedureRunnerNTGenerator getProcedureRunnerGenerator(String procName) {
+        final ProcedureRunnerNTGenerator prntg;
+        if (procName.startsWith("@")) {
+            prntg = m_sysProcs.get(procName);
+        }
+        else {
+            prntg = m_procs.get(procName);
+        }
+
+        return prntg;
+    }
+
     /**
      * Invoke an NT procedure asynchronously on one of the exec services.
      * @returns ClientResponseImpl if something goes wrong.
@@ -379,33 +414,101 @@ public class NTProcedureService {
         }
 
         String procName = task.getProcName();
+        if ("@CancelNTProcedure".equals(procName)) {
+            Object[] params = task.getParams().toArray();
+            if (params.length != 1) {
+                deliverResponseForNTProcedure(ClientResponse.UNEXPECTED_FAILURE,
+                        "Expect only one parameter for " + procName + ", but received " + params.length,
+                        task.getClientHandle(),
+                        ciHandle,
+                        ccxn.connectionId());
+                return;
+            }
 
-        final ProcedureRunnerNTGenerator prntg;
-        if (procName.startsWith("@")) {
-            prntg = m_sysProcs.get(procName);
+            String cancelProcName = (String) params[0];
+            if (cancelProcName == null) {
+                deliverResponseForNTProcedure(ClientResponse.UNEXPECTED_FAILURE,
+                        "Received NULL procedure name for @CancelNTProcedure",
+                        task.getClientHandle(),
+                        ciHandle,
+                        ccxn.connectionId());
+                return;
+            }
+
+            // check NT-Procedure existence
+            if (getProcedureRunnerGenerator(cancelProcName) == null) {
+                deliverResponseForNTProcedure(ClientResponse.UNEXPECTED_FAILURE,
+                        "Could not find NT-procedure " + cancelProcName,
+                        task.getClientHandle(),
+                        ciHandle,
+                        ccxn.connectionId());
+                return;
+            }
+
+            if (! "@NibbleDeletes".equals(cancelProcName)) {
+                deliverResponseForNTProcedure(ClientResponse.UNEXPECTED_FAILURE,
+                        "@CancelNTProcedure only support procedure @NibbleDeletes, but received " + cancelProcName,
+                        task.getClientHandle(),
+                        ciHandle,
+                        ccxn.connectionId());
+                return;
+            }
+
+            int counter = 0;
+            for (Long runnerId: m_outstandingRunner.keySet()) {
+                ProcedureRunnerNT runner = m_outstandingRunner.get(runnerId);
+                System.err.println("Checking running NT-Procedure " + runner.getProcedureName());
+                if (! cancelProcName.equals(runner.getProcedureName()))
+                    continue;
+
+                Future<?> future = m_outstandingFuture.get(runnerId);
+                counter++;
+                if (future == null) {
+                    // NT-procedure finished and got removed from the outstanding tracker
+                    continue;
+                }
+                // TODO: refactor it as an input parameter for @CancelNTProcedure if necessary
+                // maybe too dangerous if exposed
+                future.cancel(false);
+            }
+
+            deliverResponseForNTProcedure(ClientResponse.SUCCESS,
+                    "Successfully informed " + counter + " NT-Procedure " + cancelProcName + " to be cancelled",
+                    task.getClientHandle(),
+                    ciHandle,
+                    ccxn.connectionId());
+
+            return;
         }
-        else {
-            prntg = m_procs.get(procName);
+
+        final ProcedureRunnerNTGenerator prntg = getProcedureRunnerGenerator(procName);
+        if (prntg == null) {
+            // check NT-Procedure existence
+            deliverResponseForNTProcedure(ClientResponse.UNEXPECTED_FAILURE,
+                    "Could not find NT-procedure " + procName,
+                    task.getClientHandle(),
+                    ciHandle,
+                    ccxn.connectionId());
+            return;
         }
+
 
         ProcedureRunnerNT tempRunner = null;
         try {
             tempRunner = prntg.generateProcedureRunnerNT(user, ccxn, isAdmin, ciHandle, task.getClientHandle(), task.getBatchTimeout());
         } catch (InstantiationException | IllegalAccessException e1) {
-            // I don't expect to hit this, but it's here...
-            // must be done as IRM to CI mailbox for backpressure accounting
-            ClientResponseImpl response = new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                                                                 new VoltTable[0],
-                                                                 "Could not create running context for " + procName + ".",
-                                                                 task.getClientHandle());
-            InitiateResponseMessage irm = InitiateResponseMessage.messageForNTProcResponse(ciHandle,
-                                                                                           ccxn.connectionId(),
-                                                                                           response);
-            m_mailbox.deliver(irm);
+            // not likely to happen, but it must be done as IRM to CI mailbox for backpressure accounting
+            deliverResponseForNTProcedure(ClientResponse.UNEXPECTED_FAILURE,
+                    "Could not create running context for " + procName + ".",
+                    task.getClientHandle(),
+                    ciHandle,
+                    ccxn.connectionId());
             return;
         }
+
+
         final ProcedureRunnerNT runner = tempRunner;
-        m_outstanding.put(runner.m_id, runner);
+        m_outstandingRunner.put(runner.m_id, runner);
 
         Runnable invocationRunnable = new Runnable() {
             @Override
@@ -421,30 +524,30 @@ public class NTProcedureService {
         };
 
         try {
+            Future<?> ft;
             // pick the executor service based on priority
             // - new (from user) txns get regular one
             // - sub tasks and sub procs generated by nt procs get
             //   immediate exec service (priority)
             if (ntPriority) {
-                m_priorityExecutorService.submit(invocationRunnable);
+                ft = m_priorityExecutorService.submit(invocationRunnable);
             }
             else {
-                m_primaryExecutorService.submit(invocationRunnable);
+                ft = m_primaryExecutorService.submit(invocationRunnable);
             }
+
+            runner.setFuture(ft);
+            m_outstandingFuture.put(runner.m_id, ft);
         }
         catch (RejectedExecutionException e) {
             handleNTProcEnd(runner);
 
-            // I really don't expect this to happen... but it's here.
-            // must be done as IRM to CI mailbox for backpressure accounting
-            ClientResponseImpl response = new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                                                                 new VoltTable[0],
-                                                                 "Could not submit NT procedure " + procName + " to exec service for .",
-                                                                 task.getClientHandle());
-            InitiateResponseMessage irm = InitiateResponseMessage.messageForNTProcResponse(ciHandle,
-                                                                                           ccxn.connectionId(),
-                                                                                           response);
-            m_mailbox.deliver(irm);
+            // not likely to happen, but it must be done as IRM to CI mailbox for backpressure accounting
+            deliverResponseForNTProcedure(ClientResponse.GRACEFUL_FAILURE,
+                    "Could not submit NT procedure " + procName + " to exec service",
+                    task.getClientHandle(),
+                    ciHandle,
+                    ccxn.connectionId());
             return;
         }
     }
@@ -454,7 +557,9 @@ public class NTProcedureService {
      * outstanding NT procs doesn't leak.
      */
     void handleNTProcEnd(ProcedureRunnerNT runner) {
-        m_outstanding.remove(runner.m_id);
+        // slightly better to remove the Future first as we access it from Runner
+        m_outstandingFuture.remove(runner.m_id);
+        m_outstandingRunner.remove(runner.m_id);
     }
 
     /**
@@ -464,7 +569,7 @@ public class NTProcedureService {
      * ICH and the other plumbing should handle regular, txn procs.
      */
     void handleCallbacksForFailedHosts(final Set<Integer> failedHosts) {
-        for (ProcedureRunnerNT runner : m_outstanding.values()) {
+        for (ProcedureRunnerNT runner : m_outstandingRunner.values()) {
             runner.processAnyCallbacksFromFailedHosts(failedHosts);
         }
     }

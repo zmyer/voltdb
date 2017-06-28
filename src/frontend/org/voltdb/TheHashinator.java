@@ -585,15 +585,37 @@ public abstract class TheHashinator {
      */
     public static VoltTable getPartitionKeys(VoltType type) {
         TheHashinator hashinator = instance.get().getSecond();
+        VoltTable vt = null;
+
         switch (type) {
             case INTEGER:
-                return hashinator.m_integerPartitionKeys.get();
+                vt = hashinator.m_integerPartitionKeys.get();
+                break;
             case STRING:
-                return hashinator.m_stringPartitionKeys.get();
+                vt = hashinator.m_stringPartitionKeys.get();
+                break;
             case VARBINARY:
-                return hashinator.m_varbinaryPartitionKeys.get();
+                vt = hashinator.m_varbinaryPartitionKeys.get();
+                break;
             default:
-                return null;
+                vt = null;
         }
+        if (vt == null) return null;
+
+        // create a shared buffered VoltTable to handle multiple reader concurrently
+        VoltTable result = new VoltTable(new VoltTable.ColumnInfo[] {
+                new VoltTable.ColumnInfo(
+                        VoltSystemProcedure.CNAME_PARTITION_ID,
+                        VoltSystemProcedure.CTYPE_ID),
+                new VoltTable.ColumnInfo(CNAME_PARTITION_KEY, type)});
+
+        synchronized (result) {
+            int rowCount = vt.getRowCount();
+            for (int i = 0; i < rowCount; i++) {
+                result.add(vt.fetchRow(i));
+            }
+        }
+
+        return result;
     }
 }

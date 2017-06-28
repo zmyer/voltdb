@@ -707,6 +707,52 @@ public class TestNTProcs extends TestCase {
         localServer.join();
     }
 
+    public void testCancelNTProcedure() throws Exception {
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("--dont care");
+        builder.setUseDDLSchema(true);
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        ServerThread localServer = new ServerThread(config);
+
+        localServer.start();
+        localServer.waitForInitialization();
+
+        Client client = ClientFactory.createClient();
+        client.createConnection("localhost");
+
+        ProcedureCallback callback = new ProcedureCallback() {
+            @Override
+            public void clientCallback(ClientResponse clientResponse) throws Exception {
+                System.err.println(clientResponse.getResults()[0]);
+            }
+        };
+        client.callProcedure(callback,
+                "@AdHoc", "create table blah (pkey integer not null, strval varchar(200), PRIMARY KEY(pkey));");
+
+        Thread.sleep(200);
+        try {
+            client.callProcedure("@CancelNTProcedure", "@AdHoc");
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage(), ex.getMessage().contains("@CancelNTProcedure only support procedure @NibbleDeletes"));
+        }
+
+        client.drain();
+
+        localServer.shutdown();
+        localServer.join();
+    }
+
     /*
     final static int CALL_NOTHING = 0;
     final static int CALL_ADHOC = 1;

@@ -165,20 +165,27 @@ public class NibbleDeletes extends AdHocNTBase {
     static List<Integer> getPartitionKeys() {
         // get partition key list
         VoltTable vt = TheHashinator.getPartitionKeys(VoltType.INTEGER);
+
         // PARTITION_ID:INTEGER, PARTITION_KEY:INTEGER
         List<Integer> partitionKeys = new ArrayList<>();
+
+        vt.resetRowPosition();
         while (vt.advanceRow()) {
             //check for mock unit test
             if (vt.getColumnCount() == 2) {
-                Integer key = (int)(vt.getLong("PARTITION_KEY"));
-                partitionKeys.add(key);
+
             }
+            Integer key = (int)(vt.getLong("PARTITION_KEY"));
+            partitionKeys.add(key);
+        }
+
+        if (partitionKeys.size() == 0) {
+            throw new RuntimeException("Get no partitions result, impossible for a running cluster");
         }
 
         return partitionKeys;
     }
 
-    // TODO: use same input as AdHoc
     public CompletableFuture<ClientResponse> run(ParameterSet params) throws InterruptedException, ExecutionException {
         if (params.size() < 1) {
             return makeQuickResponse(
@@ -204,7 +211,7 @@ public class NibbleDeletes extends AdHocNTBase {
         }
         // generate nibble delete query information
         String nibbleDeleteQuery = queryInfo.normalizedQuery + generateOrderbyLimitClause(table);
-        System.err.println(nibbleDeleteQuery);
+        System.out.println(nibbleDeleteQuery);
 
         Object[] userParams = null;
         if (paramArray.length > 1) {
@@ -229,28 +236,30 @@ public class NibbleDeletes extends AdHocNTBase {
 
         // get sample partition keys for routing queries
         List<Integer> partitionKeys = getPartitionKeys();
-
-
-        Map<Integer,CompletableFuture<ClientResponse>> allHostResponses = new LinkedHashMap<>();
-        Set<Integer> finshedPartitions = new HashSet<>();
-        Map<Integer,Long> deletedTuplesPerPartition = new HashMap<>();
-
-        CompletableFuture<ClientResponse> future = null;
         int partitionCount = partitionKeys.size();
 
+        Map<Integer,CompletableFuture<ClientResponse>> allHostResponses = new LinkedHashMap<>();
+        Map<Integer,Long> deletedTuplesPerPartition = new HashMap<>();
+        CompletableFuture<ClientResponse> future = null;
+
+        Set<Integer> finshedPartitions = new HashSet<>();
         // until all partition has finished execution (or has seen finished execution)
         while (finshedPartitions.size() != partitionCount) {
+            if (isCancelled()) {
+                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, "@NibbleDeletes is cancelled");
+            }
+
             // use partition keys to rout SP queries
             for (Integer key : partitionKeys) {
+                if (isCancelled()) {
+                    return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, "@NibbleDeletes is cancelled");
+                }
+
                 if (allHostResponses.containsKey(key)) {
                     future = allHostResponses.get(key);
                     try {
                         ClientResponse cr = future.get(100, TimeUnit.MILLISECONDS);
 
-                        if (cr == null) {
-                            //not likely to be NULL for ClientResponse
-
-                        }
                         Long count = cr.getResults()[0].asScalarLong();
                         if (deletedTuplesPerPartition.containsKey(key)) {
                             Long totalCount = deletedTuplesPerPartition.get(key);

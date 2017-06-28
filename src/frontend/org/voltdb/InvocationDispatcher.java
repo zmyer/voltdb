@@ -1356,12 +1356,12 @@ public final class InvocationDispatcher {
      */
     public void handleAllHostNTProcedureResponse(ClientResponseImpl clientResponseData) {
         long handle = clientResponseData.getClientHandle();
-        ProcedureRunnerNT runner = m_NTProcedureService.m_outstanding.get(handle);
+        ProcedureRunnerNT runner = m_NTProcedureService.m_outstandingRunner.get(handle);
         runner.allHostNTProcedureCallback(clientResponseData);
     }
 
     /** test only */
     long countNTWaitingProcs() {
-        return m_NTProcedureService.m_outstanding.size();
+        return m_NTProcedureService.m_outstandingRunner.size();
     }
 }
