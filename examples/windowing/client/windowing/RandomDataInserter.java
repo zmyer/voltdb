@@ -162,14 +162,14 @@ public class RandomDataInserter {
                 if (!app.config.inline) {
                     basicInsert(uuid, val, now);
                 }
-                // Do an insert with date-based deleting
-                else if (app.config.historyseconds > 0) {
-                    insertWithDateDelete(uuid, val, now);
-                }
-                // Do an insert with timestamp-based deleting
-                else if (app.config.maxrows > 0) {
-                    insertWithRowcountDelete(uuid, val, now);
-                }
+//                // Do an insert with date-based deleting
+//                else if (app.config.historyseconds > 0) {
+//                    insertWithDateDelete(uuid, val, now);
+//                }
+//                // Do an insert with timestamp-based deleting
+//                else if (app.config.maxrows > 0) {
+//                    insertWithRowcountDelete(uuid, val, now);
+//                }
             }
             catch (IOException e) {
                 // Not being super picky about failure handling. If this

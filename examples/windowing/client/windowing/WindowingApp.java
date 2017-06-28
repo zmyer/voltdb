@@ -134,7 +134,7 @@ public class WindowingApp {
 
     final long startTS = System.currentTimeMillis();
 
-    final ContinuousDeleter deleter;
+//    final ContinuousDeleter deleter;
     final RandomDataInserter inserter;
     final MaxTracker maxTracker;
     final Reporter reporter;
@@ -229,7 +229,7 @@ public class WindowingApp {
             e.printStackTrace();
         }
 
-        deleter = new ContinuousDeleter(this);
+//        deleter = new ContinuousDeleter(this);
         inserter = new RandomDataInserter(this, insertsClient);
         maxTracker = new MaxTracker(this);
         reporter = new Reporter(this);
@@ -320,11 +320,11 @@ public class WindowingApp {
                                                config.displayinterval,
                                                TimeUnit.SECONDS);
 
-        if (!config.inline) {
-            // Delete data as often as need be
-            //  -- This will resubmit itself at varying rates according to insert load
-            scheduler.execute(deleter);
-        }
+//        if (!config.inline) {
+//            // Delete data as often as need be
+//            //  -- This will resubmit itself at varying rates according to insert load
+//            scheduler.execute(deleter);
+//        }
 
         // Start tracking changes to the maximum value after a 5 second delay to
         // let things settle a bit. Then check up to 100 times per second.

@@ -879,6 +879,12 @@ public class SQLCommand
                 return;
             }
 
+            String nibbledeletesStatement = SQLParser.parseNibbleDeletesCall(statement);
+            if (nibbledeletesStatement != null) {
+                printResponse(m_client.callProcedure("@NibbleDeletes", nibbledeletesStatement), false);
+                return;
+            }
+
             String explainStatement = SQLParser.parseExplainCall(statement);
             if (explainStatement != null) {
                 // We've got a statement that starts with "explain", send the statement to

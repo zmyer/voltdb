@@ -95,21 +95,21 @@ public class Reporter implements Runnable {
             app.inserter.printReport();
 
             // Print out an update on how many tuples have been deleted.
-            System.out.printf("  Deleted %d tuples since last report\n", app.getDeletesSinceLastChecked());
+//            System.out.printf("  Deleted %d tuples since last report\n", app.getDeletesSinceLastChecked());
 
             //
             // FAILURE REPORTING FOR PERIODIC OPERATIONS
             //
-            long continuousDeleterFailures = app.deleter.failureCount.getAndSet(0);
-            if (continuousDeleterFailures > 0) {
-                System.out.printf("  Continuous Deleter failed %d times since last report.\n",
-                                  continuousDeleterFailures);
-            }
-            long maxTrackerFailures = app.maxTracker.failureCount.getAndSet(0);
-            if (maxTrackerFailures > 0) {
-                System.out.printf("  Max Tracker failed %d times since last report.\n",
-                                  maxTrackerFailures);
-            }
+//            long continuousDeleterFailures = app.deleter.failureCount.getAndSet(0);
+//            if (continuousDeleterFailures > 0) {
+//                System.out.printf("  Continuous Deleter failed %d times since last report.\n",
+//                                  continuousDeleterFailures);
+//            }
+//            long maxTrackerFailures = app.maxTracker.failureCount.getAndSet(0);
+//            if (maxTrackerFailures > 0) {
+//                System.out.printf("  Max Tracker failed %d times since last report.\n",
+//                                  maxTrackerFailures);
+//            }
 
             System.out.println();
             System.out.flush();
