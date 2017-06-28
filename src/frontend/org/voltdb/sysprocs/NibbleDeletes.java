@@ -94,8 +94,6 @@ public class NibbleDeletes extends AdHocNTBase {
 
         int groupsize = matcher.groupCount();
         for (int i = 0; i < groupsize; i++) {
-//            System.err.println("group " + i + " -> " + matcher.group(i));
-
             queryInfo.normalizedQuery= matcher.group(0);
             queryInfo.tableName = matcher.group(1);
             queryInfo.whereClause = matcher.group(2);
@@ -169,7 +167,7 @@ public class NibbleDeletes extends AdHocNTBase {
         // PARTITION_ID:INTEGER, PARTITION_KEY:INTEGER
         List<Integer> partitionKeys = new ArrayList<>();
 
-        vt.resetRowPosition();
+        assert(vt.getActiveRowIndex() != -1);
         while (vt.advanceRow()) {
             //check for mock unit test
             if (vt.getColumnCount() == 2) {
@@ -205,6 +203,10 @@ public class NibbleDeletes extends AdHocNTBase {
 
         CatalogContext context = VoltDB.instance().getCatalogContext();
         Table table = context.getTable(queryInfo.tableName);
+        if (table == null) {
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
+                    "DELETE statement for table " + queryInfo.tableName + " can not be found");
+        }
         if (table.getIsreplicated()) {
             return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
                     "DELETE statement for replicated table " + queryInfo.tableName + " is not supported for @NibbleDeletes");

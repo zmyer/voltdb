@@ -472,12 +472,19 @@ public class NTProcedureService {
                 future.cancel(false);
             }
 
-            deliverResponseForNTProcedure(ClientResponse.SUCCESS,
-                    "Successfully informed " + counter + " NT-Procedure " + cancelProcName + " to be cancelled",
-                    task.getClientHandle(),
-                    ciHandle,
-                    ccxn.connectionId());
+            VoltTable resultTable = new VoltTable(new VoltTable.ColumnInfo("INFO", VoltType.STRING));
+            String resultInfo = "Successfully informed " + counter + " NT-Procedure " + cancelProcName + " to be cancelled";
+            resultTable.addRow(resultInfo);
 
+
+            ClientResponseImpl response = new ClientResponseImpl(ClientResponse.SUCCESS,
+                    new VoltTable[]{resultTable},
+                    resultInfo,
+                    task.getClientHandle());
+            InitiateResponseMessage irm = InitiateResponseMessage.messageForNTProcResponse(ciHandle,
+                    ccxn.connectionId(),
+                    response);
+            m_mailbox.deliver(irm);
             return;
         }
 

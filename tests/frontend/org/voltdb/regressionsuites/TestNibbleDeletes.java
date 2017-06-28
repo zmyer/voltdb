@@ -109,8 +109,10 @@ public class TestNibbleDeletes extends RegressionSuite {
             Thread.sleep(100);
             ClientResponse cr = client.callProcedure("@CancelNTProcedure", "@NibbleDeletes");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            String expectedResult = "Successfully informed 1 NT-Procedure @NibbleDeletes";
             assertTrue(cr.getStatusString(),
-                    cr.getStatusString().contains("Successfully informed 1 NT-Procedure @NibbleDeletes"));
+                    cr.getStatusString().contains(expectedResult));
+            assertTrue(cr.getResults()[0].toString(), cr.getResults()[0].toString().contains(expectedResult));
 
             vt = client.callProcedure("@AdHoc", "select count(*) from P1;").getResults()[0];
             System.err.println("count(*): " + vt.asScalarLong());
@@ -121,6 +123,22 @@ public class TestNibbleDeletes extends RegressionSuite {
             NibbleDeletes.BATCH_DELETE_TUPLE_COUNT = BATCH_SIZE;
         }
     }
+
+    public void testWindowExample() throws IOException, ProcCallException, InterruptedException {
+        System.out.println("STARTING testWindowExample.....");
+
+        Client client = this.getClient();
+
+        VoltTable vt = client.callProcedure("@NibbleDeletes", "DELETE FROM timedata WHERE update_ts <= NOW ").getResults()[0];
+
+        System.err.println(vt);
+
+        vt = client.callProcedure("@CancelNTProcedure", "@NibbleDeletes").getResults()[0];
+
+        System.err.println(vt);
+
+    }
+
 
 
     public TestNibbleDeletes(String name) {
@@ -135,10 +153,18 @@ public class TestNibbleDeletes extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
         final String literalSchema =
                 "CREATE TABLE p1 ( " +
-                        "ID INTEGER DEFAULT 0 NOT NULL, " +
-                        "POINTS INTEGER, " +
-                        "PRIMARY KEY (ID) );" +
-                        "Partition table p1 on column ID;";
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
+                "POINTS INTEGER, " +
+                "PRIMARY KEY (ID) );" +
+                "Partition table p1 on column ID;" +
+
+                "CREATE TABLE timedata (" +
+                "uuid VARCHAR(36) NOT NULL," +
+                "val BIGINT NOT NULL," +
+                "update_ts TIMESTAMP NOT NULL," +
+                "CONSTRAINT PK_timedate PRIMARY KEY (uuid, update_ts));" +
+                "PARTITION TABLE timedata ON COLUMN uuid;"
+                ;
         try {
             project.addLiteralSchema(literalSchema);
         } catch (IOException e) {
