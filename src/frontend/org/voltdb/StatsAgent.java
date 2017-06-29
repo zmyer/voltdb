@@ -532,6 +532,9 @@ public class StatsAgent extends OpsAgent
         case LIVECLIENTS:
             stats = collectStats(StatsSelector.LIVECLIENTS, interval);
             break;
+        case NIBBLEDELETES:
+            stats = collectStats(StatsSelector.NIBBLEDELETES, interval);
+            break;
         case LATENCY:
             stats = collectStats(StatsSelector.LATENCY, false);
             break;

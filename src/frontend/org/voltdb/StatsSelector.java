@@ -37,6 +37,9 @@ public enum StatsSelector {
     PROCEDUREOUTPUT,
     PROCEDUREDETAIL,  // provides more granular statistics for procedure calls at a per-statement level.
 
+
+    NIBBLEDELETES,    // Stats for @NibbleDeletes
+
     /*
      * DRPRODUCERPARTITION and DRPRODUCERNODE are internal names
      * Externally the selector is "DRPRODUCER", or just "DR"

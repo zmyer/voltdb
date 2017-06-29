@@ -357,6 +357,11 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public NibbleDeletesStats getNibbleDeletesStatsSource() {
+        return null;
+    }
+
+    @Override
     public String getVersionString()
     {
         if (!m_noLoadLib) {

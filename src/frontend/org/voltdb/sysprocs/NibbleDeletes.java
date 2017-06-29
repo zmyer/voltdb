@@ -36,6 +36,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.NibbleDeletesStats;
 import org.voltdb.ParameterSet;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
@@ -57,6 +58,8 @@ public class NibbleDeletes extends AdHocNTBase {
 
     public final static Integer BATCH_DELETE_TUPLE_COUNT = 1000; // batch size of a SP transaction to delete tuples
 
+    NibbleDeletesStats m_stats;
+
     // DELETE FROM table WHERE clause
     // No support of ORDER BY LIMIT OFFSET
     static class NibbleDeletesRequest {
@@ -68,6 +71,7 @@ public class NibbleDeletes extends AdHocNTBase {
         Object[] m_userParams = null;
         Table m_table = null;
 
+        String m_nibbleDeleteQuery = null;
         int m_batchSize = BATCH_DELETE_TUPLE_COUNT;
 
         public boolean isValidQuery() {
@@ -77,6 +81,9 @@ public class NibbleDeletes extends AdHocNTBase {
             return true;
         }
     }
+
+    NibbleDeletesRequest m_info = new NibbleDeletesRequest();
+    Map<Integer, Integer> m_partitionMap;
 
     static private String generateQueryInfo(String deleteQuery, NibbleDeletesRequest queryInfo) {
         if (deleteQuery == null) {
@@ -99,7 +106,7 @@ public class NibbleDeletes extends AdHocNTBase {
 
         int groupsize = matcher.groupCount();
         for (int i = 0; i < groupsize; i++) {
-            queryInfo.m_normalizedQuery= matcher.group(0);
+            queryInfo.m_normalizedQuery = matcher.group(0);
             queryInfo.m_tableName = matcher.group(1);
             queryInfo.m_whereClause = matcher.group(2);
             Matcher orderby = SQLLexer.matchOrderbyStatement(queryInfo.m_whereClause);
@@ -148,7 +155,7 @@ public class NibbleDeletes extends AdHocNTBase {
                     orderByStmt += ", ";
                 }
             }
-            return orderByStmt + " limit " + limitSize + ";";
+            return orderByStmt + " limit " + limitSize;
         }
         assert(uniqueIndex == null);
         if (uniqueExpressionIndex == null) {
@@ -248,42 +255,42 @@ public class NibbleDeletes extends AdHocNTBase {
         return result;
     }
 
-    public CompletableFuture<ClientResponse> run(ParameterSet params) throws InterruptedException, ExecutionException {
-        NibbleDeletesRequest info = new NibbleDeletesRequest();
+    public CompletableFuture<ClientResponse> run(ParameterSet params)
+            throws InterruptedException, ExecutionException {
+
         // check input parameters
-        String errorMsg = validateParameterAndGetRequestInfo(params, info);
+        String errorMsg = validateParameterAndGetRequestInfo(params, m_info);
         if (errorMsg != null) {
-            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, errorMsg);
+            return quickErrorResponse( errorMsg);
         }
 
         // generate nibble delete query information
-        String nibbleDeleteQuery = info.m_normalizedQuery +
-                generateOrderbyLimitClause(info.m_table, info.m_batchSize);
-        System.out.println(nibbleDeleteQuery);
+        String nibbleDeleteQuery = m_info.m_normalizedQuery +
+                generateOrderbyLimitClause(m_info.m_table, m_info.m_batchSize);
+        m_info.m_nibbleDeleteQuery = nibbleDeleteQuery;
 
         CatalogContext context = VoltDB.instance().getCatalogContext();
         AdHocPlannedStatement result = null;
         try {
             // plan force SP AdHoc query
-            result = planQueryForcedSP(context, nibbleDeleteQuery, info.m_userParams);
+            result = planQueryForcedSP(context, nibbleDeleteQuery, m_info.m_userParams);
         }
         catch (AdHocPlanningException e) {
-            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, e.getMessage());
+            return quickErrorResponse( e.getMessage());
         }
 
         // get sample partition keys for routing queries
-        Map<Integer, Integer> partitionMaps = getPartitionMap();
-        int partitionCount = partitionMaps.size();
+        m_partitionMap = getPartitionMap();
+        int partitionCount = m_partitionMap.size();
+        m_stats = VoltDB.instance().getNibbleDeletesStatsSource();
 
         final Map<Integer, Long> totalCountMap;
         try {
             totalCountMap = gatherTotalTuplesPerPartitions(
-                    info, context, info.m_userParams, partitionMaps);
+                    m_info, context, m_info.m_userParams, m_partitionMap);
         } catch (AdHocPlanningException | InterruptedException | ExecutionException ex) {
-            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
-                    "Error while gather total number tuples to be deleted: " + ex.getMessage());
+            return quickErrorResponse("Error while gather total number tuples to be deleted: " + ex.getMessage());
         }
-
 
         Map<Integer,CompletableFuture<ClientResponse>> allHostResponses = new LinkedHashMap<>();
         Map<Integer,Long> deletedTuplesMap = new HashMap<>();
@@ -298,7 +305,7 @@ public class NibbleDeletes extends AdHocNTBase {
             }
 
             // use partition keys to rout SP queries
-            for (Entry<Integer, Integer> entry : partitionMaps.entrySet()) {
+            for (Entry<Integer, Integer> entry : m_partitionMap.entrySet()) {
                 if (isCancelled()) {
                     return genereateResult(totalCountMap, deletedTuplesMap,
                             "@NibbleDeletes is cancelled");
@@ -312,13 +319,16 @@ public class NibbleDeletes extends AdHocNTBase {
                         ClientResponse cr = future.get(100, TimeUnit.MILLISECONDS);
 
                         Long count = cr.getResults()[0].asScalarLong();
+                        Long newDeletedCount = count;
                         if (deletedTuplesMap.containsKey(pid)) {
                             Long totalCount = deletedTuplesMap.get(pid);
                             // replace the old value
-                            deletedTuplesMap.put(pid, totalCount + count);
-                        } else {
-                            deletedTuplesMap.put(pid, count);
+                            newDeletedCount += totalCount;
                         }
+                        deletedTuplesMap.put(pid, newDeletedCount);
+
+                        m_stats.updateNibbleDeletesStatsRow(nibbleDeleteQuery, pid,
+                                totalCountMap.get(pid), newDeletedCount);
 
                         if (count == 0) {
                             // this partition has no tuples to be deleted, mark it done
@@ -336,7 +346,7 @@ public class NibbleDeletes extends AdHocNTBase {
                 List<AdHocPlannedStatement> stmts = new ArrayList<>();
                 stmts.add(result);
                 AdHocPlannedStmtBatch plannedStmtBatch =
-                        new AdHocPlannedStmtBatch(info.m_userParams,
+                        new AdHocPlannedStmtBatch(m_info.m_userParams,
                                                   stmts,
                                                   -1,
                                                   null,
@@ -351,8 +361,7 @@ public class NibbleDeletes extends AdHocNTBase {
 
         // all partition has seen no tuples available to be deleted
         // prepare the final result
-        CompletableFuture<ClientResponse> f = genereateResult(
-                totalCountMap, deletedTuplesMap, "");
+        CompletableFuture<ClientResponse> f = genereateResult(totalCountMap, deletedTuplesMap, "");
         return f;
     }
 
@@ -392,13 +401,27 @@ public class NibbleDeletes extends AdHocNTBase {
             CompletableFuture<ClientResponse> future = futureMap.get(pid);
             ClientResponse cr;
             cr = future.get();
-            resultMap.put(pid, cr.getResults()[0].asScalarLong());
+            Long tupleCount = cr.getResults()[0].asScalarLong();
+            resultMap.put(pid, tupleCount);
+
+            // update the initial statistic row
+            m_stats.updateNibbleDeletesStatsRow(info.m_nibbleDeleteQuery, pid, tupleCount, 0);
         }
 
         return resultMap;
     }
 
-    private static CompletableFuture<ClientResponse> genereateResult(
+    protected CompletableFuture<ClientResponse> quickErrorResponse(String msg) {
+        ClientResponseImpl cri = new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE, new VoltTable[0], msg);
+        CompletableFuture<ClientResponse> f = new CompletableFuture<>();
+        f.complete(cri);
+
+        m_stats.removeFinishedNibbleDeletesStats(m_info.m_nibbleDeleteQuery, m_partitionMap.keySet());
+
+        return f;
+    }
+
+    private CompletableFuture<ClientResponse> genereateResult(
             Map<Integer,Long> totalCountMap,
             Map<Integer,Long> deletedTuplesMap,
             String statusString)
@@ -415,6 +438,8 @@ public class NibbleDeletes extends AdHocNTBase {
                 new VoltTable[]{resultTable}, statusString);
         CompletableFuture<ClientResponse> f = new CompletableFuture<>();
         f.complete(cri);
+
+        m_stats.removeFinishedNibbleDeletesStats(m_info.m_nibbleDeleteQuery, m_partitionMap.keySet());
 
         return f;
     }

@@ -251,6 +251,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @SuppressWarnings("unused")
     private InitiatorStats m_initiatorStats;
     private LiveClientsStats m_liveClientsStats = null;
+    private NibbleDeletesStats m_nibbleDeleteStats = null;
     int m_myHostId;
     String m_httpPortExtraLogMessage = null;
     boolean m_jsonEnabled;
@@ -1263,7 +1264,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_initiatorStats = new InitiatorStats(m_myHostId);
             m_liveClientsStats = new LiveClientsStats();
             getStatsAgent().registerStatsSource(StatsSelector.LIVECLIENTS, 0, m_liveClientsStats);
-
+            m_nibbleDeleteStats = new NibbleDeletesStats();
+            getStatsAgent().registerStatsSource(StatsSelector.NIBBLEDELETES, 0, m_nibbleDeleteStats);
             m_latencyStats = new LatencyStats();
             getStatsAgent().registerStatsSource(StatsSelector.LATENCY, 0, m_latencyStats);
             m_latencyCompressedStats = new LatencyHistogramStats(m_myHostId);
@@ -3607,6 +3609,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public MemoryStats getMemoryStatsSource() {
         return m_memoryStats;
+    }
+
+    @Override
+    public NibbleDeletesStats getNibbleDeletesStatsSource() {
+        return m_nibbleDeleteStats;
     }
 
     @Override

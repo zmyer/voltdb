@@ -73,32 +73,38 @@ public class TestNibbleDeletes extends RegressionSuite {
         client.drain();
     }
 
+    class SimpleSuccessCallBack implements ProcedureCallback {
+        String m_statusString;
+
+        public SimpleSuccessCallBack () {
+            m_statusString = null;
+        }
+
+        public SimpleSuccessCallBack (String status) {
+            m_statusString = status;
+        }
+
+        @Override
+        public void clientCallback(ClientResponse clientResponse) throws Exception {
+            assertEquals(ClientResponse.SUCCESS, clientResponse.getStatus());
+            if (m_statusString != null) {
+                assertEquals(m_statusString, clientResponse.getStatusString());
+            }
+        }
+    }
+
     public void testCancelNibbleDelete() throws IOException, ProcCallException, InterruptedException {
         System.out.println("STARTING testCancelNibbleDelete.....");
 
         // to make the deletes slow, use batch size 1 to delete
         Client client = this.getClient();
-        ProcedureCallback NullCallBack = new ProcedureCallback() {
-            @Override
-            public void clientCallback(ClientResponse clientResponse) throws Exception {
-                assertEquals(ClientResponse.SUCCESS, clientResponse.getStatus());
-            }
-        };
         for (int i = 0; i < 10000; i++) {
-            client.callProcedure(NullCallBack, "P1.insert", i, i);
+            client.callProcedure(new SimpleSuccessCallBack(), "P1.insert", i, i);
         }
         client.drain();
         VoltTable vt;
 
-        ProcedureCallback callback = new ProcedureCallback() {
-            @Override
-            public void clientCallback(ClientResponse clientResponse) throws Exception {
-                assertEquals(ClientResponse.SUCCESS, clientResponse.getStatus());
-                assertEquals("@NibbleDeletes is cancelled", clientResponse.getStatusString());
-            }
-        };
-
-        client.callProcedure(callback,
+        client.callProcedure(new SimpleSuccessCallBack("@NibbleDeletes is cancelled"),
                 "@NibbleDeletes", "delete from p1 where points > 0;", 1);
 
         Thread.sleep(100);
@@ -116,6 +122,39 @@ public class TestNibbleDeletes extends RegressionSuite {
         client.drain();
     }
 
+    public void testNibbleDeletesStats() throws IOException, ProcCallException, InterruptedException {
+        System.out.println("STARTING testNibbleDeletesStats.....");
+
+        // to make the deletes slow, use batch size 1 to delete
+        Client client = this.getClient();
+        for (int i = 0; i < 10000; i++) {
+            client.callProcedure(new SimpleSuccessCallBack(), "P1.insert", i, i);
+        }
+        client.drain();
+
+        client.callProcedure(new SimpleSuccessCallBack(),
+                "@NibbleDeletes", "delete from p1 where points > 0;", 1);
+        Thread.sleep(150);
+
+        VoltTable vt;
+
+        int ct = 3;
+        while (ct-- > 0) {
+            vt = client.callProcedure("@Statistics", "NIBBLEDELETES", 1).getResults()[0];
+            assertEquals(2, vt.getRowCount());
+
+            Thread.sleep(100);
+        }
+        client.drain();
+
+        // delete the NIBBLEDELTES stats record
+        vt = client.callProcedure("@Statistics", "NIBBLEDELETES", 0).getResults()[0];
+        assertEquals(0, vt.getRowCount());
+
+        client.drain();
+    }
+
+
     public void testWindowExample() throws IOException, ProcCallException, InterruptedException {
         System.out.println("STARTING testWindowExample.....");
 
@@ -128,10 +167,7 @@ public class TestNibbleDeletes extends RegressionSuite {
         vt = client.callProcedure("@CancelNTProcedure", "@NibbleDeletes").getResults()[0];
 
         System.err.println(vt);
-
     }
-
-
 
     public TestNibbleDeletes(String name) {
         super(name);

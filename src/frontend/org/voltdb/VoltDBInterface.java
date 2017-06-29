@@ -124,6 +124,7 @@ public interface VoltDBInterface
     // existing code
     public StatsAgent getStatsAgent();
     public MemoryStats getMemoryStatsSource();
+    public NibbleDeletesStats getNibbleDeletesStatsSource();
     public BackendTarget getBackendTargetType();
     public String getLocalMetadata();
     public SiteTracker getSiteTrackerForSnapshot();
