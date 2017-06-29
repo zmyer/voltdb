@@ -99,6 +99,7 @@ public class LocalCluster extends VoltServerConfig {
     protected int m_siteCount;
     int m_hostCount;
     int m_missingHostCount = 0;
+    int m_extraHostCount = 0;
     int m_kfactor = 0;
     int m_clusterId;
     protected String m_jarFileName;
@@ -244,11 +245,10 @@ public class LocalCluster extends VoltServerConfig {
             int hostCount,
             int kfactor,
             BackendTarget target,
-            int inactiveCount)
-{
+            int inactiveCount) {
        this(jarFileName, siteCount, hostCount, kfactor, target, null);
        this.m_missingHostCount = inactiveCount;
-}
+    }
 
     public LocalCluster(String jarFileName,
                         int siteCount,
@@ -861,7 +861,7 @@ public class LocalCluster extends VoltServerConfig {
         templateCmdLine.coordinators(internalPortGenerator.getCoordinators());
 
         m_eeProcs.clear();
-        int hostCount = m_hostCount - m_missingHostCount;
+        int hostCount = m_hostCount - m_missingHostCount + m_extraHostCount;
         for (int ii = 0; ii < hostCount; ii++) {
             String logfile = "LocalCluster_host_" + ii + ".log";
             m_eeProcs.add(new EEProcess(templateCmdLine.target(), m_siteCount, logfile));
@@ -874,7 +874,6 @@ public class LocalCluster extends VoltServerConfig {
             resetLogMessageMatchResults();
         }
         int oopStartIndex = 0;
-
         // create the in-process server instance.
         if (m_hasLocalServer) {
             try {
@@ -2356,5 +2355,10 @@ public class LocalCluster extends VoltServerConfig {
     private void resetLogMessageMatchResults(int hostId) {
         assertTrue(m_logMessageMatchResults.containsKey(hostId));
         m_logMessageMatchResults.get(hostId).clear();
+    }
+
+    public void setExtraHostCount(int extraHostCount) {
+        assertTrue((m_hostCount - m_missingHostCount) > extraHostCount);
+        m_extraHostCount = extraHostCount;
     }
 }

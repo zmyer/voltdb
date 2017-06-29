@@ -506,8 +506,12 @@ public class MeshProber implements JoinAcceptor {
 
     @Override
     public void determineFinalStartActionIfNeeded() {
-        Map<Integer,HostCriteria> update = m_hostCriteria.get();
-        if (m_missingHostCount > 0 && update.size() < getHostCount()) {
+        if (m_probedDetermination.isDone() || m_missingHostCount == 0) {
+            return;
+        }
+
+        //give extra time to allow more nodes join the mesh
+        if (m_hostCriteria.get().size() < getHostCount()) {
             try {
                 Thread.sleep(MISSING_NODE_OPTION_WAIT);
             } catch (InterruptedException e) {
