@@ -579,16 +579,6 @@ public class SQLParser extends SQLPatternFactory
             // explainview.
             "\\s*",              // extra spaces
             Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
-    // Match queries that start with "nibbledeletes" (case insensitive).  We'll convert them to @Explain invocations.
-    private static final Pattern NibbleDeletesCallPreamble = Pattern.compile(
-            "^\\s*" +            // optional indent at start of line
-            "nibbledeletes" +          // required command, whitespace terminated
-            "(\\W|$)" +          // require an end to the keyword OR EOL (group 1)
-            // Make everything that follows optional so that explain command
-            // diagnostics can "own" any line starting with the word
-            // explain.
-            "\\s*",              // extra spaces
-            Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
 
     private static final SimpleDateFormat FullDateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
     private static final SimpleDateFormat WholeSecondDateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
@@ -1135,7 +1125,11 @@ public class SQLParser extends SQLPatternFactory
     // to the extent that comments are supported they have already been stripped out.
     private static List<String> parseExecParameters(String paramText)
     {
+        final String PARAM_STRING_ESCAPE_SINGLE_QUOTE = "#(PARAM_STRING_ESCAPE_SINGLE_QUOTE)";
+        paramText = EscapedSingleQuote.matcher(paramText).replaceAll(PARAM_STRING_ESCAPE_SINGLE_QUOTE);
+
         final String SafeParamStringValuePattern = "#(SQL_PARSER_SAFE_PARAMSTRING)";
+
         // Find all quoted strings.
         // Mask out strings that contain whitespace or commas
         // that must not be confused with parameter separators.
@@ -1182,6 +1176,7 @@ public class SQLParser extends SQLPatternFactory
                 while (fragment.indexOf(SafeParamStringValuePattern) > -1) {
                     fragment = fragment.replace(SafeParamStringValuePattern,
                             originalString.get(subCount));
+                    fragment = fragment.replace(PARAM_STRING_ESCAPE_SINGLE_QUOTE, "''");
                     ++subCount;
                 }
             }
@@ -1424,7 +1419,7 @@ public class SQLParser extends SQLPatternFactory
 
         String remainder = statement.substring(fileMatcher.end(), statement.length());
 
-        List<FileInfo> filesInfo = new ArrayList<FileInfo>();
+        List<FileInfo> filesInfo = new ArrayList<>();
 
         Matcher inlineBatchMatcher = DashInlineBatchToken.matcher(remainder);
         if (inlineBatchMatcher.lookingAt()) {
@@ -1456,7 +1451,7 @@ public class SQLParser extends SQLPatternFactory
 
         // split filenames assuming they are separated by space ignoring spaces within quotes
         // tests for parsing in TestSqlCmdInterface.java
-        List<String> filenames = new ArrayList<String>();
+        List<String> filenames = new ArrayList<>();
         Pattern regex = Pattern.compile("[^\\s\']+|'[^']*'");
         Matcher regexMatcher = regex.matcher(remainder);
         while (regexMatcher.find()) {
@@ -1919,20 +1914,6 @@ public class SQLParser extends SQLPatternFactory
         // Clean up any extra spaces around the remainder of the line,
         // which should be a view name.
         return statement.substring(matcher.end()).trim();
-    }
-
-    /**
-     * Parse NIBBLEDELETES <query>
-     * @param statement  statement to parse
-     * @return           query parameter string or NULL if statement wasn't recognized
-     */
-    public static String parseNibbleDeletesCall(String statement)
-    {
-        Matcher matcher = NibbleDeletesCallPreamble.matcher(statement);
-        if ( ! matcher.lookingAt()) {
-            return null;
-        }
-        return statement.substring(matcher.end());
     }
 
     /**

@@ -879,12 +879,6 @@ public class SQLCommand
                 return;
             }
 
-            String nibbledeletesStatement = SQLParser.parseNibbleDeletesCall(statement);
-            if (nibbledeletesStatement != null) {
-                printResponse(m_client.callProcedure("@NibbleDeletes", nibbledeletesStatement), false);
-                return;
-            }
-
             String explainStatement = SQLParser.parseExplainCall(statement);
             if (explainStatement != null) {
                 // We've got a statement that starts with "explain", send the statement to
@@ -1069,7 +1063,7 @@ public class SQLCommand
         Procedures.put("@GetPartitionKeys",
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@NibbleDeletes",
-                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
+                ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "integer")).build());
         Procedures.put("@CancelNTProcedure",
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@GC",

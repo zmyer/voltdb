@@ -50,7 +50,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.sysprocs.NibbleDeletes;
 
 public class TestNibbleDeletes extends RegressionSuite {
 
@@ -62,7 +61,7 @@ public class TestNibbleDeletes extends RegressionSuite {
             client.callProcedure("P1.insert", i, i);
         }
         VoltTable vt;
-        vt = client.callProcedure("@NibbleDeletes", "delete from p1 where points > 0;").getResults()[0];
+        vt = client.callProcedure("@NibbleDeletes", "delete from p1 where points > 0;", 2).getResults()[0];
         System.out.println(vt);
 
         vt = client.callProcedure("@AdHoc", "select count(*) from P1;").getResults()[0];
@@ -77,51 +76,44 @@ public class TestNibbleDeletes extends RegressionSuite {
     public void testCancelNibbleDelete() throws IOException, ProcCallException, InterruptedException {
         System.out.println("STARTING testCancelNibbleDelete.....");
 
-        final int BATCH_SIZE = NibbleDeletes.BATCH_DELETE_TUPLE_COUNT;
-        // to make the deletes slow
-        NibbleDeletes.BATCH_DELETE_TUPLE_COUNT = 1;
-
-        try {
-            Client client = this.getClient();
-            ProcedureCallback NullCallBack = new ProcedureCallback() {
-                @Override
-                public void clientCallback(ClientResponse clientResponse) throws Exception {
-                    assertEquals(ClientResponse.SUCCESS, clientResponse.getStatus());
-                }
-            };
-            for (int i = 0; i < 10000; i++) {
-                client.callProcedure(NullCallBack, "P1.insert", i, i);
+        // to make the deletes slow, use batch size 1 to delete
+        Client client = this.getClient();
+        ProcedureCallback NullCallBack = new ProcedureCallback() {
+            @Override
+            public void clientCallback(ClientResponse clientResponse) throws Exception {
+                assertEquals(ClientResponse.SUCCESS, clientResponse.getStatus());
             }
-            client.drain();
-            VoltTable vt;
-
-            ProcedureCallback callback = new ProcedureCallback() {
-                @Override
-                public void clientCallback(ClientResponse clientResponse) throws Exception {
-                    assertEquals(ClientResponse.GRACEFUL_FAILURE, clientResponse.getStatus());
-                    assertEquals("@NibbleDeletes is cancelled", clientResponse.getStatusString());
-                }
-            };
-
-            client.callProcedure(callback,
-                    "@NibbleDeletes", "delete from p1 where points > 0;");
-
-            Thread.sleep(100);
-            ClientResponse cr = client.callProcedure("@CancelNTProcedure", "@NibbleDeletes");
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            String expectedResult = "Successfully informed 1 NT-Procedure @NibbleDeletes";
-            assertTrue(cr.getStatusString(),
-                    cr.getStatusString().contains(expectedResult));
-            assertTrue(cr.getResults()[0].toString(), cr.getResults()[0].toString().contains(expectedResult));
-
-            vt = client.callProcedure("@AdHoc", "select count(*) from P1;").getResults()[0];
-            System.err.println("count(*): " + vt.asScalarLong());
-            assertTrue(vt.asScalarLong() < 10000);
-
-            client.drain();
-        } finally {
-            NibbleDeletes.BATCH_DELETE_TUPLE_COUNT = BATCH_SIZE;
+        };
+        for (int i = 0; i < 10000; i++) {
+            client.callProcedure(NullCallBack, "P1.insert", i, i);
         }
+        client.drain();
+        VoltTable vt;
+
+        ProcedureCallback callback = new ProcedureCallback() {
+            @Override
+            public void clientCallback(ClientResponse clientResponse) throws Exception {
+                assertEquals(ClientResponse.SUCCESS, clientResponse.getStatus());
+                assertEquals("@NibbleDeletes is cancelled", clientResponse.getStatusString());
+            }
+        };
+
+        client.callProcedure(callback,
+                "@NibbleDeletes", "delete from p1 where points > 0;", 1);
+
+        Thread.sleep(100);
+        ClientResponse cr = client.callProcedure("@CancelNTProcedure", "@NibbleDeletes");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        String expectedResult = "Successfully informed 1 NT-Procedure @NibbleDeletes";
+        assertTrue(cr.getStatusString(),
+                cr.getStatusString().contains(expectedResult));
+        assertTrue(cr.getResults()[0].toString(), cr.getResults()[0].toString().contains(expectedResult));
+
+        vt = client.callProcedure("@AdHoc", "select count(*) from P1;").getResults()[0];
+        System.err.println("count(*): " + vt.asScalarLong());
+        assertTrue(vt.asScalarLong() < 10000);
+
+        client.drain();
     }
 
     public void testWindowExample() throws IOException, ProcCallException, InterruptedException {
