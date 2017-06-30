@@ -175,7 +175,8 @@ public class NibbleDeletes extends AdHocNTBase {
 
     static Map<Integer, Integer> getPartitionMap() {
         // get partition key list
-        VoltTable vt = TheHashinator.getPartitionKeys(VoltType.INTEGER);
+//        VoltTable vt = TheHashinator.getPartitionKeys(VoltType.INTEGER);
+        VoltTable vt = TheHashinator.instance.get().getSecond().getSupplierForType(VoltType.INTEGER).get();
 
         // PARTITION_ID:INTEGER, PARTITION_KEY:INTEGER
         Map<Integer, Integer> partitionMap = new LinkedHashMap<>();

@@ -28,11 +28,9 @@ from voltcli.checkstats import StatisticsProcedureException
 
 @VOLT.Command(
     bundles=VOLT.AdminBundle(),
-    description="Show status of current cluster and remote cluster(s) it connects to",
+    description="Show in-flight @NibbleDeletes progress information",
     options=(
             VOLT.BooleanOption('-c', '--continuous', 'continuous', 'continuous listing', default=False),
-            VOLT.BooleanOption('-j', '--json', 'json', 'print out JSON format instead of plain text', default=False),
-            VOLT.BooleanOption(None, '--dr', 'dr', 'display DR/XDCR related status', default=False)
     ),
 )
 
@@ -59,10 +57,7 @@ def doNibbledeletes(runner):
                               runner.opts.ssl_config)
 
     statsInfo = getNibbleDeletesStats(runner)
-    if runner.opts.json:
-        printJSONSummary(statsInfo)
-    else:
-        printPlainSummary(statsInfo)
+    printPlainSummary(statsInfo)
 
 class NibbleDeletesRow(object):
     def __init__(self, hostid, hostname, query, pid, total, delete, percent):
@@ -83,82 +78,55 @@ def getNibbleDeletesStats(runner):
         sys.exit(e.exitCode)
     statsInfo = {}
     for row in response.table(0).tuples():
-        hostid = row[1]
-        hostname = row(row[2])
-        query = row(row[3])
-        pid = row[4]
-        total = row[5]
-        delete = row[6]
-        percent = row[7]
-        
+        hostid = int(row[1])
+        hostname = str(row[2])
+        query = str(row[3])
+        pid = int(row[4])
+        total = long(row[5])
+        delete = long(row[6])
+        percent = int(row[7])
+
         nibbledeletesrow = NibbleDeletesRow(hostid, hostname, query, pid, total, delete, percent)
-        
-        if statsInfo[query] == None:
-             statsInfo[query] = [nibbledeletesrow]
-        else:
+
+        if query in statsInfo:
             curList = statsInfo[query]
             curList.append(nibbledeletesrow)
-        
+        else:
+            statsInfo[query] = [nibbledeletesrow]
+
     return statsInfo
 
 def printPlainSummary(statsInfo):
-    
+
     if len(statsInfo) == 0:
-        sys.stdout.write('no running @NibbleDeletes query')
+        sys.stdout.write('no running @NibbleDeletes query\n')
         return
-    
+
+    maxLen = 60.0
     for query in statsInfo:
-        
-        
-        
-        
-    
-    sys.stdout.write(header1)
-    sys.stdout.write('\n')
-    
+        curList = statsInfo[query]
+        curList.sort(key=lambda row: row.pid)
+        maxRow = max(curList, key=lambda row: row.total)
 
-def printJSONSummary(cluster):
+        maxTotal = maxRow.total
 
-    remoteClusterInfos = []
-    for clusterId, remoteCluster in cluster.remoteclusters_by_id.items():
-        clusterInfo = {
-            "clusterId": clusterId,
-            "state": remoteCluster.status,
-            "role": remoteCluster.role
-        }
-        remoteClusterInfos.append(clusterInfo)
+        sys.stdout.write('Hostname: %s, HostId: %d \n' % (maxRow.hostname, maxRow.hostid))
+        sys.stdout.write('Query:' + query + '\n')
+        for row in curList:
+            barLen = int(row.total * maxLen / float(maxTotal));
+            status = '%d / %d' % (row.delete, row.total)
+            progress(row.pid, barLen, row.delete, row.total, status)
+            sys.stdout.write('\n')
+            pass
 
-    members = []
-    for hostId, hostname in cluster.hosts_by_id.items():
-        latencies = []
-        for clusterId, remoteCluster in cluster.remoteclusters_by_id.items():
-            latency = {
-                "clusterId": clusterId,
-                "delay": remoteCluster.producer_max_latency[hostname + str(clusterId)]
-            }
-            latencies.append(latency)
-        hostInfo = {
-            "hostId": hostId,
-            "hostname": hostname,
-            "replicationLatencies": latencies,
-        }
-        members.append(hostInfo)
+        sys.stdout.write('\n')
+    pass
 
-    livehost = len(cluster.hosts_by_id)
-    missing = cluster.hostcount - livehost
-    body = {
-        "clusterId": cluster.id,
-        "version": cluster.version,
-        "hostcount": cluster.hostcount,
-        "kfactor": cluster.kfactor,
-        "livehost": livehost,
-        "missing": missing,
-        "liveclient": cluster.liveclients,
-        "uptime": cluster.uptime,
-        "remoteClusters": remoteClusterInfos,
-        "members": members
-    }
-    jsonStr = json.dumps(body)
-    print jsonStr
+def progress(pid, barLen, count, total, status=''):
+    filledLen = int(round(barLen * count / float(total)))
 
+    percent = round(100.0 * count / float(total), 1)
+    bar = '=' * filledLen + '-' * (barLen - filledLen)
+
+    sys.stdout.write('Partition %d [%s] %s%s ...%s\r' % (pid, bar, percent, '%', status))
 

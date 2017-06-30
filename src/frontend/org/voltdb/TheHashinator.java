@@ -116,8 +116,8 @@ public abstract class TheHashinator {
      /*
      * Stamped instance, version associated with hash function, only update for newer versions
      */
-    private static final AtomicReference<Pair<Long, ? extends TheHashinator>> instance =
-            new AtomicReference<Pair<Long, ? extends TheHashinator>>();
+    public static final AtomicReference<Pair<Long, ? extends TheHashinator>> instance =
+            new AtomicReference<>();
 
     // Set true once the current Hashinator does not match m_pristineHashinator
     private static boolean m_elasticallyModified = false;
@@ -540,7 +540,7 @@ public abstract class TheHashinator {
 
     public static final String CNAME_PARTITION_KEY = "PARTITION_KEY";
 
-    private Supplier<VoltTable> getSupplierForType(final VoltType type) {
+    public synchronized Supplier<VoltTable> getSupplierForType(final VoltType type) {
         return new Supplier<VoltTable>() {
             @Override
             public VoltTable get() {
@@ -602,22 +602,22 @@ public abstract class TheHashinator {
         }
         if (vt == null) return null;
 
-        // create a shared buffered VoltTable to handle multiple reader concurrently
-        VoltTable result = new VoltTable(new VoltTable.ColumnInfo[] {
-                new VoltTable.ColumnInfo(
-                        VoltSystemProcedure.CNAME_PARTITION_ID,
-                        VoltSystemProcedure.CTYPE_ID),
-                new VoltTable.ColumnInfo(CNAME_PARTITION_KEY, type)});
+//        // create a shared buffered VoltTable to handle multiple reader concurrently
+//        VoltTable result = new VoltTable(new VoltTable.ColumnInfo[] {
+//                new VoltTable.ColumnInfo(
+//                        VoltSystemProcedure.CNAME_PARTITION_ID,
+//                        VoltSystemProcedure.CTYPE_ID),
+//                new VoltTable.ColumnInfo(CNAME_PARTITION_KEY, type)});
+//
+//        synchronized (result) {
+//            vt.resetRowPosition();
+//            int rowCount = vt.getRowCount();
+//            for (int i = 0; i < rowCount; i++) {
+//                result.add(vt.fetchRow(i));
+//            }
+//            vt.resetRowPosition();
+//        }
 
-        synchronized (result) {
-            vt.resetRowPosition();
-            int rowCount = vt.getRowCount();
-            for (int i = 0; i < rowCount; i++) {
-                result.add(vt.fetchRow(i));
-            }
-            vt.resetRowPosition();
-        }
-
-        return result;
+        return vt;
     }
 }
