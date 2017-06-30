@@ -58,6 +58,7 @@
 #include "indexes/CompactingHashUniqueIndex.h"
 #include "indexes/CompactingHashMultiMapIndex.h"
 #include "indexes/CoveringCellIndex.h"
+#include "indexes/CompactingArtUniqueIndex.h"
 
 namespace voltdb {
 
@@ -72,7 +73,7 @@ class TableIndexPicker
             } else if (m_scheme.countable) {
                 return new CompactingTreeUniqueIndex<NormalKeyValuePair<TKeyType>, true>(m_keySchema, m_scheme);
             } else {
-                return new CompactingTreeUniqueIndex<NormalKeyValuePair<TKeyType>, false>(m_keySchema, m_scheme);
+                return new CompactingArtUniqueIndex<NormalKeyValuePair<TKeyType>, false>(m_keySchema, m_scheme);
             }
         } else {
             if (m_type != BALANCED_TREE_INDEX) {

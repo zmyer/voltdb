@@ -28,7 +28,7 @@
 #include <cstdio>
 #include <sys/time.h>
 #include "harness.h"
-#include "structures/CompactingMap.h"
+#include "structures/CompactingArt.h"
 #include "common/FixUnusedAssertHack.h"
 
 using namespace voltdb;
@@ -46,6 +46,8 @@ public:
         return lhs.compare(rhs);
     }
 };
+
+// Also add Compact Int Key support
 
 class IntComparator {
 public:
@@ -468,7 +470,7 @@ TEST_F(CompactingMapTest, BenchmarkMulti) {
 }
 
 TEST_F(CompactingMapTest, Trivial) {
-    voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator> m(true, IntComparator());
+    voltdb::CompactingArt<NormalKeyValuePair<int, int>, IntComparator> m(false, IntComparator());
     bool success = m.insert(std::pair<int,int>(2,2));
     ASSERT_TRUE(success);
     success = m.insert(std::pair<int,int>(1,1));
@@ -494,7 +496,7 @@ TEST_F(CompactingMapTest, Trivial) {
     success = m2.insert(std::pair<int,int>(1,1));
     ASSERT_TRUE(success);
 
-    ASSERT_TRUE(m2.verify());
+    ASSERT_TRUE(m.verify());
 }
 
 TEST_F(CompactingMapTest, RandomUnique) {

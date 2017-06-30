@@ -363,7 +363,8 @@ enum TableIndexType {
     BALANCED_TREE_INDEX     = 1,
     HASH_TABLE_INDEX        = 2,
     BTREE_INDEX             = 3, // unused
-    COVERING_CELL_INDEX     = 4
+    COVERING_CELL_INDEX     = 4,
+    ART_INDEX               = 5
 };
 
 // ------------------------------------------------------------------
