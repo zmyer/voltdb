@@ -180,6 +180,13 @@ public class VoltLog4jLogger implements CoreVoltLogger {
      * @param xmlConfig The text of a Log4j config file.
      */
     public static void configure(String xmlConfig, File voltroot) {
+
+        // NEEDSWORK: jmc -- This gets called through reflection starting with the voltadmin log4j command. See
+        // RealVoltDB.logUpdate, caled from UpdateLogging.run().
+        //
+        // For Log4J2, you can update the whole cofiguration in one shot as illustrated here:
+        // https://logging.apache.org/log4j/2.0/faq.html#reconfig_from_code
+
         DOMConfigurator configurator = new DOMConfigurator();
         StringReader sr = new StringReader(xmlConfig.trim());
         configurator.doConfigure(sr, LogManager.getLoggerRepository());

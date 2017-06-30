@@ -27,7 +27,7 @@
 	<classpathentry kind="lib" path="lib/jetty-continuation-9.3.6.v20151106.jar"/>
 	<classpathentry kind="lib" path="lib/jetty-io-9.3.6.v20151106.jar"/>
 	<classpathentry kind="lib" path="lib/slf4j-api-1.6.2.jar"/>
-	<classpathentry kind="lib" path="lib/slf4j-nop-1.6.2.jar"/>
+	<classpathentry kind="lib" path="lib/slf4j-log4j12-1.7.25.jar"/>
 	<classpathentry kind="lib" path="lib/jna.jar"/>
 	<classpathentry kind="lib" path="lib/protobuf-java-3.1.0.jar"/>
 	<classpathentry kind="lib" path="lib/snappy-java-1.1.1.7.jar"/>
