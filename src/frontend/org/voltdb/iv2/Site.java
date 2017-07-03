@@ -55,6 +55,7 @@ import org.voltdb.PartitionDRGateway;
 import org.voltdb.PostGISBackend;
 import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
+import org.voltdb.RealVoltDB;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
 import org.voltdb.SnapshotDataTarget;
@@ -87,6 +88,7 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngine.EventType;
 import org.voltdb.jni.ExecutionEngine.TaskType;
@@ -110,7 +112,7 @@ import com.google_voltpatches.common.base.Preconditions;
 
 import vanilla.java.affinity.impl.PosixJNAAffinity;
 
-public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
+public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection, DurableUniqueIdListener
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger drLog = new VoltLogger("DRAGENT");
@@ -178,6 +180,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     private PartitionDRGateway m_drGateway;
     private PartitionDRGateway m_mpDrGateway;
     private final boolean m_hasMPDRGateway; // true if this site has the MP gateway
+    private long m_lastDurableSpUniqueId = -1;
+    private long m_lastDurableMpUniqueId = -1;
 
     /*
      * Track the last producer-cluster unique IDs and drIds associated with an
@@ -384,6 +388,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         public SiteSnapshotConnection getSiteSnapshotConnection()
         {
             return Site.this;
+        }
+
+        @Override
+        public long getLastDurableSpUniqueId() {
+            return m_lastDurableSpUniqueId;
+        }
+
+        @Override
+        public long getLastDurableMpUniqueId() {
+            return m_lastDurableMpUniqueId;
         }
 
         @Override
@@ -715,6 +729,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 return (now - 5) > m_lastTxnTime;
             }
         });
+
+        VoltDB.instance().setDurabilityUniqueIdListener(m_partitionId, this);
     }
 
     /** Create a native VoltDB execution engine */
@@ -1737,5 +1753,17 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     public ExecutionEngine getExecutionEngine() {
         return m_ee;
+    }
+
+    @Override
+    public void lastUniqueIdsMadeDurable(long spUniqueId, long mpUniqueId)
+    {
+        if (spUniqueId > m_lastDurableSpUniqueId) {
+            m_lastDurableSpUniqueId = spUniqueId;
+        }
+
+        if (mpUniqueId > m_lastDurableMpUniqueId) {
+            m_lastDurableMpUniqueId = mpUniqueId;
+        }
     }
 }

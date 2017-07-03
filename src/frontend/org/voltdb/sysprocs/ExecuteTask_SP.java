@@ -29,6 +29,8 @@ import org.voltdb.ParameterSet;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 import org.voltdb.jni.ExecutionEngine.TaskType;
 
 public class ExecuteTask_SP extends VoltSystemProcedure {
@@ -54,11 +56,12 @@ public class ExecuteTask_SP extends VoltSystemProcedure {
      * @param partitionParam  key for routing stored procedure to correct site
      * @param params          additional parameter(s) for the task to execute, first one is always task type
      */
-    public void run(SystemProcedureExecutionContext ctx, byte[] partitionParam, byte[] params)
+    public VoltTable run(SystemProcedureExecutionContext ctx, byte[] partitionParam, byte[] params)
     {
         assert params.length > 0;
         byte taskId = params[0];
         TaskType taskType = TaskType.values()[taskId];
+        VoltTable results = null;
         switch (taskType) {
         case SP_JAVA_GET_DRID_TRACKER:
             Map<Integer, Map<Integer, DRConsumerDrIdTracker>> drIdTrackers = ctx.getDrAppliedTrackers();
@@ -75,9 +78,18 @@ public class ExecuteTask_SP extends VoltSystemProcedure {
             byte clusterId = params[1];
             ctx.resetDrAppliedTracker(clusterId);
             break;
+        case GET_DURABLE_UNIQUE_IDS:
+            results = new VoltTable( new ColumnInfo[] {
+                    new ColumnInfo("LAST_DURABLE_SP_ID", VoltType.BIGINT),
+                    new ColumnInfo("LAST_DURABLE_MP_ID", VoltType.BIGINT)
+            });
+            results.addRow(ctx.getLastDurableSpUniqueId(), ctx.getLastDurableMpUniqueId());
+            break;
         default:
             throw new VoltAbortException("Unable to find the task associated with the given task id");
         }
+
+        return results;
     }
 
     public static String jsonifyTrackedDRData(Pair<Long, Long> lastConsumerUniqueIds,

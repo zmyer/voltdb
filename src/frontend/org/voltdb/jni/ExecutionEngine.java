@@ -70,7 +70,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         RESET_DR_APPLIED_TRACKER(7),
         SET_MERGED_DRID_TRACKER(8),
         INIT_DRID_TRACKER(9),
-        RESET_DR_APPLIED_TRACKER_SINGLE(10);
+        RESET_DR_APPLIED_TRACKER_SINGLE(10),
+        GET_DURABLE_UNIQUE_IDS(11);
 
         private TaskType(int taskId) {
             this.taskId = taskId;

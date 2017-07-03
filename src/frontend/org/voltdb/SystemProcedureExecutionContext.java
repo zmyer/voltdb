@@ -117,4 +117,7 @@ public interface SystemProcedureExecutionContext {
 
     Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
                                                List<DBBPool.BBContainer> outputBuffers);
+
+    long getLastDurableSpUniqueId();
+    long getLastDurableMpUniqueId();
 }
