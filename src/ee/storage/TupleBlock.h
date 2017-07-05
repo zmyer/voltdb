@@ -246,6 +246,7 @@ public:
     }
 private:
     char*   m_storage;
+    uint64_t m_storageSize;
     uint32_t m_references;
     uint32_t m_tupleLength;
     uint32_t m_tuplesPerBlock;

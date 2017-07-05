@@ -344,8 +344,6 @@ public class VoltDB {
             /*
              *  !!! D O  N O T  U S E  hostLog  T O  L O G ,  U S E  System.[out|err]  I N S T E A D
              */
-            System.out.println(Arrays.toString(args));
-
             for (int i=0; i < args.length; ++i) {
                 arg = args[i];
                 // Some LocalCluster ProcessBuilder instances can result in an empty string

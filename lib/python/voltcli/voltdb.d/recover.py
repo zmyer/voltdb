@@ -14,6 +14,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
+import os
+
 @VOLT.Command(
     # Uses all default except last is safemode switch availability
     bundles = VOLT.ServerBundle('recover',

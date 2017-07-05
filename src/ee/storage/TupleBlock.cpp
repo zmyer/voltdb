@@ -19,6 +19,7 @@
 #include <sys/mman.h>
 #include <errno.h>
 #include "common/ThreadLocalPool.h"
+#include "common/MemoryChunkAllocator.hpp"
 
 namespace voltdb {
 
@@ -26,6 +27,7 @@ volatile int tupleBlocksAllocated = 0;
 
 TupleBlock::TupleBlock(Table *table, TBBucketPtr bucket) :
         m_storage(NULL),
+        m_storageSize(table->m_tableAllocationSize),
         m_references(0),
         m_tupleLength(table->m_tupleLength),
         m_tuplesPerBlock(table->m_tuplesPerBlock),
@@ -35,29 +37,12 @@ TupleBlock::TupleBlock(Table *table, TBBucketPtr bucket) :
         m_bucket(bucket),
         m_bucketIndex(0)
 {
-#ifdef USE_MMAP
-    size_t tableAllocationSize = static_cast<size_t> (m_tupleLength * m_tuplesPerBlock);
-    m_storage = static_cast<char*>(::mmap( 0, tableAllocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
-    if (m_storage == MAP_FAILED) {
-        std::cout << strerror( errno ) << std::endl;
-        throwFatalException("Failed mmap");
-    }
-#else
-    m_storage = new char[table->m_tableAllocationSize];
-#endif
+    m_storage = allocateMemoryChunk(m_storageSize);
     tupleBlocksAllocated++;
 }
 
 TupleBlock::~TupleBlock() {
-#ifdef USE_MMAP
-    size_t tableAllocationSize = static_cast<size_t> (m_tupleLength * m_tuplesPerBlock);
-    if (::munmap( m_storage, tableAllocationSize) != 0) {
-        std::cout << strerror( errno ) << std::endl;
-        throwFatalException("Failed munmap");
-    }
-#else
-    delete []m_storage;
-#endif
+    deallocateMemoryChunk(m_storage, m_storageSize);
 }
 
 std::pair<int, int> TupleBlock::merge(Table *table, TBPtr source, TupleMovementListener *listener) {

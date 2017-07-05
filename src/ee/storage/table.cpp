@@ -56,6 +56,7 @@
 #include "common/tabletuple.h"
 #include "common/Pool.hpp"
 #include "common/FatalException.hpp"
+#include "common/MemoryChunkAllocator.hpp"
 #include "indexes/tableindex.h"
 #include "storage/tableiterator.h"
 #include "storage/persistenttable.h"
@@ -118,21 +119,12 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string>
     m_tableAllocationSize = m_tupleLength;
 #else
     m_tuplesPerBlock = m_tableAllocationTargetSize / m_tupleLength;
-#ifdef USE_MMAP
     if (m_tuplesPerBlock < 1) {
         m_tuplesPerBlock = 1;
-        m_tableAllocationSize = nexthigher(m_tupleLength);
+        m_tableAllocationSize = computeMemoryChunkSize(m_tupleLength);
     } else {
-        m_tableAllocationSize = nexthigher(m_tableAllocationTargetSize);
+        m_tableAllocationSize = computeMemoryChunkSize(m_tableAllocationTargetSize);
     }
-#else
-    if (m_tuplesPerBlock < 1) {
-        m_tuplesPerBlock = 1;
-        m_tableAllocationSize = m_tupleLength;
-    } else {
-        m_tableAllocationSize = m_tableAllocationTargetSize;
-    }
-#endif
 #endif
 
     // initialize column names

@@ -95,7 +95,7 @@ function server() {
     echo
     echo "${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}$1.jar"
     echo
-    ${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}$1.jar
+    perf stat -e dTLB-load-misses,iTLB-load-misses ${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}$1.jar
 }
 
 # run the client that drives the example

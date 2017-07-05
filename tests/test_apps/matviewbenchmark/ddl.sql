@@ -3,6 +3,7 @@ CREATE TABLE ids
   id BIGINT NOT NULL,
   group_id BIGINT,
   value BIGINT,
+  junk VARCHAR(128) DEFAULT 'foobar',
   PRIMARY KEY (id)
 );
 PARTITION TABLE ids ON COLUMN id;
@@ -12,6 +13,7 @@ CREATE TABLE idsWithMatView
   id BIGINT NOT NULL,
   group_id BIGINT,
   value BIGINT,
+  junk VARCHAR(128) DEFAULT 'foobar',
   PRIMARY KEY (id)
 );
 PARTITION TABLE idsWithMatView ON COLUMN id;
@@ -21,6 +23,7 @@ CREATE TABLE idsWithMinMatView
   id BIGINT NOT NULL,
   group_id BIGINT,
   value BIGINT,
+  junk VARCHAR(128) DEFAULT 'foobar',
   PRIMARY KEY (id)
 );
 PARTITION TABLE idsWithMinMatView ON COLUMN id;
@@ -30,6 +33,7 @@ CREATE TABLE idsWithMinMatViewOpt
   id BIGINT NOT NULL,
   group_id BIGINT,
   value BIGINT,
+  junk VARCHAR(128) DEFAULT 'foobar',
   PRIMARY KEY (id)
 );
 PARTITION TABLE idsWithMinMatViewOpt ON COLUMN id;
@@ -42,6 +46,7 @@ CREATE TABLE idsWith4MinMatView
   v2 BIGINT,
   v3 BIGINT,
   v4 BIGINT,
+  junk VARCHAR(128) DEFAULT 'foobar',
   PRIMARY KEY (id)
 );
 PARTITION TABLE idsWith4MinMatView ON COLUMN id;
@@ -54,6 +59,7 @@ CREATE TABLE idsWith4MinMatViewOpt
   v2 BIGINT,
   v3 BIGINT,
   v4 BIGINT,
+  junk VARCHAR(128) DEFAULT 'foobar',
   PRIMARY KEY (id)
 );
 PARTITION TABLE idsWith4MinMatViewOpt ON COLUMN id;
@@ -64,6 +70,7 @@ CREATE TABLE idsWithMultiGroupsMinMatView
   group_id_1 BIGINT,
   group_id_2 BIGINT,
   value BIGINT,
+  junk VARCHAR(128) DEFAULT 'foobar',
   PRIMARY KEY (id)
 );
 PARTITION TABLE idsWithMultiGroupsMinMatView ON COLUMN id;
@@ -74,6 +81,7 @@ CREATE TABLE idsWithMultiGroupsMinMatViewOpt
   group_id_1 BIGINT,
   group_id_2 BIGINT,
   value BIGINT,
+  junk VARCHAR(128) DEFAULT 'foobar',
   PRIMARY KEY (id)
 );
 PARTITION TABLE idsWithMultiGroupsMinMatViewOpt ON COLUMN id;
@@ -84,6 +92,7 @@ CREATE TABLE idsWithMultiGroupsMinMatViewBestOpt
   group_id_1 BIGINT,
   group_id_2 BIGINT,
   value BIGINT,
+  junk VARCHAR(128) DEFAULT 'foobar',
   PRIMARY KEY (id)
 );
 PARTITION TABLE idsWithMultiGroupsMinMatViewBestOpt ON COLUMN id;
@@ -94,12 +103,14 @@ CREATE TABLE noJoinedViewSrc1 (
   G1 BIGINT DEFAULT '0' NOT NULL,
   C2 BIGINT DEFAULT '0' NOT NULL,
   C3 BIGINT DEFAULT '0' NOT NULL,
-  C8 BIGINT DEFAULT '0' NOT NULL
+  C8 BIGINT DEFAULT '0' NOT NULL,
+  junk VARCHAR(128) DEFAULT 'foobar'
 );
 PARTITION TABLE noJoinedViewSrc1 ON COLUMN id;
 
 CREATE TABLE noJoinedViewSrc2 (
-  G0 BIGINT NOT NULL PRIMARY KEY
+  G0 BIGINT NOT NULL PRIMARY KEY,
+  junk VARCHAR(128) DEFAULT 'foobar'
 );
 
 CREATE TABLE joinedViewSrc1 (
@@ -108,52 +119,54 @@ CREATE TABLE joinedViewSrc1 (
   G1 BIGINT DEFAULT '0' NOT NULL,
   C2 BIGINT DEFAULT '0' NOT NULL,
   C3 BIGINT DEFAULT '0' NOT NULL,
-  C8 BIGINT DEFAULT '0' NOT NULL
+  C8 BIGINT DEFAULT '0' NOT NULL,
+  junk VARCHAR(128) DEFAULT 'foobar'
 );
 PARTITION TABLE joinedViewSrc1 ON COLUMN id;
 CREATE INDEX idxJoinedViewSrc1 ON joinedViewSrc1(G1, C3);
 
 CREATE TABLE joinedViewSrc2 (
-  G0 BIGINT NOT NULL PRIMARY KEY
+  G0 BIGINT NOT NULL PRIMARY KEY,
+  junk VARCHAR(128) DEFAULT 'foobar'
 );
 
 CREATE PROCEDURE ids_insert
   PARTITION ON TABLE ids COLUMN id AS
-  INSERT INTO ids VALUES (?,?,?);
+  INSERT INTO ids VALUES (?,?,?,'junk');
 CREATE PROCEDURE idsWithMatView_insert
   PARTITION ON TABLE idsWithMatView COLUMN id AS
-  INSERT INTO idsWithMatView VALUES (?,?,?);
+  INSERT INTO idsWithMatView VALUES (?,?,?,'junk');
 CREATE PROCEDURE idsWithMinMatView_insert
   PARTITION ON TABLE idsWithMinMatView COLUMN id AS
-  INSERT INTO idsWithMinMatView VALUES (?,?,?);
+  INSERT INTO idsWithMinMatView VALUES (?,?,?,'junk');
 CREATE PROCEDURE idsWithMinMatViewOpt_insert
   PARTITION ON TABLE idsWithMinMatViewOpt COLUMN id AS
-  INSERT INTO idsWithMinMatViewOpt VALUES (?,?,?);
+  INSERT INTO idsWithMinMatViewOpt VALUES (?,?,?,'junk');
 CREATE PROCEDURE idsWith4MinMatView_insert
   PARTITION ON TABLE idsWith4MinMatView COLUMN id AS
-  INSERT INTO idsWith4MinMatView VALUES (?,?,?,?,?,?);
+  INSERT INTO idsWith4MinMatView VALUES (?,?,?,?,?,?,'junk');
 CREATE PROCEDURE idsWith4MinMatViewOpt_insert
   PARTITION ON TABLE idsWith4MinMatViewOpt COLUMN id AS
-  INSERT INTO idsWith4MinMatViewOpt VALUES (?,?,?,?,?,?);
+  INSERT INTO idsWith4MinMatViewOpt VALUES (?,?,?,?,?,?,'junk');
 CREATE PROCEDURE idsWithMultiGroupsMinMatView_insert
   PARTITION ON TABLE idsWithMultiGroupsMinMatView COLUMN id AS
-  INSERT INTO idsWithMultiGroupsMinMatView VALUES (?,?,?,?);
+  INSERT INTO idsWithMultiGroupsMinMatView VALUES (?,?,?,?,'junk');
 CREATE PROCEDURE idsWithMultiGroupsMinMatViewOpt_insert
   PARTITION ON TABLE idsWithMultiGroupsMinMatViewOpt COLUMN id AS
-  INSERT INTO idsWithMultiGroupsMinMatViewOpt VALUES (?,?,?,?);
+  INSERT INTO idsWithMultiGroupsMinMatViewOpt VALUES (?,?,?,?,'junk');
 CREATE PROCEDURE idsWithMultiGroupsMinMatViewBestOpt_insert
   PARTITION ON TABLE idsWithMultiGroupsMinMatViewBestOpt COLUMN id AS
-  INSERT INTO idsWithMultiGroupsMinMatViewBestOpt VALUES (?,?,?,?);
+  INSERT INTO idsWithMultiGroupsMinMatViewBestOpt VALUES (?,?,?,?,'junk');
 CREATE PROCEDURE noJoinedViewSrc1_insert
   PARTITION ON TABLE noJoinedViewSrc1 COLUMN id AS
-  INSERT INTO noJoinedViewSrc1 VALUES (?,?,?,?,?,?);
+  INSERT INTO noJoinedViewSrc1 VALUES (?,?,?,?,?,?,'junk');
 CREATE PROCEDURE noJoinedViewSrc2_insert AS
-  INSERT INTO noJoinedViewSrc2 VALUES (?);
+  INSERT INTO noJoinedViewSrc2 VALUES (?,'junk');
 CREATE PROCEDURE joinedViewSrc1_insert
   PARTITION ON TABLE joinedViewSrc1 COLUMN id AS
-  INSERT INTO joinedViewSrc1 VALUES (?,?,?,?,?,?);
+  INSERT INTO joinedViewSrc1 VALUES (?,?,?,?,?,?,'junk');
 CREATE PROCEDURE joinedViewSrc2_insert AS
-  INSERT INTO joinedViewSrc2 VALUES (?);
+  INSERT INTO joinedViewSrc2 VALUES (?,'junk');
 
 CREATE PROCEDURE ids_group_id_update
   PARTITION ON TABLE ids COLUMN id AS
