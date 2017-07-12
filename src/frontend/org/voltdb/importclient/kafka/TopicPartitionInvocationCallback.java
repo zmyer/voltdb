@@ -18,6 +18,7 @@ package org.voltdb.importclient.kafka;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.function.LongBinaryOperator;
 
 import org.voltdb.client.ClientResponse;
@@ -31,46 +32,29 @@ public class TopicPartitionInvocationCallback implements ProcedureCallback
 {
     private final long m_nextoffset;
     private final long m_offset;
-    private final PendingWorkTracker m_callbackTracker;
+    private final LongAdder m_callbackTracker;
     private final CommitTracker m_tracker;
     private final AtomicBoolean m_dontCommit;
-    private final AtomicLong m_pauseOffset;
 
     public TopicPartitionInvocationCallback(
             final long curoffset,
             final long nextoffset,
-            final PendingWorkTracker callbackTracker,
+            final LongAdder callbackTracker,
             final CommitTracker tracker,
-            final AtomicBoolean dontCommit,
-            final AtomicLong pauseOffset) {
+            final AtomicBoolean dontCommit) {
         m_offset = curoffset;
         m_nextoffset = nextoffset;
         m_callbackTracker = callbackTracker;
         m_tracker = tracker;
         m_dontCommit = dontCommit;
-        m_pauseOffset = pauseOffset;
-    }
-
-    private static class PausedOffsetCalculator implements LongBinaryOperator {
-        @Override
-        public long applyAsLong(long currentValue, long givenUpdate) {
-            if (currentValue == -1){
-                return givenUpdate;
-            } else {
-                return Math.min(currentValue, givenUpdate);
-            }
-        }
     }
 
     @Override
     public void clientCallback(ClientResponse response) throws Exception {
 
-        m_callbackTracker.consumeWork();
+        m_callbackTracker.increment();
         if (!m_dontCommit.get() && response.getStatus() != ClientResponse.SERVER_UNAVAILABLE) {
             m_tracker.commit(m_nextoffset);
-        }
-        if (response.getStatus() == ClientResponse.SERVER_UNAVAILABLE) {
-            m_pauseOffset.accumulateAndGet(m_offset, new PausedOffsetCalculator());
         }
     }
 
