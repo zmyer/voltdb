@@ -28,7 +28,7 @@ import java.util.concurrent.TimeUnit;
  *
  * <p><b>Warning:</b> The methods of {@code ForwardingBlockingDeque} forward
  * <b>indiscriminately</b> to the methods of the delegate. For example, overriding {@link #add}
- * alone <b>will not</b> change the behaviour of {@link #offer} which can lead to unexpected
+ * alone <b>will not</b> change the behaviour of {@link #data.offer} which can lead to unexpected
  * behaviour. In this case, you should override {@code offer} as well, either providing your own
  * implementation, or delegating to the provided {@code standardOffer} method.
  *

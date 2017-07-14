@@ -40,6 +40,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
@@ -47,6 +48,9 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.importclient.kafka.DurableTracker;
+import org.voltdb.importer.CommitTracker;
+import org.voltdb.importer.ImporterLogger;
 import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
 
@@ -72,6 +76,45 @@ public class KafkaLoader10 {
     private List<Kafka10ConsumerRunner> m_consumers;
     private final long pollTimedWaitInMilliSec = Integer.getInteger("KAFKALOADER_POLLED_WAIT_MILLI_SECONDS", 1000); // 1 second
 
+    private ImporterLogger m_logger = new ImporterLogger() {
+
+        @Override
+        public void rateLimitedLog(Level level, Throwable cause, String format, Object... args) {
+            // TODO Auto-generated method stub
+
+        }
+
+        @Override
+        public void info(Throwable t, String msgFormat, Object... args) {
+            // TODO Auto-generated method stub
+
+        }
+
+        @Override
+        public void warn(Throwable t, String msgFormat, Object... args) {
+            // TODO Auto-generated method stub
+
+        }
+
+        @Override
+        public void error(Throwable t, String msgFormat, Object... args) {
+            // TODO Auto-generated method stub
+
+        }
+
+        @Override
+        public void debug(Throwable t, String msgFormat, Object... args) {
+            // TODO Auto-generated method stub
+
+        }
+
+        @Override
+        public boolean isDebugEnabled() {
+            // TODO Auto-generated method stub
+            return false;
+        }
+
+    };
     public KafkaLoader10(CLIOptions options) {
         m_cliOptions = options;
     }
@@ -339,6 +382,7 @@ public class KafkaLoader10 {
         private final CSVParser m_csvParser;
         private final Formatter m_formatter;
         private AtomicBoolean m_closed = new AtomicBoolean(false);
+        private CommitTracker m_tracker;
 
         Kafka10ConsumerRunner(CLIOptions config, CSVDataLoader loader, KafkaConsumer<byte[], byte[]> consumer)
                 throws FileNotFoundException, IOException, ClassNotFoundException, NoSuchMethodException,
@@ -359,6 +403,9 @@ public class KafkaLoader10 {
                 m_formatter = null;
             }
             m_consumer = consumer;
+
+            // NEEDSWORK: Examine class/package visibility
+            m_tracker = new DurableTracker(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768), m_logger, consumer.toString());
         }
 
         void forceClose() {
@@ -460,6 +507,7 @@ public class KafkaLoader10 {
             m_executorService.awaitTermination(365, TimeUnit.DAYS);
             m_executorService = null;
         }
+
     }
 
     /**

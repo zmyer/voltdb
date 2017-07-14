@@ -1029,7 +1029,7 @@ public class LinkedTransferQueue<E> extends AbstractQueue<E>
      * Inserts the specified element at the tail of this queue.
      * As the queue is unbounded, this method will never return {@code false}.
      *
-     * @return {@code true} (as specified by {@link Queue#offer})
+     * @return {@code true} (as specified by {@link Queue#data.offer})
      * @throws NullPointerException if the specified element is null
      */
     public boolean offer(E e) {

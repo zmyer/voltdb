@@ -30,7 +30,7 @@ import java.util.Queue;
  * <p><b>Warning:</b> The methods of {@code ForwardingQueue} forward
  * <b>indiscriminately</b> to the methods of the delegate. For example,
  * overriding {@link #add} alone <b>will not</b> change the behavior of {@link
- * #offer} which can lead to unexpected behavior. In this case, you should
+ * #data.offer} which can lead to unexpected behavior. In this case, you should
  * override {@code offer} as well, either providing your own implementation, or
  * delegating to the provided {@code standardOffer} method.
  *
@@ -83,8 +83,8 @@ public abstract class ForwardingQueue<E> extends ForwardingCollection<E> impleme
   }
 
   /**
-   * A sensible definition of {@link #offer} in terms of {@link #add}. If you
-   * override {@link #add}, you may wish to override {@link #offer} to forward
+   * A sensible definition of {@link #data.offer} in terms of {@link #add}. If you
+   * override {@link #add}, you may wish to override {@link #data.offer} to forward
    * to this implementation.
    * 
    * @since 7.0

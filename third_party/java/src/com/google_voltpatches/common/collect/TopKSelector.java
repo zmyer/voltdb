@@ -40,7 +40,7 @@ import javax.annotation_voltpatches.Nullable;
  *
  * <p>This uses the same efficient implementation as {@link Ordering#leastOf(Iterable, int)},
  * offering expected O(n + k log k) performance (worst case O(n log k)) for n calls to
- * {@link #offer} and a call to {@link #topK}, with O(k) memory. In comparison, quickselect has the
+ * {@link #data.offer} and a call to {@link #topK}, with O(k) memory. In comparison, quickselect has the
  * same asymptotics but requires O(n) memory, and a {@code PriorityQueue} implementation takes O(n
  * log k). In benchmarks, this implementation performs at least as well as either implementation,
  * and degrades more gracefully for worst-case input.

@@ -30,7 +30,7 @@ import java.util.Iterator;
  * <p><b>Warning:</b> The methods of {@code ForwardingDeque} forward
  * <b>indiscriminately</b> to the methods of the delegate. For example,
  * overriding {@link #add} alone <b>will not</b> change the behavior of {@link
- * #offer} which can lead to unexpected behavior. In this case, you should
+ * #data.offer} which can lead to unexpected behavior. In this case, you should
  * override {@code offer} as well.
  *
  * <p><b>{@code default} method warning:</b> This class does <i>not</i> forward calls to {@code
