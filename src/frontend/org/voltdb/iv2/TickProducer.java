@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
 import org.voltdb.rejoin.TaskLog;
@@ -35,7 +36,7 @@ public class TickProducer extends SiteTasker implements Runnable
     private final long m_procedureLogThreshold;
     private final long SUPPRESS_INTERVAL = 60; // 60 seconds
     private VoltLogger m_logger;
-    private int m_partitionId;
+    private long m_siteId;
     private long m_previousTaskTimestamp = -1;
     private long m_previousTaskPeekTime = -1;
 
@@ -44,7 +45,7 @@ public class TickProducer extends SiteTasker implements Runnable
     {
         m_taskQueue = taskQueue;
         m_logger = new VoltLogger("HOST");
-        m_partitionId = taskQueue.getPartitionId();
+        m_siteId = m_taskQueue.getSiteId();
         // get warning threshold from deployment
         // convert to nano seconds (default 10s)
         m_procedureLogThreshold = 1_000_000L * VoltDB.instance()
@@ -84,10 +85,10 @@ public class TickProducer extends SiteTasker implements Runnable
             m_previousTaskPeekTime = currentTime;
         } else if (currentTime - m_previousTaskPeekTime >= m_procedureLogThreshold) {
             String fmt = " A process (procedure, fragment, or operational task) is taking a long time "
-                    + "-- over %d seconds -- and blocking the queue for site %d. "
+                    + "-- over %d seconds -- and blocking the queue for execution site %s. "
                     + "No other jobs will be executed until that process completes.";
             long waitTime = (currentTime - m_previousTaskPeekTime)/1_000_000_000L; // in seconds
-            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.INFO, null, fmt, waitTime, m_partitionId);
+            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.INFO, null, fmt, waitTime, CoreUtils.hsIdToString(m_siteId));
         }
     }
 

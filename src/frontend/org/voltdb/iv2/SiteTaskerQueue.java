@@ -30,6 +30,7 @@ public class SiteTaskerQueue
     private StarvationTracker m_starvationTracker;
     private QueueDepthTracker m_queueDepthTracker;
     private int m_partitionId;
+    private long m_siteId;
 
     public SiteTaskerQueue(int partitionId) {
         m_partitionId = partitionId;
@@ -37,6 +38,10 @@ public class SiteTaskerQueue
 
     public int getPartitionId() {
         return m_partitionId;
+    }
+
+    public long getSiteId() {
+        return m_siteId;
     }
 
     public boolean offer(SiteTasker task)
@@ -98,5 +103,6 @@ public class SiteTaskerQueue
     public void setQueueDepthTracker(QueueDepthTracker tracker) {
         m_queueDepthTracker = tracker;
         m_queueDepthTracker.beginQueueDepth(m_tasks.size(), m_tasks);
+        m_siteId = tracker.getSiteId();
     }
 }
