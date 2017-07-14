@@ -26,10 +26,12 @@ import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -38,6 +40,8 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.voltcore.logging.Level;
@@ -291,7 +295,7 @@ public class KafkaLoader10 {
     private Properties kafkaConfigProperties() throws IOException {
         //Get group id which should be unique for table so as to keep offsets clean for multiple runs.
         String groupId = "voltdb-" + (m_cliOptions.useSuppliedProcedure ? m_cliOptions.procedure : m_cliOptions.table);
-
+        m_log.warn("GroupId=" + groupId);
         Properties props = new Properties();
         if (m_cliOptions.config.trim().isEmpty()) {
             props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
@@ -305,7 +309,9 @@ public class KafkaLoader10 {
             // the supplied command line
             m_cliOptions.brokers = props.getProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, m_cliOptions.brokers);
 
+            props.setProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");  // jmc NEEDSWORK Hack
             String autoCommit = props.getProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG);
+
             if (autoCommit != null && !autoCommit.trim().isEmpty() &&
                     !("true".equals(autoCommit.trim().toLowerCase())) ) {
                 m_log.warn("Auto commit policy for Kafka loader will be set to \'true\' instead of \'" + autoCommit +"\'");
@@ -333,34 +339,48 @@ public class KafkaLoader10 {
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, m_cliOptions.brokers);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
-        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
+        //props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
 
+        m_log.info(props);
         return props;
     }
 
     private ExecutorService getExecutor() throws Exception {
         Properties props = kafkaConfigProperties();
-        // create as many threads equal as number of partitions specified in config
-        ExecutorService executor = Executors.newFixedThreadPool(m_cliOptions.kpartitions);
-        m_consumers = new ArrayList<>();
-        try {
-            KafkaConsumer<byte[], byte[]> consumer = null;
-            for (int i = 0; i < m_cliOptions.kpartitions; i++) {
-                consumer = new KafkaConsumer<>(props);
-                m_consumers.add(new Kafka10ConsumerRunner(m_cliOptions, m_loader, consumer));
 
+        // Instead of specifying number of partitions per topic, specify number of consumers per topic -- Kafka client multiplexes
+        // the available consumers against the number of partitions.  For better scalability, have more consumers when you have more partitions.
+
+        int consumerCount = 3; //m_cliOptions.kpartitions; // NEEDSWORK: Change this property
+        String consumerAssignorStrategy = org.apache.kafka.clients.consumer.RangeAssignor.class.getName(); // "partition.assignment.strategy"
+        props.put("partition.assignment.strategy", consumerAssignorStrategy); // NEEDSWORK: Put this in the config properties, with default
+
+        ExecutorService executor = Executors.newFixedThreadPool(consumerCount, new ThreadFactory() {
+            private int threadNum = 0;
+            @Override
+            public Thread newThread(Runnable r) {
+                return new Thread(r, "Kafka_Consumer_" + m_cliOptions.topic + "_" + threadNum++);
+            }
+        });
+
+        m_consumers = new ArrayList<>();
+
+        try {
+            for (int i = 0; i < consumerCount; i++) {
+               KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(props); // NEEDSWORK: Make this a factory
+                m_consumers.add(new Kafka10ConsumerRunner(m_cliOptions, m_loader, consumer));
             }
         } catch (Throwable terminate) {
             m_log.error("Failed creating Kafka consumer ", terminate);
-            for (Kafka10ConsumerRunner consumer : m_consumers) {
+            for (Kafka10ConsumerRunner consumerRunner : m_consumers) {
                 // close all consumer connections
-                consumer.forceClose();
+                consumerRunner.forceClose();
             }
             return null;
         }
 
-        for (Kafka10ConsumerRunner consumer : m_consumers) {
-            executor.submit(consumer);
+        for (Kafka10ConsumerRunner consumerRunner : m_consumers) {
+            executor.submit(consumerRunner);
         }
         return executor;
     }
@@ -374,6 +394,7 @@ public class KafkaLoader10 {
             }
         }
     }
+
 
     class Kafka10ConsumerRunner implements Runnable {
         private KafkaConsumer<byte[], byte[]> m_consumer;
@@ -405,6 +426,7 @@ public class KafkaLoader10 {
             m_consumer = consumer;
 
             // NEEDSWORK: Examine class/package visibility
+            // NEESDWORK: Initialize with original offset
             m_tracker = new DurableTracker(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768), m_logger, consumer.toString());
         }
 
@@ -429,10 +451,13 @@ public class KafkaLoader10 {
                 m_consumer.subscribe(Arrays.asList(m_config.topic));
                 while (!m_closed.get()) {
                     ConsumerRecords<byte[], byte[]> records = m_consumer.poll(pollTimedWaitInMilliSec);
+
                     for (ConsumerRecord<byte[], byte[]> record : records) {
+
                         byte[] msg  = record.value();
                         long offset = record.offset();
                         smsg = new String(msg);
+                        System.out.println("Got message: [" + smsg + "] on thread" + Thread.currentThread());
                         Object params[];
                         if (m_formatter != null) {
                             try {
@@ -446,8 +471,24 @@ public class KafkaLoader10 {
                             params = m_csvParser.parseLine(smsg);
                         }
                         if (params == null) continue;
+                        m_tracker.submit(offset);
                         m_loader.insertRow(new RowWithMetaData(smsg, offset), params);
+
+                        // jmc Need to add in pause, offset reset, error handling, etc.
+
+                        long xo = m_tracker.commit(offset+1);
+                        // jmc Gotta be a better way to collapse this
+                        for (TopicPartition partition : records.partitions()) {
+                            List<ConsumerRecord<byte[],  byte[]>> partitionRecords = records.records(partition);
+                            for (ConsumerRecord<byte[], byte[]> r : partitionRecords) {
+                                System.out.println(record.offset() + ": " + record.value());
+                            }
+                            long lastOffset = partitionRecords.get(partitionRecords.size() - 1).offset();
+                            System.out.println("partition=" + partition.partition() + " lastOffset=" + lastOffset + " xo=" + xo);
+                            m_consumer.commitSync(Collections.singletonMap(partition, new OffsetAndMetadata(xo)));
+                        }
                     }
+
                 }
             } catch (IllegalArgumentException invalidTopic) {
                 m_closed.set(true);
