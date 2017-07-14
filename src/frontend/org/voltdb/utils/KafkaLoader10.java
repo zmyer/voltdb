@@ -27,7 +27,9 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -403,7 +405,7 @@ public class KafkaLoader10 {
         private final CSVParser m_csvParser;
         private final Formatter m_formatter;
         private AtomicBoolean m_closed = new AtomicBoolean(false);
-        private CommitTracker m_tracker;
+        private Map<Integer,CommitTracker> m_trackerMap = new HashMap<>();
 
         Kafka10ConsumerRunner(CLIOptions config, CSVDataLoader loader, KafkaConsumer<byte[], byte[]> consumer)
                 throws FileNotFoundException, IOException, ClassNotFoundException, NoSuchMethodException,
@@ -426,10 +428,14 @@ public class KafkaLoader10 {
             m_consumer = consumer;
 
             // NEEDSWORK: Examine class/package visibility
-            // NEESDWORK: Initialize with original offset
-            m_tracker = new DurableTracker(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768), m_logger, consumer.toString());
+            // NEESDWORK: Initialize trackers with original offset
+
         }
 
+        private long getCurrentOffset(TopicPartition partition) {
+            OffsetAndMetadata meta = m_consumer.committed(partition);
+            return meta.offset();
+        }
         void forceClose() {
             m_closed.set(true);
             try {
@@ -450,10 +456,15 @@ public class KafkaLoader10 {
             try {
                 m_consumer.subscribe(Arrays.asList(m_config.topic));
                 while (!m_closed.get()) {
+
+                    // We don't know what partition we're getting, because Kafka can dynamically adjust. So we get partition information from the
+                    // response records.
+
+                    // NEEDSWORK: ACK! We can't use durable tracker, since the partition can change every time this executor (consumer) gets records from poll().
+                    // Maybe we can add a hash table to it, and hash per partition.
+
                     ConsumerRecords<byte[], byte[]> records = m_consumer.poll(pollTimedWaitInMilliSec);
-
                     for (ConsumerRecord<byte[], byte[]> record : records) {
-
                         byte[] msg  = record.value();
                         long offset = record.offset();
                         smsg = new String(msg);
@@ -471,22 +482,34 @@ public class KafkaLoader10 {
                             params = m_csvParser.parseLine(smsg);
                         }
                         if (params == null) continue;
-                        m_tracker.submit(offset);
+
+
+                        //  m_tracker = new DurableTracker(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768), m_logger, consumer.toString());
+                        //m_tracker.submit(offset);
+
+                        int partition = record.partition();
+                        TopicPartition tp = new TopicPartition(m_config.topic, partition);
+
+                        CommitTracker tracker = m_trackerMap.get(partition);
+
+                        if (tracker == null) {
+                            tracker = new DurableTracker(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768), m_logger, m_consumer.toString() + "_" + partition);
+                            tracker.submit(getCurrentOffset(tp));
+                            m_trackerMap.put(partition,  tracker);
+                        }
+                        tracker.submit(offset);
+
+                        // Submit to the database:
                         m_loader.insertRow(new RowWithMetaData(smsg, offset), params);
 
                         // jmc Need to add in pause, offset reset, error handling, etc.
 
-                        long xo = m_tracker.commit(offset+1);
-                        // jmc Gotta be a better way to collapse this
-                        for (TopicPartition partition : records.partitions()) {
-                            List<ConsumerRecord<byte[],  byte[]>> partitionRecords = records.records(partition);
-                            for (ConsumerRecord<byte[], byte[]> r : partitionRecords) {
-                                System.out.println(record.offset() + ": " + record.value());
-                            }
-                            long lastOffset = partitionRecords.get(partitionRecords.size() - 1).offset();
-                            System.out.println("partition=" + partition.partition() + " lastOffset=" + lastOffset + " xo=" + xo);
-                            m_consumer.commitSync(Collections.singletonMap(partition, new OffsetAndMetadata(xo)));
-                        }
+                        long lastOffset = record.offset(); //records.get(records.size() - 1).offset();
+                        long xo = tracker.commit(lastOffset+1);
+
+                        System.out.println("partition=" + partition + " lastOffset=" + lastOffset + " xo=" + xo);
+                        m_consumer.commitSync(Collections.singletonMap(tp, new OffsetAndMetadata(xo)));
+
                     }
 
                 }
@@ -514,6 +537,7 @@ public class KafkaLoader10 {
             }
         }
     }
+
 
     private void processKafkaMessages() throws Exception {
         // Split server list
