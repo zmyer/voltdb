@@ -108,6 +108,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 long lastSegmentId = peekLastSegment().segmentId();
                 while (!segmentReader.hasMoreEntries()) {
                     if (m_segment.segmentId() == lastSegmentId) { // nothing more to read
+                        LOG.error("jmc PBD.poll returning null; m_segment="+m_segment.segmentId() + " lastSegmentId=" + lastSegmentId);
                         return null;
                     }
 
@@ -132,6 +133,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             if (m_segment == null || m_segment.segmentId() < firstSegment.segmentId()) {
                 m_segment = firstSegment;
             }
+
         }
 
         @Override
@@ -582,17 +584,17 @@ public class PersistentBinaryDeque implements BinaryDeque {
         //Check to see if the tail is completely consumed so we can close and delete it
         if (tail.hasAllFinishedReading() && canDeleteSegment(tail)) {
             pollLastSegment();
-            if (m_usageSpecificLog.isDebugEnabled()) {
-                m_usageSpecificLog.debug("Segment " + tail.file() + " has been closed and deleted because of empty queue");
-            }
+           // if (m_usageSpecificLog.isDebugEnabled()) {
+                m_usageSpecificLog.info("Segment " + tail.file() + " has been closed and deleted because of empty queue");
+           // }
             closeAndDeleteSegment(tail);
         }
         Long nextIndex = tail.segmentId() + 1;
         tail = newSegment(nextIndex, new VoltFile(m_path, m_nonce + "." + nextIndex + ".pbd"));
         tail.openForWrite(true);
-        if (m_usageSpecificLog.isDebugEnabled()) {
-            m_usageSpecificLog.debug("Segment " + tail.file() + " has been created because of an offer");
-        }
+        //if (m_usageSpecificLog.isDebugEnabled()) {
+            m_usageSpecificLog.info("Segment " + tail.file() + " has been created because of an offer");
+        //}
         closeTailAndOffer(tail);
         return tail;
     }
