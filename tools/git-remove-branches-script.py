@@ -20,7 +20,7 @@ import time
 import jiratools
 
 # set exclusions if there are any branches that should not be listed
-exclusions = ['^master','^release-[0-9.]+\.x$']
+exclusions = ['^master','^release-[0-9.]+\.x$','/^pr[0-9]+']
 combined_regex= '(' + ')|('.join(exclusions) + ')'
 jira_url = 'https://issues.voltdb.com/'
 gitshowmap = \
@@ -34,22 +34,35 @@ DELIMITER='^'
 
 def run_cmd(cmd):
     proc = Popen(cmd.split(' '),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-    #print cmd
     (out, err) = proc.communicate(input=None)
     return (proc.returncode, out, err)
 
-def get_branch_list(merged):
-    branches = []
-
-    git_cmd = 'git branch -r %s' % ('--merged' if merged else '--no-merged')
+def get_release_branches():
+    branches=[]
+    git_cmd = 'git branch -r'
     print ('#\n# git command: %s\n#' % git_cmd)
     (returncode, stdout, stderr) = run_cmd (git_cmd)
+    return [b.strip() for b in stdout.splitlines() if b.strip().find('origin/release-') == 0 and b.strip()[-2:] == '.x']
 
-    #only want branches at origin and don't want HEAD listed
-    branches = [b.strip() for b in stdout.splitlines()if b.strip().find('origin/') == 0 and b.find('HEAD') < 0]
+def get_branch_list(merged, base=None):
+    branches = []
 
-    #Filter others from list
-    origin_exclusions = ['origin/' + b for b in exclusions]
+    if base:
+        basebranches=[base]
+    else:
+        basebranches = get_release_branches()
+
+    #If merged, check release branches and master
+
+    for b in basebranches:
+        git_cmd = 'git branch -r %s %s' % ('--merged' if merged else '--no-merged', b)
+        print ('#\n# git command: %s\n#' % git_cmd)
+        (returncode, stdout, stderr) = run_cmd (git_cmd)
+
+        #only want branches at origin and don't want HEAD listed
+        found_branches = [b.strip() for b in stdout.splitlines()if b.strip().find('origin/') == 0 and b.find('HEAD') < 0]
+        branches = list(set().union(branches, found_branches))
+        
     return [b for b in branches if not re.match(combined_regex,b.split('origin/')[-1])]
 
 def make_delete_branches_script(branch_infos, dry_run):
@@ -128,15 +141,19 @@ if __name__ == "__main__":
     parser.add_option('--older', dest = 'olderthan', action = 'store',
                       help = "age of unmerged branches to list",
                       type="int", default = 60);
+    parser.add_option('--release', dest = 'release', action = 'store',
+                      help = "release branch for checking merges");
 
     (options,args) = parser.parse_args()
-
+    if not options.merged and (options.release != 'master' and options.release != None):
+        parser.error('Unmerged branches can only be checked against master.')
+            
     if options.use_jira:
         user = options.username
         password = options.password or getpass.getpass('Enter your Jira password: ')
 
     #Get the branch list
-    branch_names = get_branch_list(options.merged)
+    branch_names = get_branch_list(options.merged, options.release)
     format_string = DELIMITER.join([gitshowmap[key] for key in sorted(gitshowmap)])
     #Iterate over it and get a bunch of commit information using git log
     branch_infos = []
