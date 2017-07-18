@@ -108,7 +108,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 long lastSegmentId = peekLastSegment().segmentId();
                 while (!segmentReader.hasMoreEntries()) {
                     if (m_segment.segmentId() == lastSegmentId) { // nothing more to read
-                        LOG.error("jmc PBD.poll returning null; m_segment="+m_segment.segmentId() + " lastSegmentId=" + lastSegmentId);
+                        LOG.warn("jmc PBD.poll returning null; m_segment="+m_segment.segmentId() + " lastSegmentId=" + lastSegmentId + " on thread: " + Thread.currentThread(), new Throwable());
                         return null;
                     }
 
