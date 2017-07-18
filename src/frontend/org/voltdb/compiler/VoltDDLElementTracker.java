@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import org.voltcore.utils.Pair;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 
@@ -48,7 +49,7 @@ public class VoltDDLElementTracker {
     final NavigableMap<String, NavigableSet<String>> m_exportsByTargetName = new TreeMap<>();
     // additional non-procedure classes for the jar
     final Set<String> m_extraClassses = new TreeSet<>();
-    final Map<String, String> m_drTables = new LinkedHashMap<>();
+    final Map<String, Pair<String, String>> m_drTables = new LinkedHashMap<>();
     final Set<String> m_importLines = new TreeSet<>();
 
     /**
@@ -227,14 +228,13 @@ public class VoltDDLElementTracker {
         return m_exportsByTargetName;
     }
 
-    void addDRedTable(String tableName, String action)
+    void addDRedTable(String tableName, String conflictResolver, String action)
     {
         assert tableName != null && ! tableName.trim().isEmpty();
-
-        m_drTables.put(tableName, action);
+        m_drTables.put(tableName, new Pair<String, String>(conflictResolver, action));
     }
 
-    Map<String, String> getDRedTables() {
+    Map<String, Pair<String, String>> getDRedTables() {
         return m_drTables;
     }
 

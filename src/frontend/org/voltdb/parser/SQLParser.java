@@ -392,7 +392,10 @@ public class SQLParser extends SQLPatternFactory
             "\\A"  +                                // start statement
             "DR\\s+TABLE\\s+" +                     // DR TABLE
             "([\\w.$|\\\\*]+)" +                    // (1) <table name>
-            "(?:\\s+(DISABLE))?" +                  //     (2) optional DISABLE argument
+            "(?:\\s+USING\\s+RESOLVER\\s+" +                 // (start optional USING RESOLVER clause block)
+            "(\\w+)" +                              //   (2) <resolver name>
+            ")?" +                              // (end optional USING RESOLVER clause block)
+            "(?:\\s+(DISABLE))?" +                  //     (3) optional DISABLE argument
             "\\s*;\\z"                              // (end statement)
             );
 

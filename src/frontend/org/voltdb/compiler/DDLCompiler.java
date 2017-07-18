@@ -914,6 +914,7 @@ public class DDLCompiler {
                 String partitionCol = e.attributes.get("partitioncolumn");
                 String export = e.attributes.get("export");
                 String drTable = e.attributes.get("drTable");
+                String conflictResolver = e.attributes.get("conflictResolver");
                 if (partitionCol != null) {
                     m_tracker.addPartition(tableName, partitionCol);
                 }
@@ -927,7 +928,7 @@ public class DDLCompiler {
                     m_tracker.removeExportedTable(tableName);
                 }
                 if (drTable != null) {
-                    m_tracker.addDRedTable(tableName, drTable);
+                    m_tracker.addDRedTable(tableName, conflictResolver, drTable);
                 }
             }
         }

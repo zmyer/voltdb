@@ -40,11 +40,13 @@ public class DRTable extends StatementProcessor {
     @Override
     protected boolean processStatement(DDLStatement ddlStatement, Database db, DdlProceduresToLoad whichProcs)
             throws VoltCompilerException {
-        // matches if it is DR TABLE <table-name> [DISABLE]
+        // matches if it is DR TABLE <table-name> [conflict-resolver-name] [DISABLE]
         // group 1 -- table name
-        // group 2 -- NULL: enable dr
+        // group 2 -- conflict resolver name
+        // group 3 -- NULL: enable dr
         //            NOT NULL: disable dr
         // TODO: maybe I should write one fit all regex for this.
+
         Matcher statementMatcher = SQLParser.matchDRTable(ddlStatement.statement);
         if (! statementMatcher.matches()) {
             return false;
@@ -57,7 +59,9 @@ public class DRTable extends StatementProcessor {
             tableName = checkIdentifierStart(statementMatcher.group(1), ddlStatement.statement);
         }
 
-        //System.out.println("\n\n" + m_schema.toString());
+//        System.out.println("\nSchema is\n" + m_schema.toString());
+//        System.out.println("statement is: "+ddlStatement.statement);
+//        System.out.println("tableName="+tableName);
 
         VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
         if (tableXML != null) {
@@ -66,10 +70,32 @@ public class DRTable extends StatementProcessor {
                     "Invalid DR statement: table %s is an export table", tableName));
             }
             else {
+                // if conflict resolver is specified
                 if ((statementMatcher.group(2) != null)) {
-                    tableXML.attributes.put("drTable", "DISABLE");
+                    // check if this table has primary key
+                    boolean hasPrimaryKey = false;
+                    VoltXMLElement constraints = tableXML.findChild("constraints", "constraints");
+                    if (constraints != null) {
+                        for (VoltXMLElement constraint : constraints.children) {
+                            if (constraint.attributes.get("constrainttype").equals("PRIMARY_KEY")) {
+                                hasPrimaryKey = true;
+                                break;
+                            }
+                        }
+                    }
+                    // throw exception if no primary key
+                    if (!hasPrimaryKey) {
+                        throw m_compiler.new VoltCompilerException(String.format(
+                            "Invalid DR statement: table %s does not have a primary key", tableName));
+                    } else {
+                        String resolverName = checkIdentifierStart(statementMatcher.group(2), ddlStatement.statement);
+                        tableXML.attributes.put("conflictResolver", resolverName);
+                    }
                 }
-                else {
+                // check if DR is enabled
+                if ((statementMatcher.group(3) != null)){
+                    tableXML.attributes.put("drTable", "DISABLE");
+                } else {
                     tableXML.attributes.put("drTable", "ENABLE");
                 }
             }

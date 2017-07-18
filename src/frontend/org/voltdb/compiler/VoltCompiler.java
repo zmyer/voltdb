@@ -50,6 +50,7 @@ import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltcore.TransactionIdManager;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.ProcInfoData;
 import org.voltdb.RealVoltDB;
@@ -1038,7 +1039,7 @@ public class VoltCompiler {
         ddlcompiler.processMaterializedViewWarnings(db);
 
         // process DRed tables
-        for (Entry<String, String> drNode: voltDdlTracker.getDRedTables().entrySet()) {
+        for (Entry<String, Pair<String, String>> drNode: voltDdlTracker.getDRedTables().entrySet()) {
             compileDRTable(drNode, db);
         }
 
@@ -1301,18 +1302,20 @@ public class VoltCompiler {
 
     }
 
-    void compileDRTable(final Entry<String, String> drNode, final Database db)
+    void compileDRTable(final Entry<String, Pair<String, String>> drNode, final Database db)
             throws VoltCompilerException
     {
         String tableName = drNode.getKey();
-        String action = drNode.getValue();
+        Pair<String, String> resolverAndAction = drNode.getValue();
+        String conflictResolver = resolverAndAction.getFirst();
+        String action = resolverAndAction.getSecond();
 
         org.voltdb.catalog.Table tableref = db.getTables().getIgnoreCase(tableName);
         if (tableref.getMaterializer() != null) {
             throw new VoltCompilerException("While configuring dr, table " + tableName + " is a materialized view." +
                                             " DR does not support materialized view.");
         }
-
+        tableref.setConflictResolver(conflictResolver);
         if (action.equalsIgnoreCase("DISABLE")) {
             tableref.setIsdred(false);
         } else {
