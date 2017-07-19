@@ -521,7 +521,6 @@ if whichtests in ("${eetestsuite}", "indexes"):
 
 if whichtests in ("${eetestsuite}", "storage"):
     CTX.TESTS['storage'] = """
-     CompactionTest
      CopyOnWriteTest
      DRBinaryLog_test
      DRTupleStream_test

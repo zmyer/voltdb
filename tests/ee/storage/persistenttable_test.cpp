@@ -73,8 +73,7 @@ public:
                              0,     // drClusterId
                              1024,  // defaultDrBufferSize
                              voltdb::DEFAULT_TEMP_TABLE_MEMORY,
-                             false, // don't create DR replicated stream
-                             95);   // compaction threshold
+                             false); // don't create DR replicated stream
         m_engine->setUndoToken(m_undoToken);
     }
 

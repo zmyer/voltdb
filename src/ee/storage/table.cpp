@@ -79,8 +79,7 @@ Table::Table(int tableAllocationTargetSize) :
     m_name(""),
     m_ownsTupleSchema(true),
     m_tableAllocationTargetSize(tableAllocationTargetSize),
-    m_refcount(0),
-    m_compactionThreshold(95)
+    m_refcount(0)
 {
 }
 
@@ -101,7 +100,7 @@ Table::~Table() {
     m_columnHeaderData = NULL;
 }
 
-void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string> &columnNames, bool ownsTupleSchema, int32_t compactionThreshold) {
+void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string> &columnNames, bool ownsTupleSchema) {
 
     // copy the tuple schema
     if (m_ownsTupleSchema) {
@@ -157,8 +156,6 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string>
 
     // set the data to be empty
     m_tupleCount = 0;
-
-    m_compactionThreshold = compactionThreshold;
 }
 
 // ------------------------------------------------------------------

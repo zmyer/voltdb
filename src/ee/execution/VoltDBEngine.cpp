@@ -173,13 +173,11 @@ void VoltDBEngine::initialize(int32_t clusterIndex,
                               int32_t drClusterId,
                               int32_t defaultDrBufferSize,
                               int64_t tempTableMemoryLimit,
-                              bool createDrReplicatedStream,
-                              int32_t compactionThreshold) {
+                              bool createDrReplicatedStream) {
     m_clusterIndex = clusterIndex;
     m_siteId = siteId;
     m_partitionId = partitionId;
     m_tempTableMemoryLimit = tempTableMemoryLimit;
-    m_compactionThreshold = compactionThreshold;
 
     // Instantiate our catalog - it will be populated later on by load()
     m_catalog.reset(new catalog::Catalog());
@@ -800,8 +798,7 @@ bool VoltDBEngine::processCatalogAdditions(bool isStreamUpdate, int64_t timestam
             // add a completely new table
             //////////////////////////////////////////
 
-            tcd = new TableCatalogDelegate(catalogTable->signature(),
-                                           m_compactionThreshold);
+            tcd = new TableCatalogDelegate(catalogTable->signature());
             // use the delegate to init the table and create indexes n' stuff
             tcd->init(*m_database, *catalogTable, m_isActiveActiveDREnabled);
             m_catalogDelegates[catalogTable->path()] = tcd;

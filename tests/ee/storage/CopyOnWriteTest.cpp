@@ -382,10 +382,6 @@ public:
         }
     }
 
-    bool doForcedCompaction(PersistentTable *table) {
-        return table->doForcedCompaction();
-    }
-
     void checkTuples(size_t tupleCount, const T_ValueSet& expected, const T_ValueSet& received) {
         std::vector<int64_t> diff;
         std::insert_iterator<std::vector<int64_t> > ii( diff, diff.begin());
@@ -1625,8 +1621,6 @@ public:
 
     virtual bool notifyTupleDelete(TableTuple &tuple) { return false; }
 
-    virtual void notifyBlockWasCompactedAway(TBPtr block) {}
-
     virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
                                      TableTuple &sourceTuple, TableTuple &targetTuple) {
         m_test.m_shuffles.insert(*reinterpret_cast<const int64_t*>(sourceTuple.address() + 1));
@@ -1647,7 +1641,7 @@ public:
 
     ElasticTableScrambler(CopyOnWriteTest &test,
                           int npartitions, int tuplesPerBlock, int numInitial,
-                          int freqInsert, int freqDelete, int freqUpdate, int freqCompaction) :
+                          int freqInsert, int freqDelete, int freqUpdate) :
         m_test(test),
         m_npartitions(npartitions),
         m_tuplesPerBlock(tuplesPerBlock),
@@ -1655,7 +1649,6 @@ public:
         m_freqInsert(freqInsert),
         m_freqDelete(freqDelete),
         m_freqUpdate(freqUpdate),
-        m_freqCompaction(freqCompaction),
         m_icycle(0)
     {}
 
@@ -1680,19 +1673,6 @@ public:
             m_test.doRandomUpdate(m_test.m_table, &m_test.m_updatesSrc, &m_test.m_updatesTgt);
         }
 
-        if (m_freqCompaction > 0 && (m_icycle + m_freqCompaction - 1) % m_freqCompaction == 0) {
-            size_t churn = m_test.m_table->activeTupleCount() / 2;
-            // Delete half the tuples to create enough fragmentation for
-            // compaction to happen.
-            for (size_t i = 0; i < churn; i++) {
-                m_test.doRandomDelete(m_test.m_table, &m_test.m_deletes);
-            }
-            m_test.doForcedCompaction(m_test.m_table);
-            // Re-insert the same number of tuples.
-            for (size_t i = 0; i < churn; i++) {
-                m_test.doRandomInsert(m_test.m_table, &m_test.m_inserts);
-            }
-        }
         m_icycle++;
     }
 
@@ -1704,7 +1684,6 @@ public:
     int m_freqInsert;
     int m_freqDelete;
     int m_freqUpdate;
-    int m_freqCompaction;
     int m_icycle;
 };
 
@@ -1718,12 +1697,11 @@ TEST_F(CopyOnWriteTest, ElasticScanner) {
     const int FREQ_INSERT = 1;
     const int FREQ_DELETE = 10;
     const int FREQ_UPDATE = 5;
-    const int FREQ_COMPACTION = 100;
 
     ElasticTableScrambler tableScrambler(*this,
                                          NUM_PARTITIONS, TUPLES_PER_BLOCK, NUM_INITIAL,
                                          FREQ_INSERT, FREQ_DELETE,
-                                         FREQ_UPDATE, FREQ_COMPACTION);
+                                         FREQ_UPDATE);
 
     tableScrambler.initialize();
 
@@ -1799,10 +1777,6 @@ public:
         return m_context->notifyTupleDelete(tuple);
     }
 
-    virtual void notifyBlockWasCompactedAway(TBPtr block) {
-        m_context->notifyBlockWasCompactedAway(block);
-    }
-
     virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
                                      TableTuple &sourceTuple, TableTuple &targetTuple) {
         DummyTableStreamer::notifyTupleMovement(sourceBlock, targetBlock, sourceTuple, targetTuple);
@@ -1825,12 +1799,11 @@ TEST_F(CopyOnWriteTest, ElasticIndex) {
     const int FREQ_INSERT = 1;
     const int FREQ_DELETE = 10;
     const int FREQ_UPDATE = 5;
-    const int FREQ_COMPACTION = 100;
 
     ElasticTableScrambler tableScrambler(*this,
                                          NUM_PARTITIONS, TUPLES_PER_BLOCK, NUM_INITIAL,
                                          FREQ_INSERT, FREQ_DELETE,
-                                         FREQ_UPDATE, FREQ_COMPACTION);
+                                         FREQ_UPDATE);
 
     tableScrambler.initialize();
 
@@ -1874,7 +1847,6 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
     const int FREQ_INSERT = 1;
     const int FREQ_DELETE = 10;
     const int FREQ_UPDATE = 5;
-    const int FREQ_COMPACTION = 100;
 
     // These ranges test edge conditions and also that hash range expressions
     // and elastic index predicates filter the same way.
@@ -1902,7 +1874,7 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
         ElasticTableScrambler tableScrambler(*this,
                                              NUM_PARTITIONS, TUPLES_PER_BLOCK, NUM_INITIAL,
                                              FREQ_INSERT, FREQ_DELETE,
-                                             FREQ_UPDATE, FREQ_COMPACTION);
+                                             FREQ_UPDATE);
 
         // Clear and populate the table.
         tableScrambler.initialize();

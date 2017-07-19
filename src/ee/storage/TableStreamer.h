@@ -113,16 +113,6 @@ public:
     }
 
     /**
-     * Block compaction hook.
-     */
-    virtual void notifyBlockWasCompactedAway(TBPtr block) {
-        BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
-            assert(streamPtr != NULL);
-            streamPtr->m_context->notifyBlockWasCompactedAway(block);
-        }
-    }
-
-    /**
      * Called for each tuple moved.
      */
     virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,

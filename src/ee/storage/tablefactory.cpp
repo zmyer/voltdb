@@ -70,7 +70,6 @@ Table* TableFactory::getPersistentTable(
             bool exportOnly,
             int tableAllocationTargetSize,
             int tupleLimit,
-            int32_t compactionThreshold,
             bool drEnabled)
 {
     Table *table = NULL;
@@ -94,8 +93,7 @@ Table* TableFactory::getPersistentTable(
                name,
                schema,
                columnNames,
-               true,  // table will take ownership of TupleSchema object
-               compactionThreshold);
+               true); // table will take ownership of TupleSchema object
 
     TableStats *stats;
     if (exportOnly) {
@@ -124,8 +122,7 @@ StreamedTable* TableFactory::getStreamedTableForTest(
             TupleSchema* schema,
             const std::vector<std::string> &columnNames,
             ExportTupleStream* wrapper,
-            bool exportEnabled,
-            int32_t compactionThreshold)
+            bool exportEnabled)
 {
     StreamedTable *table = new StreamedTable(exportEnabled, wrapper);
 
@@ -134,8 +131,7 @@ StreamedTable* TableFactory::getStreamedTableForTest(
                name,
                schema,
                columnNames,
-               true,  // table will take ownership of TupleSchema object
-               compactionThreshold);
+               true);  // table will take ownership of TupleSchema object
 
     // initialize stats for the table
     configureStats(name, table->getTableStats());
@@ -182,8 +178,7 @@ void TableFactory::initCommon(
             const std::string &name,
             TupleSchema *schema,
             const std::vector<std::string> &columnNames,
-            const bool ownsTupleSchema,
-            const int32_t compactionThreshold) {
+            const bool ownsTupleSchema) {
 
     assert(table != NULL);
     assert(schema != NULL);
@@ -191,7 +186,7 @@ void TableFactory::initCommon(
 
     table->m_databaseId = databaseId;
     table->m_name = name;
-    table->initializeWithColumns(schema, columnNames, ownsTupleSchema, compactionThreshold);
+    table->initializeWithColumns(schema, columnNames, ownsTupleSchema);
     assert (table->columnCount() == schema->columnCount());
 }
 

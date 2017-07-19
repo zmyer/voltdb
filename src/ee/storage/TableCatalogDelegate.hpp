@@ -53,11 +53,10 @@ template<typename K, typename V> V findInMapOrNull(const K& key, std::map<K, V> 
 
 class TableCatalogDelegate {
   public:
-    TableCatalogDelegate(const std::string& signature, int32_t compactionThreshold)
+    TableCatalogDelegate(const std::string& signature)
         : m_table(NULL)
         , m_exportEnabled(false)
         , m_signature(signature)
-        , m_compactionThreshold(compactionThreshold)
     {}
 
     ~TableCatalogDelegate();
@@ -141,7 +140,6 @@ class TableCatalogDelegate {
     bool m_exportEnabled;
     bool m_materialized;
     const std::string m_signature;
-    const int32_t m_compactionThreshold;
     char m_signatureHash[20];
 };
 

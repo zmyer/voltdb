@@ -394,7 +394,6 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
                                                     tableIsExportOnly,
                                                     tableAllocationTargetSize,
                                                     catalogTable.tuplelimit(),
-                                                    m_compactionThreshold,
                                                     drEnabled);
     PersistentTable* persistentTable = dynamic_cast<PersistentTable*>(table);
     if ( ! persistentTable) {

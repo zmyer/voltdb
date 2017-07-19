@@ -88,7 +88,6 @@ public:
         bool exportOnly = false,
         int tableAllocationTargetSize = 0,
         int tuplelimit = INT_MAX,
-        int32_t compactionThreshold = 95,
         bool drEnabled = false);
 
     static StreamedTable* getStreamedTableForTest(
@@ -97,8 +96,7 @@ public:
                 TupleSchema* schema,
                 const std::vector<std::string> &columnNames,
                 ExportTupleStream* mockWrapper = NULL,
-                bool exportEnabled = false,
-                int32_t compactionThreshold = 95);
+                bool exportEnabled = false);
 
     /**
      * Creates an empty temp table with given name and columns.
@@ -141,8 +139,7 @@ private:
         const std::string &name,
         TupleSchema *schema,
         const std::vector<std::string> &columnNames,
-        const bool ownsTupleSchema,
-        const int32_t compactionThreshold = 95);
+        const bool ownsTupleSchema);
 
     static void configureStats(
         std::string name,

@@ -220,8 +220,7 @@ private:
 
     virtual void initializeWithColumns(TupleSchema* schema,
             std::vector<std::string> const& columnNames,
-            bool ownsTupleSchema,
-            int32_t compactionThreshold = 95);
+            bool ownsTupleSchema);
 
 public:
     virtual ~PersistentTable();
@@ -239,9 +238,9 @@ public:
     }
 
     void notifyQuantumRelease() {
-        if (compactionPredicate()) {
-            doForcedCompaction();
-        }
+        //if (compactionPredicate()) {
+        //    doForcedCompaction();
+        //}
     }
 
     // Return a table iterator by reference
@@ -427,8 +426,6 @@ public:
         return m_blocksNotPendingSnapshot.size();
     }
 
-    void doIdleCompaction();
-
     void printBucketInfo();
 
     void increaseStringMemCount(size_t bytes) {
@@ -594,10 +591,6 @@ private:
 
     void nextFreeTuple(TableTuple* tuple);
 
-    bool doCompactionWithinSubset(TBBucketPtrVector* bucketVector);
-
-    bool doForcedCompaction();  // Returns true if a compaction was performed
-
     void insertIntoAllIndexes(TableTuple* tuple);
 
     void deleteFromAllIndexes(TableTuple* tuple);
@@ -607,9 +600,6 @@ private:
     bool checkUpdateOnUniqueIndexes(TableTuple& targetTupleToUpdate,
                                     TableTuple const& sourceTupleWithNewValues,
                                     std::vector<TableIndex*> const& indexesToUpdate);
-
-
-    void notifyBlockWasCompactedAway(TBPtr block);
 
     // Call-back from TupleBlock::merge() for each tuple moved.
     virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
@@ -741,8 +731,6 @@ private:
 
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
     TBMap m_data;
-
-    int m_failedCompactionCount;
 
     // This is a testability feature not intended for use in product logic.
     int m_invisibleTuplesPendingDeleteCount;
