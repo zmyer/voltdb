@@ -1315,7 +1315,7 @@ public class VoltCompiler {
             throw new VoltCompilerException("While configuring dr, table " + tableName + " is a materialized view." +
                                             " DR does not support materialized view.");
         }
-        tableref.setConflictResolver(conflictResolver);
+        tableref.setConflictresolver(conflictResolver);
         if (action.equalsIgnoreCase("DISABLE")) {
             tableref.setIsdred(false);
         } else {
