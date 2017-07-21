@@ -45,6 +45,8 @@ import kafka.javaapi.consumer.SimpleConsumer;
  */
 public class KafkaStreamImporterConfig implements ImporterConfig
 {
+    // NEEDSWORK: Lots of consolidation/subclassing can happen here. Clean up the factory (static) method in favor of constructor, too?
+
     private static final Logger m_logger = Logger.getLogger("IMPORT");
 
     public static final String CLIENT_ID = "voltdb-importer";
