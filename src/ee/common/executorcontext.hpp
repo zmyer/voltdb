@@ -163,8 +163,29 @@ class ExecutorContext {
 
     static int8_t getClusterIdFromHiddenNValue(const NValue &value) {
         int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
-        return static_cast<int8_t>(hiddenValue >> 49);
+        return static_cast<int8_t>(hiddenValue >> 49 & 0x7F);
     }
+
+    static int64_t getConflictFlagFromHiddenNValue(const NValue &value) {
+        int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
+        return static_cast<int64_t>(hiddenValue & (1UL << 63));
+    }
+
+    static void setConflictFlagFromHiddenNValue(const NValue &value) {
+        int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
+        hiddenValue |= (1UL << 63);
+    }
+
+    static void resetConflictFlagFromHiddenNValue(const NValue &value) {
+        int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
+        hiddenValue &= 0x7FFFFFFFFFFFFFFF;
+    }
+
+    static bool isRowInConflictFromHiddenNValue(const NValue &value) {
+        int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
+        return static_cast<bool>(hiddenValue >> 63);
+    }
+
 
     UndoQuantum *getCurrentUndoQuantum() {
         return m_undoQuantum;

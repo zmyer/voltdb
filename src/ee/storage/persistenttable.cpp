@@ -719,8 +719,16 @@ void PersistentTable::swapTableIndexes(PersistentTable* otherTable,
 
 void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tuple, bool update) {
     assert(hasDRTimestampColumn());
-    if (update || tuple.getHiddenNValue(getDRTimestampColumnIndex()).isNull()) {
-        int64_t drTimestamp = ec->currentDRTimestamp();
+    NValue curr = tuple.getHiddenNValue(getDRTimestampColumnIndex());
+    if (update || curr.isNull()) {
+        int64_t drTimestamp;
+        if (update) {
+            drTimestamp = ec->currentDRTimestamp() |
+                    ExecutorContext::getConflictFlagFromHiddenNValue(curr);
+        }
+        else {
+            drTimestamp = ec->currentDRTimestamp();
+        }
         tuple.setHiddenNValue(getDRTimestampColumnIndex(), ValueFactory::getBigIntValue(drTimestamp));
     }
 }

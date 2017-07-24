@@ -198,6 +198,16 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
+    m_reportCustomDRConflictMID = m_jniEnv->GetStaticMethodID(
+            m_partitionDRGatewayClass,
+            "reportCustomDRConflict",
+            "(IIJLjava/lang/String;java/lang/String;IILjava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;ILjava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;)I");
+    if (m_reportCustomDRConflictMID == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_reportCustomDRConflictMID != NULL);
+        throw std::exception();
+    }
+
     m_encoderClass = m_jniEnv->FindClass("org/voltdb/utils/Encoder");
     if (m_encoderClass == NULL) {
         m_jniEnv->ExceptionDescribe();
@@ -593,6 +603,115 @@ int JNITopend::reportDRConflict(int32_t partitionId, int32_t remoteClusterId, in
     m_jniEnv->DeleteLocalRef(existingTupleRowsBufferForInsert);
     m_jniEnv->DeleteLocalRef(newMetaRowsBufferForInsert);
     m_jniEnv->DeleteLocalRef(newTupleRowsBufferForInsert);
+
+    return retval;
+}
+
+static boost::shared_array<char> preallocateDirectByteBufferForOneRow(JNIEnv *jniEngine, Table *table, jobject &byteBuffer) {
+    if (table) {
+        size_t serializeSize = table->getAccurateSizeToSerialize();
+        serializeSize += sizeof(int32_t);
+        serializeSize += table->schema()->getMaxSerializedTupleSize(true);
+        boost::shared_array<char> backingArray(new char[serializeSize]);
+        ReferenceSerializeOutput conflictSerializeOutput(backingArray.get(), serializeSize);
+        table->serializeColumnHeaderTo(conflictSerializeOutput);
+        byteBuffer = jniEngine->NewDirectByteBuffer(static_cast<void*>(backingArray.get()),
+                                                            static_cast<int32_t>(serializeSize));
+        if (byteBuffer == NULL) {
+            jniEngine->ExceptionDescribe();
+            throw std::exception();
+        }
+        return backingArray;
+    }
+    return boost::shared_array<char>();
+}
+
+int JNITopend::reportCustomDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp,
+        std::string tableName, std::string customResolverName, DRRecordType action,
+        DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
+        Table *expectedMetaTableForDelete, Table *expectedTupleTableForDelete,
+        DRConflictType insertConflict, Table *existingMetaTableForInsert, Table *existingTupleTableForInsert,
+        Table *newMetaTableForInsert, Table *newTupleTableForInsert, Table *replacementTupleForInsert) {
+    // prepare tablename
+    jstring tableNameString = m_jniEnv->NewStringUTF(tableName.c_str());
+    jstring customResolverNameString = m_jniEnv->NewStringUTF(customResolverName.c_str());
+
+    // prepare input buffer for delete conflict
+    jobject existingMetaRowsBufferForDelete = NULL;
+    boost::shared_array<char> existingMetaArrayForDelete = serializeToDirectByteBuffer(m_jniEnv,
+                                                                                       existingMetaTableForDelete,
+                                                                                       existingMetaRowsBufferForDelete);
+
+    jobject existingTupleRowsBufferForDelete = NULL;
+    boost::shared_array<char> existingTupleArrayForDelete = serializeToDirectByteBuffer(m_jniEnv,
+                                                                                        existingTupleTableForDelete,
+                                                                                        existingTupleRowsBufferForDelete);
+
+    jobject expectedMetaRowsBufferForDelete = NULL;
+    boost::shared_array<char> expectedMetaArrayForDelete = serializeToDirectByteBuffer(m_jniEnv,
+                                                                                       expectedMetaTableForDelete,
+                                                                                       expectedMetaRowsBufferForDelete);
+
+    jobject expectedTupleRowsBufferForDelete = NULL;
+    boost::shared_array<char> expectedTupleArrayForDelete = serializeToDirectByteBuffer(m_jniEnv,
+                                                                                        expectedTupleTableForDelete,
+                                                                                        expectedTupleRowsBufferForDelete);
+
+    jobject existingMetaRowsBufferForInsert = NULL;
+    boost::shared_array<char> existingMetaArrayForInsert = serializeToDirectByteBuffer(m_jniEnv,
+                                                                                       existingMetaTableForInsert,
+                                                                                       existingMetaRowsBufferForInsert);
+
+    jobject existingTupleRowsBufferForInsert = NULL;
+    boost::shared_array<char> existingTupleArrayForInsert = serializeToDirectByteBuffer(m_jniEnv,
+                                                                                        existingTupleTableForInsert,
+                                                                                        existingTupleRowsBufferForInsert);
+
+    jobject newMetaRowsBufferForInsert = NULL;
+    boost::shared_array<char> newMetaArrayForInsert = serializeToDirectByteBuffer(m_jniEnv,
+                                                                                  newMetaTableForInsert,
+                                                                                  newMetaRowsBufferForInsert);
+
+    jobject newTupleRowsBufferForInsert = NULL;
+    boost::shared_array<char> newTupleArrayForInsert = serializeToDirectByteBuffer(m_jniEnv,
+                                                                                   newTupleTableForInsert,
+                                                                                   newTupleRowsBufferForInsert);
+
+    jobject replacementTupleRowsBufferForInsert = NULL;
+    boost::shared_array<char> replacementTupleArrayForInsert = preallocateDirectByteBufferForOneRow(m_jniEnv,
+                                                                                           replacementTupleForInsert,
+                                                                                           replacementTupleRowsBufferForInsert);
+
+    int32_t retval = m_jniEnv->CallStaticIntMethod(m_partitionDRGatewayClass,
+                                                   m_reportCustomDRConflictMID,
+                                                   partitionId,
+                                                   remoteClusterId,
+                                                   remoteTimestamp,
+                                                   tableNameString,
+                                                   customResolverNameString,
+                                                   action,
+                                                   deleteConflict,
+                                                   existingMetaRowsBufferForDelete,
+                                                   existingTupleRowsBufferForDelete,
+                                                   expectedMetaRowsBufferForDelete,
+                                                   expectedTupleRowsBufferForDelete,
+                                                   insertConflict,
+                                                   existingMetaRowsBufferForInsert,
+                                                   existingTupleRowsBufferForInsert,
+                                                   newMetaRowsBufferForInsert,
+                                                   newTupleRowsBufferForInsert,
+                                                   replacementTupleRowsBufferForInsert);
+
+    m_jniEnv->DeleteLocalRef(tableNameString);
+    m_jniEnv->DeleteLocalRef(existingMetaRowsBufferForDelete);
+    m_jniEnv->DeleteLocalRef(existingTupleRowsBufferForDelete);
+    m_jniEnv->DeleteLocalRef(expectedMetaRowsBufferForDelete);
+    m_jniEnv->DeleteLocalRef(expectedTupleRowsBufferForDelete);
+    m_jniEnv->DeleteLocalRef(existingMetaRowsBufferForInsert);
+    m_jniEnv->DeleteLocalRef(existingTupleRowsBufferForInsert);
+    m_jniEnv->DeleteLocalRef(newMetaRowsBufferForInsert);
+    m_jniEnv->DeleteLocalRef(newTupleRowsBufferForInsert);
+    m_jniEnv->DeleteLocalRef(replacementTupleRowsBufferForInsert);
 
     return retval;
 }

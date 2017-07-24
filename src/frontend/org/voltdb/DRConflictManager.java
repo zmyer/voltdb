@@ -35,4 +35,22 @@ public interface DRConflictManager {
                                ByteBuffer existingTupleTableForInsert,
                                ByteBuffer newMetaTableForInsert,
                                ByteBuffer newTupleTableForInsert);
+
+    public int resolveCustomConflict(int partitionId,
+                                     int remoteClusterId,
+                                     long remoteTimestamp,
+                                     String tableName,
+                                     String customResolverName,
+                                     PartitionDRGateway.DRRecordType action,
+                                     PartitionDRGateway.DRConflictType deleteConflictType,
+                                     ByteBuffer existingMetaTableForDelete,
+                                     ByteBuffer existingTupleTableForDelete,
+                                     ByteBuffer expectedMetaTableForDelete,
+                                     ByteBuffer expectedTupleTableForDelete,
+                                     PartitionDRGateway.DRConflictType insertConflictType,
+                                     ByteBuffer existingMetaTableForInsert,
+                                     ByteBuffer existingTupleTableForInsert,
+                                     ByteBuffer newMetaTableForInsert,
+                                     ByteBuffer newTupleTableForInsert,
+                                     ByteBuffer replacementTupleTableForInsert);
 }

@@ -61,6 +61,7 @@ const static int DR_TUPLE_COLUMN_INDEX = 11;
 
 const static int DECISION_BIT = 1;
 const static int RESOLVED_BIT = 1 << 1;
+const static int REPLACED_BIT = 1 << 2;
 
 // a c++ style way to limit access from outside this file
 namespace {
@@ -147,6 +148,10 @@ bool isApplyNewRow(int32_t retval) {
 
 bool isResolved(int32_t retval) {
     return (retval & RESOLVED_BIT) == RESOLVED_BIT;
+}
+
+bool useReplacementRow(int32_t retval) {
+    return (retval & REPLACED_BIT) == REPLACED_BIT;
 }
 
 void setConflictOutcome(boost::shared_ptr<TempTable> metadataTable, bool acceptRemoteChange, bool convergent) {
@@ -392,6 +397,7 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
                                   insertConflict, NEW_ROW, uniqueId, remoteClusterId);
     }
 
+//    if (drTable->getCustomResolverName().isEmpty())
     int retval = ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(engine->getPartitionId(),
                                                                                       remoteClusterId,
                                                                                       UniqueId::timestampSinceUnixEpoch(uniqueId),
@@ -407,6 +413,47 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
                                                                                       existingTupleTableForInsert.get(),
                                                                                       newMetaTableForInsert.get(),
                                                                                       newTupleTableForInsert.get());
+//    }
+//    else {
+//    boost::shared_ptr<TempTable> replacementTupleForInsert;
+//    replacementTupleForInsert.reset(TableFactory::buildCopiedTempTable(NEW_TABLE, drTable, NULL));
+//    int retval = ExecutorContext::getExecutorContext()->getTopend()->reportCustomDRConflict(engine->getPartitionId(),
+//                                                                                            remoteClusterId,
+//                                                                                            UniqueId::timestampSinceUnixEpoch(uniqueId),
+//                                                                                            drTable->name(),
+//                                                                                            drTable->getCustomResolverName(),
+//                                                                                            actionType,
+//                                                                                            deleteConflict,
+//                                                                                            existingMetaTableForDelete.get(),
+//                                                                                            existingTupleTableForDelete.get(),
+//                                                                                            expectedMetaTableForDelete.get(),
+//                                                                                            expectedTupleTableForDelete.get(),
+//                                                                                            insertConflict,
+//                                                                                            existingMetaTableForInsert.get(),
+//                                                                                            existingTupleTableForInsert.get(),
+//                                                                                            newMetaTableForInsert.get(),
+//                                                                                            newTupleTableForInsert.get(),
+//                                                                                            replacementTupleForInsert.get());
+//    bool replaced = useReplacementRow(retval);
+//    if (replaced) {
+//        TableTuple tempTuple = drTable->tempTuple();
+//        tempTuple.deserializeFrom(replacementTupleForInsert
+//        newTuple = create new tuple from replacement tuple
+//        NValue curr = newTuple.getHiddenNValue(getDRTimestampColumnIndex());
+//        ExecutorContext::setConflictFlagFromHiddenNValue(curr);
+//    }
+//    else if (deleteConflict == CONFLICT_EXPECTED_ROW_MISMATCH)
+//        if (isApplyNewRow(retval)) {
+//            // new tuple should not have the conflict bit set
+//            NValue curr = newTuple.getHiddenNValue(getDRTimestampColumnIndex());
+//            ExecutorContext::resetConflictFlagFromHiddenNValue(curr);
+//        }
+//        else {
+//            NValue curr = existingTuple.getHiddenNValue(getDRTimestampColumnIndex());
+//            ExecutorContext::setConflictFlagFromHiddenNValue(curr);
+//        }
+//    }
+
     bool applyRemoteChange = isApplyNewRow(retval);
     bool resolved = isResolved(retval);
     // if conflict is not resolved, don't delete any existing rows.

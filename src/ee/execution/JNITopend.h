@@ -60,6 +60,15 @@ public:
             DRConflictType insertConflict, Table *existingMetaTableForInsert, Table *existingTupleTableForInsert,
             Table *newMetaTableForInsert, Table *newTupleTableForInsert);
 
+
+    int reportCustomDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp,
+            std::string tableName, std::string customResolverName, DRRecordType action,
+            DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
+            Table *expectedMetaTableForDelete, Table *expectedTupleTableForDelete,
+            DRConflictType insertConflict, Table *existingMetaTableForInsert, Table *existingTupleTableForInsert,
+            Table *newMetaTableForInsert, Table *newTupleTableForInsert,
+            Table *replacementTupleForInsert);
+
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
 
     std::string decodeBase64AndDecompress(const std::string& buffer);
@@ -98,6 +107,7 @@ private:
     jmethodID m_getQueuedExportBytesMID;
     jmethodID m_pushDRBufferMID;
     jmethodID m_reportDRConflictMID;
+    jmethodID m_reportCustomDRConflictMID;
     jmethodID m_decodeBase64AndDecompressToBytesMID;
     jclass m_exportManagerClass;
     jclass m_partitionDRGatewayClass;

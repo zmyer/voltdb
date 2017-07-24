@@ -58,7 +58,8 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
 
     public static enum DRConflictResolutionFlag {
         ACCEPT_CHANGE,
-        CONVERGENT
+        CONVERGENT,
+        REPLACED_ROW,
     }
 
     // Keep sync with EE DRConflictType at types.h
@@ -190,5 +191,42 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
                                                  DRConflictType.values()[insertConflict],
                                                  existingMetaTableForInsert, existingTupleTableForInsert,
                                                  newMetaTableForInsert, newTupleTableForInsert);
+    }
+
+    public static int reportCustomDRConflict(int partitionId, int remoteClusterId, long remoteTimestamp,
+                                             String tableName, String customResolverName, int action,
+                                             int deleteConflict, ByteBuffer existingMetaTableForDelete, ByteBuffer existingTupleTableForDelete,
+                                             ByteBuffer expectedMetaTableForDelete, ByteBuffer expectedTupleTableForDelete,
+                                             int insertConflict, ByteBuffer existingMetaTableForInsert, ByteBuffer existingTupleTableForInsert,
+                                             ByteBuffer newMetaTableForInsert, ByteBuffer newTupleTableForInsert, ByteBuffer replacementTupleTableForInsert) {
+        DRConflictType deleteConflictType = DRConflictType.values()[deleteConflict];
+        if (deleteConflictType == DRConflictType.EXPECTED_ROW_TIMESTAMP_MISMATCH) {
+            return m_conflictManager.resolveCustomConflict(partitionId,
+                                                           remoteClusterId,
+                                                           remoteTimestamp,
+                                                           tableName,
+                                                           customResolverName,
+                                                           DRRecordType.values()[action],
+                                                           deleteConflictType,
+                                                           existingMetaTableForDelete, existingTupleTableForDelete,
+                                                           expectedMetaTableForDelete, expectedTupleTableForDelete,
+                                                           DRConflictType.values()[insertConflict],
+                                                           existingMetaTableForInsert, existingTupleTableForInsert,
+                                                           newMetaTableForInsert, newTupleTableForInsert,
+                                                           replacementTupleTableForInsert);
+        }
+        else {
+            return m_conflictManager.resolveConflict(partitionId,
+                                                     remoteClusterId,
+                                                     remoteTimestamp,
+                                                     tableName,
+                                                     DRRecordType.values()[action],
+                                                     deleteConflictType,
+                                                     existingMetaTableForDelete, existingTupleTableForDelete,
+                                                     expectedMetaTableForDelete, expectedTupleTableForDelete,
+                                                     DRConflictType.values()[insertConflict],
+                                                     existingMetaTableForInsert, existingTupleTableForInsert,
+                                                     newMetaTableForInsert, newTupleTableForInsert);
+        }
     }
 }
