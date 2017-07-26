@@ -451,6 +451,9 @@ public:
     /** Returns true if DR is enabled for this table */
     bool isDREnabled() const { return m_drEnabled; }
 
+    void setDRCustomResolverName(const std::string& resolverName) { m_drCustomResolverName = resolverName; }
+    std::string& getDRCustomResolverName() const { return m_drCustomResolverName; }
+
     /** Returns true if there is a hidden column in this table for the
         DR timestamp (used to resolve active/active conflicts) */
     bool hasDRTimestampColumn() const { return m_drTimestampColumnIndex != -1; }
@@ -760,6 +763,9 @@ private:
 
     // is DR enabled
     bool m_drEnabled;
+
+    // custom DR resolver name
+    std::string m_drCustomResolverName;
 
     // SHA-1 of signature string
     char m_signature[20];

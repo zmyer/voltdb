@@ -397,7 +397,12 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
                                                     m_compactionThreshold,
                                                     drEnabled);
     PersistentTable* persistentTable = dynamic_cast<PersistentTable*>(table);
-    if ( ! persistentTable) {
+    if (persistentTable) {
+        if (isXDCR && !catalogTable.conflictResolver().empty() ) {
+            persistentTable->setDRCustomResolverName(catalogTable.conflictResolver());
+        }
+    }
+    else {
         assert(pkeyIndexId.empty());
         assert(indexes.empty());
         return table;

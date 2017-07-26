@@ -114,7 +114,8 @@ private:
     TableTuple& m_target;
 };
 
-PersistentTable::PersistentTable(int partitionColumn, char const* signature, bool isMaterialized, int tableAllocationTargetSize, int tupleLimit, bool drEnabled) :
+PersistentTable::PersistentTable(int partitionColumn, char const* signature, bool isMaterialized,
+        int tableAllocationTargetSize, int tupleLimit, bool drEnabled) :
     Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
     m_iter(this),
     m_allowNulls(),
@@ -135,7 +136,8 @@ PersistentTable::PersistentTable(int partitionColumn, char const* signature, boo
     m_pkeyIndex(NULL),
     m_mvHandler(NULL),
     m_deltaTable(NULL),
-    m_deltaTableActive(false)
+    m_deltaTableActive(false),
+    m_drCustomResolverName("");
 {
     // this happens here because m_data might not be initialized above
     m_iter.reset(m_data.begin());

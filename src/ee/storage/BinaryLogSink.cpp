@@ -397,8 +397,9 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
                                   insertConflict, NEW_ROW, uniqueId, remoteClusterId);
     }
 
-//    if (drTable->getCustomResolverName().isEmpty())
-    int retval = ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(engine->getPartitionId(),
+    int retval;
+    if (drTable->getDRCustomResolverName().empty()) {
+        retval = ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(engine->getPartitionId(),
                                                                                       remoteClusterId,
                                                                                       UniqueId::timestampSinceUnixEpoch(uniqueId),
                                                                                       drTable->name(),
@@ -413,46 +414,48 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
                                                                                       existingTupleTableForInsert.get(),
                                                                                       newMetaTableForInsert.get(),
                                                                                       newTupleTableForInsert.get());
-//    }
-//    else {
-//    boost::shared_ptr<TempTable> replacementTupleForInsert;
-//    replacementTupleForInsert.reset(TableFactory::buildCopiedTempTable(NEW_TABLE, drTable, NULL));
-//    int retval = ExecutorContext::getExecutorContext()->getTopend()->reportCustomDRConflict(engine->getPartitionId(),
-//                                                                                            remoteClusterId,
-//                                                                                            UniqueId::timestampSinceUnixEpoch(uniqueId),
-//                                                                                            drTable->name(),
-//                                                                                            drTable->getCustomResolverName(),
-//                                                                                            actionType,
-//                                                                                            deleteConflict,
-//                                                                                            existingMetaTableForDelete.get(),
-//                                                                                            existingTupleTableForDelete.get(),
-//                                                                                            expectedMetaTableForDelete.get(),
-//                                                                                            expectedTupleTableForDelete.get(),
-//                                                                                            insertConflict,
-//                                                                                            existingMetaTableForInsert.get(),
-//                                                                                            existingTupleTableForInsert.get(),
-//                                                                                            newMetaTableForInsert.get(),
-//                                                                                            newTupleTableForInsert.get(),
-//                                                                                            replacementTupleForInsert.get());
-//    bool replaced = useReplacementRow(retval);
-//    if (replaced) {
-//        TableTuple tempTuple = drTable->tempTuple();
-//        tempTuple.deserializeFrom(replacementTupleForInsert
-//        newTuple = create new tuple from replacement tuple
-//        NValue curr = newTuple.getHiddenNValue(getDRTimestampColumnIndex());
-//        ExecutorContext::setConflictFlagFromHiddenNValue(curr);
-//    }
-//    else if (deleteConflict == CONFLICT_EXPECTED_ROW_MISMATCH)
-//        if (isApplyNewRow(retval)) {
-//            // new tuple should not have the conflict bit set
-//            NValue curr = newTuple.getHiddenNValue(getDRTimestampColumnIndex());
-//            ExecutorContext::resetConflictFlagFromHiddenNValue(curr);
-//        }
-//        else {
-//            NValue curr = existingTuple.getHiddenNValue(getDRTimestampColumnIndex());
-//            ExecutorContext::setConflictFlagFromHiddenNValue(curr);
-//        }
-//    }
+    }
+    else {
+        boost::shared_ptr<TempTable> replacementTupleForInsert;
+        replacementTupleForInsert.reset(TableFactory::buildCopiedTempTable(NEW_TABLE, drTable, NULL));
+        retval = ExecutorContext::getExecutorContext()->getTopend()->reportCustomDRConflict(engine->getPartitionId(),
+                                                                                            remoteClusterId,
+                                                                                            UniqueId::timestampSinceUnixEpoch(uniqueId),
+                                                                                            drTable->name(),
+                                                                                            drTable->getDRCustomResolverName(),
+                                                                                            actionType,
+                                                                                            deleteConflict,
+                                                                                            existingMetaTableForDelete.get(),
+                                                                                            existingTupleTableForDelete.get(),
+                                                                                            expectedMetaTableForDelete.get(),
+                                                                                            expectedTupleTableForDelete.get(),
+                                                                                            insertConflict,
+                                                                                            existingMetaTableForInsert.get(),
+                                                                                            existingTupleTableForInsert.get(),
+                                                                                            newMetaTableForInsert.get(),
+                                                                                            newTupleTableForInsert.get(),
+                                                                                            replacementTupleForInsert.get());
+        bool replaced = useReplacementRow(retval);
+        if (replaced) {
+            boost::scoped_ptr<TableIterator> iter = replacementTupleForInsert->makeIterator();
+            TableTuple tempTuple = drTable->tempTuple();
+            iter->next(tempTuple);
+            newTuple = tempTuple;
+            NValue curr = newTuple->getHiddenNValue(drTable->getDRTimestampColumnIndex());
+            ExecutorContext::setConflictFlagFromHiddenNValue(curr);
+        }
+        else if (deleteConflict == CONFLICT_EXPECTED_ROW_MISMATCH) {
+            if (isApplyNewRow(retval)) {
+                // new tuple should not have the conflict bit set
+                NValue curr = newTuple->getHiddenNValue(drTable->getDRTimestampColumnIndex());
+                ExecutorContext::resetConflictFlagFromHiddenNValue(curr);
+            }
+            else {
+                NValue curr = existingTuple->getHiddenNValue(drTable->getDRTimestampColumnIndex());
+                ExecutorContext::resetConflictFlagFromHiddenNValue(curr);
+            }
+        }
+    }
 
     bool applyRemoteChange = isApplyNewRow(retval);
     bool resolved = isResolved(retval);
@@ -775,9 +778,11 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, const DRRecord
     }
     case DR_RECORD_DELETE_BY_INDEX: {
         throwSerializableEEException("Delete by index is not supported for DR");
+        break;
     }
     case DR_RECORD_UPDATE_BY_INDEX: {
         throwSerializableEEException("Update by index is not supported for DR");
+        break;
     }
     case DR_RECORD_TRUNCATE_TABLE: {
         int64_t tableHandle = taskInfo->readLong();
