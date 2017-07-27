@@ -1376,7 +1376,7 @@ public class TestCSVLoader {
         test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
-	@Test
+    @Test
     public void testHeaderColumnMissing() throws Exception
     {
         // ENG-11098: csvloader --header doesn't work if the CSV is missing columns from the schema.
@@ -1485,7 +1485,6 @@ public class TestCSVLoader {
         int validLineCnt = 0;
         test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
     }
-
 
     @Test
     public void testMultiByteCharacterUTF8() throws Exception
