@@ -32,7 +32,6 @@ import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.DRIdempotencyResult;
 import org.voltdb.DependencyPair;
 import org.voltdb.HsqlBackend;
-import org.voltdb.HybridCrc32;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.NonVoltDBBackend;
 import org.voltdb.ParameterSet;
@@ -585,9 +584,10 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             long[] planFragmentIds,
             long[] inputDepIds,
             Object[] parameterSets,
-            boolean[] isWriteFrag,
-            HybridCrc32 writeCRC,
+            DeterminismHash determinismHash,
             String[] sqlTexts,
+            boolean[] isWriteFrags,
+            int[] sqlCRCs,
             long txnId,
             long spHandle,
             long uniqueId,
@@ -681,6 +681,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     @Override
     public void setDRProtocolVersion(int drVersion, long spHandle, long uniqueId)
     {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
+    public void setDRStreamEnd(long spHandle, long uniqueId) {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 

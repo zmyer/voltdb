@@ -29,6 +29,7 @@ import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
+import org.voltdb.QueueDepthTracker;
 import org.voltdb.StartAction;
 import org.voltdb.StarvationTracker;
 import org.voltdb.StatsAgent;
@@ -108,6 +109,10 @@ public abstract class BaseInitiator implements Initiator
         agent.registerStatsSource(StatsSelector.STARVATION,
                                   getInitiatorHSId(),
                                   st);
+        QueueDepthTracker qdt = m_scheduler.setupQueueDepthTracker(getInitiatorHSId());
+        agent.registerStatsSource(StatsSelector.QUEUE,
+                                  getInitiatorHSId(),
+                                  qdt);
 
         String partitionString = " ";
         if (m_partitionId != -1) {
@@ -163,6 +168,7 @@ public abstract class BaseInitiator implements Initiator
             LoadedProcedureSet procSet = new LoadedProcedureSet(m_executionSite);
             procSet.loadProcedures(catalogContext, csp);
             m_executionSite.setLoadedProcedures(procSet);
+            m_scheduler.setProcedureSet(procSet);
             m_scheduler.setCommandLog(cl);
 
             m_siteThread = new Thread(m_executionSite);

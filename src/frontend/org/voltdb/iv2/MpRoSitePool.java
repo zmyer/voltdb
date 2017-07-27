@@ -56,9 +56,10 @@ class MpRoSitePool {
                 ThreadFactory threadFactory)
         {
             m_catalogContext = context;
-            m_queue = new SiteTaskerQueue();
+            m_queue = new SiteTaskerQueue(partitionId);
             // IZZY: Just need something non-null for now
             m_queue.setStarvationTracker(new StarvationTracker(siteId));
+            m_queue.setupQueueDepthTracker(siteId);
             m_site = new MpRoSite(m_queue, siteId, backend, m_catalogContext, partitionId);
             m_loadedProcedures = new LoadedProcedureSet(m_site);
             m_loadedProcedures.loadProcedures(m_catalogContext, csp);

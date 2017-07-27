@@ -493,7 +493,7 @@ public class MockVoltDB implements VoltDBInterface
             byte[] catalogBytes, byte[] catalogHash, int expectedCatalogVersion,
             long currentTxnId, long currentTxnTimestamp, byte[] deploymentBytes,
             byte[] deploymentHash, boolean requireCatalogDiffCmdsApplyToEE,
-            boolean hasSchemaChange, boolean requiresNewExportGeneration)
+            boolean hasSchemaChange, boolean requiresNewExportGeneration, long ccrTime)
     {
         throw new UnsupportedOperationException("unimplemented");
     }
@@ -680,7 +680,17 @@ public class MockVoltDB implements VoltDBInterface
             }
 
             @Override
-            public boolean isTrial() {
+            public boolean isAnyKindOfTrial() {
+                return false;
+            }
+
+            @Override
+            public boolean isProTrial() {
+                return false;
+            }
+
+            @Override
+            public boolean isEnterpriseTrial() {
                 return false;
             }
 

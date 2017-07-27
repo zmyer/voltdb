@@ -46,7 +46,6 @@ import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.HsqlBackend;
-import org.voltdb.HybridCrc32;
 import org.voltdb.IndexStats;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
@@ -75,6 +74,7 @@ import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
+import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.DRCatalogCommands;
@@ -1428,7 +1428,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         if (drSequenceNumbers != null) {
             Long partitionDRSequenceNumber = drSequenceNumbers.get(m_partitionId);
             Long mpDRSequenceNumber = drSequenceNumbers.get(MpInitiator.MP_INIT_PID);
+            hostLog.info("Setting drIds " + partitionDRSequenceNumber + " and " + mpDRSequenceNumber);
             setDRSequenceNumbers(partitionDRSequenceNumber, mpDRSequenceNumber);
+            if (VoltDB.instance().getNodeDRGateway() != null && m_sysprocContext.isLowestSiteId()) {
+                VoltDB.instance().getNodeDRGateway().cacheRejoinStartDRSNs(drSequenceNumbers);
+            }
         } else if (requireExistingSequenceNumbers) {
             VoltDB.crashLocalVoltDB("Could not find DR sequence number for partition " + m_partitionId);
         }
@@ -1457,9 +1461,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             long[] planFragmentIds,
             long[] inputDepIds,
             Object[] parameterSets,
-            boolean[] isWriteFrag,
-            HybridCrc32 writeCRC,
+            DeterminismHash determinismHash,
             String[] sqlTexts,
+            boolean[] isWriteFrags,
+            int[] sqlCRCs,
             long txnId,
             long spHandle,
             long uniqueId,
@@ -1472,9 +1477,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 planFragmentIds,
                 inputDepIds,
                 parameterSets,
-                isWriteFrag,
-                writeCRC,
+                determinismHash,
                 sqlTexts,
+                isWriteFrags,
+                sqlCRCs,
                 txnId,
                 spHandle,
                 m_lastCommittedSpHandle,
@@ -1501,6 +1507,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean requiresNewExportGeneration)
     {
+        CatalogContext oldContext = m_context;
         m_context = context;
         m_ee.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
                 getSystemsettings().get("systemsettings").getQuerytimeout());
@@ -1528,6 +1535,19 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 }
             }
         }
+
+        if (!DRCatalogChange) { // Check against old catalog for deletions
+            CatalogMap<Table> oldTables = oldContext.catalog.getClusters().get("cluster").getDatabases().get("database").getTables();
+            for (Table t : oldTables) {
+                if (t.getIsdred()) {
+                    DRCatalogChange |= diffCmds.contains(CatalogDiffEngine.getDeleteDiffStatement(t, "tables"));
+                    if (DRCatalogChange) {
+                        break;
+                    }
+                }
+            }
+        }
+
         // if a snapshot is in process, wait for it to finish
         // don't bother if this isn't a schema change
         //
@@ -1547,7 +1567,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         //Necessary to quiesce before updating the catalog
         //so export data for the old generation is pushed to Java.
         m_ee.quiesce(m_lastCommittedSpHandle);
-        m_ee.updateCatalog(m_context.m_uniqueId, requiresNewExportGeneration, diffCmds);
+        m_ee.updateCatalog(m_context.m_ccrTime, requiresNewExportGeneration, diffCmds);
         if (DRCatalogChange) {
             final DRCatalogCommands catalogCommands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(m_context.catalog, -1);
             generateDREvent( EventType.CATALOG_UPDATE, uniqueId, m_lastCommittedSpHandle,
@@ -1687,6 +1707,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         setDRProtocolVersion(drVersion);
         generateDREvent(
                 EventType.DR_STREAM_START, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);
+    }
+
+    public void setDRStreamEnd(long spHandle, long uniqueId) {
+        generateDREvent(
+                EventType.DR_STREAM_END, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);
     }
 
     /**

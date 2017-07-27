@@ -430,7 +430,7 @@ public class RegressionSuite extends TestCase {
         final SocketChannel channel = (SocketChannel)
             ConnectionUtil.getAuthenticatedConnection(
                     hNp.getHostText(), m_username, hashedPassword, port, null,
-                    ClientAuthScheme.getByUnencodedLength(hashedPassword.length), sslEngine)[0];
+                    ClientAuthScheme.getByUnencodedLength(hashedPassword.length), sslEngine, 0)[0];
         channel.configureBlocking(true);
         if (!noTearDown) {
             synchronized (m_clientChannels) {
@@ -1115,6 +1115,17 @@ public class RegressionSuite extends TestCase {
                 + "expected " + expectedTable.length + ", "
                 + "actual: " + actualTable.getRowCount(),
                 actualTable.advanceRow());
+    }
+
+    static protected void assertSuccessfulDML(Client client, String stmt) throws NoConnectionsException, IOException, ProcCallException {
+        assertSuccessfulDML(client, stmt, 1L);
+    }
+
+    static protected void assertSuccessfulDML(Client client, String stmt, long returnValue) throws NoConnectionsException, IOException, ProcCallException {
+        VoltTable[] results = null;
+        results = client.callProcedure("@AdHoc", stmt).getResults();
+        assertEquals(1, results.length);
+        assertEquals(returnValue, results[0].asScalarLong());
     }
 
     static protected void verifyStmtFails(Client client, String stmt, String expectedPattern) throws IOException {

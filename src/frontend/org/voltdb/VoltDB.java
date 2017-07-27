@@ -54,6 +54,7 @@ import org.voltdb.probe.MeshProber;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.settings.Settings;
+import org.voltdb.settings.SettingsException;
 import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
@@ -316,8 +317,11 @@ public class VoltDB {
         /** apply safe mode strategy when recovering */
         public boolean m_safeMode = false;
 
-        /** location of user supplied DDL */
+        /** location of user supplied schema */
         public File m_userSchema = null;
+
+        /** location of user supplied classes and resources jar file */
+        public File m_stagedClassesPath = null;
 
         public int getZKPort() {
             return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, org.voltcore.common.Constants.DEFAULT_ZK_PORT);
@@ -665,18 +669,32 @@ public class VoltDB {
                     m_getOutput = args[++i].trim();
                 } else if (arg.equalsIgnoreCase("forceget")) {
                     m_forceGetCreate = true;
-                } else if (arg.equalsIgnoreCase("schema")){
+                } else if (arg.equalsIgnoreCase("schema")) {
                     m_userSchema = new File(args[++i].trim());
-                    if (!m_userSchema.exists()){
+                    if (!m_userSchema.exists()) {
                         System.err.println("FATAL: Supplied schema file " + m_userSchema + " does not exist.");
                         referToDocAndExit();
                     }
-                    if (!m_userSchema.canRead()){
+                    if (!m_userSchema.canRead()) {
                         System.err.println("FATAL: Supplied schema file " + m_userSchema + " can't be read.");
                         referToDocAndExit();
                     }
-                    if (!m_userSchema.isFile()){
+                    if (!m_userSchema.isFile()) {
                         System.err.println("FATAL: Supplied schema file " + m_userSchema + " is not an ordinary file.");
+                        referToDocAndExit();
+                    }
+                } else if (arg.equalsIgnoreCase("classes")) {
+                    m_stagedClassesPath = new File(args[++i].trim());
+                    if (!m_stagedClassesPath.exists()){
+                        System.err.println("FATAL: Supplied classes jar file " + m_stagedClassesPath + " does not exist.");
+                        referToDocAndExit();
+                    }
+                    if (!m_stagedClassesPath.canRead()) {
+                        System.err.println("FATAL: Supplied classes jar file " + m_stagedClassesPath + " can't be read.");
+                        referToDocAndExit();
+                    }
+                    if (!m_stagedClassesPath.isFile()) {
+                        System.err.println("FATAL: Supplied classes jar file " + m_stagedClassesPath + " is not an ordinary file.");
                         referToDocAndExit();
                     }
                 } else {
@@ -808,6 +826,26 @@ public class VoltDB {
             Settings.initialize(m_voltdbRoot);
             return ImmutableMap.<String, String>builder()
                     .put(NodeSettings.VOLTDBROOT_PATH_KEY, m_voltdbRoot.getPath())
+                    .build();
+        }
+
+        public Map<String,String> asRelativePathSettingsMap() {
+            Settings.initialize(m_voltdbRoot);
+            File currDir;
+            File voltdbroot;
+            try {
+                currDir = new File("").getCanonicalFile();
+                voltdbroot = m_voltdbRoot.getCanonicalFile();
+            } catch (IOException e) {
+                throw new SettingsException(
+                        "Failed to relativize voltdbroot " +
+                        m_voltdbRoot.getPath() +
+                        ". Reason: " +
+                        e.getMessage());
+            }
+            String relativePath = currDir.toPath().relativize(voltdbroot.toPath()).toString();
+            return ImmutableMap.<String, String>builder()
+                    .put(NodeSettings.VOLTDBROOT_PATH_KEY, relativePath)
                     .build();
         }
 

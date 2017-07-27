@@ -37,7 +37,6 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 
-import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLDDLInfo;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -56,7 +55,6 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
-import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compiler.statements.CatchAllVoltDBStatement;
 import org.voltdb.compiler.statements.CreateFunctionFromMethod;
@@ -91,6 +89,9 @@ import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.LineReaderAdapter;
+import org.voltdb.utils.SQLCommand;
+
 
 
 /**
@@ -108,7 +109,6 @@ public class DDLCompiler {
     private final MaterializedViewProcessor m_mvProcessor;
 
     private String m_fullDDL = "";
-    private int m_currLineNo = 1;
 
     private final VoltDBStatementProcessor m_voltStatementProcessor;
 
@@ -167,8 +167,13 @@ public class DDLCompiler {
 
     public static class DDLStatement {
         public DDLStatement() { }
+        public DDLStatement(String statement, int lineNo) {
+            this.statement = statement;
+            this.lineNo = lineNo;
+        }
         public String statement = "";
-        public int lineNo;
+        public int lineNo; // beginning of statement line number
+        public int endLineNo; // end of statement line number
     }
 
     public DDLCompiler(VoltCompiler compiler,
@@ -292,6 +297,73 @@ public class DDLCompiler {
         protected static final String DR = "DR";
     }
 
+    public void loadSchemaWithFiltering(Reader reader, final Database db, final DdlProceduresToLoad whichProcs, SQLParser.FileInfo fileInfo)
+            throws VoltCompiler.VoltCompilerException {
+
+        final LineReaderAdapter lineReader = new LineReaderAdapter(reader);
+
+        DDLParserCallback callback = new DDLParserCallback() {
+
+            @Override
+            public void statement(String statement, int lineNum) throws VoltCompiler.VoltCompilerException {
+                try {
+                    if (statement == null || statement.trim().isEmpty()) {
+                        return;
+                    }
+                    doExecuteStatement(statement.trim() + ";", lineNum);
+                }
+                catch (Exception e) {
+                    throw m_compiler.new VoltCompilerException(e);
+                }
+            }
+
+            @Override
+            public void batch(String batch, int batchEndLineNumber) throws VoltCompiler.VoltCompilerException {
+                try {
+                    String[] parts = batch.split(";");
+
+                    int currLine = batchEndLineNumber - parts.length;
+                    for (String s : parts) {
+                        if (!s.trim().isEmpty()) {
+                            doExecuteStatement(s.trim() + ";", currLine++);
+                        }
+                    }
+                }
+                catch (Exception e) {
+                    throw m_compiler.new VoltCompilerException(e);
+                }
+            }
+
+            private void doExecuteStatement(String statement, int lineNum) throws VoltCompiler.VoltCompilerException {
+
+                // Filter out any statements that we don't want to deal with
+                if (statement.toUpperCase().startsWith("LOAD")) {
+                    return;
+                }
+
+                DDLStatement stmt = new DDLStatement(statement, lineNum);
+                processVoltDBStatements(db, whichProcs, stmt);
+            }
+        };
+
+        try {
+            SQLCommand.executeScriptFromReader(fileInfo, lineReader, callback);
+        }
+        catch (Exception e) {
+            throw m_compiler.new VoltCompilerException(e);
+        }
+        finally {
+            // NEEDSWORK (ENG-12255): This really should be done outside the loop, by the caller. The exception propagation, at this point, is pretty messy, and
+            // changing it would be a pretty big effort that's really not relevant to this ticket. Fix this sometime.
+            lineReader.close();
+        }
+
+        // process extra classes
+        m_tracker.addExtraClasses(m_classMatcher.getMatchedClassList());
+        // possibly save some memory
+        m_classMatcher.clear();
+    }
+
     /**
      * Compile a DDL schema from an abstract reader
      * @param reader  abstract DDL reader
@@ -301,51 +373,13 @@ public class DDLCompiler {
      */
     void loadSchema(Reader reader, Database db, DdlProceduresToLoad whichProcs)
             throws VoltCompiler.VoltCompilerException {
-        m_currLineNo = 1;
+        int currLineNo = 1;
 
-        DDLStatement stmt = getNextStatement(reader, m_compiler);
+        DDLStatement stmt = getNextStatement(reader, m_compiler, currLineNo);
         while (stmt != null) {
             // Some statements are processed by VoltDB and the rest are handled by HSQL.
-            boolean processed = false;
-            try {
-                // Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE,
-                // CREATE PROCEDURE, CREATE FUNCTION, and CREATE ROLE.
-                processed = m_voltStatementProcessor.process(stmt, db, whichProcs);
-            } catch (VoltCompilerException e) {
-                // Reformat the message thrown by VoltDB DDL processing to have a line number.
-                String msg = "VoltDB DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
-                throw m_compiler.new VoltCompilerException(msg);
-            }
-            if (! processed) {
-                try {
-                    //* enable to debug */ System.out.println("DEBUG: " + stmt.statement);
-                    // kind of ugly.  We hex-encode each statement so we can
-                    // avoid embedded newlines so we can delimit statements
-                    // with newline.
-                    m_fullDDL += Encoder.hexEncode(stmt.statement) + "\n";
-
-                    // figure out what table this DDL might affect to minimize diff processing
-                    HSQLDDLInfo ddlStmtInfo = HSQLLexer.preprocessHSQLDDL(stmt.statement);
-
-                    // Get the diff that results from applying this statement and apply it
-                    // to our local tree (with Volt-specific additions)
-                    VoltXMLDiff thisStmtDiff = m_hsql.runDDLCommandAndDiff(ddlStmtInfo, stmt.statement);
-                    // null diff means no change (usually drop if exists for non-existent thing)
-                    if (thisStmtDiff != null) {
-                        applyDiff(thisStmtDiff);
-                    }
-
-                    // special treatment for stream syntax
-                    if (ddlStmtInfo.creatStream) {
-                       processCreateStreamStatement(stmt, db, whichProcs);
-                    }
-                } catch (HSQLParseException e) {
-                    String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
-                    throw m_compiler.new VoltCompilerException(msg, stmt.lineNo);
-                }
-
-            }
-            stmt = getNextStatement(reader, m_compiler);
+            processVoltDBStatements(db, whichProcs, stmt);
+            stmt = getNextStatement(reader, m_compiler, stmt.endLineNo);
         }
 
         try {
@@ -623,91 +657,10 @@ public class DDLCompiler {
         }
     }
 
-    private class CreateProcedurePartitionData {
+    public static class CreateProcedurePartitionData {
         String tableName = null;
         String columnName = null;
         String parameterNo = null;
-    }
-
-    /**
-     * Parse and validate the substring containing ALLOW and PARTITION
-     * clauses for CREATE PROCEDURE.
-     * @param clauses  the substring to parse
-     * @param descriptor  procedure descriptor populated with role names from ALLOW clause
-     * @return  parsed and validated partition data or null if there was no PARTITION clause
-     * @throws VoltCompilerException
-     */
-    private CreateProcedurePartitionData parseCreateProcedureClauses(
-            ProcedureDescriptor descriptor,
-            String clauses) throws VoltCompilerException {
-
-        // Nothing to do if there were no clauses.
-        // Null means there's no partition data to return.
-        // There's also no roles to add.
-        if (clauses == null || clauses.isEmpty()) {
-            return null;
-        }
-        CreateProcedurePartitionData data = null;
-
-        Matcher matcher = SQLParser.matchAnyCreateProcedureStatementClause(clauses);
-        int start = 0;
-        while (matcher.find(start)) {
-            start = matcher.end();
-
-            if (matcher.group(1) != null) {
-                // Add roles if it's an ALLOW clause. More that one ALLOW clause is okay.
-                for (String roleName : StringUtils.split(matcher.group(1), ',')) {
-                    // Don't put the same role in the list more than once.
-                   String roleNameFixed = roleName.trim().toLowerCase();
-                    if (!descriptor.m_authGroups.contains(roleNameFixed)) {
-                        descriptor.m_authGroups.add(roleNameFixed);
-                    }
-                }
-            }
-            else {
-                // Add partition info if it's a PARTITION clause. Only one is allowed.
-                if (data != null) {
-                    throw m_compiler.new VoltCompilerException(
-                        "Only one PARTITION clause is allowed for CREATE PROCEDURE.");
-                }
-                data = new CreateProcedurePartitionData();
-                data.tableName = matcher.group(2);
-                data.columnName = matcher.group(3);
-                data.parameterNo = matcher.group(4);
-            }
-        }
-
-        return data;
-    }
-
-    private void addProcedurePartitionInfo(
-            String procName,
-            CreateProcedurePartitionData data,
-            String statement) throws VoltCompilerException {
-
-        assert(procName != null);
-
-        // Will be null when there is no optional partition clause.
-        if (data == null) {
-            return;
-        }
-
-        assert(data.tableName != null);
-        assert(data.columnName != null);
-
-        // Check the identifiers.
-        checkIdentifierStart(procName, statement);
-        checkIdentifierStart(data.tableName, statement);
-        checkIdentifierStart(data.columnName, statement);
-
-        // if not specified default parameter index to 0
-        if (data.parameterNo == null) {
-            data.parameterNo = "0";
-        }
-
-        String partitionInfo = String.format("%s.%s: %s", data.tableName, data.columnName, data.parameterNo);
-
-        m_tracker.addProcedurePartitionInfoTo(procName, partitionInfo);
     }
 
     private void checkValidPartitionTableIndex(Index index, Column partitionCol, String tableName)
@@ -912,14 +865,14 @@ public class DDLCompiler {
     private static int kStateReadingEndCodeBlockNextDelim = 11;   // dealing with ending code block delimiter ###
 
 
-    private int readingState(char[] nchar, DDLStatement retval) {
+    private static int readingState(char[] nchar, DDLStatement retval) {
         if (nchar[0] == '-') {
             // remember that a possible '--' is being examined
             return kStateReadingCommentDelim;
         }
         else if (nchar[0] == '\n') {
             // normalize newlines to spaces
-            m_currLineNo += 1;
+            retval.endLineNo += 1;
             retval.statement += " ";
         }
         else if (nchar[0] == '\r') {
@@ -947,7 +900,7 @@ public class DDLCompiler {
         return kStateReading;
     }
 
-    private int readingCodeBlockStateDelim(char [] nchar, DDLStatement retval) {
+    private static int readingCodeBlockStateDelim(char [] nchar, DDLStatement retval) {
         retval.statement += nchar[0];
         if (SQLLexer.isBlockDelimiter(nchar[0])) {
             return kStateReadingCodeBlockNextDelim;
@@ -956,7 +909,7 @@ public class DDLCompiler {
         }
     }
 
-    private int readingEndCodeBlockStateDelim(char [] nchar, DDLStatement retval) {
+    private static int readingEndCodeBlockStateDelim(char [] nchar, DDLStatement retval) {
         retval.statement += nchar[0];
         if (SQLLexer.isBlockDelimiter(nchar[0])) {
             return kStateReadingEndCodeBlockNextDelim;
@@ -965,7 +918,7 @@ public class DDLCompiler {
         }
     }
 
-    private int readingCodeBlockStateNextDelim(char [] nchar, DDLStatement retval) {
+    private static int readingCodeBlockStateNextDelim(char [] nchar, DDLStatement retval) {
         if (SQLLexer.isBlockDelimiter(nchar[0])) {
             retval.statement += nchar[0];
             return kStateReadingCodeBlock;
@@ -973,7 +926,7 @@ public class DDLCompiler {
         return readingState(nchar, retval);
     }
 
-    private int readingEndCodeBlockStateNextDelim(char [] nchar, DDLStatement retval) {
+    private static int readingEndCodeBlockStateNextDelim(char [] nchar, DDLStatement retval) {
         retval.statement += nchar[0];
         if (SQLLexer.isBlockDelimiter(nchar[0])) {
             return kStateReading;
@@ -981,7 +934,7 @@ public class DDLCompiler {
         return kStateReadingCodeBlock;
     }
 
-    private int readingCodeBlock(char [] nchar, DDLStatement retval) {
+    private static int readingCodeBlock(char [] nchar, DDLStatement retval) {
         // all characters in the literal are accumulated. keep track of
         // newlines for error messages.
         retval.statement += nchar[0];
@@ -990,17 +943,17 @@ public class DDLCompiler {
         }
 
         if (nchar[0] == '\n') {
-            m_currLineNo += 1;
+            retval.endLineNo += 1;
         }
         return kStateReadingCodeBlock;
     }
 
-    private int readingStringLiteralState(char[] nchar, DDLStatement retval) {
+    private static int readingStringLiteralState(char[] nchar, DDLStatement retval) {
         // all characters in the literal are accumulated. keep track of
         // newlines for error messages.
         retval.statement += nchar[0];
         if (nchar[0] == '\n') {
-            m_currLineNo += 1;
+            retval.endLineNo += 1;
         }
 
         // if we see a SINGLE_QUOTE, change states to check for terminating literal
@@ -1013,7 +966,7 @@ public class DDLCompiler {
     }
 
 
-    private int readingStringLiteralSpecialChar(char[] nchar, DDLStatement retval) {
+    private static int readingStringLiteralSpecialChar(char[] nchar, DDLStatement retval) {
 
         // if this is an escaped quote, return kReadingStringLiteral.
         // otherwise, the string is complete. Parse nchar as a non-literal
@@ -1026,7 +979,7 @@ public class DDLCompiler {
         }
     }
 
-    private int readingCommentDelimState(char[] nchar, DDLStatement retval) {
+    private static int readingCommentDelimState(char[] nchar, DDLStatement retval) {
         if (nchar[0] == '-') {
             // confirmed that a comment is being read
             return kStateReadingComment;
@@ -1039,16 +992,16 @@ public class DDLCompiler {
         }
     }
 
-    private int readingCommentState(char[] nchar, DDLStatement retval) {
+    private static int readingCommentState(char[] nchar, DDLStatement retval) {
         if (nchar[0] == '\n') {
             // a comment is continued until a newline is found.
-            m_currLineNo += 1;
+            retval.endLineNo += 1;
             return kStateReading;
         }
         return kStateReadingComment;
     }
 
-    private DDLStatement getNextStatement(Reader reader, VoltCompiler compiler)
+    public static DDLStatement getNextStatement(Reader reader, VoltCompiler compiler, int currLineNo)
             throws VoltCompiler.VoltCompilerException {
 
         int state = kStateInvalid;
@@ -1056,7 +1009,6 @@ public class DDLCompiler {
         char[] nchar = new char[1];
         @SuppressWarnings("synthetic-access")
         DDLStatement retval = new DDLStatement();
-        retval.lineNo = m_currLineNo;
 
         try {
 
@@ -1069,7 +1021,7 @@ public class DDLCompiler {
 
                 // trim leading whitespace outside of a statement
                 if (nchar[0] == '\n') {
-                    m_currLineNo++;
+                    currLineNo++;
                 }
                 else if (nchar[0] == '\r') {
                 }
@@ -1087,7 +1039,7 @@ public class DDLCompiler {
                     }
                     if (nchar[0] != '-') {
                         String msg = "Invalid content before or between DDL statements.";
-                        throw compiler.new VoltCompilerException(msg, m_currLineNo);
+                        throw compiler.new VoltCompilerException(msg, currLineNo);
                     }
                     else {
                         do {
@@ -1098,7 +1050,7 @@ public class DDLCompiler {
                         } while (nchar[0] != '\n');
 
                         // process the newline and loop
-                        m_currLineNo++;
+                        currLineNo++;
                     }
                 }
 
@@ -1106,11 +1058,13 @@ public class DDLCompiler {
                 else {
                     retval.statement += nchar[0];
                     state = kStateReading;
-                    // Set the line number to the start of the real statement.
-                    retval.lineNo = m_currLineNo;
                     break;
                 }
             } while (true);
+
+            // Set the line number to the start of the real statement.
+            retval.lineNo = currLineNo;
+            retval.endLineNo = currLineNo;
 
             while (state != kStateCompleteStatement) {
                 if (reader.read(nchar) == -1) {
@@ -1218,8 +1172,10 @@ public class DDLCompiler {
             }
 
             if (subNode.name.equals("indexes")) {
-                // do non-system indexes first so they get priority when the compiler
-                // starts throwing out duplicate indexes
+
+                // Do the system indexes first, since we don't want to
+                // drop them: there are constraint objects in the catalog
+                // that refer to them.
                 for (VoltXMLElement indexNode : subNode.children) {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
@@ -1229,7 +1185,6 @@ public class DDLCompiler {
                     }
                 }
 
-                // now do system indexes
                 for (VoltXMLElement indexNode : subNode.children) {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
@@ -1238,6 +1193,7 @@ public class DDLCompiler {
                                 indexMap, columnMap, m_compiler);
                     }
                 }
+
             }
 
             if (subNode.name.equals("constraints")) {
@@ -1671,18 +1627,19 @@ public class DDLCompiler {
         index.setCountable(false);
         index.setIssafewithnonemptysources(! unsafeOps.isUnsafe());
 
-        String indexNameNoCase = name.toLowerCase();
-        // The index is a hash iff:
-        //   1. it does not have "tree" in the name, and
-        //   2. it does have "hash" in the name, and
-        //   3. it does not have an autogenerated name.
-        // We don't think about the column type here, but see
-        // below.
+        // Set the index type.  It will be one of:
+        // - Covering cell index (geo index for CONTAINS predicates)
+        // - HASH index (set in HSQL because "hash" is in the name of the
+        //   constraint or the index
+        // - TREE index, which is the default
+        boolean isHashIndex = node.attributes.get("ishashindex").equals("true");
         if (has_geo_col) {
             index.setType(IndexType.COVERING_CELL_INDEX.getValue());
         }
-        else if (( ! indexNameNoCase.contains("tree") ) && indexNameNoCase.contains("hash") &&
-                 ! indexNameNoCase.startsWith(HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX.toLowerCase())) {
+        else if (isHashIndex) {
+            // warn user that hash index will be deprecated
+            compiler.addWarn("Hash indexes are deprecated. In a future release, VoltDB will only support tree indexes, even if the index name contains the string \"hash\"");
+
             // If the column type is not an integer, we cannot
             // make the index a hash.
             if (has_nonint_col) {
@@ -1971,5 +1928,50 @@ public class DDLCompiler {
 
     public void processMaterializedViewWarnings(Database db) throws VoltCompilerException {
             m_mvProcessor.processMaterializedViewWarnings(db, m_matViewMap);
+    }
+
+    private void processVoltDBStatements(final Database db, final DdlProceduresToLoad whichProcs, DDLStatement stmt) throws VoltCompilerException {
+
+        boolean processed = false;
+
+        try {
+            // Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE,
+            // CREATE PROCEDURE, CREATE FUNCTION, and CREATE ROLE.
+            processed = m_voltStatementProcessor.process(stmt, db, whichProcs);
+        }
+        catch (VoltCompilerException e) {
+            // Reformat the message thrown by VoltDB DDL processing to have a line number.
+            String msg = "VoltDB DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
+            throw m_compiler.new VoltCompilerException(msg);
+        }
+
+        if (! processed) {
+            try {
+                //* enable to debug */ System.out.println("DEBUG: " + stmt.statement);
+                // kind of ugly.  We hex-encode each statement so we can
+                // avoid embedded newlines so we can delimit statements
+                // with newline.
+                m_fullDDL += Encoder.hexEncode(stmt.statement) + "\n";
+
+                // figure out what table this DDL might affect to minimize diff processing
+                HSQLDDLInfo ddlStmtInfo = HSQLLexer.preprocessHSQLDDL(stmt.statement);
+
+                // Get the diff that results from applying this statement and apply it
+                // to our local tree (with Volt-specific additions)
+                VoltXMLDiff thisStmtDiff = m_hsql.runDDLCommandAndDiff(ddlStmtInfo, stmt.statement);
+                // null diff means no change (usually drop if exists for non-existent thing)
+                if (thisStmtDiff != null) {
+                    applyDiff(thisStmtDiff);
+                }
+
+                // special treatment for stream syntax
+                if (ddlStmtInfo.creatStream) {
+                    processCreateStreamStatement(stmt, db, whichProcs);
+                }
+            } catch (HSQLParseException e) {
+                String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
+                throw m_compiler.new VoltCompilerException(msg, stmt.lineNo);
+            }
+        }
     }
 }

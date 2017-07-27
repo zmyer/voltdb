@@ -53,6 +53,8 @@ load classes sqlcmdtest-sabotaged-procs.jar;
 Command succeeded.
 
 --- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                    
+ sqlcmdtest.BoxedInsertEmployee        
  sqlcmdtest.Breakable0                 
  sqlcmdtest.Breakable1                 
  sqlcmdtest.Breakable2                 
@@ -138,6 +140,8 @@ Trivial
 
 
 --- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                    
+ sqlcmdtest.BoxedInsertEmployee        
  sqlcmdtest.Breakable0                 
  sqlcmdtest.Breakable1                 
  sqlcmdtest.Breakable2                 
@@ -152,9 +156,13 @@ Trivial
 
 exec Trivial;
 
+create procedure from class sqlcmdtest.BadSwap;
+
 remove classes sqlcmdtest.*;
 
 --- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                    
+ sqlcmdtest.BoxedInsertEmployee        
  sqlcmdtest.Breakable0                 
  sqlcmdtest.Breakable1                 
  sqlcmdtest.Breakable2                 
@@ -219,6 +227,8 @@ load classes sqlcmdtest-sabotaged-procs.jar;
 Command succeeded.
 
 --- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                    
+ sqlcmdtest.BoxedInsertEmployee        
  sqlcmdtest.Breakable0                 
  sqlcmdtest.Breakable1                 
  sqlcmdtest.Breakable2                 
@@ -270,6 +280,8 @@ Breakable0
 
 
 --- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                    
+ sqlcmdtest.BoxedInsertEmployee        
  sqlcmdtest.Breakable1                 
  sqlcmdtest.Breakable2                 
  sqlcmdtest.InsertEmployee             
@@ -346,6 +358,8 @@ load classes sqlcmdtest-sabotaged-procs.jar;
 Command succeeded.
 
 --- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                    
+ sqlcmdtest.BoxedInsertEmployee        
  sqlcmdtest.Breakable0                 
  sqlcmdtest.Breakable1                 
  sqlcmdtest.Breakable2                 
@@ -397,6 +411,8 @@ Breakable0
 
 
 --- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                    
+ sqlcmdtest.BoxedInsertEmployee        
  sqlcmdtest.Breakable1                 
  sqlcmdtest.Breakable2                 
  sqlcmdtest.InsertEmployee             
@@ -462,3 +478,24 @@ Command succeeded.
 --- Empty Class List -----------------------------------------
 
 
+
+create table swap1 (
+  id integer
+);
+Command succeeded.
+
+create table swap2 (
+  id integer
+);
+Command succeeded.
+
+create procedure badswap as @SwapTables swap2 swap1;
+
+drop table swap1 if exists;
+Command succeeded.
+
+drop table swap2 if exists;
+Command succeeded.
+
+drop table badswap if exists;
+Command succeeded.

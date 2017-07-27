@@ -46,7 +46,7 @@ CTX.CPPFLAGS += """-Wall -Wextra -Werror -Woverloaded-virtual
             -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK
             -fno-omit-frame-pointer
             -fvisibility=default
-            -DBOOST_SP_DISABLE_THREADS -DBOOST_DISABLE_THREADS -DBOOST_ALL_NO_LIB"""
+            -DBOOST_SP_DISABLE_THREADS -DBOOST_DISABLE_THREADS -DBOOST_ALL_NO_LIB -D_USE_MATH_DEFINES"""
 
 # clang doesn't seem to want this
 if CTX.compilerName() == 'gcc':
@@ -260,6 +260,7 @@ CTX.INPUT['common'] = """
  TupleSchema.cpp
  types.cpp
  UndoLog.cpp
+ LargeTempTableBlockCache.cpp
  NValue.cpp
  RecoveryProtoMessage.cpp
  RecoveryProtoMessageBuilder.cpp
@@ -377,6 +378,8 @@ CTX.INPUT['storage'] = """
  ElasticIndexReadContext.cpp
  ElasticScanner.cpp
  ExportTupleStream.cpp
+ LargeTempTable.cpp
+ LargeTempTableBlock.cpp
  MaterializedViewHandler.cpp
  MaterializedViewTriggerForInsert.cpp
  MaterializedViewTriggerForWrite.cpp
@@ -523,6 +526,7 @@ if whichtests in ("${eetestsuite}", "storage"):
      DRBinaryLog_test
      DRTupleStream_test
      ExportTupleStream_test
+     LargeTempTableTest
      PersistentTableMemStatsTest
      StreamedTable_test
      TempTableLimitsTest
