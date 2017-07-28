@@ -127,7 +127,6 @@ public class ConstraintFailureException extends SQLException {
             sb.append('\n');
             sb.append("Constraint Type ");
             sb.append(type);
-            sb.append(", Table CatalogId ");
             sb.append(", Constraint Name ");
             sb.append(Constraintname);
             sb.append(", Table Name ");
