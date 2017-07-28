@@ -26,7 +26,8 @@ ConstraintFailureException::ConstraintFailureException(
         Table *table,
         TableTuple tuple,
         TableTuple otherTuple,
-        ConstraintType type) :
+        ConstraintType type,
+        const std::string &name) :
     SQLException(
             SQLException::integrity_constraint_violation,
             "Attempted violation of constraint",
@@ -34,7 +35,8 @@ ConstraintFailureException::ConstraintFailureException(
     m_table(table),
     m_tuple(tuple),
     m_otherTuple(otherTuple),
-    m_type(type)
+    m_type(type),
+    m_name(name)
 {
     assert(table);
     assert(!tuple.isNullTuple());
@@ -43,7 +45,8 @@ ConstraintFailureException::ConstraintFailureException(
 ConstraintFailureException::ConstraintFailureException(
         Table *table,
         TableTuple tuple,
-        string message) :
+        string message,
+        const std::string &name) :
         SQLException(
                 SQLException::integrity_constraint_violation,
                 message,
@@ -51,7 +54,8 @@ ConstraintFailureException::ConstraintFailureException(
     m_table(table),
     m_tuple(tuple),
     m_otherTuple(TableTuple()),
-    m_type(CONSTRAINT_TYPE_PARTITIONING)
+    m_type(CONSTRAINT_TYPE_PARTITIONING),
+    m_name(name)
 {
     assert(table);
     assert(!tuple.isNullTuple());
@@ -61,6 +65,11 @@ void ConstraintFailureException::p_serialize(ReferenceSerializeOutput *output) c
     SQLException::p_serialize(output);
     output->writeInt(m_type);
     output->writeTextString(m_table->name());
+    if(m_name != ""){
+                   std::string SystemMessage = "VOLTDB_AUTOGEN_CONSTRAINT_IDX_" ;
+                   std::string Constraint_name = m_name.substr(SystemMessage.size(),m_name.size());
+                   output->writeTextString(Constraint_name);
+            }
     size_t tableSizePosition = output->reserveBytes(4);
     TableTuple tuples[] = { m_tuple, m_otherTuple };
     if (m_otherTuple.isNullTuple()) {
@@ -85,7 +94,12 @@ ConstraintFailureException::message() const
     msg.append(type_string);
     msg.append("\non table: ");
     msg.append(m_table->name());
-
+    if(m_name != ""){
+                       std::string SystemMessage = "VOLTDB_AUTOGEN_CONSTRAINT_IDX_" ;
+                       std::string Constraint_name = m_name.substr(SystemMessage.size(),m_name.size());
+                       msg.append("\nConstraint name: ");
+                       msg.append(Constraint_name);
+                }
     msg.append("\nNew tuple:\n\t");
     msg.append(m_tuple.debug(m_table->name()));
     if (!m_otherTuple.isNullTuple()) {

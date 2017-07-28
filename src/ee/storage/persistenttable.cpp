@@ -857,7 +857,12 @@ void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
         throw;
     }
     if (!conflict.isNullTuple()) {
-        throw ConstraintFailureException(this, source, conflict, CONSTRAINT_TYPE_UNIQUE);
+                 std::cout<<m_indexes.size();
+             char * name = nullptr;
+                 BOOST_FOREACH (auto index, m_indexes) {
+                     name = const_cast<char*>(index->getName().c_str());
+                 }
+        throw ConstraintFailureException(this, source, conflict, CONSTRAINT_TYPE_UNIQUE, name);
     }
 
     // this is skipped for inserts that are never expected to fail,

@@ -50,6 +50,14 @@ public class ConstraintFailureException extends SQLException {
             // failure, which would be a corruption/defect.
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
+        try {
+                Constraintname = FastDeserializer.readString(exceptionBuffer);
+        }
+            catch (IOException e) {
+                  // implies that the EE created an invalid constraint
+              // failure, which would be a corruption/defect.
+                  VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+        }
         if (exceptionBuffer.hasRemaining()) {
             int tableSize = exceptionBuffer.getInt();
             buffer = ByteBuffer.allocate(tableSize);
@@ -105,6 +113,11 @@ public class ConstraintFailureException extends SQLException {
      */
     private VoltTable table = null;
 
+    /**
+     * Name of constraint violation that caused this exception to be thrown
+     */
+    private String Constraintname = null;
+
     @Override
     public String getMessage() {
         if (buffer.capacity() == 0) {
@@ -115,6 +128,9 @@ public class ConstraintFailureException extends SQLException {
             sb.append("Constraint Type ");
             sb.append(type);
             sb.append(", Table CatalogId ");
+            sb.append(", Constraint Name ");
+            sb.append(Constraintname);
+            sb.append(", Table Name ");
             sb.append(tableName);
             sb.append('\n');
             sb.append("Relevant Tuples:\n");

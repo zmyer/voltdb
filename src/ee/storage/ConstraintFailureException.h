@@ -42,7 +42,7 @@ public:
      * @param otherTuple updated tuple values or a null tuple.
      * @param type Type of constraint that was violated
      */
-    ConstraintFailureException(Table *table, TableTuple tuple, TableTuple otherTuple, ConstraintType type);
+    ConstraintFailureException(Table *table, TableTuple tuple, TableTuple otherTuple, ConstraintType type, const std::string &name = "");
 
     /**
      * Special constructor for partitioning error CFEs only
@@ -51,7 +51,7 @@ public:
      * @param tuple Tuple that was being inserted or updated
      * @param message Description of the partitioning failure.
      */
-    ConstraintFailureException(Table *table, TableTuple tuple, std::string message);
+    ConstraintFailureException(Table *table, TableTuple tuple, std::string message, const std::string &name = "");
 
     virtual const std::string message() const;
     virtual ~ConstraintFailureException();
@@ -65,6 +65,7 @@ protected:
     TableTuple m_tuple;
     TableTuple m_otherTuple;
     ConstraintType m_type;
+    string m_name;
 };
 
 }
