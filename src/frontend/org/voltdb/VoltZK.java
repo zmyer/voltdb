@@ -351,7 +351,7 @@ public class VoltZK {
         } catch (KeeperException e) {
             if (e.code() != KeeperException.Code.NONODE) {
                 if (log != null) {
-                    log.error("Failed to remove catalog udpate blocker: " + e.getMessage(), e);
+                    log.error("Failed to remove catalog update blocker: " + e.getMessage(), e);
                 }
                 return false;
             }

@@ -66,6 +66,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         SET_DR_SEQUENCE_NUMBERS(2),
         SET_DR_PROTOCOL_VERSION(3),
         SP_JAVA_GET_DRID_TRACKER(4),
+        // TODO: remove or rename this taskType
         SET_DRID_TRACKER_START(5),
         GENERATE_DR_EVENT(6),
         RESET_DR_APPLIED_TRACKER(7),
