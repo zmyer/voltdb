@@ -437,12 +437,13 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
                                                                                             replacementTupleForInsert.get());
         bool replaced = useReplacementRow(retval);
         if (replaced) {
-            boost::scoped_ptr<TableIterator> iter = replacementTupleForInsert->makeIterator();
+            TableIterator* iter = replacementTupleForInsert->makeIterator();
             TableTuple tempTuple = drTable->tempTuple();
             iter->next(tempTuple);
-            newTuple = tempTuple;
+            newTuple = &tempTuple;
             NValue curr = newTuple->getHiddenNValue(drTable->getDRTimestampColumnIndex());
             ExecutorContext::setConflictFlagFromHiddenNValue(curr);
+            delete iter;
         }
         else if (deleteConflict == CONFLICT_EXPECTED_ROW_MISMATCH) {
             if (isApplyNewRow(retval)) {

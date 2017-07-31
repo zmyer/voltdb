@@ -452,7 +452,7 @@ public:
     bool isDREnabled() const { return m_drEnabled; }
 
     void setDRCustomResolverName(const std::string& resolverName) { m_drCustomResolverName = resolverName; }
-    std::string& getDRCustomResolverName() const { return m_drCustomResolverName; }
+    const std::string& getDRCustomResolverName() const { return m_drCustomResolverName; }
 
     /** Returns true if there is a hidden column in this table for the
         DR timestamp (used to resolve active/active conflicts) */

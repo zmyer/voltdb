@@ -129,6 +129,7 @@ PersistentTable::PersistentTable(int partitionColumn, char const* signature, boo
     m_tableForStreamIndexing(NULL),
     m_isMaterialized(isMaterialized),
     m_drEnabled(drEnabled),
+    m_drCustomResolverName(""),
     m_noAvailableUniqueIndex(false),
     m_smallestUniqueIndex(NULL),
     m_smallestUniqueIndexCrc(0),
@@ -136,8 +137,7 @@ PersistentTable::PersistentTable(int partitionColumn, char const* signature, boo
     m_pkeyIndex(NULL),
     m_mvHandler(NULL),
     m_deltaTable(NULL),
-    m_deltaTableActive(false),
-    m_drCustomResolverName("");
+    m_deltaTableActive(false)
 {
     // this happens here because m_data might not be initialized above
     m_iter.reset(m_data.begin());
