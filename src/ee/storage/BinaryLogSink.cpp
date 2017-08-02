@@ -441,7 +441,18 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
             TableTuple tempTuple = drTable->tempTuple();
             iter->next(tempTuple);
             newTuple = &tempTuple;
-            NValue curr = newTuple->getHiddenNValue(drTable->getDRTimestampColumnIndex());
+            // set timestamp of replacement row to be the later of expected and existing tuple
+            int timeStampIndex = drTable->getDRTimestampColumnIndex();
+            NValue existingTimeStamp = existingTuple->getHiddenNValue(timeStampIndex);
+            NValue expectedTimeStamp = expectedTuple->getHiddenNValue(timeStampIndex);
+            if (existingTimeStamp.op_greaterThan(expectedTimeStamp).isTrue()) {
+std::cout<<"use existing timestamp"<<std::endl;
+                newTuple->setHiddenNValue(timeStampIndex, existingTimeStamp);
+            } else {
+                newTuple->setHiddenNValue(timeStampIndex, expectedTimeStamp);
+std::cout<<"use expected timestamp"<<std::endl;
+            }	    
+            NValue curr = newTuple->getHiddenNValue(timeStampIndex);
             ExecutorContext::setConflictFlagFromHiddenNValue(curr);
             delete iter;
         }

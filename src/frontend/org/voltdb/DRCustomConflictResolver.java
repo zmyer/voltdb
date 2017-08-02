@@ -23,6 +23,8 @@ package org.voltdb;
  */
 public interface DRCustomConflictResolver extends DRConflictResolver {
 
+    static final String m_customConflictResolverPath = "org.voltdb.";
+
     /**
      * Indicates a binary log message from the remote cluster that is trying to update from an existing row that
      * a) cannot be found or has an unexpected timestamp, and/or
