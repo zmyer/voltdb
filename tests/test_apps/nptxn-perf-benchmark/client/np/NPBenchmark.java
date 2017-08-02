@@ -94,6 +94,9 @@ class NPBenchmark {
         @Option(desc = "Number of clients for the test")
         int clientscount = 30;
 
+        @Option(desc = "max tps allowed for a single client")
+        int maxclienttps = 1500;
+
         @Override
         public void validate() {
             if (sprate > 1 || sprate < 0) {
@@ -142,7 +145,7 @@ class NPBenchmark {
 
         for (int i = 0; i < config.clientscount; i++) {
             ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
-            clientConfig.setMaxTransactionsPerSecond(1500);
+            clientConfig.setMaxTransactionsPerSecond(config.maxclienttps);
 
             clients[i] = ClientFactory.createClient(clientConfig);
             periodicStatsContexts[i] = clients[i].createStatsContext();

@@ -106,12 +106,13 @@ function client() {
     init
     java -classpath $BENCHMARK_JAR_NAME:$CLIENTCLASSPATH np.NPBenchmark \
          --servers="$SERVERS" \
-         --sprate=0.9 \
-         --cardcount=500000 \
+         --sprate=0.0 \
+         --cardcount=10000 \
          --mprate=0.005 \
          --skew=0.0 \
          --duration=30 \
-         --clientscount=15
+         --clientscount=5 \
+         --maxclienttps=200
 }
 
 ###################
