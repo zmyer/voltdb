@@ -451,7 +451,7 @@ std::cout<<"use existing timestamp"<<std::endl;
             } else {
                 newTuple->setHiddenNValue(timeStampIndex, expectedTimeStamp);
 std::cout<<"use expected timestamp"<<std::endl;
-            }	    
+            }
             NValue curr = newTuple->getHiddenNValue(timeStampIndex);
             ExecutorContext::setConflictFlagFromHiddenNValue(curr);
             delete iter;
