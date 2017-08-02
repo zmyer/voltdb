@@ -92,7 +92,7 @@ class NPBenchmark {
         double skew = 0.2;
 
         @Option(desc = "Number of clients for the test")
-        int clientscount = 1;
+        int clientscount = 30;
 
         @Override
         public void validate() {
@@ -136,13 +136,14 @@ class NPBenchmark {
     public NPBenchmark(NPBenchmarkConfig config) {
         this.config = config;
 
-        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
-
         clients = new Client[config.clientscount];
         periodicStatsContexts = new ClientStatsContext[config.clientscount];
         fullStatsContexts = new ClientStatsContext[config.clientscount];
 
         for (int i = 0; i < config.clientscount; i++) {
+            ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+            clientConfig.setMaxTransactionsPerSecond(1500);
+
             clients[i] = ClientFactory.createClient(clientConfig);
             periodicStatsContexts[i] = clients[i].createStatsContext();
             fullStatsContexts[i] = clients[i].createStatsContext();
@@ -410,13 +411,14 @@ class NPBenchmark {
 
     public void initialize() throws Exception {
         System.out.println("Generating " + config.cardcount + " cards...");
+        int k = 0;
         for (int i = 0; i < config.cardcount; i++) {
             // generate a card
             String pan = generate16DString(i);
             Date now = new Date();
 
             // insert the card
-            clients[0].callProcedure(new ProcCallback("CARD_ACCOUNT.insert"),
+            clients[k++].callProcedure(new ProcCallback("CARD_ACCOUNT.insert"),
                                  "CARD_ACCOUNT.insert",
                                  pan,
                                  1, // ACTIVE
@@ -426,6 +428,8 @@ class NPBenchmark {
                                  "USD",
                                  now
                                  );
+            if (k == config.clientscount) { k = 0; }
+
             if (i % 50000 == 0)
                 System.out.println("  " + i);
 
@@ -436,57 +440,55 @@ class NPBenchmark {
     /**
      * Performs one iteration of the benchmark
      */
-    public void iterate() throws Exception {
+    public void iterate(int num) throws Exception {
         double count = ((double) config.cardcount) * (1.0 - config.skew);
         int offset = (int) (((double) config.cardcount) / 2.0 - count / 2.0);
 
-        for (int num = 0; num < config.clientscount; num++) {
-            // SP transaction
-            if (rand.nextDouble() < config.sprate) {
+        // SP transaction
+        if (rand.nextDouble() < config.sprate) {
+            String pan1 = generate16DString(rand.nextInt(config.cardcount));
+            String pan2 = generate16DString(rand.nextInt(config.cardcount));
+
+            clients[num].callProcedure(new ProcCallback("Authorize"),
+                                "Authorize",
+                                pan1,
+                                1,
+                                "USD"
+                                );
+            clients[num].callProcedure(new ProcCallback("Redeem"),
+                                "Redeem",
+                                pan2,
+                                1,
+                                "USD",
+                                1
+                                );
+        } else {
+            for (int i = 0; i < 2; i++) {
+                // 2P transaction
                 String pan1 = generate16DString(rand.nextInt(config.cardcount));
-                String pan2 = generate16DString(rand.nextInt(config.cardcount));
+                String pan2 = generate16DString(rand.nextInt((int) count) + offset);    // a smaller range of entities
 
-                clients[num].callProcedure(new ProcCallback("Authorize"),
-                                    "Authorize",
-                                    pan1,
-                                    1,
-                                    "USD"
-                                    );
-                clients[num].callProcedure(new ProcCallback("Redeem"),
-                                    "Redeem",
-                                    pan2,
-                                    1,
-                                    "USD",
-                                    1
-                                    );
-            } else {
-                for (int i = 0; i < 2; i++) {
-                    // 2P transaction
-                    String pan1 = generate16DString(rand.nextInt(config.cardcount));
-                    String pan2 = generate16DString(rand.nextInt((int) count) + offset);    // a smaller range of entities
+                clients[num].callProcedure(new ProcCallback("Transfer",10000),
+                                        "Transfer",
+                                        pan1,
+                                        pan2,
+                                        rand.nextDouble() < 0.5 ? -1 : 1,   // random transfer direction
+                                        "USD"
+                                        );
 
-                    clients[num].callProcedure(new ProcCallback("Transfer",10000),
-                                            "Transfer",
-                                            pan1,
-                                            pan2,
-                                            rand.nextDouble() < 0.5 ? -1 : 1,   // random transfer direction
-                                            "USD"
-                                            );
+                if (rand.nextDouble() < config.mprate) {
+                    // MP transaction
+                    int id1 = rand.nextInt(config.cardcount);
+                    int id2 = id1 + 2000 < config.cardcount ?
+                            id1 + 2000 : config.cardcount - 1;
 
-                    if (rand.nextDouble() < config.mprate) {
-                        // MP transaction
-                        int id1 = rand.nextInt(config.cardcount);
-                        int id2 = id1 + 2000 < config.cardcount ?
-                                id1 + 2000 : config.cardcount - 1;
+                    pan1 = generate16DString(id1);
+                    pan2 = generate16DString(id2);
 
-                        pan1 = generate16DString(id1);
-                        pan2 = generate16DString(id2);
-
-                        clients[num].callProcedure(new ProcCallback("Select"),
-                                            "Select",
-                                            pan1,
-                                            pan2);
-                    }
+                    clients[num].callProcedure(new ProcCallback("Select"),
+                                        "Select",
+                                        pan1,
+                                        pan2);
                 }
             }
         }
@@ -514,12 +516,19 @@ class NPBenchmark {
         System.out.println("Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
 
+        for (Client client : clients) {
+            client.drain();
+        }
+
         // Run the benchmark loop for the requested warmup time
         // The throughput may be throttled depending on client configuration
         System.out.println("Warming up for "+ config.warmup +" seconds...");
         final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
+        int k = 0;
         while (warmupEndTime > System.currentTimeMillis()) {
-            iterate();
+            iterate(k++);
+
+            if (k >= config.clientscount) { k = 0; }
         }
 
         // reset the stats after warmup
@@ -530,18 +539,21 @@ class NPBenchmark {
 
         // print periodic statistics to the console
         benchmarkStartTS = System.currentTimeMillis();
-        schedulePeriodicStats();
+        // schedulePeriodicStats();
 
         // Run the benchmark loop for the requested duration
         // The throughput may be throttled depending on client configuration
         System.out.println("\nRunning benchmark...");
         final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
+        k = 0;
         while (benchmarkEndTime > System.currentTimeMillis()) {
-            iterate();
+            iterate(k++);   // simple round-robin scheduling
+
+            if (k >= config.clientscount) { k = 0; }
         }
 
         // cancel periodic stats printing
-        timer.cancel();
+        // timer.cancel();
 
         // block until all outstanding txns return
         for (int i = 0; i < config.clientscount; i++) {
