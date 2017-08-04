@@ -416,6 +416,7 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
                                                                                       newTupleTableForInsert.get());
     }
     else {
+std::cout<<"before calling java, timestamp="<<ExecutorContext::getDRTimestampFromHiddenNValue(newTuple->getHiddenNValue(drTable->getDRTimestampColumnIndex()))<<std::endl;
         boost::shared_ptr<TempTable> replacementTupleForInsert;
         replacementTupleForInsert.reset(TableFactory::buildCopiedTempTable(NEW_TABLE, drTable, NULL));
         retval = ExecutorContext::getExecutorContext()->getTopend()->reportCustomDRConflict(engine->getPartitionId(),
