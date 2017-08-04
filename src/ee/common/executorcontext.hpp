@@ -171,14 +171,16 @@ class ExecutorContext {
         return static_cast<int64_t>(hiddenValue & (1UL << 63));
     }
 
-    static void setConflictFlagFromHiddenNValue(const NValue &value) {
+    static void setConflictFlagFromHiddenNValue(TableTuple *tuple, const NValue &value, int timeStampIndex) {
         int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
         hiddenValue |= (1UL << 63);
+tuple->setHiddenNValue(timeStampIndex, ValueFactory::getBigIntValue(hiddenValue));
     }
 
-    static void resetConflictFlagFromHiddenNValue(const NValue &value) {
+    static void resetConflictFlagFromHiddenNValue(TableTuple *tuple, const NValue &value, int timeStampIndex) {
         int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
         hiddenValue &= 0x7FFFFFFFFFFFFFFF;
+tuple->setHiddenNValue(timeStampIndex, ValueFactory::getBigIntValue(hiddenValue));
     }
 
     static bool isRowInConflictFromHiddenNValue(const NValue &value) {

@@ -612,7 +612,7 @@ static boost::shared_array<char> preallocateDirectByteBufferForOneRow(JNIEnv *jn
         size_t serializeSize = table->getAccurateSizeToSerialize();
         serializeSize += sizeof(int32_t);
         serializeSize += table->schema()->getMaxSerializedTupleSize(true);
-        boost::shared_array<char> backingArray(new char[serializeSize]);
+        boost::shared_array<char> backingArray(new char[serializeSize]());
         ReferenceSerializeOutput conflictSerializeOutput(backingArray.get(), serializeSize);
         table->serializeColumnHeaderTo(conflictSerializeOutput);
         byteBuffer = jniEngine->NewDirectByteBuffer(static_cast<void*>(backingArray.get()),
