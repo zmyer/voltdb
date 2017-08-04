@@ -171,6 +171,7 @@ class ExecutorContext {
         return static_cast<int64_t>(hiddenValue & (1UL << 63));
     }
 
+
     static void setConflictFlagFromHiddenNValue(TableTuple *tuple, const NValue &value, int timeStampIndex) {
         int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
         hiddenValue |= (1UL << 63);
