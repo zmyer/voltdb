@@ -436,12 +436,19 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
                                                                                             newTupleTableForInsert.get(),
                                                                                             replacementTupleForInsert.get());
 //if (retval != 7) std::cout<<"returned value = "<<retval<<std::endl;
+
+
+
+//std::cout<<"newTimeStamp after java returned value ="<<ExecutorContext::getDRTimestampFromHiddenNValue(newTuple->getHiddenNValue(drTable->getDRTimestampColumnIndex()))<<std::endl;
+
+
         bool replaced = useReplacementRow(retval);
         if (replaced) {
             TableIterator* iter = replacementTupleForInsert->makeIterator();
             TableTuple tempTuple = drTable->tempTuple();
             iter->next(tempTuple);
-            newTuple = &tempTuple;
+            //newTuple = &tempTuple;
+
             // set timestamp of replacement row to be the later of expected and existing tuple
             int timeStampIndex = drTable->getDRTimestampColumnIndex();
 
@@ -462,19 +469,23 @@ std::cout<<"conflict flag not set in existing time stamp"<<std::endl;
 
 NValue existingTimeStamp = existingTuple->getHiddenNValue(timeStampIndex);
 int64_t existingTimeStampNoFlag = ExecutorContext::getDRTimestampFromHiddenNValue(existingTimeStamp);//ExecutorContext::getTimeStampWithoutConflictFlagFromHiddenNValue(existingTimeStamp);
-//std::cout<<"existingTimeStamp="<<existingTimeStampNoFlag<<std::endl;
+std::cout<<"existingTimeStamp="<<existingTimeStampNoFlag<<std::endl;
             NValue newTimeStamp = newTuple->getHiddenNValue(timeStampIndex);
 int64_t newTimeStampNoFlag = ExecutorContext::getDRTimestampFromHiddenNValue(newTimeStamp);//ExecutorContext::getTimeStampWithoutConflictFlagFromHiddenNValue(expectedTimeStamp);
-//std::cout<<"newTimeStamp="<<expectedTimeStampNoFlag<<std::endl;
+std::cout<<"newTimeStamp="<<newTimeStampNoFlag<<std::endl;
+
+            newTuple = &tempTuple;
             if (existingTimeStampNoFlag > newTimeStampNoFlag) {
 std::cout<<"use existing timestamp"<<std::endl;
                 newTuple->setHiddenNValue(timeStampIndex, existingTimeStamp);
             } else {
-                //newTuple->setHiddenNValue(timeStampIndex, expectedTimeStamp);
+                newTuple->setHiddenNValue(timeStampIndex, newTimeStamp);
 std::cout<<"use new timestamp"<<std::endl;
             }
-            NValue curr = newTuple->getHiddenNValue(timeStampIndex);
-            ExecutorContext::setConflictFlagFromHiddenNValue(newTuple, curr, timeStampIndex);
+            
+std::cout<<"after resolving, timestamp="<<ExecutorContext::getDRTimestampFromHiddenNValue(newTuple->getHiddenNValue(drTable->getDRTimestampColumnIndex()))<<std::endl;
+
+            ExecutorContext::setConflictFlagFromHiddenNValue(newTuple, timeStampIndex);
 
 /*if (needReset) {
 ExecutorContext::setConflictFlagFromHiddenNValue(existingTuple, existingTimeStamp, timeStampIndex);
@@ -485,12 +496,10 @@ ExecutorContext::setConflictFlagFromHiddenNValue(existingTuple, existingTimeStam
         else if (deleteConflict == CONFLICT_EXPECTED_ROW_MISMATCH) {
             if (isApplyNewRow(retval)) {
                 // new tuple should not have the conflict bit set
-                NValue curr = newTuple->getHiddenNValue(drTable->getDRTimestampColumnIndex());
-                ExecutorContext::resetConflictFlagFromHiddenNValue(newTuple, curr, drTable->getDRTimestampColumnIndex());
+                ExecutorContext::resetConflictFlagFromHiddenNValue(newTuple, drTable->getDRTimestampColumnIndex());
             }
             else {
-                NValue curr = existingTuple->getHiddenNValue(drTable->getDRTimestampColumnIndex());
-                ExecutorContext::resetConflictFlagFromHiddenNValue(newTuple, curr, drTable->getDRTimestampColumnIndex());
+                ExecutorContext::resetConflictFlagFromHiddenNValue(newTuple, drTable->getDRTimestampColumnIndex());
             }
         }
     }
