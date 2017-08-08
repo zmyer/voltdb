@@ -724,13 +724,13 @@ void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tu
     NValue curr = tuple.getHiddenNValue(getDRTimestampColumnIndex());
     if (update || curr.isNull()) {
         int64_t drTimestamp;
-        if (update) {
-            drTimestamp = ec->currentDRTimestamp() |
-                    ExecutorContext::getConflictFlagFromHiddenNValue(curr);
-        }
-        else {
+//        if (update) {
+//            drTimestamp = ec->currentDRTimestamp() |
+//                    ExecutorContext::getConflictFlagFromHiddenNValue(curr);
+//        }
+//        else {
             drTimestamp = ec->currentDRTimestamp();
-        }
+//        }
         tuple.setHiddenNValue(getDRTimestampColumnIndex(), ValueFactory::getBigIntValue(drTimestamp));
     }
 }
@@ -981,6 +981,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     // Write to the DR stream before doing anything else to ensure we don't
     // leave a half updated tuple behind in case this throws.
     ExecutorContext* ec = ExecutorContext::getExecutorContext();
+int32_t clusterId = ec->drClusterId();
     if (hasDRTimestampColumn() && updateDRTimestamp) {
         setDRTimestampForTuple(ec, sourceTupleWithNewValues, true);
     }
@@ -1073,6 +1074,23 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     std::vector<char*> oldObjects;
     std::vector<char*> newObjects;
 
+if (hasDRTimestampColumn() && updateDRTimestamp) {
+int16_t clusterIdFromTuple = ExecutorContext::getClusterIdFromHiddenNValue(sourceTupleWithNewValues.getHiddenNValue(m_drTimestampColumnIndex));
+if (clusterIdFromTuple - clusterId == 0) {
+if (targetTupleToUpdate.getNValue(0).toString().compare("3") == 0) {
+std::cout<<"local update! Reset conflict bit"<<std::endl;
+}
+ExecutorContext::resetConflictFlagFromHiddenNValue(&sourceTupleWithNewValues, m_drTimestampColumnIndex);
+} 
+}
+
+/*if (targetTupleToUpdate.getNValue(0).toString().compare("3") == 0) {
+std::cout<<"is conflict bit set? "
+<<(ExecutorContext::getConflictFlagFromHiddenNValue(sourceTupleWithNewValues.getHiddenNValue(m_drTimestampColumnIndex)) != 0)
+<<", cluster ID: "<<static_cast<int16_t>(ExecutorContext::getClusterIdFromHiddenNValue(sourceTupleWithNewValues.getHiddenNValue(m_drTimestampColumnIndex)))
+<<", local cluster ID:"<<clusterId
+<<std::endl;
+}*/
     // this is the actual write of the new values
     targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
 

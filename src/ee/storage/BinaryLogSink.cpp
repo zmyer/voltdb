@@ -476,10 +476,12 @@ ExecutorContext::setConflictFlagFromHiddenNValue(newTuple, timeStampIndex);
         else if (deleteConflict == CONFLICT_EXPECTED_ROW_MISMATCH) {
             if (isApplyNewRow(retval)) {
                 // new tuple should not have the conflict bit set
+std::cout<<"use new row and reset bit"<<std::endl;
                 ExecutorContext::resetConflictFlagFromHiddenNValue(newTuple, drTable->getDRTimestampColumnIndex());
             }
             else {
-                ExecutorContext::resetConflictFlagFromHiddenNValue(newTuple, drTable->getDRTimestampColumnIndex());
+std::cout<<"use existing row and reset bit"<<std::endl;
+                ExecutorContext::resetConflictFlagFromHiddenNValue(existingTuple, drTable->getDRTimestampColumnIndex());
             }
         }
     }
@@ -517,7 +519,6 @@ ExecutorContext::setConflictFlagFromHiddenNValue(newTuple, timeStampIndex);
             }
         }
         if (newTuple) {
-//std::cout<<"now insert replacement row"<<std::endl;
             drTable->insertPersistentTuple(*newTuple, true, true);
         }
     }
