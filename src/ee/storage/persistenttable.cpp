@@ -1081,7 +1081,7 @@ if (targetTupleToUpdate.getNValue(0).toString().compare("3") == 0) {
 std::cout<<"local update! Reset conflict bit"<<std::endl;
 }
 ExecutorContext::resetConflictFlagFromHiddenNValue(&sourceTupleWithNewValues, m_drTimestampColumnIndex);
-} 
+}
 }
 
 /*if (targetTupleToUpdate.getNValue(0).toString().compare("3") == 0) {
