@@ -137,6 +137,12 @@ public:
             DRConflictType insertConflict, Table *existingMetaTableForInsert, Table *existingTupleTableForInsert,
             Table *newMetaTableForInsert, Table *newTupleTableForInsert);
 
+int reportCustomDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, std::string customResolverNameString, DRRecordType action,
+            DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
+            Table *expectedMetaTableForDelete, Table *expectedTupleTableForDelete,
+            DRConflictType insertConflict, Table *existingMetaTableForInsert, Table *existingTupleTableForInsert,
+            Table *newMetaTableForInsert, Table *newTupleTableForInsert, Table *replacementTupleForInsert);
+
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
 
     std::string decodeBase64AndDecompress(const std::string& buffer);
