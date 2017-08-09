@@ -461,7 +461,7 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
             ExecutorContext::setConflictFlagFromHiddenNValue(newTuple, timeStampIndex);
             delete iter;
         }
-        else if (deleteConflict == CONFLICT_EXPECTED_ROW_MISMATCH) {
+        /*else if (deleteConflict == CONFLICT_EXPECTED_ROW_MISMATCH) {
             if (isApplyNewRow(retval)) {
                 // new tuple should not have the conflict bit set
                 ExecutorContext::resetConflictFlagFromHiddenNValue(newTuple, drTable->getDRTimestampColumnIndex());
@@ -469,7 +469,7 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
             else {
                 ExecutorContext::resetConflictFlagFromHiddenNValue(existingTuple, drTable->getDRTimestampColumnIndex());
             }
-        }
+        }*/
     }
 
     bool applyRemoteChange = isApplyNewRow(retval);
