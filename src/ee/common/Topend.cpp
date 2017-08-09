@@ -140,6 +140,57 @@ namespace voltdb {
         return 2; /*resolved but not apply remote change*/
     }
 
+int DummyTopend::reportCustomDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, std::string customResolverNameString, DRRecordType action,
+            DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
+            Table *expectedMetaTableForDelete, Table *expectedTupleTableForDelete,
+            DRConflictType insertConflict, Table *existingMetaTableForInsert, Table *existingTupleTableForInsert,
+            Table *newMetaTableForInsert, Table *newTupleTableForInsert, Table *replacementTupleForInsert) {
+        this->actionType = action;
+        this->deleteConflictType = deleteConflict;
+        this->insertConflictType = insertConflict;
+        this->remoteClusterId = remoteClusterId;
+        this->remoteTimestamp = remoteTimestamp;
+        char signature[20];
+
+        if (existingMetaTableForDelete) {
+            this->existingMetaRowsForDelete = boost::shared_ptr<Table>(copyTable("existingMeta",
+                                                                                 existingMetaTableForDelete,
+                                                                                 signature));
+            this->existingTupleRowsForDelete = boost::shared_ptr<Table>(copyTable("existing",
+                                                                                  existingTupleTableForDelete,
+                                                                                  signature));
+        }
+
+        if (expectedMetaTableForDelete) {
+            this->expectedMetaRowsForDelete = boost::shared_ptr<Table>(copyTable("expectedMeta",
+                                                                                 expectedMetaTableForDelete,
+                                                                                 signature));
+            this->expectedTupleRowsForDelete = boost::shared_ptr<Table>(copyTable("expected",
+                                                                                  expectedTupleTableForDelete,
+                                                                                  signature));
+        }
+
+        if (existingMetaTableForInsert) {
+            this->existingMetaRowsForInsert = boost::shared_ptr<Table>(copyTable("existingMeta",
+                                                                                 existingMetaTableForInsert,
+                                                                                 signature));
+            this->existingTupleRowsForInsert = boost::shared_ptr<Table>(copyTable("existing",
+                                                                                  existingTupleTableForInsert,
+                                                                                  signature));
+        }
+
+        if (newMetaTableForInsert) {
+            this->newMetaRowsForInsert = boost::shared_ptr<Table>(copyTable("newMeta",
+                                                                            newMetaTableForInsert,
+                                                                            signature));
+            this->newTupleRowsForInsert = boost::shared_ptr<Table>(copyTable("new",
+                                                                             newTupleTableForInsert,
+                                                                             signature));
+        }
+
+        return 2; /*resolved but not apply remote change*/
+    }
+
     void DummyTopend::fallbackToEEAllocatedBuffer(char *buffer, size_t length) {}
 
     std::string DummyTopend::decodeBase64AndDecompress(const std::string& buffer) {
