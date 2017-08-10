@@ -983,7 +983,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     // leave a half updated tuple behind in case this throws.
     ExecutorContext* ec = ExecutorContext::getExecutorContext();
     // Retrieve local cluster ID
-    int32_t clusterId = ec->drClusterId();
+//    int32_t clusterId = ec->drClusterId();
 
     if (hasDRTimestampColumn() && updateDRTimestamp) {
         setDRTimestampForTuple(ec, sourceTupleWithNewValues, true);
