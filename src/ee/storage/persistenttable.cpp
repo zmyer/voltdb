@@ -1083,9 +1083,9 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     if (hasDRTimestampColumn() && updateDRTimestamp) {
         // remote cluster ID
         int16_t clusterIdFromTuple = ExecutorContext::getClusterIdFromHiddenNValue(sourceTupleWithNewValues.getHiddenNValue(m_drTimestampColumnIndex));
-        if (clusterIdFromTuple - clusterId == 0) {
-            ExecutorContext::resetConflictFlagFromHiddenNValue(&sourceTupleWithNewValues, m_drTimestampColumnIndex);
-        }
+//        if (clusterIdFromTuple - clusterId == 0) {
+//            ExecutorContext::resetConflictFlagFromHiddenNValue(&sourceTupleWithNewValues, m_drTimestampColumnIndex);
+//        }
      }
 
     // this is the actual write of the new values
