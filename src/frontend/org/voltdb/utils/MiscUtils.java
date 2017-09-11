@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -41,12 +41,14 @@ import java.util.regex.Pattern;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.ReplicationRole;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.licensetool.LicenseException;
 
@@ -135,7 +137,17 @@ public class MiscUtils {
                 }
 
                 @Override
-                public boolean isTrial() {
+                public boolean isAnyKindOfTrial() {
+                    return false;
+                }
+
+                @Override
+                public boolean isProTrial() {
+                    return false;
+                }
+
+                @Override
+                public boolean isEnterpriseTrial() {
                     return false;
                 }
 
@@ -308,7 +320,7 @@ public class MiscUtils {
      * @return true if the licensing constraints are met
      */
     public static boolean validateLicense(LicenseApi licenseApi,
-            int numberOfNodes, ReplicationRole replicationRole)
+                                          int numberOfNodes, DrRoleType replicationRole)
     {
         // Delay the handling of an invalid license file until here so
         // that the leader can terminate the full cluster.
@@ -328,12 +340,12 @@ public class MiscUtils {
         boolean valid = true;
 
         // make it really expire tomorrow to deal with timezone whiners
-        Calendar tomorrow = GregorianCalendar.getInstance();
-        tomorrow.add(Calendar.DATE, 1);
+        Calendar yesterday = GregorianCalendar.getInstance();
+        yesterday.add(Calendar.DATE, -1);
 
-        if (tomorrow.after(licenseApi.expires())) {
+        if (yesterday.after(licenseApi.expires())) {
             if (licenseApi.hardExpiration()) {
-                if (licenseApi.isTrial()) {
+                if (licenseApi.isAnyKindOfTrial()) {
                     hostLog.fatal("VoltDB trial license expired on " + expiresStr + ".");
                 }
                 else {
@@ -350,9 +362,14 @@ public class MiscUtils {
         }
 
         // enforce DR replication constraint
-        if (replicationRole == ReplicationRole.REPLICA) {
-            if (licenseApi.isDrReplicationAllowed() == false) {
+        if (licenseApi.isDrReplicationAllowed() == false) {
+            if (replicationRole != DrRoleType.NONE) {
                 hostLog.fatal("Warning, VoltDB license does not allow use of DR replication.");
+                return false;
+            }
+        } else if (licenseApi.isDrActiveActiveAllowed() == false) {
+            if (replicationRole == DrRoleType.XDCR) {
+                hostLog.fatal("Warning, VoltDB license does not allow use of XDCR.");
                 return false;
             }
         }
@@ -385,7 +402,7 @@ public class MiscUtils {
         long diffDays = diff / (24 * 60 * 60 * 1000);
 
         // print out trial success message
-        if (licenseApi.isTrial()) {
+        if (licenseApi.isAnyKindOfTrial()) {
             consoleLog.info("Starting VoltDB with trial license. License expires on " + expiresStr + " (" + diffDays + " days remaining).");
             return true;
         }
@@ -983,5 +1000,25 @@ public class MiscUtils {
             assert this.value != null;
             return this.value;
         }
+    }
+
+    public static String hsIdTxnIdToString(long hsId, long txnId) {
+        final StringBuilder sb = new StringBuilder();
+        CoreUtils.hsIdToString(hsId, sb);
+        sb.append(" ");
+        TxnEgo.txnIdToString(txnId, sb);
+        return sb.toString();
+    }
+
+    public static String hsIdPairTxnIdToString(final long srcHsId, final long destHsId,
+                                               final long txnId, final long uniqID) {
+        final StringBuilder sb = new StringBuilder(32);
+        CoreUtils.hsIdToString(srcHsId, sb);
+        sb.append("->");
+        CoreUtils.hsIdToString(destHsId, sb);
+        sb.append(" ");
+        TxnEgo.txnIdToString(txnId, sb);
+        sb.append(" ").append(uniqID);
+        return sb.toString();
     }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -40,7 +40,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  *//* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -82,12 +82,13 @@ import org.voltdb.sqlparser.syntax.SQLKind;
 
 import org.voltdb.sqlparser.assertions.semantics.VoltXMLElementAssert.IDTable;
 import static org.voltdb.sqlparser.assertions.semantics.VoltXMLElementAssert.*;
+import org.voltdb.planner.ParameterizationInfo;
 
 public class TestTableCreation {
     HSQLInterface m_HSQLInterface = null;
     String        m_schema = null;
     public TestTableCreation() {
-        m_HSQLInterface = HSQLInterface.loadHsqldb();
+        m_HSQLInterface = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
     }
     /**
      * Test TINYINT type.
@@ -127,7 +128,8 @@ public class TestTableCreation {
     //....|....|...ELEMENT: index
     //....|....|.....assumeunique = false
     //....|....|.....columns =
-    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....ishashindex = false
+    //....|....|.....name = SYS_IDX_10002
     //....|....|.....unique = true
     //....|....ELEMENT: constraints
     //....|....|.name = constraints
@@ -136,6 +138,7 @@ public class TestTableCreation {
     //....|....|.....assumeunique = false
     //....|....|.....constrainttype = NOT_NULL
     //....|....|.....name = SYS_CT_10001
+    //....|....|.....nameisauto = true
     //....|....|.....rowslimit = 2147483647
     //
     //
@@ -145,7 +148,7 @@ public class TestTableCreation {
     public void testCreateTableTinyInt() throws Exception {
         String ddl    = "create table alpha ( id TiNyInT not null, beta TINYINT)";
         IDTable idTable = new IDTable();
-        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        HSQLInterface hif = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
         VoltXMLElement element = hif.getVoltCatalogXML(null);
         assertThat(element)
@@ -171,9 +174,16 @@ public class TestTableCreation {
                             withAttribute(17, "size", "3"),
                             withAttribute(18, "valuetype", "TINYINT"))),
                     withChildNamed(19, "indexes",
-                        withAttribute(20, "name", "indexes")),
-                    withChildNamed(21, "constraints",
-                        withAttribute(22, "name", "constraints"))));
+                        withAttribute(20, "name", "indexes"),
+                        withChildNamed(21, "index",
+                                       "name", "SYS_IDX_10002",
+                            withAttribute(22, "assumeunique", "false"),
+                            withAttribute(23, "columns", ""),
+                            withAttribute(24, "ishashindex", "false"),
+                            withAttribute(25, "name", "SYS_IDX_10002"),
+                            withAttribute(26, "unique", "true"))),
+                    withChildNamed(27, "constraints",
+                        withAttribute(28, "name", "constraints"))));
     }
     /**
      * Test SMALLINT type.
@@ -213,7 +223,8 @@ public class TestTableCreation {
     //....|....|...ELEMENT: index
     //....|....|.....assumeunique = false
     //....|....|.....columns =
-    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....ishashindex = false
+    //....|....|.....name = SYS_IDX_10002
     //....|....|.....unique = true
     //....|....ELEMENT: constraints
     //....|....|.name = constraints
@@ -222,6 +233,7 @@ public class TestTableCreation {
     //....|....|.....assumeunique = false
     //....|....|.....constrainttype = NOT_NULL
     //....|....|.....name = SYS_CT_10001
+    //....|....|.....nameisauto = true
     //....|....|.....rowslimit = 2147483647
     //
     //
@@ -231,7 +243,7 @@ public class TestTableCreation {
     public void testCreateTableSmallInt() throws Exception {
         String ddl    = "create table alpha ( id SmallInt not null, beta SMALLINT)";
         IDTable idTable = new IDTable();
-        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        HSQLInterface hif = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
         VoltXMLElement element = hif.getVoltCatalogXML(null);
         assertThat(element)
@@ -257,9 +269,16 @@ public class TestTableCreation {
                             withAttribute(17, "size", "5"),
                             withAttribute(18, "valuetype", "SMALLINT"))),
                     withChildNamed(19, "indexes",
-                        withAttribute(20, "name", "indexes")),
-                    withChildNamed(21, "constraints",
-                        withAttribute(22, "name", "constraints"))));
+                        withAttribute(20, "name", "indexes"),
+                        withChildNamed(21, "index",
+                                       "name", "SYS_IDX_10002",
+                            withAttribute(22, "assumeunique", "false"),
+                            withAttribute(23, "columns", ""),
+                            withAttribute(24, "ishashindex", "false"),
+                            withAttribute(25, "name", "SYS_IDX_10002"),
+                            withAttribute(26, "unique", "true"))),
+                    withChildNamed(27, "constraints",
+                        withAttribute(28, "name", "constraints"))));
     }
     /**
      * Test INTEGER type.
@@ -299,7 +318,8 @@ public class TestTableCreation {
     //....|....|...ELEMENT: index
     //....|....|.....assumeunique = false
     //....|....|.....columns =
-    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....ishashindex = false
+    //....|....|.....name = SYS_IDX_10002
     //....|....|.....unique = true
     //....|....ELEMENT: constraints
     //....|....|.name = constraints
@@ -308,6 +328,7 @@ public class TestTableCreation {
     //....|....|.....assumeunique = false
     //....|....|.....constrainttype = NOT_NULL
     //....|....|.....name = SYS_CT_10001
+    //....|....|.....nameisauto = true
     //....|....|.....rowslimit = 2147483647
     //
     //
@@ -317,7 +338,7 @@ public class TestTableCreation {
     public void testCreateTableInteger() throws Exception {
         String ddl    = "create table alpha ( id integer not null, beta integer)";
         IDTable idTable = new IDTable();
-        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        HSQLInterface hif = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
         VoltXMLElement element = hif.getVoltCatalogXML(null);
         assertThat(element)
@@ -343,9 +364,16 @@ public class TestTableCreation {
                             withAttribute(17, "size", "10"),
                             withAttribute(18, "valuetype", "INTEGER"))),
                     withChildNamed(19, "indexes",
-                        withAttribute(20, "name", "indexes")),
-                    withChildNamed(21, "constraints",
-                        withAttribute(22, "name", "constraints"))));
+                        withAttribute(20, "name", "indexes"),
+                        withChildNamed(21, "index",
+                                       "name", "SYS_IDX_10002",
+                            withAttribute(22, "assumeunique", "false"),
+                            withAttribute(23, "columns", ""),
+                            withAttribute(24, "ishashindex", "false"),
+                            withAttribute(25, "name", "SYS_IDX_10002"),
+                            withAttribute(26, "unique", "true"))),
+                    withChildNamed(27, "constraints",
+                        withAttribute(28, "name", "constraints"))));
     }
     /**
      * Test BIGINT type.
@@ -385,7 +413,8 @@ public class TestTableCreation {
     //....|....|...ELEMENT: index
     //....|....|.....assumeunique = false
     //....|....|.....columns =
-    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....ishashindex = false
+    //....|....|.....name = SYS_IDX_10002
     //....|....|.....unique = true
     //....|....ELEMENT: constraints
     //....|....|.name = constraints
@@ -394,6 +423,7 @@ public class TestTableCreation {
     //....|....|.....assumeunique = false
     //....|....|.....constrainttype = NOT_NULL
     //....|....|.....name = SYS_CT_10001
+    //....|....|.....nameisauto = true
     //....|....|.....rowslimit = 2147483647
     //
     //
@@ -403,7 +433,7 @@ public class TestTableCreation {
     public void testCreateTableBigInt() throws Exception {
         String ddl    = "create table alpha ( id BiGiNt not null, beta bIgInT)";
         IDTable idTable = new IDTable();
-        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        HSQLInterface hif = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
         VoltXMLElement element = hif.getVoltCatalogXML(null);
         assertThat(element)
@@ -429,9 +459,16 @@ public class TestTableCreation {
                             withAttribute(17, "size", "19"),
                             withAttribute(18, "valuetype", "BIGINT"))),
                     withChildNamed(19, "indexes",
-                        withAttribute(20, "name", "indexes")),
-                    withChildNamed(21, "constraints",
-                        withAttribute(22, "name", "constraints"))));
+                        withAttribute(20, "name", "indexes"),
+                        withChildNamed(21, "index",
+                                       "name", "SYS_IDX_10002",
+                            withAttribute(22, "assumeunique", "false"),
+                            withAttribute(23, "columns", ""),
+                            withAttribute(24, "ishashindex", "false"),
+                            withAttribute(25, "name", "SYS_IDX_10002"),
+                            withAttribute(26, "unique", "true"))),
+                    withChildNamed(27, "constraints",
+                        withAttribute(28, "name", "constraints"))));
     }
     /**
      * Test DECIMAL type, default scale and precision.
@@ -471,7 +508,8 @@ public class TestTableCreation {
     //....|....|...ELEMENT: index
     //....|....|.....assumeunique = false
     //....|....|.....columns =
-    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....ishashindex = false
+    //....|....|.....name = SYS_IDX_10003
     //....|....|.....unique = true
     //....|....ELEMENT: constraints
     //....|....|.name = constraints
@@ -480,11 +518,13 @@ public class TestTableCreation {
     //....|....|.....assumeunique = false
     //....|....|.....constrainttype = NOT_NULL
     //....|....|.....name = SYS_CT_10001
+    //....|....|.....nameisauto = true
     //....|....|.....rowslimit = 2147483647
     //....|....|...ELEMENT: constraint
     //....|....|.....assumeunique = false
     //....|....|.....constrainttype = NOT_NULL
     //....|....|.....name = SYS_CT_10002
+    //....|....|.....nameisauto = true
     //....|....|.....rowslimit = 2147483647
     //
     //
@@ -494,7 +534,7 @@ public class TestTableCreation {
     public void testCreateTableWithDecimal() throws Exception {
         String ddl    = "create table alpha ( id integer not null, beta Decimal                 not null)";
         IDTable idTable = new IDTable();
-        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        HSQLInterface hif = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
         VoltXMLElement element = hif.getVoltCatalogXML(null);
         assertThat(element)
@@ -520,9 +560,16 @@ public class TestTableCreation {
                             withAttribute(17, "size", "100"),
                             withAttribute(18, "valuetype", "DECIMAL"))),
                     withChildNamed(19, "indexes",
-                        withAttribute(20, "name", "indexes")),
-                    withChildNamed(21, "constraints",
-                        withAttribute(22, "name", "constraints"))));
+                        withAttribute(20, "name", "indexes"),
+                        withChildNamed(21, "index",
+                                       "name", "SYS_IDX_10003",
+                            withAttribute(22, "assumeunique", "false"),
+                            withAttribute(23, "columns", ""),
+                            withAttribute(24, "ishashindex", "false"),
+                            withAttribute(25, "name", "SYS_IDX_10003"),
+                            withAttribute(26, "unique", "true"))),
+                    withChildNamed(27, "constraints",
+                        withAttribute(28, "name", "constraints"))));
     }
     /**
      * Test DECIMAL type with scale and precision.
@@ -562,7 +609,8 @@ public class TestTableCreation {
     //....|....|...ELEMENT: index
     //....|....|.....assumeunique = false
     //....|....|.....columns =
-    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....ishashindex = false
+    //....|....|.....name = SYS_IDX_10003
     //....|....|.....unique = true
     //....|....ELEMENT: constraints
     //....|....|.name = constraints
@@ -571,11 +619,13 @@ public class TestTableCreation {
     //....|....|.....assumeunique = false
     //....|....|.....constrainttype = NOT_NULL
     //....|....|.....name = SYS_CT_10001
+    //....|....|.....nameisauto = true
     //....|....|.....rowslimit = 2147483647
     //....|....|...ELEMENT: constraint
     //....|....|.....assumeunique = false
     //....|....|.....constrainttype = NOT_NULL
     //....|....|.....name = SYS_CT_10002
+    //....|....|.....nameisauto = true
     //....|....|.....rowslimit = 2147483647
     //
     //
@@ -585,7 +635,7 @@ public class TestTableCreation {
     public void testCreateTableWithDecimalScalePrecision() throws Exception {
         String ddl    = "create table alpha ( id integer not null, beta Decimal (10, 100) not null)";
         IDTable idTable = new IDTable();
-        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        HSQLInterface hif = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
         VoltXMLElement element = hif.getVoltCatalogXML(null);
         assertThat(element)
@@ -611,9 +661,16 @@ public class TestTableCreation {
                             withAttribute(17, "size", "10"),
                             withAttribute(18, "valuetype", "DECIMAL"))),
                     withChildNamed(19, "indexes",
-                        withAttribute(20, "name", "indexes")),
-                    withChildNamed(21, "constraints",
-                        withAttribute(22, "name", "constraints"))));
+                        withAttribute(20, "name", "indexes"),
+                        withChildNamed(21, "index",
+                                       "name", "SYS_IDX_10003",
+                            withAttribute(22, "assumeunique", "false"),
+                            withAttribute(23, "columns", ""),
+                            withAttribute(24, "ishashindex", "false"),
+                            withAttribute(25, "name", "SYS_IDX_10003"),
+                            withAttribute(26, "unique", "true"))),
+                    withChildNamed(27, "constraints",
+                        withAttribute(28, "name", "constraints"))));
     }
     /**
      * Test FLOAT type
@@ -653,7 +710,8 @@ public class TestTableCreation {
     //....|....|...ELEMENT: index
     //....|....|.....assumeunique = false
     //....|....|.....columns =
-    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....ishashindex = false
+    //....|....|.....name = SYS_IDX_10002
     //....|....|.....unique = true
     //....|....ELEMENT: constraints
     //....|....|.name = constraints
@@ -662,6 +720,7 @@ public class TestTableCreation {
     //....|....|.....assumeunique = false
     //....|....|.....constrainttype = NOT_NULL
     //....|....|.....name = SYS_CT_10001
+    //....|....|.....nameisauto = true
     //....|....|.....rowslimit = 2147483647
     //
     //
@@ -671,7 +730,7 @@ public class TestTableCreation {
     public void testCreateTableFloat() throws Exception {
         String ddl    = "create table alpha ( id BiGiNt not null, beta FlOaT)";
         IDTable idTable = new IDTable();
-        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        HSQLInterface hif = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
         VoltXMLElement element = hif.getVoltCatalogXML(null);
         assertThat(element)
@@ -697,9 +756,16 @@ public class TestTableCreation {
                             withAttribute(17, "size", "0"),
                             withAttribute(18, "valuetype", "FLOAT"))),
                     withChildNamed(19, "indexes",
-                        withAttribute(20, "name", "indexes")),
-                    withChildNamed(21, "constraints",
-                        withAttribute(22, "name", "constraints"))));
+                        withAttribute(20, "name", "indexes"),
+                        withChildNamed(21, "index",
+                                       "name", "SYS_IDX_10002",
+                            withAttribute(22, "assumeunique", "false"),
+                            withAttribute(23, "columns", ""),
+                            withAttribute(24, "ishashindex", "false"),
+                            withAttribute(25, "name", "SYS_IDX_10002"),
+                            withAttribute(26, "unique", "true"))),
+                    withChildNamed(27, "constraints",
+                        withAttribute(28, "name", "constraints"))));
     }
     /**
      * Test VARCHAR type
@@ -740,7 +806,8 @@ public class TestTableCreation {
     //....|....|...ELEMENT: index
     //....|....|.....assumeunique = false
     //....|....|.....columns =
-    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....ishashindex = false
+    //....|....|.....name = SYS_IDX_10002
     //....|....|.....unique = true
     //....|....ELEMENT: constraints
     //....|....|.name = constraints
@@ -749,6 +816,7 @@ public class TestTableCreation {
     //....|....|.....assumeunique = false
     //....|....|.....constrainttype = NOT_NULL
     //....|....|.....name = SYS_CT_10001
+    //....|....|.....nameisauto = true
     //....|....|.....rowslimit = 2147483647
     //
     //
@@ -758,7 +826,7 @@ public class TestTableCreation {
     public void testCreateTableVarchar() throws Exception {
         String ddl    = "create table alpha ( id BiGiNt not null, beta varchar(100))";
         IDTable idTable = new IDTable();
-        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        HSQLInterface hif = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
         VoltXMLElement element = hif.getVoltCatalogXML(null);
         assertThat(element)
@@ -785,9 +853,16 @@ public class TestTableCreation {
                             withAttribute(18, "size", "100"),
                             withAttribute(19, "valuetype", "VARCHAR"))),
                     withChildNamed(20, "indexes",
-                        withAttribute(21, "name", "indexes")),
-                    withChildNamed(22, "constraints",
-                        withAttribute(23, "name", "constraints"))));
+                        withAttribute(21, "name", "indexes"),
+                        withChildNamed(22, "index",
+                                       "name", "SYS_IDX_10002",
+                            withAttribute(23, "assumeunique", "false"),
+                            withAttribute(24, "columns", ""),
+                            withAttribute(25, "ishashindex", "false"),
+                            withAttribute(26, "name", "SYS_IDX_10002"),
+                            withAttribute(27, "unique", "true"))),
+                    withChildNamed(28, "constraints",
+                        withAttribute(29, "name", "constraints"))));
     }
     /**
      * Test VARBINARY type
@@ -827,7 +902,8 @@ public class TestTableCreation {
     //....|....|...ELEMENT: index
     //....|....|.....assumeunique = false
     //....|....|.....columns =
-    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....ishashindex = false
+    //....|....|.....name = SYS_IDX_10002
     //....|....|.....unique = true
     //....|....ELEMENT: constraints
     //....|....|.name = constraints
@@ -836,6 +912,7 @@ public class TestTableCreation {
     //....|....|.....assumeunique = false
     //....|....|.....constrainttype = NOT_NULL
     //....|....|.....name = SYS_CT_10001
+    //....|....|.....nameisauto = true
     //....|....|.....rowslimit = 2147483647
     //
     //
@@ -845,7 +922,7 @@ public class TestTableCreation {
     public void testCreateTableVarbinary() throws Exception {
         String ddl    = "create table alpha ( id BiGiNt not null, beta varbinary(100))";
         IDTable idTable = new IDTable();
-        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        HSQLInterface hif = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
         VoltXMLElement element = hif.getVoltCatalogXML(null);
         assertThat(element)
@@ -871,9 +948,16 @@ public class TestTableCreation {
                             withAttribute(17, "size", "100"),
                             withAttribute(18, "valuetype", "VARBINARY"))),
                     withChildNamed(19, "indexes",
-                        withAttribute(20, "name", "indexes")),
-                    withChildNamed(21, "constraints",
-                        withAttribute(22, "name", "constraints"))));
+                        withAttribute(20, "name", "indexes"),
+                        withChildNamed(21, "index",
+                                       "name", "SYS_IDX_10002",
+                            withAttribute(22, "assumeunique", "false"),
+                            withAttribute(23, "columns", ""),
+                            withAttribute(24, "ishashindex", "false"),
+                            withAttribute(25, "name", "SYS_IDX_10002"),
+                            withAttribute(26, "unique", "true"))),
+                    withChildNamed(27, "constraints",
+                        withAttribute(28, "name", "constraints"))));
     }
     /**
      * Test TIMESTAMP type
@@ -913,7 +997,8 @@ public class TestTableCreation {
     //....|....|...ELEMENT: index
     //....|....|.....assumeunique = false
     //....|....|.....columns =
-    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....ishashindex = false
+    //....|....|.....name = SYS_IDX_10002
     //....|....|.....unique = true
     //....|....ELEMENT: constraints
     //....|....|.name = constraints
@@ -922,6 +1007,7 @@ public class TestTableCreation {
     //....|....|.....assumeunique = false
     //....|....|.....constrainttype = NOT_NULL
     //....|....|.....name = SYS_CT_10001
+    //....|....|.....nameisauto = true
     //....|....|.....rowslimit = 2147483647
     //
     //
@@ -931,7 +1017,7 @@ public class TestTableCreation {
     public void testCreateTableTimestamp() throws Exception {
         String ddl    = "create table alpha ( id BiGiNt not null, beta timestamp)";
         IDTable idTable = new IDTable();
-        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        HSQLInterface hif = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
         VoltXMLElement element = hif.getVoltCatalogXML(null);
         assertThat(element)
@@ -957,9 +1043,16 @@ public class TestTableCreation {
                             withAttribute(17, "size", "8"),
                             withAttribute(18, "valuetype", "TIMESTAMP"))),
                     withChildNamed(19, "indexes",
-                        withAttribute(20, "name", "indexes")),
-                    withChildNamed(21, "constraints",
-                        withAttribute(22, "name", "constraints"))));
+                        withAttribute(20, "name", "indexes"),
+                        withChildNamed(21, "index",
+                                       "name", "SYS_IDX_10002",
+                            withAttribute(22, "assumeunique", "false"),
+                            withAttribute(23, "columns", ""),
+                            withAttribute(24, "ishashindex", "false"),
+                            withAttribute(25, "name", "SYS_IDX_10002"),
+                            withAttribute(26, "unique", "true"))),
+                    withChildNamed(27, "constraints",
+                        withAttribute(28, "name", "constraints"))));
     }
     /**
      * Test bigint PRIMARY KEY
@@ -999,6 +1092,7 @@ public class TestTableCreation {
     //....|....|...ELEMENT: index
     //....|....|.....assumeunique = false
     //....|....|.....columns = ID
+    //....|....|.....ishashindex = false
     //....|....|.....name = VOLTDB_AUTOGEN_IDX_PK_ALPHA_ID
     //....|....|.....unique = true
     //....|....ELEMENT: constraints
@@ -1008,12 +1102,14 @@ public class TestTableCreation {
     //....|....|.....assumeunique = false
     //....|....|.....constrainttype = PRIMARY_KEY
     //....|....|.....index = VOLTDB_AUTOGEN_IDX_PK_ALPHA_ID
-    //....|....|.....name = VOLTDB_AUTOGEN_IDX_PK_ALPHA_ID
+    //....|....|.....name = VOLTDB_AUTOGEN_CT__PK_ALPHA_ID
+    //....|....|.....nameisauto = true
     //....|....|.....rowslimit = 2147483647
     //....|....|...ELEMENT: constraint
     //....|....|.....assumeunique = false
     //....|....|.....constrainttype = NOT_NULL
     //....|....|.....name = SYS_CT_10001
+    //....|....|.....nameisauto = true
     //....|....|.....rowslimit = 2147483647
     //
     //
@@ -1023,7 +1119,7 @@ public class TestTableCreation {
     public void testCreateTablePrimaryKey() throws Exception {
         String ddl    = "create table alpha ( id BiGiNt not null PRIMARY KEY, beta timestamp)";
         IDTable idTable = new IDTable();
-        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        HSQLInterface hif = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
         VoltXMLElement element = hif.getVoltCatalogXML(null);
         assertThat(element)
@@ -1091,11 +1187,13 @@ public class TestTableCreation {
     //....|....|...ELEMENT: index
     //....|....|.....assumeunique = false
     //....|....|.....columns =
-    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....ishashindex = false
+    //....|....|.....name = SYS_IDX_10003
     //....|....|.....unique = true
     //....|....|...ELEMENT: index
     //....|....|.....assumeunique = false
     //....|....|.....columns = ID
+    //....|....|.....ishashindex = false
     //....|....|.....name = VOLTDB_AUTOGEN_IDX_CT_ALPHA_ID
     //....|....|.....unique = true
     //....|....ELEMENT: constraints
@@ -1105,12 +1203,14 @@ public class TestTableCreation {
     //....|....|.....assumeunique = false
     //....|....|.....constrainttype = NOT_NULL
     //....|....|.....name = SYS_CT_10001
+    //....|....|.....nameisauto = true
     //....|....|.....rowslimit = 2147483647
     //....|....|...ELEMENT: constraint
     //....|....|.....assumeunique = false
     //....|....|.....constrainttype = UNIQUE
     //....|....|.....index = VOLTDB_AUTOGEN_IDX_CT_ALPHA_ID
-    //....|....|.....name = VOLTDB_AUTOGEN_IDX_CT_ALPHA_ID
+    //....|....|.....name = VOLTDB_AUTOGEN_CT__CT_ALPHA_ID
+    //....|....|.....nameisauto = true
     //....|....|.....rowslimit = 2147483647
     //
     //
@@ -1120,7 +1220,7 @@ public class TestTableCreation {
     public void testCreateTableUniqueKey() throws Exception {
         String ddl    = "create table alpha ( id BiGiNt not null UNIQUE, beta timestamp)";
         IDTable idTable = new IDTable();
-        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        HSQLInterface hif = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
         VoltXMLElement element = hif.getVoltCatalogXML(null);
         assertThat(element)
@@ -1146,9 +1246,16 @@ public class TestTableCreation {
                             withAttribute(17, "size", "8"),
                             withAttribute(18, "valuetype", "TIMESTAMP"))),
                     withChildNamed(19, "indexes",
-                        withAttribute(20, "name", "indexes")),
-                    withChildNamed(21, "constraints",
-                        withAttribute(22, "name", "constraints"))));
+                        withAttribute(20, "name", "indexes"),
+                        withChildNamed(21, "index",
+                                       "name", "SYS_IDX_10003",
+                            withAttribute(22, "assumeunique", "false"),
+                            withAttribute(23, "columns", ""),
+                            withAttribute(24, "ishashindex", "false"),
+                            withAttribute(25, "name", "SYS_IDX_10003"),
+                            withAttribute(26, "unique", "true"))),
+                    withChildNamed(27, "constraints",
+                        withAttribute(28, "name", "constraints"))));
     }
     /**
      * Test bigint ASSUMEUNIQUE KEY
@@ -1188,11 +1295,13 @@ public class TestTableCreation {
     //....|....|...ELEMENT: index
     //....|....|.....assumeunique = false
     //....|....|.....columns =
-    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....ishashindex = false
+    //....|....|.....name = SYS_IDX_10003
     //....|....|.....unique = true
     //....|....|...ELEMENT: index
     //....|....|.....assumeunique = true
     //....|....|.....columns = ID
+    //....|....|.....ishashindex = false
     //....|....|.....name = VOLTDB_AUTOGEN_IDX_CT_ALPHA_ID
     //....|....|.....unique = true
     //....|....ELEMENT: constraints
@@ -1202,12 +1311,14 @@ public class TestTableCreation {
     //....|....|.....assumeunique = false
     //....|....|.....constrainttype = NOT_NULL
     //....|....|.....name = SYS_CT_10001
+    //....|....|.....nameisauto = true
     //....|....|.....rowslimit = 2147483647
     //....|....|...ELEMENT: constraint
     //....|....|.....assumeunique = true
     //....|....|.....constrainttype = UNIQUE
     //....|....|.....index = VOLTDB_AUTOGEN_IDX_CT_ALPHA_ID
-    //....|....|.....name = VOLTDB_AUTOGEN_IDX_CT_ALPHA_ID
+    //....|....|.....name = VOLTDB_AUTOGEN_CT__CT_ALPHA_ID
+    //....|....|.....nameisauto = true
     //....|....|.....rowslimit = 2147483647
     //
     //
@@ -1217,7 +1328,7 @@ public class TestTableCreation {
     public void testCreateTableAssumeUniqueKey() throws Exception {
         String ddl    = "create table alpha ( id BiGiNt not null ASSUMEUNIQUE, beta timestamp)";
         IDTable idTable = new IDTable();
-        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        HSQLInterface hif = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
         VoltXMLElement element = hif.getVoltCatalogXML(null);
         assertThat(element)
@@ -1243,9 +1354,16 @@ public class TestTableCreation {
                             withAttribute(17, "size", "8"),
                             withAttribute(18, "valuetype", "TIMESTAMP"))),
                     withChildNamed(19, "indexes",
-                        withAttribute(20, "name", "indexes")),
-                    withChildNamed(21, "constraints",
-                        withAttribute(22, "name", "constraints"))));
+                        withAttribute(20, "name", "indexes"),
+                        withChildNamed(21, "index",
+                                       "name", "SYS_IDX_10003",
+                            withAttribute(22, "assumeunique", "false"),
+                            withAttribute(23, "columns", ""),
+                            withAttribute(24, "ishashindex", "false"),
+                            withAttribute(25, "name", "SYS_IDX_10003"),
+                            withAttribute(26, "unique", "true"))),
+                    withChildNamed(27, "constraints",
+                        withAttribute(28, "name", "constraints"))));
     }
     /**
      * Test bigint ASSUMEUNIQUE KEY
@@ -1292,7 +1410,8 @@ public class TestTableCreation {
     //....|....|...ELEMENT: index
     //....|....|.....assumeunique = false
     //....|....|.....columns =
-    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....ishashindex = false
+    //....|....|.....name = SYS_IDX_10001
     //....|....|.....unique = true
     //....|....ELEMENT: constraints
     //....|....|.name = constraints
@@ -1304,7 +1423,7 @@ public class TestTableCreation {
     public void testCreateTableDefaultValue() throws Exception {
         String ddl    = "create table alpha ( id BiGiNt default '100', beta timestamp)";
         IDTable idTable = new IDTable();
-        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        HSQLInterface hif = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
         VoltXMLElement element = hif.getVoltCatalogXML(null);
         assertThat(element)
@@ -1335,8 +1454,15 @@ public class TestTableCreation {
                             withAttribute(22, "size", "8"),
                             withAttribute(23, "valuetype", "TIMESTAMP"))),
                     withChildNamed(24, "indexes",
-                        withAttribute(25, "name", "indexes")),
-                    withChildNamed(26, "constraints",
-                        withAttribute(27, "name", "constraints"))));
+                        withAttribute(25, "name", "indexes"),
+                        withChildNamed(26, "index",
+                                       "name", "SYS_IDX_10001",
+                            withAttribute(27, "assumeunique", "false"),
+                            withAttribute(28, "columns", ""),
+                            withAttribute(29, "ishashindex", "false"),
+                            withAttribute(30, "name", "SYS_IDX_10001"),
+                            withAttribute(31, "unique", "true"))),
+                    withChildNamed(32, "constraints",
+                        withAttribute(33, "name", "constraints"))));
     }
 }

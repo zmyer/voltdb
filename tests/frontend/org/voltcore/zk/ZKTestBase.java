@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -60,7 +60,7 @@ public class ZKTestBase {
                 .mapToObj(i -> ":" + (i+Constants.DEFAULT_INTERNAL_PORT))
                 .toArray(s -> new String[s]);
         for (int ii = 0; ii < sites; ii++) {
-            HostMessenger.Config config = new HostMessenger.Config();
+            HostMessenger.Config config = new HostMessenger.Config(false);
             config.internalPort += ii;
             config.acceptor = MeshProber.builder()
                     .coordinators(coordinators)
@@ -88,7 +88,7 @@ public class ZKTestBase {
 
         for (String coord: criteria.getCoordinators()) {
             HostAndPort hp = HostAndPort.fromString(coord).withDefaultPort(Constants.DEFAULT_INTERNAL_PORT);
-            HostMessenger.Config config = new HostMessenger.Config();
+            HostMessenger.Config config = new HostMessenger.Config(false);
             config.acceptor = criteria;
             assert config.internalPort + i == hp.getPort() : "coordinator port mismatches internal port";
             config.internalPort = hp.getPort();
@@ -103,7 +103,7 @@ public class ZKTestBase {
         }
 
         for (; i < criteria.getHostCount(); ++i) {
-            HostMessenger.Config config = new HostMessenger.Config();
+            HostMessenger.Config config = new HostMessenger.Config(false);
             config.acceptor = criteria;
             config.internalPort += i;
             int externalPort = m_ports.next();

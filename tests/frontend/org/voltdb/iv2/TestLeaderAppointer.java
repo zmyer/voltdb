@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,10 +25,7 @@ package org.voltdb.iv2;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import java.util.List;
 import java.util.Map;
@@ -47,8 +44,10 @@ import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKTestBase;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.AbstractTopology;
+import org.voltdb.ReplicationRole;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltZK;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -81,6 +80,9 @@ public class TestLeaderAppointer extends ZKTestBase {
     @Before
     public void setUp() throws Exception
     {
+        final VoltDBInterface mock = mock(VoltDBInterface.class);
+        when(mock.getReplicationRole()).thenReturn(ReplicationRole.NONE);
+        VoltDB.replaceVoltDBInstanceForTest(mock);
         VoltDB.ignoreCrash = false;
         VoltDB.wasCrashCalled = false;
         setUpZK(NUM_AGREEMENT_SITES);
@@ -136,7 +138,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         KSafetyStats stats = new KSafetyStats();
         m_dut = new LeaderAppointer(m_hm, m_topo.getPartitionCount(),
                 m_kfactor,
-                null, m_topo.topologyToJSON(), m_mpi, stats, false);
+                m_topo.topologyToJSON(), m_mpi, stats, false);
         m_dut.onReplayCompletion();
     }
 
@@ -284,7 +286,6 @@ public class TestLeaderAppointer extends ZKTestBase {
         m_dut = new LeaderAppointer(m_hm,
                                     m_topo.getPartitionCount(),
                                     m_kfactor,
-                                    null,
                                     m_topo.topologyToJSON(),
                                     m_mpi,
                                     new KSafetyStats(),
@@ -503,6 +504,10 @@ public class TestLeaderAppointer extends ZKTestBase {
     @Test
     public void testFailureDuringSyncSnapshot() throws Exception
     {
+        final VoltDBInterface mVolt = mock(VoltDBInterface.class);
+        doReturn(ReplicationRole.REPLICA).when(mVolt).getReplicationRole();
+        VoltDB.replaceVoltDBInstanceForTest(mVolt);
+
         configure(2, 2, 1, false);
         Thread dutthread = new Thread() {
             @Override
@@ -531,7 +536,6 @@ public class TestLeaderAppointer extends ZKTestBase {
         m_dut = new LeaderAppointer(m_hm,
                                     m_topo.getPartitionCount(),
                                     m_kfactor,
-                                    null,
                                     m_topo.topologyToJSON(),
                                     m_mpi,
                                     new KSafetyStats(),
@@ -547,5 +551,11 @@ public class TestLeaderAppointer extends ZKTestBase {
         }
         assertTrue(threw);
         assertTrue(VoltDB.wasCrashCalled);
+
+        // Promote the replica to a master before sync snapshot, failure should not crash now.
+        doReturn(ReplicationRole.NONE).when(mVolt).getReplicationRole();
+        VoltDB.wasCrashCalled = false;
+        m_dut.acceptPromotion();
+        assertFalse(VoltDB.wasCrashCalled);
     }
 }

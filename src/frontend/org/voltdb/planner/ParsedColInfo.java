@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -34,7 +34,7 @@ import org.voltdb.plannodes.SchemaColumn;
  * up.
  */
 public class ParsedColInfo implements Cloneable {
-    /* Schema information: table may be "VOLT_TEMP_TABLE" */
+    /* Schema information: table may be AbstractParsedStmt.TEMP_TABLE_NAME */
     public String alias = null;
     public String columnName = null;
     public String tableName = null;
@@ -129,8 +129,8 @@ public class ParsedColInfo implements Cloneable {
         else {
             String alias = child.attributes.get("alias");
             orderCol.alias = alias;
-            orderCol.tableName = "VOLT_TEMP_TABLE";
-            orderCol.tableAlias = "VOLT_TEMP_TABLE";
+            orderCol.tableName = AbstractParsedStmt.TEMP_TABLE_NAME;
+            orderCol.tableAlias = AbstractParsedStmt.TEMP_TABLE_NAME;
             orderCol.columnName = "";
             // Replace its expression to TVE after we build the ExpressionIndexMap
 
@@ -139,6 +139,7 @@ public class ParsedColInfo implements Cloneable {
                     (child.name.equals("win_aggregation") == false) &&
                     (child.name.equals("function") == false) &&
                     (child.name.equals("rank") == false) &&
+                    (child.name.equals("value") == false) &&
                     (child.name.equals("columnref") == false)) {
                throw new RuntimeException(
                        "ORDER BY parsed with strange child node type: " +

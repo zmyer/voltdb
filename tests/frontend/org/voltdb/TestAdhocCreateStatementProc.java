@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -175,6 +175,16 @@ public class TestAdhocCreateStatementProc extends AdhocDDLTestBase {
                 assertTrue(pce.getMessage().contains("incompatible data type in operation"));
             }
             assertFalse(findProcedureInSystemCatalog("FOOCOUNT"));
+
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "create procedure MULTIFOO as begin select * from FOO where ID=?; select * from foo; end;");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to create statement procedure");
+            }
+            assertTrue(findProcedureInSystemCatalog("MULTIFOO"));
         }
         finally {
             teardownSystem();

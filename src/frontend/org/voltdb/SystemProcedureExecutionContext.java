@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -77,9 +77,10 @@ public interface SystemProcedureExecutionContext {
     public void updateBackendLogLevels();
 
     public boolean updateCatalog(String catalogDiffCommands, CatalogContext context,
-            CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation, long uniqueId, long spHandle);
+            boolean requiresSnapshotIsolation, long uniqueId, long spHandle, boolean isReplay,
+            boolean requireCatalogDiffCmdsApplyToEE, boolean requiresNewExportGeneration);
 
-    public boolean updateSettings(CatalogContext context, CatalogSpecificPlanner csp);
+    public boolean updateSettings(CatalogContext context);
 
     public TheHashinator getCurrentHashinator();
 
@@ -103,6 +104,12 @@ public interface SystemProcedureExecutionContext {
     public void recoverWithDrAppliedTrackers(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> trackers);
 
     public void resetDrAppliedTracker();
+
+    public void resetDrAppliedTracker(byte clusterId);
+
+    public boolean hasRealDrAppliedTracker(byte clusterId);
+
+    public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap);
 
     public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackers();
 

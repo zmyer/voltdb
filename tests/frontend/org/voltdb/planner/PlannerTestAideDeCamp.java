@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -32,14 +32,12 @@ import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
-import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.expressions.ParameterValueExpression;
@@ -53,7 +51,6 @@ import org.voltdb.utils.BuildDirectoryUtils;
  */
 public class PlannerTestAideDeCamp {
 
-    private final Catalog catalog;
     private final Procedure proc;
     private final HSQLInterface hsql;
     private final Database db;
@@ -69,12 +66,11 @@ public class PlannerTestAideDeCamp {
      */
     public PlannerTestAideDeCamp(URL ddlurl, String basename) throws Exception {
         assert(ddlurl != null);
-        String pth = ddlurl.getPath();
         String schemaPath = URLDecoder.decode(ddlurl.getPath(), "UTF-8");
-        VoltCompiler compiler = new VoltCompiler();
-        hsql = HSQLInterface.loadHsqldb();
+        VoltCompiler compiler = new VoltCompiler(false);
+        hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         VoltCompiler.DdlProceduresToLoad no_procs = DdlProceduresToLoad.NO_DDL_PROCEDURES;
-        catalog = compiler.loadSchema(hsql, no_procs, schemaPath);
+        compiler.loadSchema(hsql, no_procs, schemaPath);
         db = compiler.getCatalogDatabase();
         proc = db.getProcedures().add(basename);
     }
@@ -146,9 +142,8 @@ public class PlannerTestAideDeCamp {
             partitioning = StatementPartitioning.forceMP();
         }
         String procName = catalogStmt.getParent().getTypeName();
-        Cluster catalogCluster = catalog.getClusters().get("cluster");
-        QueryPlanner planner = new QueryPlanner(sql, stmtLabel, procName, catalogCluster, db,
-                partitioning, hsql, estimates, false, StatementCompiler.DEFAULT_MAX_JOIN_TABLES,
+        QueryPlanner planner = new QueryPlanner(sql, stmtLabel, procName, db,
+                partitioning, hsql, estimates, false,
                 costModel, null, joinOrder, detMode);
 
         CompiledPlan plan = null;
@@ -163,9 +158,9 @@ public class PlannerTestAideDeCamp {
 
         // Input Parameters
         // We will need to update the system catalogs with this new information
-        for (int i = 0; i < plan.parameters.length; ++i) {
+        for (int i = 0; i < plan.getParameters().length; ++i) {
             StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(i));
-            ParameterValueExpression pve = plan.parameters[i];
+            ParameterValueExpression pve = plan.getParameters()[i];
             catalogParam.setJavatype(pve.getValueType().getValue());
             catalogParam.setIsarray(pve.getParamIsVector());
             catalogParam.setIndex(i);
@@ -211,6 +206,9 @@ public class PlannerTestAideDeCamp {
         return plannodes;
     }
 
+    public Catalog getCatalog() {
+        return db.getCatalog();
+    }
     public String getCatalogString() {
         return db.getCatalog().serialize();
     }

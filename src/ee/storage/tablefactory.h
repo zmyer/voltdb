@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -60,6 +60,7 @@ namespace voltdb {
 
 class ExportTupleStream;
 class StreamedTable;
+class LargeTempTable;
 class TempTable;
 class TempTableLimits;
 
@@ -110,6 +111,11 @@ public:
         TupleSchema* schema,
         const std::vector<std::string> &columnNames,
         TempTableLimits* limits);
+
+    static LargeTempTable* buildLargeTempTable(
+        const std::string &name,
+        TupleSchema* schema,
+        const std::vector<std::string> &columnNames);
 
     // DEPRECATED name and signature. Use buildTempTable.
     static TempTable* getTempTable(voltdb::CatalogId databaseId,

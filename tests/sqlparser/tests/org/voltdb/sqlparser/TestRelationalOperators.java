@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -40,7 +40,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  *//* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -82,12 +82,13 @@ import org.voltdb.sqlparser.syntax.SQLKind;
 
 import org.voltdb.sqlparser.assertions.semantics.VoltXMLElementAssert.IDTable;
 import static org.voltdb.sqlparser.assertions.semantics.VoltXMLElementAssert.*;
+import org.voltdb.planner.ParameterizationInfo;
 
 public class TestRelationalOperators {
     HSQLInterface m_HSQLInterface = null;
     String        m_schema = null;
     public TestRelationalOperators() {
-        m_HSQLInterface = HSQLInterface.loadHsqldb();
+        m_HSQLInterface = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         String m_schema = "create table alpha ( id integer, beta integer );create table gamma ( id integer not null, zooba integer );create table fargle ( id integer not null, dooba integer )";
         try {
             m_HSQLInterface.processDDLStatementsUsingVoltSQLParser(m_schema, null);
@@ -123,17 +124,17 @@ public class TestRelationalOperators {
     //    //....|....|...ELEMENT: joincond
     //    //....|....|...[
     //    //....|....|....|..ELEMENT: operation
-    //    //....|....|....|....id = 5
+    //    //....|....|....|....id = 4
     //    //....|....|....|....optype = equal
     //    //....|....|....|..[
     //    //....|....|....|....|.ELEMENT: columnref
     //    //....|....|....|....|...alias = ID
     //    //....|....|....|....|...column = ID
-    //    //....|....|....|....|...id = 3
+    //    //....|....|....|....|...id = 1
     //    //....|....|....|....|...index = 0
     //    //....|....|....|....|...table = ALPHA
     //    //....|....|....|....|.ELEMENT: value
-    //    //....|....|....|....|...id = 4
+    //    //....|....|....|....|...id = 3
     //    //....|....|....|....|...value = 0
     //    //....|....|....|....|...valuetype = INTEGER
     //    //
@@ -220,17 +221,17 @@ public class TestRelationalOperators {
     //    //....|....|...ELEMENT: joincond
     //    //....|....|...[
     //    //....|....|....|..ELEMENT: operation
-    //    //....|....|....|....id = 5
+    //    //....|....|....|....id = 4
     //    //....|....|....|....optype = notequal
     //    //....|....|....|..[
     //    //....|....|....|....|.ELEMENT: columnref
     //    //....|....|....|....|...alias = ID
     //    //....|....|....|....|...column = ID
-    //    //....|....|....|....|...id = 3
+    //    //....|....|....|....|...id = 1
     //    //....|....|....|....|...index = 0
     //    //....|....|....|....|...table = ALPHA
     //    //....|....|....|....|.ELEMENT: value
-    //    //....|....|....|....|...id = 4
+    //    //....|....|....|....|...id = 3
     //    //....|....|....|....|...value = 0
     //    //....|....|....|....|...valuetype = INTEGER
     //    //
@@ -317,17 +318,17 @@ public class TestRelationalOperators {
     //    //....|....|...ELEMENT: joincond
     //    //....|....|...[
     //    //....|....|....|..ELEMENT: operation
-    //    //....|....|....|....id = 5
+    //    //....|....|....|....id = 4
     //    //....|....|....|....optype = lessthan
     //    //....|....|....|..[
     //    //....|....|....|....|.ELEMENT: columnref
     //    //....|....|....|....|...alias = ID
     //    //....|....|....|....|...column = ID
-    //    //....|....|....|....|...id = 3
+    //    //....|....|....|....|...id = 1
     //    //....|....|....|....|...index = 0
     //    //....|....|....|....|...table = ALPHA
     //    //....|....|....|....|.ELEMENT: value
-    //    //....|....|....|....|...id = 4
+    //    //....|....|....|....|...id = 3
     //    //....|....|....|....|...value = 0
     //    //....|....|....|....|...valuetype = INTEGER
     //    //
@@ -414,17 +415,17 @@ public class TestRelationalOperators {
     //    //....|....|...ELEMENT: joincond
     //    //....|....|...[
     //    //....|....|....|..ELEMENT: operation
-    //    //....|....|....|....id = 5
+    //    //....|....|....|....id = 4
     //    //....|....|....|....optype = lessthanorequalto
     //    //....|....|....|..[
     //    //....|....|....|....|.ELEMENT: columnref
     //    //....|....|....|....|...alias = ID
     //    //....|....|....|....|...column = ID
-    //    //....|....|....|....|...id = 3
+    //    //....|....|....|....|...id = 1
     //    //....|....|....|....|...index = 0
     //    //....|....|....|....|...table = ALPHA
     //    //....|....|....|....|.ELEMENT: value
-    //    //....|....|....|....|...id = 4
+    //    //....|....|....|....|...id = 3
     //    //....|....|....|....|...value = 0
     //    //....|....|....|....|...valuetype = INTEGER
     //    //
@@ -511,17 +512,17 @@ public class TestRelationalOperators {
     //    //....|....|...ELEMENT: joincond
     //    //....|....|...[
     //    //....|....|....|..ELEMENT: operation
-    //    //....|....|....|....id = 5
+    //    //....|....|....|....id = 4
     //    //....|....|....|....optype = greaterthan
     //    //....|....|....|..[
     //    //....|....|....|....|.ELEMENT: columnref
     //    //....|....|....|....|...alias = ID
     //    //....|....|....|....|...column = ID
-    //    //....|....|....|....|...id = 3
+    //    //....|....|....|....|...id = 1
     //    //....|....|....|....|...index = 0
     //    //....|....|....|....|...table = ALPHA
     //    //....|....|....|....|.ELEMENT: value
-    //    //....|....|....|....|...id = 4
+    //    //....|....|....|....|...id = 3
     //    //....|....|....|....|...value = 0
     //    //....|....|....|....|...valuetype = INTEGER
     //    //
@@ -608,17 +609,17 @@ public class TestRelationalOperators {
     //    //....|....|...ELEMENT: joincond
     //    //....|....|...[
     //    //....|....|....|..ELEMENT: operation
-    //    //....|....|....|....id = 5
+    //    //....|....|....|....id = 4
     //    //....|....|....|....optype = greaterthanorequalto
     //    //....|....|....|..[
     //    //....|....|....|....|.ELEMENT: columnref
     //    //....|....|....|....|...alias = ID
     //    //....|....|....|....|...column = ID
-    //    //....|....|....|....|...id = 3
+    //    //....|....|....|....|...id = 1
     //    //....|....|....|....|...index = 0
     //    //....|....|....|....|...table = ALPHA
     //    //....|....|....|....|.ELEMENT: value
-    //    //....|....|....|....|...id = 4
+    //    //....|....|....|....|...id = 3
     //    //....|....|....|....|...value = 0
     //    //....|....|....|....|...valuetype = INTEGER
     //    //

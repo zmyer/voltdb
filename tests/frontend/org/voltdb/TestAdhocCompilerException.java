@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -36,8 +36,8 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.sysprocs.AdHocNTBase;
 import org.voltdb.utils.MiscUtils;
 
 public class TestAdhocCompilerException extends AdhocDDLTestBase
@@ -67,7 +67,7 @@ public class TestAdhocCompilerException extends AdhocDDLTestBase
             boolean threw = false;
             try {
                 // Ten seconds should be long enough to detect a hang.
-                String toxicDDL = AsyncCompilerAgent.DEBUG_EXCEPTION_DDL + ";";
+                String toxicDDL = AdHocNTBase.DEBUG_EXCEPTION_DDL + ";";
                 ((ClientImpl)m_client).callProcedureWithClientTimeout(
                         BatchTimeoutOverrideType.NO_TIMEOUT, "@AdHoc", 10, TimeUnit.SECONDS, toxicDDL);
             }
@@ -79,9 +79,8 @@ public class TestAdhocCompilerException extends AdhocDDLTestBase
                     tryNewClientWithValidDDL();
                     fail("Timeout, server was probably hung. " + message);
                 }
-                String expectedMessage = "Unexpected async compiler exception";
-                assertTrue(String.format("Unexpected exception message: %s...", expectedMessage),
-                           message.startsWith(expectedMessage));
+                assertTrue(String.format("Unexpected exception message: %s...", message),
+                           message.contains(AdHocNTBase.DEBUG_EXCEPTION_DDL));
                 threw = true;
             }
             assertTrue("Expected exception", threw);

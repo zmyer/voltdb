@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -59,8 +59,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     public ArrayList<ParsedColInfo> m_displayColumns = new ArrayList<>();
     private ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<>();
     private AbstractExpression m_having = null;
-    public ArrayList<ParsedColInfo> m_groupByColumns = new ArrayList<>();
-    public ArrayList<ParsedColInfo> m_distinctGroupByColumns = null;
+    private List<ParsedColInfo> m_groupByColumns = new ArrayList<>();
+    private ArrayList<ParsedColInfo> m_distinctGroupByColumns = null;
     private boolean m_groupAndOrderByPermutationWasTested = false;
     private boolean m_groupAndOrderByPermutationResult = false;
 
@@ -79,7 +79,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     private ArrayList<ParsedColInfo> m_avgPushdownDisplayColumns = null;
     private ArrayList<ParsedColInfo> m_avgPushdownAggResultColumns = null;
-    private ArrayList<ParsedColInfo> m_avgPushdownGroupByColumns = null;
+    private List<ParsedColInfo> m_avgPushdownGroupByColumns = null;
     private ArrayList<ParsedColInfo> m_avgPushdownDistinctGroupByColumns = null;
     private ArrayList<ParsedColInfo> m_avgPushdownOrderColumns = null;
     private AbstractExpression m_avgPushdownHaving = null;
@@ -288,7 +288,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_displayColumns = new ArrayList<>();
         ArrayList<ParsedColInfo> tmpAggResultColumns = m_aggResultColumns;
         m_aggResultColumns = new ArrayList<>();
-        ArrayList<ParsedColInfo> tmpGroupByColumns = m_groupByColumns;
+        List<ParsedColInfo> tmpGroupByColumns = m_groupByColumns;
         m_groupByColumns = new ArrayList<>();
         ArrayList<ParsedColInfo> tmpDistinctGroupByColumns = m_distinctGroupByColumns;
         m_distinctGroupByColumns = new ArrayList<>();
@@ -602,7 +602,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             assert(expr instanceof AggregateExpression);
             if (expr.hasSubquerySubexpression()) {
                 throw new PlanningErrorException(
-                        "SQL Aggregate with subquery expression is not allowed.");
+                        "SQL Aggregate function calls with subquery expression arguments are not allowed.");
             }
 
             ParsedColInfo col = new ParsedColInfo();
@@ -938,7 +938,13 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 throw new PlanningErrorException(
                         "Only one windowed function call may appear in a selection list.");
             }
-
+            if (m_hasAggregateExpression) {
+                throw new PlanningErrorException(
+                        "Use of window functions (in an OVER clause) isn't supported with other aggregate functions on the SELECT list.");
+            }
+            if (m_windowFunctionExpressions.get(0).hasSubqueryArgs()) {
+                throw new PlanningErrorException("Window function calls with subquery expression arguments are not allowed.");
+            }
             //
             // This could be an if statement, but I think it's better to
             // leave this as a pattern in case we decide to implement more
@@ -948,11 +954,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             List<AbstractExpression> orderByExpressions =
                     windowFunctionExpression.getOrderByExpressions();
             ExpressionType exprType = windowFunctionExpression.getExpressionType();
+            String aggName = exprType.symbol().toUpperCase();
             switch (exprType) {
             case AGGREGATE_WINDOWED_RANK:
             case AGGREGATE_WINDOWED_DENSE_RANK:
                 if (orderByExpressions.size() == 0) {
-                    String aggName = exprType.symbol().toUpperCase();
                     throw new PlanningErrorException(
                             "Windowed " + aggName +
                             " function call expressions require an ORDER BY specification.");
@@ -966,19 +972,31 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 }
                 break;
             case AGGREGATE_WINDOWED_COUNT:
-                if (windowFunctionExpression.getAggregateArguments().size() > 0) {
-                    if (windowFunctionExpression.getAggregateArguments().size() > 1) {
-                        throw new PlanningErrorException(
-                                "Windowed COUNT can only have one expression argument");
-                    }
-                    AbstractExpression ctArg = windowFunctionExpression.getAggregateArguments().get(0);
-                    assert(ctArg != null);
-                    VoltType vt = ctArg.getValueType();
-                    assert(vt != null);
-                    if (! (vt.isAnyIntegerType() || vt == VoltType.TIMESTAMP) ) {
-                        throw new PlanningErrorException(
-                                "Windowed Count arguments must have either integer or timestamp type.");
-                    }
+                if (windowFunctionExpression.getAggregateArguments().size() > 1) {
+                    throw new PlanningErrorException(
+                            String.format("Windowed COUNT must have either exactly one argument or else a star for an argument"));
+                }
+                // Any type is ok, so we won't inspect the type.
+                break;
+            case AGGREGATE_WINDOWED_MAX:
+            case AGGREGATE_WINDOWED_MIN:
+                if (windowFunctionExpression.getAggregateArguments().size() != 1) {
+                    throw new PlanningErrorException(
+                            String.format("Windowed %s must have exactly one argument", aggName));
+                }
+                // Any type is ok, so we won't inspect the type.
+                break;
+            case AGGREGATE_WINDOWED_SUM:
+                if (windowFunctionExpression.getAggregateArguments().size() != 1) {
+                    throw new PlanningErrorException(
+                            String.format("Windowed SUM must have exactly one numeric argument"));
+                }
+                AbstractExpression arg = windowFunctionExpression.getAggregateArguments().get(0);
+                VoltType vt = arg.getValueType();
+                assert(vt != null);
+                if (! vt.isNumber()) {
+                    throw new PlanningErrorException(
+                                "Windowed SUM must have exactly one numeric argument");
                 }
                 break;
             default:
@@ -1083,7 +1101,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // guards against subquery inside of order by clause
         if (order_exp.hasSubquerySubexpression()) {
             throw new PlanningErrorException(
-                    "ORDER BY clause with subquery expression is not allowed.");
+                    "ORDER BY clauses with subquery expressions are not allowed.");
         }
 
         // Mark the order by column if it is in displayColumns. The ORDER BY
@@ -1126,7 +1144,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (m_having.hasSubquerySubexpression()) {
             m_aggregationList.clear();
             throw new PlanningErrorException(
-                    "SQL HAVING with subquery expression is not allowed.");
+                    "SQL HAVING clauses with subquery expressions are not allowed.");
         }
         if (isDistributed) {
             m_having = m_having.replaceAVG();
@@ -1206,7 +1224,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             TupleValueExpression tve = new TupleValueExpression(
                     col.tableName, col.tableAlias,
                     col.columnName, col.alias,
-                    col.index);
+                    col.index, col.differentiator);
+            tve.setTypeSizeAndInBytes(col.asSchemaColumn());
 
             ParsedColInfo pcol = new ParsedColInfo();
             pcol.tableName = col.tableName;
@@ -1425,12 +1444,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     /**
      * Simplify the EXISTS expression:
+     *  0. LIMIT 0 => FALSE
      *  1. EXISTS ( table-agg-without-having-groupby) => TRUE
-     *  2. Replace the display columns with a single dummy column "1"
-     *     and GROUP BY expressions
+     *  2. Remove any ORDER BY columns
      *  3. Drop DISTINCT expression
      *  4. Add LIMIT 1
-     *  5. Remove ORDER BY expressions if HAVING expression is not present
      *
      * @param selectStmt
      * @return existsExpr
@@ -1444,6 +1462,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (m_limitOffset.getLimit() == 0) {
             return ConstantValueExpression.getFalse();
         }
+
         // Except for "limit 0 offset ?" which is already covered,
         // can't optimize away the entire expression if there are
         // limit and/or offset parameters
@@ -1462,49 +1481,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // Remove ORDER BY columns
         m_orderColumns.clear();
 
-        // Can drop GROUP BY expressions if there are no
-        // HAVING/OFFSET expressions
-        if (m_having == null && !hasOffset()) {
-            m_groupByColumns.clear();
-            m_groupByExpressions.clear();
-        }
-
-        // Remove all non-aggregate display columns if GROUP BY is empty
-        if (m_groupByColumns.isEmpty()) {
-            Iterator<ParsedColInfo >iter = m_displayColumns.iterator();
-            while (iter.hasNext()) {
-                ParsedColInfo col = iter.next();
-                if (!col.expression.hasAnySubexpressionOfClass(
-                        AggregateExpression.class)) {
-                    iter.remove();
-                }
-            }
-        }
-
-        // If m_displayColumns is empty from the previous step
-        // add a single dummy column
-        if (m_displayColumns.isEmpty()) {
-            ParsedColInfo col = new ParsedColInfo();
-            col.expression =
-                    ConstantValueExpression.makeExpression(VoltType.NUMERIC, "1");
-            ExpressionUtil.finalizeValueTypes(col.expression);
-
-            col.tableName = TEMP_TABLE_NAME;
-            col.tableAlias = TEMP_TABLE_NAME;
-            col.columnName = "$$_EXISTS_$$";
-            col.alias = "$$_EXISTS_$$";
-            col.index = 0;
-            m_projectSchema = null;
-            m_displayColumns.add(col);
-        }
-
-        if (m_aggResultColumns.isEmpty()) {
-            m_hasAggregateExpression = false;
-            m_hasAverage = false;
-        }
-
+        // Redo TVE placement since we've cleared the ORDER BY columns.
         placeTVEsinColumns();
-        needComplexAggregation();
 
         // Drop DISTINCT expression
         m_distinct = false;
@@ -1846,7 +1824,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return ! m_orderColumns.isEmpty();
     }
 
-    public void setUnsafeMVMessage(String msg) {
+    public void setUnsafeDDLMessage(String msg) {
         m_mvUnSafeErrorMessage = msg;
     }
 
@@ -1936,6 +1914,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public List<ParsedColInfo> groupByColumns() {
         return Collections.unmodifiableList(m_groupByColumns);
+    }
+
+    public List<ParsedColInfo> distinctGroupByColumns() {
+        return Collections.unmodifiableList(m_distinctGroupByColumns);
     }
 
     @Override
@@ -2151,7 +2133,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // the hard cases on that basis.
         HashSet<AbstractExpression> orderByTVEs = new HashSet<>();
         ArrayList<AbstractExpression> orderByNonTVEs = new ArrayList<>();
-        ArrayList<List<AbstractExpression>> orderByNonTVEBaseTVEs = new ArrayList<>();
+        ArrayList<List<TupleValueExpression>> orderByNonTVEBaseTVEs = new ArrayList<>();
         HashSet<AbstractExpression> orderByAllBaseTVEs = new HashSet<>();
 
         for (AbstractExpression orderByExpr : orderByExprs) {
@@ -2161,7 +2143,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
             else {
                 orderByNonTVEs.add(orderByExpr);
-                List<AbstractExpression> baseTVEs =
+                List<TupleValueExpression> baseTVEs =
                         orderByExpr.findAllTupleValueSubexpressions();
                 orderByNonTVEBaseTVEs.add(baseTVEs);
                 orderByAllBaseTVEs.addAll(baseTVEs);
@@ -2171,7 +2153,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         boolean result = true;
 
         for (AbstractExpression candidateExpr : candidateExprHardCases) {
-            Collection<AbstractExpression> candidateBases =
+            Collection<TupleValueExpression> candidateBases =
                     candidateExpr.findAllTupleValueSubexpressions();
             if (orderByTVEs.containsAll(candidateBases)) {
                 continue;

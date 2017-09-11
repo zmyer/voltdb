@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,7 +27,6 @@ import java.util.Map.Entry;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CatalogContext;
-import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -59,14 +58,14 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         m_sitePool = sitePool;
     }
 
-    synchronized void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
+    synchronized void updateCatalog(String diffCmds, CatalogContext context)
     {
-        m_sitePool.updateCatalog(diffCmds, context, csp);
+        m_sitePool.updateCatalog(diffCmds, context);
     }
 
-    synchronized void updateSettings(CatalogContext context, CatalogSpecificPlanner csp)
+    synchronized void updateSettings(CatalogContext context)
     {
-        m_sitePool.updateSettings(context, csp);
+        m_sitePool.updateSettings(context);
     }
 
     void shutdown()

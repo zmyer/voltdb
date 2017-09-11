@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,6 +24,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,6 +39,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.types.TimestampType;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.AddPerson;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.AddThing;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.AggAges;
@@ -212,6 +214,14 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(abs(v1)) AS vmin, MAX(abs(v1)) AS vmax FROM ENG6511 GROUP BY d1, d2 ORDER BY 1, 2;").getResults()[0];
         assertTablesAreEqual(prefix + "VENG6511expR: ", tresult, vresult, EPSILON);
 
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expRC ORDER BY d1, d2;").getResults()[0];
+        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, MIN(abs(v1)) AS vmin, COUNT(*), MAX(abs(v1)) AS vmax FROM ENG6511 GROUP BY d1, d2 ORDER BY 1, 2;").getResults()[0];
+        assertTablesAreEqual(prefix + "VENG6511expRC: ", tresult, vresult, EPSILON);
+
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expRCM ORDER BY d1, d2;").getResults()[0];
+        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, MIN(abs(v1)) AS vmin, COUNT(*), MAX(abs(v1)), COUNT(*), MIN(v1) FROM ENG6511 GROUP BY d1, d2 ORDER BY 1, 2;").getResults()[0];
+        assertTablesAreEqual(prefix + "VENG6511expRCM: ", tresult, vresult, EPSILON);
+
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expLR ORDER BY d1, d2;").getResults()[0];
         tresult = client.callProcedure("@AdHoc", "SELECT d1+1, d2*2, COUNT(*), MIN(v2-1) AS vmin, MAX(v2-1) AS vmax FROM ENG6511 GROUP BY d1+1, d2*2 ORDER BY 1, 2;").getResults()[0];
         assertTablesAreEqual(prefix + "VENG6511expLR: ", tresult, vresult, EPSILON);
@@ -287,6 +297,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         subtestIndexMinMaxSinglePartition();
         subtestIndexMinMaxSinglePartitionWithPredicate();
         subtestNullMinMaxSinglePartition();
+        subtestCountStarAnywhereSimple();
+        subtestCountStarAnywhereMultiple();
         subtestENG7872SinglePartition();
         subtestENG6511(false);
     }
@@ -857,6 +869,159 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(4, t.getLong(2));
         assertEquals(200, (int)(t.getDouble(3)));
         assertEquals(9, t.getLong(4));
+    }
+
+    private void subtestCountStarAnywhereSimple() throws IOException, ProcCallException
+    {
+        Client client = getClient();
+        truncateBeforeTest(client);
+        VoltTable[] results = null;
+        VoltTable t;
+
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE4").getResults();
+        assert(results != null);
+        assertEquals(1, results.length);
+        assertEquals(0, results[0].getRowCount());
+
+        results = client.callProcedure("AddPerson", 1, 1L, 31L, 1000.0, 3, NORMALLY).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+        results = client.callProcedure("AddPerson", 1, 2L, 31L, 900.0, 5, NORMALLY).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+        results = client.callProcedure("AddPerson", 1, 3L, 31L, 900.0, 1, NORMALLY).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+        results = client.callProcedure("AddPerson", 1, 4L, 31L, 2500.0, 5, NORMALLY).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+        results = client.callProcedure("AddPerson", 1, 5L, 31L, null, null, NORMALLY).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE4").getResults();
+        assert(results != null);
+        assertEquals(1, results.length);
+        t = results[0];
+        assertEquals(1, t.getRowCount());
+        System.out.println(t.toString());
+        t.advanceRow();
+        assertEquals(900, (int)(t.getDouble(2)));
+        assertEquals(5, t.getLong(3));
+        assertEquals(5, t.getLong(4));
+
+        results = client.callProcedure("DeletePerson", 1, 2L, NORMALLY).getResults();
+
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE4").getResults();
+        assert(results != null);
+        assertEquals(1, results.length);
+        t = results[0];
+        assertEquals(1, t.getRowCount());
+        System.out.println(t.toString());
+        t.advanceRow();
+        assertEquals(900, (int)(t.getDouble(2)));
+        assertEquals(4, t.getLong(3));
+        assertEquals(5, t.getLong(4));
+
+        results = client.callProcedure("UpdatePerson", 1, 3L, 31L, 200, 9).getResults();
+
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE4").getResults();
+        assert(results != null);
+        assertEquals(1, results.length);
+        t = results[0];
+        assertEquals(1, t.getRowCount());
+        System.out.println(t.toString());
+        t.advanceRow();
+        assertEquals(200, (int)(t.getDouble(2)));
+        assertEquals(4, t.getLong(3));
+        assertEquals(9, t.getLong(4));
+    }
+
+    private void subtestCountStarAnywhereMultiple() throws IOException, ProcCallException
+    {
+        Client client = getClient();
+        truncateBeforeTest(client);
+        VoltTable[] results = null;
+        VoltTable t;
+
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE5").getResults();
+        assert(results != null);
+        assertEquals(1, results.length);
+        assertEquals(0, results[0].getRowCount());
+
+        results = client.callProcedure("AddPerson", 1, 1L, 31L, 1000.0, 3, NORMALLY).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+        results = client.callProcedure("AddPerson", 1, 2L, 31L, 900.0, 5, NORMALLY).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+        results = client.callProcedure("AddPerson", 1, 3L, 31L, 900.0, 1, NORMALLY).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+        results = client.callProcedure("AddPerson", 1, 4L, 31L, 2500.0, 5, NORMALLY).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+        results = client.callProcedure("AddPerson", 1, 5L, 31L, null, null, NORMALLY).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE5").getResults();
+        assert(results != null);
+        assertEquals(1, results.length);
+        t = results[0];
+        assertEquals(1, t.getRowCount());
+        System.out.println(t.toString());
+        t.advanceRow();
+        assertEquals(900, (int)(t.getDouble(2)));
+        assertEquals(5, t.getLong(3));
+        assertEquals(5, t.getLong(4));
+        assertEquals(5, t.getLong(5));
+        assertEquals(2500, (int)(t.getDouble(6)));
+
+        results = client.callProcedure("DeletePerson", 1, 2L, NORMALLY).getResults();
+
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE5").getResults();
+        assert(results != null);
+        assertEquals(1, results.length);
+        t = results[0];
+        assertEquals(1, t.getRowCount());
+        System.out.println(t.toString());
+        t.advanceRow();
+        assertEquals(900, (int)(t.getDouble(2)));
+        assertEquals(4, t.getLong(3));
+        assertEquals(5, t.getLong(4));
+        assertEquals(4, t.getLong(5));
+        assertEquals(2500, (int)(t.getDouble(6)));
+
+        results = client.callProcedure("UpdatePerson", 1, 3L, 31L, 200, 9).getResults();
+
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE5").getResults();
+        assert(results != null);
+        assertEquals(1, results.length);
+        t = results[0];
+        assertEquals(1, t.getRowCount());
+        System.out.println(t.toString());
+        t.advanceRow();
+        assertEquals(200, (int)(t.getDouble(2)));
+        assertEquals(4, t.getLong(3));
+        assertEquals(9, t.getLong(4));
+        assertEquals(4, t.getLong(5));
+        assertEquals(2500, (int)(t.getDouble(6)));
+
+        results = client.callProcedure("UpdatePerson", 1, 3L, 31L, 3000, 2).getResults();
+
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE5").getResults();
+        assert(results != null);
+        assertEquals(1, results.length);
+        t = results[0];
+        assertEquals(1, t.getRowCount());
+        System.out.println(t.toString());
+        t.advanceRow();
+        assertEquals(1000, (int)(t.getDouble(2)));
+        assertEquals(4, t.getLong(3));
+        assertEquals(5, t.getLong(4));
+        assertEquals(4, t.getLong(5));
+        assertEquals(3000, (int)(t.getDouble(6)));
     }
 
     private void subtestENG7872MP() throws IOException, ProcCallException
@@ -1470,14 +1635,6 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1L, results[0].asScalarLong());
     }
 
-    private void insertRowAdHoc(Client client, String stmt) throws IOException, ProcCallException
-    {
-        VoltTable[] results = null;
-        results = client.callProcedure("@AdHoc", stmt).getResults();
-        assertEquals(1, results.length);
-        assertEquals(1L, results[0].asScalarLong());
-    }
-
     private void deleteRow(Client client, Object... parameters) throws IOException, ProcCallException
     {
         VoltTable[] results = null;
@@ -1517,6 +1674,14 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM ORDER_COUNT_GLOBAL ORDER BY 1;").getResults()[0];
         tresult = client.callProcedure("PROC_ORDER_COUNT_GLOBAL").getResults()[0];
         assertTablesAreEqual(prefix + "ORDER_COUNT_GLOBAL: ", tresult, vresult, EPSILON);
+
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM ORDER_COUNT_GLOBAL_ANYWHERE ORDER BY 1;").getResults()[0];
+        tresult = client.callProcedure("PROC_ORDER_COUNT_GLOBAL_ANYWHERE").getResults()[0];
+        assertTablesAreEqual(prefix + "ORDER_COUNT_GLOBAL_ANYWHERE: ", tresult, vresult, EPSILON);
+
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM ORDER_COUNT_GLOBAL_MULTIPLE ORDER BY 1;").getResults()[0];
+        tresult = client.callProcedure("PROC_ORDER_COUNT_GLOBAL_MULTIPLE").getResults()[0];
+        assertTablesAreEqual(prefix + "ORDER_COUNT_GLOBAL_MULTIPLE: ", tresult, vresult, EPSILON);
 
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM ORDER_DETAIL_NOPCOL ORDER BY 1;").getResults()[0];
         tresult = client.callProcedure("PROC_ORDER_DETAIL_NOPCOL").getResults()[0];
@@ -1657,7 +1822,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             System.out.println("Now testing altering the source table of a view.");
             // 3.1 add column
             try {
-                client.callProcedure("@AdHoc", "ALTER TABLE ORDERITEMS ADD COLUMN x FLOAT;" +
+                client.callProcedure("@AdHoc",
+                        "ALTER TABLE ORDERITEMS ADD COLUMN x FLOAT;" +
                         "ALTER TABLE WAS_ORDERITEMS ADD COLUMN x FLOAT;");
             } catch (ProcCallException pce) {
                 pce.printStackTrace();
@@ -1666,7 +1832,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             verifyViewOnJoinQueryResult(client);
             // 3.2 drop column
             try {
-                client.callProcedure("@AdHoc", "ALTER TABLE ORDERITEMS DROP COLUMN x;" +
+                client.callProcedure("@AdHoc",
+                        "ALTER TABLE ORDERITEMS DROP COLUMN x;" +
                         "ALTER TABLE WAS_ORDERITEMS DROP COLUMN x;");
             } catch (ProcCallException pce) {
                 pce.printStackTrace();
@@ -1675,7 +1842,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             verifyViewOnJoinQueryResult(client);
             // 3.3 alter column
             try {
-                client.callProcedure("@AdHoc", "ALTER TABLE CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(100);" +
+                client.callProcedure("@AdHoc",
+                        "ALTER TABLE CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(100);" +
                         "ALTER TABLE WAS_CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(100);");
             } catch (ProcCallException pce) {
                 pce.printStackTrace();
@@ -1689,6 +1857,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         if (! isHSQL()) {
             System.out.println("Now testing view data catching-up.");
             try {
+                client.callProcedure("@AdHoc", "DROP PROCEDURE TruncateMatViewDataMP;");
                 client.callProcedure("@AdHoc", "DROP VIEW ORDER_DETAIL_WITHPCOL;");
             } catch (ProcCallException pce) {
                 pce.printStackTrace();
@@ -1707,6 +1876,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                                    "JOIN ORDERITEMS ON ORDERS.ORDER_ID = ORDERITEMS.ORDER_ID " +
                                    "JOIN PRODUCTS ON ORDERITEMS.PID = PRODUCTS.PID " +
                     "GROUP BY CUSTOMERS.NAME, ORDERS.ORDER_ID;");
+                client.callProcedure("@AdHoc", "CREATE PROCEDURE FROM CLASS org.voltdb_testprocs.regressionsuites.matviewprocs.TruncateMatViewDataMP");
             } catch (ProcCallException pce) {
                 pce.printStackTrace();
                 fail("Should be able to create a view.");
@@ -1751,6 +1921,20 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             deleteRow(client, dataList1.get(i));
             verifyViewOnJoinQueryResult(client);
         }
+
+        // Restore catalog changes:
+        try {
+            client.callProcedure("@AdHoc",
+                    "TRUNCATE TABLE CUSTOMERS;" +
+                    "TRUNCATE TABLE WAS_CUSTOMERS;");
+            client.callProcedure("@AdHoc",
+                    "ALTER TABLE CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(50);" +
+                    "ALTER TABLE WAS_CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(50);");
+        } catch (ProcCallException pce) {
+            pce.printStackTrace();
+            fail("Should be able to alter column in a view source table.");
+        }
+        verifyViewOnJoinQueryResult(client);
     }
 
     private void truncateSourceTables(Client client, int rollback,
@@ -1783,6 +1967,31 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         catch (Exception other) {
             fail("The call to TruncateTables unexpectedly threw: " + other);
         }
+    }
+
+    public void testViewOnGeoJoin() throws Exception {
+        if (isHSQL()) {
+            return;
+        }
+        Client client = getClient();
+        String[] inserts = {
+            "INSERT INTO REGIONS VALUES (1, POLYGONFROMTEXT('POLYGON((116.223593 39.993320, 116.210284 39.913219, 116.314654 39.907425, 116.311221 39.959550, 116.297064 39.982798, 116.285391 40.013307, 116.223593 39.993320))'));",
+            "INSERT INTO REGIONS VALUES (2, POLYGONFROMTEXT('POLYGON((116.285391 40.013307, 116.297064 39.982798, 116.311221 39.959550, 116.314654 39.907425, 116.417906 39.908933, 116.417098 40.022447, 116.285391 40.013307))'));",
+            "INSERT INTO REGIONS VALUES (3, POLYGONFROMTEXT('POLYGON((116.417906 39.908933, 116.541565 39.910605, 116.541565 39.942285, 116.484160 40.013818, 116.417098 40.022447, 116.417906 39.908933))'));",
+            "INSERT INTO REGIONS VALUES (4, POLYGONFROMTEXT('POLYGON((116.314654 39.907425, 116.210284 39.913219, 116.236834 39.833608, 116.276535 39.774669, 116.302437 39.781428, 116.341139 39.778454, 116.346115 39.831547, 116.290273 39.830698, 116.314654 39.907425))'));",
+            "INSERT INTO REGIONS VALUES (5, POLYGONFROMTEXT('POLYGON((116.341139 39.778454, 116.368231 39.776329, 116.379289 39.758905, 116.417438 39.766130, 116.430708 39.790775, 116.417906 39.908933, 116.314654 39.907425, 116.290273 39.830698, 116.346115 39.831547, 116.341139 39.778454))'));",
+            "INSERT INTO REGIONS VALUES (6, POLYGONFROMTEXT('POLYGON((116.417906 39.908933, 116.430708 39.790775, 116.461670 39.791625, 116.476598 39.807342, 116.542945 39.845557, 116.541565 39.910605, 116.417906 39.908933))'));",
+            "INSERT INTO TAXI_LOCATIONS VALUES (223, '2008-02-02 15:31:02', POINTFROMTEXT('POINT(116.286058 39.990632)'));", // region 1
+            "INSERT INTO TAXI_LOCATIONS VALUES (223, '2008-02-02 15:31:02', POINTFROMTEXT('POINT(116.471170 39.953689)'));", // region 3
+            "INSERT INTO TAXI_LOCATIONS VALUES (223, '2008-02-02 15:31:02', POINTFROMTEXT('POINT(116.334239 39.861732)'));", // region 5
+            "INSERT INTO TAXI_LOCATIONS VALUES (223, '2008-02-02 15:31:02', POINTFROMTEXT('POINT(116.433545 39.896514)'));", // region 6
+            "INSERT INTO TAXI_LOCATIONS VALUES (223, '2008-02-02 15:31:02', POINTFROMTEXT('POINT(116.537664 39.913775)'));"  // region 3
+        };
+        for (String insert : inserts) {
+            assertSuccessfulDML(client, insert);
+        }
+        VoltTable vresult = client.callProcedure("@AdHoc", "SELECT * FROM REGIONAL_TAXI_COUNT ORDER BY 1;").getResults()[0];
+        assertContentOfTable(new Object[][]{{1, 1}, {3, 2}, {5, 1}, {6, 1}}, vresult);
     }
 
     public void testEng11024() throws Exception {
@@ -2209,6 +2418,16 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             vt = client.callProcedure("@AdHoc",
                 "SELECT * FROM V_ENG_11203_JOIN").getResults()[0];
             assertContentOfTable(new Object[][] {}, vt);
+
+            // Restore catalog changes:
+            try {
+                client.callProcedure("@AdHoc",
+                    "DROP INDEX I_ENG_11203_JOIN;" +
+                    "DROP INDEX I_ENG_11203_SINGLE;");
+            } catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to drop indexes on the joined table views V_ENG_11203_JOIN and V_ENG_11203_SINGLE.");
+            }
         }
     }
 
@@ -2222,9 +2441,9 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         String bugTrigger = "UPDATE T1_ENG_11314 SET C2=64, C3=1024 WHERE G1=2;";
         Object[][] viewContent = { {0, 2, 0, 0, 1024, 64, 0, 0, 0, 0, 0, 0, "abc", "def"} };
         // -1- Insert data
-        insertRowAdHoc(client, insertT1[0]);
-        insertRowAdHoc(client, insertT1[1]);
-        insertRowAdHoc(client, insertT2);
+        assertSuccessfulDML(client, insertT1[0]);
+        assertSuccessfulDML(client, insertT1[1]);
+        assertSuccessfulDML(client, insertT2);
         // -2- Test if the UPDATE statement will trigger an error on single table view V1:
         client.callProcedure("@AdHoc", bugTrigger);
         // -3- Verify view contents
@@ -2270,8 +2489,37 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         doTestMVFailedCase(sql, "cannot include the function NOW or CURRENT_TIMESTAMP");
     }
 
+    public void testENG11935() throws Exception {
+        // to_timestamp function is not implemented in the HSQL backend, skip HSQL.
+        if (isHSQL()) {
+            return;
+        }
+        // All the statements will not crash the server.
+        Client client = getClient();
+        // exec ENG11935.insert '0' 'abc' 1486148453 'def' 'ghi' 'jkl' 'mno0' 35094 30847 27285 36335 59247 50750 '0';
+        // exec ENG11935.insert '0' 'abc' 1486148453 'def' 'ghi' 'jkl' 'mno1' 35094 30847 27285 36335 59247 50750 '1';
+        client.callProcedure("ENG11935.insert", "0", "abc", 1486148453, "def", "ghi", "jkl",
+                             "mno0", 35094, 30847, 27285, 36335, 59247, 50750, "0");
+        client.callProcedure("ENG11935.insert", "0", "abc", 1486148453, "def", "ghi", "jkl",
+                             "mno1", 35094, 30847, 27285, 36335, 59247, 50750, "1");
+        TimestampType timestamp = new TimestampType("1970-01-18 04:50:00.000000");
+        VoltTable vt = client.callProcedure("@AdHoc", "SELECT * FROM V_ENG11935;").getResults()[0];
+        Object[][] expectedAnswer = new Object[][] {
+            {"0", "abc", "def", "ghi", "jkl", timestamp, 1486200, 2, "mno1",
+             new BigDecimal("1403760.000000000000"), new BigDecimal("1233880.000000000000"),
+             1091400, 1453400, 64662175800L, 73760050000L} };
+        assertContentOfTable(expectedAnswer, vt);
+        client.callProcedure("@AdHoc", "DELETE FROM ENG11935 WHERE VAR1 = '0' AND PRIMKEY = '1';");
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM V_ENG11935;").getResults()[0];
+        expectedAnswer = new Object[][] {
+            {"0", "abc", "def", "ghi", "jkl", timestamp, 1486200, 1, "mno0",
+             new BigDecimal("701880.000000000000"), new BigDecimal("616940.000000000000"),
+             545700, 726700, 32331087900L, 36880025000L} };
+        assertContentOfTable(expectedAnswer, vt);
+    }
+
     /**
-     * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
+     * Build a list of the tests that will be run when TestMaterializedViewSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
      * This particular class runs all tests on the the local JNI backend with both
      * one and two partition configurations, as well as on the hsql backend.

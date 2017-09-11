@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,6 +29,8 @@
 
 namespace voltdb
 {
+    static const size_t MAX_CACHED_POOLS = 64;
+
     class UndoLog
     {
     public:
@@ -105,10 +107,15 @@ namespace voltdb
                 }
 
                 m_undoQuantums.pop_back();
-                // Destroy the quantum, but retain its pool for reuse.
+                // Destroy the quantum, but possibly retain its pool for reuse.
                 Pool *pool = undoQuantum->undo();
                 pool->purge();
-                m_undoDataPools.push_back(pool);
+                if (m_undoDataPools.size() < MAX_CACHED_POOLS) {
+                    m_undoDataPools.push_back(pool);
+                }
+                else {
+                    delete pool; pool = NULL;
+                }
 
                 if(undoQuantumToken == undoToken) {
                     return;
@@ -135,10 +142,15 @@ namespace voltdb
                 }
 
                 m_undoQuantums.pop_front();
-                // Destroy the quantum, but retain its pool for reuse.
+                // Destroy the quantum, but possibly retain its pool for reuse.
                 Pool *pool = undoQuantum->release();
                 pool->purge();
-                m_undoDataPools.push_back(pool);
+                if (m_undoDataPools.size() < MAX_CACHED_POOLS) {
+                    m_undoDataPools.push_back(pool);
+                }
+                else {
+                    delete pool; pool = NULL;
+                }
                 if(undoQuantumToken == undoToken) {
                     return;
                 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -377,6 +377,7 @@ public class TestJoinsSuite extends RegressionSuite {
             validateRowCount(client, query, 3);
         }
         else {
+            // "IS NOT DISTINCT FROM" in the end expression, but not in the search expression (range scan).
             validateRowCount(client, query, 11);
         }
 

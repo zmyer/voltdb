@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
@@ -32,6 +33,7 @@ import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.jni.ExecutionEngine.TaskType;
@@ -42,6 +44,7 @@ public class ExecuteTask extends VoltSystemProcedure {
     private static final int DEP_executeTask = (int) SysProcFragmentId.PF_executeTask | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     private static final int DEP_executeTaskAggregate = (int) SysProcFragmentId.PF_executeTaskAggregate;
 
+    static final VoltLogger log = new VoltLogger("TM");
 
     static VoltTable createDRTupleStreamStateResultTable()
     {
@@ -55,9 +58,8 @@ public class ExecuteTask extends VoltSystemProcedure {
     }
 
     @Override
-    public void init() {
-        registerPlanFragment(SysProcFragmentId.PF_executeTask);
-        registerPlanFragment(SysProcFragmentId.PF_executeTaskAggregate);
+    public long[] getPlanFragmentIds() {
+        return new long[]{SysProcFragmentId.PF_executeTask, SysProcFragmentId.PF_executeTaskAggregate};
     }
 
     @Override
@@ -101,12 +103,20 @@ public class ExecuteTask extends VoltSystemProcedure {
                 result = new VoltTable(STATUS_SCHEMA);
                 result.addRow(STATUS_OK);
                 int drVersion = buffer.getInt();
-                context.getSiteProcedureConnection().setDRProtocolVersion(drVersion);
+                int createStartStream = buffer.getInt();
+                if (createStartStream > 0) {
+                    long uniqueId = m_runner.getUniqueId();
+                    long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
+                    context.getSiteProcedureConnection().setDRProtocolVersion(drVersion, spHandle, uniqueId);
+                } else {
+                    context.getSiteProcedureConnection().setDRProtocolVersion(drVersion);
+                }
                 break;
             }
-            case SET_DRID_TRACKER:
+            case SET_DRID_TRACKER_START:
             {
-                result = new VoltTable(STATUS_SCHEMA);
+                result = new VoltTable(STATUS_SCHEMA,
+                        new ColumnInfo("LOCAL_UNIQUEID", VoltType.BIGINT));
                 try {
                     byte[] paramBuf = new byte[buffer.remaining()];
                     buffer.get(paramBuf);
@@ -122,7 +132,7 @@ public class ExecuteTask extends VoltSystemProcedure {
                             context.appendApplyBinaryLogTxns(producerClusterId, producerPartitionId, -1L, tracker);
                         }
                     }
-                    result.addRow(STATUS_OK);
+                    result.addRow(STATUS_OK, m_runner.getTxnState().uniqueId);
 
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -137,18 +147,64 @@ public class ExecuteTask extends VoltSystemProcedure {
                 context.resetDrAppliedTracker();
                 break;
             }
+            case SET_MERGED_DRID_TRACKER:
+            {
+                result = new VoltTable(STATUS_SCHEMA);
+                try {
+                    byte[] paramBuf = new byte[buffer.remaining()];
+                    buffer.get(paramBuf);
+                    ByteArrayInputStream bais = new ByteArrayInputStream(paramBuf);
+                    ObjectInputStream ois = new ObjectInputStream(bais);
+                    Map<Integer, Map<Integer, DRConsumerDrIdTracker>> clusterToPartitionMap =
+                            (Map<Integer, Map<Integer, DRConsumerDrIdTracker>>)ois.readObject();
+                    context.recoverWithDrAppliedTrackers(clusterToPartitionMap);
+                    result.addRow(STATUS_OK);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    result.addRow("FAILURE");
+                }
+                break;
+            }
+            case INIT_DRID_TRACKER:
+            {
+                result = new VoltTable(STATUS_SCHEMA);
+                try {
+                    byte[] paramBuf = new byte[buffer.remaining()];
+                    buffer.get(paramBuf);
+                    ByteArrayInputStream bais = new ByteArrayInputStream(paramBuf);
+                    ObjectInputStream ois = new ObjectInputStream(bais);
+                    Map<Byte, Integer> clusterIdToPartitionCountMap = (Map<Byte, Integer>)ois.readObject();
+                    context.initDRAppliedTracker(clusterIdToPartitionCountMap);
+                    result.addRow(STATUS_OK);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    result.addRow("FAILURE");
+                }
+                break;
+            }
             default:
                 throw new VoltAbortException("Unable to find the task associated with the given task id");
             }
-            return new DependencyPair(DEP_executeTask, result);
+            return new DependencyPair.TableDependencyPair(DEP_executeTask, result);
         } else if (fragmentId == SysProcFragmentId.PF_executeTaskAggregate) {
-            return new DependencyPair(DEP_executeTaskAggregate, VoltTableUtil.unionTables(dependencies.get(DEP_executeTask)));
+            VoltTable unionTable = VoltTableUtil.unionTables(dependencies.get(DEP_executeTask));
+            return new DependencyPair.TableDependencyPair(DEP_executeTaskAggregate, unionTable);
         }
         assert false;
         return null;
     }
 
     public VoltTable[] run(SystemProcedureExecutionContext ctx, byte[] params) {
+        if (log.isDebugEnabled()) {
+            log.debug("Called ExecuteTask on MPI with param size of " + params.length);
+        }
+        if (params.length == 0) {
+            // This is a way for forcing the MPI to execute a runnable without doing anything
+            VoltTable result = new VoltTable(STATUS_SCHEMA);
+            result.addRow(STATUS_OK);
+            return new VoltTable[] {result};
+        }
+
         SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
 
         pfs[0] = new SynthesizedPlanFragment();

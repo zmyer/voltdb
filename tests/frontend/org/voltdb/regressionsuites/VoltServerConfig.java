@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 /**
@@ -44,6 +45,12 @@ import org.voltdb.compiler.VoltProjectBuilder;
 public abstract class VoltServerConfig {
 
     protected BackendTarget m_target = BackendTarget.NONE;
+
+    protected Catalog m_initialCatalog;
+
+    public Catalog getInitialCatalog() {
+        return m_initialCatalog;
+    }
 
     private static Set<VoltServerConfig> s_instanceSet= null;
 
@@ -135,8 +142,7 @@ public abstract class VoltServerConfig {
             String snapshotPath,
             String ppdPrefix);
 
-    abstract boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort,
-                                 boolean adminOnStartup);
+    abstract boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort, boolean adminOnStartup);
 
     /**
      * Create a directory so it is accessible

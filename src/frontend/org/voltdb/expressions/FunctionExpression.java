@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,6 +17,7 @@
 
 package org.voltdb.expressions;
 
+import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -368,7 +369,11 @@ public class FunctionExpression extends AbstractExpression {
     }
 
     @Override
-    public void findNonemptyMVSafeOperations(MVUnsafeOperators ops) {
+    public void findUnsafeOperatorsForDDL(UnsafeOperatorsForDDL ops) {
         ops.add(explain("Be Explicit"));
+    }
+
+    public boolean isUserDefined() {
+        return FunctionForVoltDB.isUserDefinedFunctionId(m_functionId);
     }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -46,7 +46,7 @@ ElasticScanner::~ElasticScanner()
 bool ElasticScanner::continueScan() {
     if (!m_scanComplete) {
         // First block or end of block?
-        if (m_currentBlockPtr == NULL || m_tupleIndex >= m_currentBlockPtr->unusedTupleBoundry()) {
+        if (m_currentBlockPtr == NULL || m_tupleIndex >= m_currentBlockPtr->unusedTupleBoundary()) {
             // No more blocks?
             m_scanComplete = (m_blockIterator == m_blockEnd);
             if (!m_scanComplete) {

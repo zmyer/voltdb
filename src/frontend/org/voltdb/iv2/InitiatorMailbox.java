@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -307,9 +307,15 @@ public class InitiatorMailbox implements Mailbox
             m_repairLog.deliver(message);
             return;
         }
-        m_repairLog.deliver(message);
+
         if (canDeliver) {
+            //For a message delivered to partition leaders, the message may not have the updated transaction id yet.
+            //The scheduler of partition leader will advance the transaction id, update the message and add it to repair log.
+            //so that the partition leader and replicas have the consistent items in their repair logs.
             m_scheduler.deliver(message);
+        } else {
+            //Add messages which are not delivered to scheduler to the repair log right away.
+            m_repairLog.deliver(message);
         }
     }
 

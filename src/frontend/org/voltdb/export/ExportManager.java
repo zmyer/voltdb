@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -235,7 +235,7 @@ public class ExportManager
                          * For those use a naive leader election strategy that is implemented
                          * by export generation.
                          */
-                        nextGeneration.kickOffLeaderElection();
+                        nextGeneration.kickOffLeaderElection(m_messenger);
                     } else {
                         /*
                          * This strategy is the one that piggy backs on
@@ -270,10 +270,11 @@ public class ExportManager
         }
         try {
             //We close and delete regardless
-            drainedGeneration.closeAndDelete();
+            drainedGeneration.closeAndDelete(m_messenger);
         } catch (IOException e) {
-            e.printStackTrace();
-            exportLog.error(e);
+            //Warn users if close or delete of PBDs has issues the generation is closed and thus on startup will be attempted
+            //to load and delete if empty.
+            exportLog.warn("Failed to close and delete generation files.", e);
         }
     }
 
@@ -302,7 +303,7 @@ public class ExportManager
         if (hasEnabledConnectors(connectors)) {
             em.createInitialExportProcessor(catalogContext, connectors, true, partitions, isRejoin);
         } else {
-            m_lastNonEnabledGeneration = catalogContext.m_uniqueId;
+            m_lastNonEnabledGeneration = catalogContext.m_genId;
         }
     }
 
@@ -377,7 +378,6 @@ public class ExportManager
     {
         m_hostId = myHostId;
         m_messenger = messenger;
-        final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
         final CatalogMap<Connector> connectors = getConnectors(catalogContext);
 
         if (!hasEnabledConnectors(connectors)) {
@@ -394,6 +394,10 @@ public class ExportManager
         updateProcessorConfig(connectors);
 
         exportLog.info(String.format("Export is enabled and can overflow to %s.", VoltDB.instance().getExportOverflowPath()));
+    }
+
+    public HostMessenger getHostMessenger() {
+        return m_messenger;
     }
 
     private void clearOverflowData(CatalogContext catContext) throws ExportManager.SetupException {
@@ -456,16 +460,16 @@ public class ExportManager
              * So construct one here, otherwise use the one provided
              */
             if (startup) {
-                if (!m_generations.containsKey(catalogContext.m_uniqueId)) {
+                if (!m_generations.containsKey(catalogContext.m_genId)) {
                     final ExportGeneration currentGeneration = new ExportGeneration(
-                            catalogContext.m_uniqueId,
+                            catalogContext.m_genId,
                             exportOverflowDirectory, isRejoin);
                     currentGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(currentGeneration));
                     currentGeneration.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
-                    m_generations.put(catalogContext.m_uniqueId, currentGeneration);
+                    m_generations.put(catalogContext.m_genId, currentGeneration);
                 } else {
                     exportLog.info("Persisted export generation same as catalog exists. Persisted generation will be used and appended to");
-                    ExportGeneration currentGeneration = m_generations.get(catalogContext.m_uniqueId);
+                    ExportGeneration currentGeneration = m_generations.get(catalogContext.m_genId);
                     currentGeneration.initializeMissingPartitionsFromCatalog(connectors, m_hostId, m_messenger, partitions);
                 }
             }
@@ -484,7 +488,7 @@ public class ExportManager
                  * to choose which server is going to export each partition
                  */
                 if (!nextGeneration.isContinueingGeneration()) {
-                    nextGeneration.kickOffLeaderElection();
+                    nextGeneration.kickOffLeaderElection(m_messenger);
                 }
             } else {
                 /*
@@ -498,7 +502,7 @@ public class ExportManager
                      * For those use a naive leader election strategy that is implemented
                      * by export generation.
                      */
-                    nextGeneration.kickOffLeaderElection();
+                    nextGeneration.kickOffLeaderElection(m_messenger);
                 } else {
                     /*
                      * This strategy is the one that piggy backs on
@@ -542,7 +546,7 @@ public class ExportManager
 
         //Only give the processor to the oldest generation
         for (File generationDirectory : generationDirectories) {
-            ExportGeneration generation = new ExportGeneration(generationDirectory, catalogContext.m_uniqueId);
+            ExportGeneration generation = new ExportGeneration(generationDirectory, catalogContext.m_genId);
             generation.setGenerationDrainRunnable(new GenerationDrainRunnable(generation));
 
             if (generation.initializeGenerationFromDisk(connectors, m_messenger)) {
@@ -618,27 +622,39 @@ public class ExportManager
         return m_connCount;
     }
 
-    public synchronized void updateCatalog(CatalogContext catalogContext, List<Integer> partitions)
+    public synchronized void updateCatalog(CatalogContext catalogContext, boolean requireCatalogDiffCmdsApplyToEE, boolean requiresNewExportGeneration, List<Integer> partitions)
     {
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
         final CatalogMap<Connector> connectors = db.getConnectors();
 
         updateProcessorConfig(connectors);
-        if (m_processorConfig.size() == 0) {
-            m_lastNonEnabledGeneration = catalogContext.m_uniqueId;
+        long genid = catalogContext.m_genId;
+        if (m_processorConfig.isEmpty()) {
+            m_lastNonEnabledGeneration = genid;
             return;
         }
 
+        if (!requiresNewExportGeneration) {
+            exportLog.info("Skipped rolling generations as no stream related changes happened during this update.");
+            return;
+        }
+        /**
+         * This checks if the catalogUpdate was done in EE or not. If catalog update is skipped for @UpdateClasses and such
+         * EE does not roll to new generation and thus we need to ignore creating new generation roll with the current generation.
+         * If anything changes in getDiffCommandsForEE or design changes pay attention to fix this.
+         */
+        if (requireCatalogDiffCmdsApplyToEE == false) {
+            exportLog.info("Skipped rolling generations as generation not created in EE.");
+            return;
+        }
         File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
-        final int numOfReplicas = catalogContext.getDeployment().getCluster().getKfactor();
-
-        ExportGeneration newGeneration = null;
+        ExportGeneration newGeneration;
         try {
-            newGeneration = new ExportGeneration(catalogContext.m_uniqueId, exportOverflowDirectory, false);
+            newGeneration = new ExportGeneration(genid, exportOverflowDirectory, false);
             newGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(newGeneration));
             newGeneration.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
-            m_generations.put(catalogContext.m_uniqueId, newGeneration);
+            m_generations.put(genid, newGeneration);
         } catch (IOException e1) {
             VoltDB.crashLocalVoltDB("Error processing catalog update in export system", true, e1);
         }
@@ -655,7 +671,7 @@ public class ExportManager
 
     public void shutdown() {
         for (ExportGeneration generation : m_generations.values()) {
-            generation.close();
+            generation.close(m_messenger);
         }
         ExportDataProcessor proc = m_processor.getAndSet(null);
         if (proc != null) {
@@ -681,7 +697,7 @@ public class ExportManager
             return exportBytes;
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
-            exportLog.error(e);
+            exportLog.error("Failed to get export queued bytes.", e);
         }
         return 0;
     }

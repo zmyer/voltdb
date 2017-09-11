@@ -1,4 +1,45 @@
 /* This file is part of VoltDB.
+ * Copyright (C) 2008-2017 VoltDB Inc.
+ *
+ * This file contains original code and/or modifications of original code.
+ * Any modifications made by VoltDB Inc. are licensed under the following
+ * terms and conditions:
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with this
+ * work for additional information regarding copyright ownership. The ASF
+ * licenses this file to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ *//* This file is part of VoltDB.
  * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
@@ -102,6 +143,7 @@ import javax.xml.bind.Unmarshaller;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltdb.planner.ParameterizationInfo;
 import org.voltdb.sqlparser.syntax.SQLKind;
 import org.voltdb.sqlparser.tools.model.Test;
 import org.voltdb.sqlparser.tools.model.Testpoint;
@@ -112,16 +154,16 @@ public class VoltXMLElementTestFromSQL {
      * These probably needs to be encapsulated in a
      * single class.  Too much work.
      */
-    List<String> m_sqlStrings = new ArrayList<String>();
-    List<String> m_testNames = new ArrayList<String>();
-    private List<SQLKind> m_testTypes = new ArrayList<SQLKind>();
-    private List<String> m_testComments = new ArrayList<String>();
+    List<String> m_sqlStrings = new ArrayList<>();
+    List<String> m_testNames = new ArrayList<>();
+    private List<SQLKind> m_testTypes = new ArrayList<>();
+    private List<String> m_testComments = new ArrayList<>();
 
     String m_sqlSourceFolder = "~/src/voltdb/tests/sqlparser";
     boolean m_showPatternXML = false;
     String m_fullyQualifiedClassName = null;
     String m_className = null;
-    List<String> m_ddl = new ArrayList<String>();
+    List<String> m_ddl = new ArrayList<>();
     private PrintStream m_outputStream = null;
     String m_packageName = null;
     int m_errors = 0;
@@ -297,7 +339,7 @@ public class VoltXMLElementTestFromSQL {
             System.err.println(e.getMessage());
             return;
         }
-        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        HSQLInterface hif = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         if (haveSchema()) {
             try {
                 for (String ddl : m_ddl) {
@@ -432,13 +474,14 @@ public class VoltXMLElementTestFromSQL {
             + "\n"
             + "import org.voltdb.sqlparser.assertions.semantics.VoltXMLElementAssert.IDTable;\n"
             + "import static org.voltdb.sqlparser.assertions.semantics.VoltXMLElementAssert.*;\n"
+            + "import org.voltdb.planner.ParameterizationInfo;\n"
             + "\n"
             + "public class %s {\n"
             + ""
             + "    HSQLInterface m_HSQLInterface = null;\n"
             + "    String        m_schema = null;\n"
             + "    public %s() {\n"
-            + "        m_HSQLInterface = HSQLInterface.loadHsqldb();\n"
+            + "        m_HSQLInterface = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());\n"
             + (!haveSchema() ? "" : "        String m_schema = \"%s\";\n")
             + (!haveSchema() ? "" : "        try {\n")
             + (!haveSchema() ? "" : "            m_HSQLInterface.processDDLStatementsUsingVoltSQLParser(m_schema, null);\n")
@@ -456,7 +499,7 @@ public class VoltXMLElementTestFromSQL {
     }
 
     private void writeDDLTestBody(String aSql, String aTestName, String aComment) {
-        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        HSQLInterface hif = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         try {
             hif.runDDLCommand(aSql);
             VoltXMLElement elem = hif.getXMLFromCatalog();
@@ -464,7 +507,7 @@ public class VoltXMLElementTestFromSQL {
             if (aComment != null) {
                 addComment(sb, aComment);
             }
-            List<String> initialContext = new ArrayList<String>();
+            List<String> initialContext = new ArrayList<>();
             initialContext.add(elem.name);
             sb.append("\n");
             sb.append("    //\n");
@@ -482,7 +525,7 @@ public class VoltXMLElementTestFromSQL {
             sb.append(String.format("    public void %s() throws Exception {\n", aTestName));
             sb.append(String.format("        String ddl    = \"%s\";\n", aSql));
             sb.append("        IDTable idTable = new IDTable();\n");
-            sb.append("        HSQLInterface hif = HSQLInterface.loadHsqldb();\n");
+            sb.append("        HSQLInterface hif = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());\n");
             sb.append("        hif.processDDLStatementsUsingVoltSQLParser(ddl, null);\n");
             sb.append("        VoltXMLElement element = hif.getVoltCatalogXML(null);\n");
             sb.append("        assertThat(element)\n");
@@ -522,7 +565,7 @@ public class VoltXMLElementTestFromSQL {
         if (aComment != null) {
             addComment(sb, aComment);
         }
-        List<String> initialContext = new ArrayList<String>();
+        List<String> initialContext = new ArrayList<>();
         initialContext.add(aElem.name);
         if (m_showPatternXML) {
             sb.append("    // Pattern XML:\n");
@@ -593,7 +636,7 @@ public class VoltXMLElementTestFromSQL {
             // we need to disambiguate by looking at the attributes.
             // The particular attribute we care about depends on
             // the context.
-            List<String> attributes = new ArrayList<String>();
+            List<String> attributes = new ArrayList<>();
             // We ignore some subtrees entirely.
             boolean skipit = false;
             //

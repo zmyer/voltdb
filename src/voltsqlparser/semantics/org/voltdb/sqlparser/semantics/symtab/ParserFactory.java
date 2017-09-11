@@ -1,4 +1,20 @@
 /* This file is part of VoltDB.
+ * Copyright (C) 2008-2017 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+/* This file is part of VoltDB.
  * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -55,16 +71,17 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.voltdb.sqlparser.semantics.grammar.InsertStatement;
-import org.voltdb.sqlparser.semantics.grammar.SimpleTableSelectQuery;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
 import org.voltdb.sqlparser.syntax.grammar.IColumnIdent;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
+import org.voltdb.sqlparser.syntax.grammar.IJoinTree;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
 import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
 import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.symtab.IColumn;
 import org.voltdb.sqlparser.syntax.symtab.IExpressionParser;
 import org.voltdb.sqlparser.syntax.symtab.IParserFactory;
+import org.voltdb.sqlparser.syntax.symtab.ISourceLocation;
 import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
 import org.voltdb.sqlparser.syntax.symtab.ITable;
 import org.voltdb.sqlparser.syntax.symtab.IType;
@@ -86,7 +103,7 @@ public abstract class ParserFactory implements IParserFactory {
     private ErrorMessageSet m_errorMessages = new ErrorMessageSet();
 
     private static Map<String, IOperator> initOperatorMap() {
-        HashMap<String, IOperator> answer = new HashMap<String, IOperator>();
+        HashMap<String, IOperator> answer = new HashMap<>();
         for (Operator op : Operator.values()) {
             answer.put(op.getOperation(), op);
         }
@@ -96,6 +113,17 @@ public abstract class ParserFactory implements IParserFactory {
     public ParserFactory(ICatalogAdapter aCatalog) {
         m_catalog = aCatalog;
     }
+
+    /**
+     * This is used for operations that make no sense, or which are not
+     * implemented in the mock factory.
+     *
+     * @param aFuncName
+     */
+    protected void unimplementedOperation(String aFuncName) {
+        throw new AssertionError("Unimplemented ParserFactory Method " + aFuncName);
+    }
+
     /* (non-Javadoc)
      * @see org.voltdb.sqlparser.symtab.IParserFactory#getStandardPrelude()
      */
@@ -105,14 +133,14 @@ public abstract class ParserFactory implements IParserFactory {
     }
 
     @Override
-    public IColumn newColumn(String aColName, IType aColType) {
+    public IColumn newColumn(ISourceLocation aLoc, String aColName, IType aColType) {
         assert(aColType instanceof Type);
-        return new Column(aColName, (Type)aColType);
+        return new Column(aLoc, aColName, (Type)aColType);
     }
 
     @Override
-    public ITable newTable(String aTableName) {
-        return new Table(aTableName);
+    public ITable newTable(ISourceLocation aLoc, String aTableName) {
+        return new Table(aLoc, aTableName);
     }
 
     @Override
@@ -187,7 +215,7 @@ public abstract class ParserFactory implements IParserFactory {
                 }
                 return new Semantino[]{lconverted, rconverted};
             } else {
-                m_errorMessages.addError(-1, -1, "Can't convert type \"%s\" to \"%s\"",
+                m_errorMessages.addError(newSourceLocation(-1, -1), "Can't convert type \"%s\" to \"%s\"",
                                          leftType, rightType);
                 return new Semantino[]{(Semantino) getErrorSemantino(),
                                        (Semantino) getErrorSemantino()};
@@ -225,6 +253,11 @@ public abstract class ParserFactory implements IParserFactory {
     @Override
     public ISemantino getErrorSemantino() {
         return Semantino.getErrorSemantino();
+    }
+
+    @Override
+    public ISourceLocation newSourceLocation(int aLineNumber, int aColumnNumber) {
+        return new SourceLocation(aLineNumber, aColumnNumber);
     }
 
 }

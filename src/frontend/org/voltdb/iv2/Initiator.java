@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,7 +23,6 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
-import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.MemoryStats;
 import org.voltdb.ProducerDRGateway;
@@ -41,7 +40,6 @@ public interface Initiator
     public void configure(BackendTarget backend,
                           CatalogContext catalogContext,
                           String serializedCatalog,
-                          CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           StartAction startAction,
                           StatsAgent agent,

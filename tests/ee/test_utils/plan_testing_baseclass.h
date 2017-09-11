@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -44,8 +44,16 @@
 #ifndef TESTS_EE_TEST_UTILS_PLAN_TESTING_BASECLASS_H_
 #define TESTS_EE_TEST_UTILS_PLAN_TESTING_BASECLASS_H_
 
+#include <cstdlib>
+#include <sstream>
+#include <string.h>
+
+#include "catalog/cluster.h"
+#include "catalog/constraint.h"
+#include "catalog/table.h"
+
 #include "execution/VoltDBEngine.h"
-#include "common/ValueFactory.hpp"
+#include "storage/temptable.h"
 #include "test_utils/LoadTableFrom.hpp"
 #include "test_utils/plan_testing_config.h"
 
@@ -97,7 +105,8 @@ public:
         m_database(NULL),
         m_constraint(NULL),
         m_isinitialized(false),
-        m_fragmentNumber(100)
+        m_fragmentNumber(100),
+        m_paramCount(0)
     { }
 
     void initialize(const char   *catalogString,
@@ -126,15 +135,29 @@ public:
          */
         m_topend.reset(TOPEND::newInstance());
         m_engine.reset(new voltdb::VoltDBEngine(m_topend.get()));
-        m_parameter_buffer.reset(new char [4 * 1024]);
-        m_result_buffer.reset(new char [1024 * 1024 * 2]);
-        m_exception_buffer.reset(new char [4 * 1024]);
-        m_engine->setBuffers(m_parameter_buffer.get(), 4 * 1024,
-                             m_result_buffer.get(), 1024 * 1024 * 2,
-                             m_exception_buffer.get(), 4096);
+
+        m_parameter_buffer.reset(new char[m_smallBufferSize]);
+        ::memset(m_parameter_buffer.get(), 0, m_smallBufferSize);
+
+        m_per_fragment_stats_buffer.reset(new char[m_smallBufferSize]);
+        ::memset(m_per_fragment_stats_buffer.get(), 0, m_smallBufferSize);
+
+        m_result_buffer.reset(new char[m_resultBufferSize]);
+        ::memset(m_result_buffer.get(), 0, m_resultBufferSize);
+
+        m_exception_buffer.reset(new char[m_smallBufferSize]);
+        ::memset(m_exception_buffer.get(), 0, m_smallBufferSize);
+
+        m_engine->setBuffers(m_parameter_buffer.get(), m_smallBufferSize,
+                             m_per_fragment_stats_buffer.get(), m_smallBufferSize,
+                             NULL, 0, // the UDF buffer
+                             NULL, 0, // the first result buffer
+                             m_result_buffer.get(), m_resultBufferSize,
+                             m_exception_buffer.get(), m_smallBufferSize);
         m_engine->resetReusedResultOutputBuffer();
-        int partitionCount = 3;
-        ASSERT_TRUE(m_engine->initialize(this->m_cluster_id, this->m_site_id, 0, 0, "", 0, 1024, voltdb::DEFAULT_TEMP_TABLE_MEMORY, false));
+        m_engine->resetPerFragmentStatsOutputBuffer();
+        int partitionCount = htonl(1);
+        m_engine->initialize(m_cluster_id, m_site_id, 0, 0, "", 0, 1024, voltdb::DEFAULT_TEMP_TABLE_MEMORY, false);
         m_engine->updateHashinator(voltdb::HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
         ASSERT_TRUE(m_engine->loadCatalog( -2, m_catalog_string));
 
@@ -159,57 +182,155 @@ public:
             //
             // When we delete the VoltDBEngine
             // it will cleanup all the tables for us.
+            // The m_pool will delete all of its memory
+            // as well.  So we should be good here.
             //
         }
 
-    voltdb::PersistentTable *getPersistentTableAndId(const std::string &name, int *id) {
+    voltdb::PersistentTable *getPersistentTableAndId(const std::string &name,
+                                                     int *id,
+                                                     voltdb::PersistentTable **table) {
         catalog::Table *tbl = m_database->tables().get(name);
         assert(tbl != NULL);
         if (id != NULL) {
             *id = tbl->relativeIndex();
         }
-        return dynamic_cast<voltdb::PersistentTable *>(m_engine->getTable(name));
+        voltdb::PersistentTable *pt = dynamic_cast<voltdb::PersistentTable *>(m_engine->getTableByName(name));
+        if (table != NULL) {
+            *table = pt;
+        }
+        return pt;
     }
 
+    // The first two parameters are solely out parameters.
+    // They may be NULL if their value is not wanted.
     void initTable(voltdb::PersistentTable       **table,
                    int                            *table_id,
                    const TableConfig              *oneTable) {
-        initializeTableOfInt(oneTable->m_tableName,
-                             table,
-                             table_id,
-                             oneTable->m_numRows,
-                             oneTable->m_numCols,
-                             oneTable->m_contents);
+        initializeTable(oneTable->m_tableName,
+                        table,
+                        table_id,
+                        oneTable->m_types,
+                        oneTable->m_typeSizes,
+                        oneTable->m_numRows,
+                        oneTable->m_numCols,
+                        oneTable->m_contents,
+                        oneTable->m_strings,
+                        oneTable->m_numStrings);
     }
 
     void initTable(const TableConfig *oneTable) {
+        // We apparently don't want the persistent table or
+        // the table id.
         initTable(NULL, NULL, oneTable);
     }
 
-    void initializeTableOfInt(std::string                     tableName,
-                              voltdb::PersistentTable       **table,
-                              int                            *tableId,
-                              int                             nRows,
-                              int                             nCols,
-                              const int32_t                  *vals) {
-        voltdb::PersistentTable *pTable = getPersistentTableAndId(tableName.c_str(), tableId);
-        assert(pTable != NULL);
-        if (table != NULL) {
-            *table = pTable;
+    void initializeTable(const std::string               tableName,
+                         voltdb::PersistentTable       **table,
+                         int                            *tableId,
+                         const voltdb::ValueType        *types,
+                         const int32_t                  *typesizes,
+                         int                             nRows,
+                         int                             nCols,
+                         const int32_t                  *vals,
+                         const char                    **strings,
+                         int                             num_strings) {
+        voltdb::PersistentTable *pTable = getPersistentTableAndId(tableName.c_str(), tableId, table);
+        if (pTable == NULL) {
+            std::ostringstream oss;
+            oss << "Cannot find table "
+                << tableName
+                << " in the schema."
+                << std::endl;
+            throw std::logic_error(oss.str());
         }
+        assert(pTable != NULL);
         for (int row = 0; row < nRows; row += 1) {
+            if (row > 0 && (row % 100 == 0)) {
+                std::cout << '.';
+                std::cout.flush();
+            }
             voltdb::TableTuple &tuple = pTable->tempTuple();
             for (int col = 0; col < nCols; col += 1) {
-                int32_t val = vals[(row*nCols) + col];
-                voltdb::NValue nval = voltdb::ValueFactory::getIntegerValue(val);
-                tuple.setNValue(col, nval);
+                int val;
+                std::string strstr;
+                if (vals != NULL) {
+                    // If we have values, then use them.
+                    val = vals[(row*nCols) + col];
+                    if (types[col] == voltdb::VALUE_TYPE_VARCHAR) {
+                        if (val < 0 || (num_strings <= val)) {
+                            std::ostringstream oss;
+                            oss << "string index "
+                                << val
+                                << " out of range [0, "
+                                << num_strings
+                                << "]"
+                                << std::endl;
+                            throw std::logic_error(oss.str());
+                        }
+                        voltdb::NValue nval = voltdb::ValueFactory::getStringValue(strings[val], &m_pool);
+                        tuple.setNValue(col, nval);
+                    } else {
+                        voltdb::NValue nval = voltdb::ValueFactory::getIntegerValue(val);
+                        tuple.setNValue(col, nval);
+                    }
+                } else {
+                    // If we have no values, generate them randomly.
+                    if (types[col] == voltdb::VALUE_TYPE_VARCHAR) {
+                        strstr = getRandomString(1, typesizes[col]);
+                        voltdb::NValue nval = voltdb::ValueFactory::getStringValue(strstr.c_str(), &m_pool);
+                        tuple.setNValue(col, nval);
+                    } else {
+                        val = getRandomInt(0, typesizes[col]);
+                        voltdb::NValue nval = voltdb::ValueFactory::getIntegerValue(val);
+                        tuple.setNValue(col, nval);
+                    }
+                }
             }
             if (!pTable->insertTuple(tuple)) {
                 return;
             }
         }
+        if (nRows > 100) {
+            std::cout << std::endl;
+        }
     }
 
+    /**
+     * Get a random integer in the range [minval, maxval).
+     * The distribution is whatever std::random uses, which
+     * should be uniform.
+     */
+    const int32_t getRandomInt(int minval, int maxval) {
+        if (maxval < 0 || maxval <= minval) {
+            return minval;
+        }
+        double r = (maxval - 1 - minval)/static_cast<double>(RAND_MAX);
+        return static_cast<int32_t>(std::rand() * r) + minval;
+    }
+
+    /**
+     * Get a random string whose length is between minlen and
+     * maxlen.  The characters are all upper or lower case, or
+     * digits.
+     */
+    const std::string getRandomString(int minlen, int maxlen) {
+        std::stringstream ostr;
+        int len = getRandomInt(minlen, maxlen+1);
+        for (int idx = 0; idx < len; idx += 1) {
+            int32_t rv = getRandomInt(0, 62);
+            char ch;
+            if (rv < 26) {
+                ch = rv + 'a';
+            } else if (rv < 36) {
+                ch = rv - 26 + '0';
+            } else {
+                ch = rv - 36 + 'A';
+            }
+            ostr << ch;
+        }
+        return ostr.str();
+    }
     /**
      * Execute a single test.  Execute the test's fragment, and then
      * validate the output table.
@@ -217,7 +338,10 @@ public:
     void executeTest(const TestConfig &test) {
         // The fragment number doesn't really matter here.
         executeFragment(m_fragmentNumber, test.m_planString);
-        validateResult((const int32_t *)test.m_outputTable, test.m_numOutputRows, test.m_numOutputCols);
+        // If we have expected output data, then validate it.
+        if (test.m_outputConfig != NULL) {
+            validateResult(test.m_outputConfig, test.m_expectFail);
+        }
     }
     /**
      * Given a PlanFragmentInfo data object, make the m_engine execute it,
@@ -226,27 +350,32 @@ public:
     void executeFragment(fragmentId_t fragmentId, const char *plan) {
         m_topend->addPlan(fragmentId, plan);
 
-            // Make sure the parameter buffer is filled
-            // with healthful zeros, and then create an input
-            // deserializer.
-            memset(m_parameter_buffer.get(), 0, 4 * 1024);
-            voltdb::ReferenceSerializeInputBE emptyParams(m_parameter_buffer.get(), 4 * 1024);
+        // Make sure the parameter buffer is filled
+        // with healthful zeros, and then create an input
+        // deserializer.
+        memset(m_parameter_buffer.get(), 0, m_smallBufferSize);
+        voltdb::ReferenceSerializeInputBE emptyParams(m_parameter_buffer.get(), m_smallBufferSize);
 
-            //
-            // Execute the plan.  You'd think this would be more
-            // impressive.
-            //
-            m_engine->executePlanFragments(1, &fragmentId, NULL, emptyParams, 1000, 1000, 1000, 1000, 1);
+        //
+        // Execute the plan.  You'd think this would be more
+        // impressive.
+        //
+        try {
+            m_engine->executePlanFragments(1, &fragmentId, NULL, emptyParams, 1000, 1000, 1000, 1000, 1, false);
+        } catch (voltdb::SerializableEEException &ex) {
+            throw;
+        }
     }
 
     /**
      * Fetch the results.  We have forced them to be written
-     *
      * to our own buffer in the local engine.  But we don't
      * know how much of the buffer is actually used.  So we
      * need to query the engine.
      */
-    void validateResult(const int *answer, int nRows, int nCols) {
+    void validateResult(const TableConfig *answer, bool expectFail) {
+        int nRows = answer->m_numRows;
+        int nCols = answer->m_numCols;
         size_t result_size = m_engine->getResultsSize();
         boost::scoped_ptr<voltdb::TempTable> result(voltdb::loadTableFrom(m_result_buffer.get(), result_size));
         assert(result.get() != NULL);
@@ -254,40 +383,151 @@ public:
 
         const voltdb::TupleSchema* res_schema = result->schema();
         voltdb::TableTuple tuple(res_schema);
-        voltdb::TableIterator &iter = result->iterator();
+        voltdb::TableIterator iter = result->iterator();
         if (!iter.hasNext() && nRows > 0) {
             printf("No results!!\n");
             ASSERT_FALSE(true);
         }
-        ASSERT_EQ(nCols, result->columnCount());
+        int32_t resColCount = result->columnCount();
+        if (nCols != resColCount) {
+            std::ostringstream oss;
+            oss << "Error: nCols = "
+                << nCols
+                << " != resColCount = "
+                << resColCount
+                << "."
+                << std::endl;
+        }
+        ASSERT_EQ(nCols, resColCount);
         bool failed = false;
         for (int32_t row = 0; row < nRows; row += 1) {
             ASSERT_TRUE(iter.next(tuple));
             for (int32_t col = 0; col < nCols; col += 1) {
-                int32_t expected = answer[row * nCols + col];
-                int32_t v1 = voltdb::ValuePeeker::peekAsInteger(tuple.getNValue(col));
-                VOLT_TRACE("Row %02d, col %02d: expected %04d, got %04d (%s)",
-                           row, col,
-                           expected, v1,
-                           (expected != v1) ? "failed" : "ok");
-                if (expected != v1) {
-                    failed = true;
+                int32_t expected = answer->m_contents[row * nCols + col];
+                if (answer->m_types[col] == voltdb::VALUE_TYPE_VARCHAR) {
+                    voltdb::NValue nval = tuple.getNValue(col);
+                    int32_t actualSize;
+                    const char *actualStr = voltdb::ValuePeeker::peekObject(nval, &actualSize);
+                    if (actualStr == NULL) {
+                        actualSize = -1;
+                    }
+                    const char *expStr = answer->m_strings[expected];
+                    size_t expSize = (expStr != NULL) ? strlen(expStr) : -1;
+                    bool neq = (((actualStr == NULL) != (expStr == NULL))
+                                || (actualSize != expSize)
+                                || ((actualStr != NULL)
+                                    && (expStr != NULL)
+                                    && (::strncmp(actualStr, expStr, actualSize) != 0)));
+                    VOLT_TRACE("Row %02d, col %02d: expected \"%s\", got \"%s\" (%s)",
+                               row, col,
+                               expStr, actualStr,
+                               neq ? "failed" : "ok");
+                    if (neq) {
+                        failed = true;
+                    }
+                } else if (answer->m_types[col] == voltdb::VALUE_TYPE_INTEGER) {
+                    int32_t v1 = voltdb::ValuePeeker::peekAsInteger(tuple.getNValue(col));
+                    VOLT_TRACE("Row %02d, col %02d: expected %04d, got %04d (%s)",
+                               row, col,
+                               expected, v1,
+                               (expected != v1) ? "failed" : "ok");
+                    if (expected != v1) {
+                        failed = true;
+                    }
+                } else {
+                    std::ostringstream oss;
+                    oss << "Value type "
+                        << answer->m_types[col]
+                        << " Only "
+                        << voltdb::VALUE_TYPE_INTEGER
+                        << " and "
+                        << voltdb::VALUE_TYPE_VARCHAR
+                        << " are supported."
+                        << std::endl;
+                    throw std::logic_error(oss.str());
                 }
             }
         }
         bool hasNext = iter.next(tuple);
         if (hasNext) {
-            VOLT_TRACE("Unexpected next element\n");
-            failed = true;
+            throw std::logic_error("Unexpected next element\n");
         }
-        ASSERT_FALSE(failed);
+        ASSERT_EQ(expectFail, failed);
     }
+
+    void validateDMLResultTable(voltdb::TempTable *result, int64_t expectedModifiedTuples = 1) {
+        ASSERT_TRUE(result);
+        const voltdb::TupleSchema* resultSchema = result->schema();
+        voltdb::TableTuple tuple(resultSchema);
+        boost::scoped_ptr<voltdb::TableIterator> iter(result->makeIterator());
+        ASSERT_TRUE(iter->next(tuple));
+        int64_t actualModifiedTuples = voltdb::ValuePeeker::peekBigInt(tuple.getNValue(0));
+        ASSERT_EQ(expectedModifiedTuples, actualModifiedTuples);
+        ASSERT_FALSE(iter->next(tuple));
+    }
+
+    void initParamsBuffer() {
+        m_paramsOutput.initializeWithPosition(m_parameter_buffer.get(),
+                                              m_smallBufferSize,
+                                              0);
+    }
+
+    void prepareParamsBufferForNextFragment() {
+        m_paramCount = 0;
+        m_paramCountOffset = m_paramsOutput.reserveBytes(sizeof(int16_t));
+        m_paramsOutput.writeShortAt(m_paramCountOffset, m_paramCount);
+    }
+
+    void addParameterToBuffer(voltdb::ValueType type, const void *buf, int32_t length = OBJECTLENGTH_NULL) {
+        m_paramsOutput.writeByte(static_cast<int8_t>(type));
+        switch (type) {
+            case voltdb::VALUE_TYPE_VARCHAR:
+            case voltdb::VALUE_TYPE_VARBINARY:
+                if (buf == NULL) {
+                    m_paramsOutput.writeInt(OBJECTLENGTH_NULL);
+                    break;
+                }
+                if (length <= OBJECTLENGTH_NULL) {
+                    // Attempted to serialize a value with a negative length
+                    ASSERT_TRUE(false);
+                }
+                m_paramsOutput.writeInt(length);
+                m_paramsOutput.writeBytes(buf, length);
+                break;
+            case voltdb::VALUE_TYPE_TINYINT:
+                m_paramsOutput.writeByte(*static_cast<const int8_t*>(buf));
+                break;
+            case voltdb::VALUE_TYPE_SMALLINT:
+                m_paramsOutput.writeShort(*static_cast<const int16_t*>(buf));
+                break;
+            case voltdb::VALUE_TYPE_INTEGER:
+                m_paramsOutput.writeInt(*static_cast<const int32_t*>(buf));
+                break;
+            case voltdb::VALUE_TYPE_TIMESTAMP:
+                m_paramsOutput.writeLong(*static_cast<const int64_t*>(buf));
+                break;
+            case voltdb::VALUE_TYPE_BIGINT:
+                m_paramsOutput.writeLong(*static_cast<const int64_t*>(buf));
+                break;
+            case voltdb::VALUE_TYPE_DOUBLE:
+                m_paramsOutput.writeDouble(*static_cast<const double*>(buf));
+                break;
+            default:
+                // Unsupported type.
+                ASSERT_TRUE(false);
+        }
+        m_paramCount++;
+        m_paramsOutput.writeShortAt(m_paramCountOffset, m_paramCount);
+    }
+
 protected:
     voltdb::CatalogId m_cluster_id;
     voltdb::CatalogId m_database_id;
     voltdb::CatalogId m_site_id;
     std::string m_catalog_string;
-    catalog::Catalog *m_catalog; //This is not the real catalog that the VoltDBEngine uses. It is a duplicate made locally to get GUIDs
+    // This is not the real catalog that the VoltDBEngine uses.
+    // It is a duplicate made locally to get GUIDs
+    catalog::Catalog     *m_catalog;
     catalog::Cluster *m_cluster;
     catalog::Database *m_database;
     catalog::Constraint *m_constraint;
@@ -296,8 +536,17 @@ protected:
     boost::shared_array<char>m_result_buffer;
     boost::shared_array<char>m_exception_buffer;
     boost::shared_array<char>m_parameter_buffer;
+    boost::shared_array<char>                m_per_fragment_stats_buffer;
     bool                     m_isinitialized;
     int                      m_fragmentNumber;
+    size_t                                   m_paramCountOffset;
+    int16_t                                  m_paramCount;
+    voltdb::ReferenceSerializeOutput         m_paramsOutput;
+    // The size for all the synthetic buffers except the result buffer.
+    static const size_t  m_smallBufferSize = 4 * 1024;
+    // The size of the result buffer.
+    static const size_t m_resultBufferSize = 1024 * 1024 * 2;
+    voltdb::Pool        m_pool;
 };
 
 #endif /* TESTS_EE_TEST_UTILS_PLAN_TESTING_BASECLASS_H_ */

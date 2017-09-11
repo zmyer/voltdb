@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,12 +26,10 @@ import com.google_voltpatches.common.collect.ImmutableSet;
 
 public class DRProducerStatsBase {
 
-    //  DR_STATS_CONSUMER_CLUSTER_ID java property must equal "true"
-    private static boolean m_addConsumerIdStat = Boolean.getBoolean("DR_STATS_CONSUMER_CLUSTER_ID");
-
     public static interface Columns {
         // column for both tables
-        public static final String CONSUMER_CLUSTER_ID = "CONSUMERCLUSTERID";
+        public static final String CLUSTER_ID = "CLUSTER_ID";
+        public static final String REMOTE_CLUSTER_ID = "REMOTE_CLUSTER_ID";
 
         // columns for the node-level table
         public static final String STATE = "STATE";
@@ -47,6 +45,7 @@ public class DRProducerStatsBase {
         public static final String TOTAL_BUFFERS = "TOTALBUFFERS";
         public static final String LAST_QUEUED_DRID = "LASTQUEUEDDRID";
         public static final String LAST_ACK_DRID = "LASTACKDRID";
+        public static final String QUEUE_GAP = "QUEUE_GAP";
         public static final String LAST_QUEUED_TIMESTAMP = "LASTQUEUEDTIMESTAMP";
         public static final String LAST_ACK_TIMESTAMP = "LASTACKTIMESTAMP";
         public static final String IS_SYNCED = "ISSYNCED";
@@ -62,9 +61,8 @@ public class DRProducerStatsBase {
         @Override
         protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
             super.populateColumnSchema(columns);
-            if (m_addConsumerIdStat) {
-                columns.add(new ColumnInfo(Columns.CONSUMER_CLUSTER_ID, VoltType.SMALLINT));
-            }
+            columns.add(new ColumnInfo(Columns.CLUSTER_ID, VoltType.SMALLINT));
+            columns.add(new ColumnInfo(Columns.REMOTE_CLUSTER_ID, VoltType.SMALLINT));
             columns.add(new ColumnInfo(Columns.STATE, VoltType.STRING));
             columns.add(new ColumnInfo(Columns.SYNC_SNAPSHOT_STATE, VoltType.STRING));
             columns.add(new ColumnInfo(Columns.ROWS_IN_SYNC_SNAPSHOT, VoltType.BIGINT));
@@ -87,9 +85,8 @@ public class DRProducerStatsBase {
         @Override
         protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
             super.populateColumnSchema(columns);
-            if (m_addConsumerIdStat) {
-                columns.add(new ColumnInfo(Columns.CONSUMER_CLUSTER_ID, VoltType.SMALLINT));
-            }
+            columns.add(new ColumnInfo(Columns.CLUSTER_ID, VoltType.SMALLINT));
+            columns.add(new ColumnInfo(Columns.REMOTE_CLUSTER_ID, VoltType.SMALLINT));
             columns.add(new ColumnInfo(VoltSystemProcedure.CNAME_PARTITION_ID, VoltType.INTEGER));
             columns.add(new ColumnInfo(Columns.STREAM_TYPE, VoltType.STRING));
             columns.add(new ColumnInfo(Columns.TOTAL_BYTES, VoltType.BIGINT));
@@ -101,6 +98,7 @@ public class DRProducerStatsBase {
             columns.add(new ColumnInfo(Columns.LAST_ACK_TIMESTAMP, VoltType.TIMESTAMP));
             columns.add(new ColumnInfo(Columns.IS_SYNCED, VoltType.STRING));
             columns.add(new ColumnInfo(Columns.MODE, VoltType.STRING));
+            columns.add(new ColumnInfo(Columns.QUEUE_GAP, VoltType.BIGINT));
         }
 
         @Override

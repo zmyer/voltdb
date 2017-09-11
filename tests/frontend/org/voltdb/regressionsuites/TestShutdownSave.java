@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.InvocationDispatcher;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ArbitraryDurationProc;
@@ -70,7 +71,7 @@ public class TestShutdownSave extends RegressionSuite
             //if execution reaches here, it indicates the expected exception was thrown.
             System.out.println("@SystemInformation:" + e.getMessage());
             assertEquals("incorrect status from @SystemInformation",
-                    "Server shutdown in progress - new transactions are not processed.", e.getMessage());
+                    InvocationDispatcher.SHUTDOWN_MSG, e.getMessage());
         }
 
         //test query that is not allowed
@@ -81,7 +82,7 @@ public class TestShutdownSave extends RegressionSuite
             //if execution reaches here, it indicates the expected exception was thrown.
             System.out.println("ArbitraryDurationProc:" + e.getMessage());
             assertEquals("incorrect status from ArbitraryDurationProc",
-                    "Server shutdown in progress - new transactions are not processed.", e.getMessage());
+                    InvocationDispatcher.SHUTDOWN_MSG, e.getMessage());
         }
         long sum = Long.MAX_VALUE;
         while (sum > 0) {
@@ -196,7 +197,7 @@ public class TestShutdownSave extends RegressionSuite
         LocalCluster config = new LocalCluster("prepare_shutdown_importer.jar", 4, HOST_COUNT, 0, BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
         config.setHasLocalServer(false);
-        boolean compile = config.compileWithAdminMode(project, VoltDB.DEFAULT_ADMIN_PORT, false);
+        boolean compile = config.compileWithAdminMode(project, -1, false);
         assertTrue(compile);
         builder.addServerConfig(config);
         return builder;

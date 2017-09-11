@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,29 +23,29 @@
 
 package org.voltdb.planner;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.InputStream;
-import java.io.PrintWriter;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
+import java.util.EmptyStackException;
 import java.util.List;
-import java.util.Map;
-
-import junit.framework.TestCase;
+import java.util.Map.Entry;
+import java.util.Stack;
 
 import org.apache.commons.lang3.StringUtils;
-import org.json_voltpatches.JSONException;
+import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
+import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.types.ExpressionType;
+import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
+
+import junit.framework.TestCase;
 
 public class PlannerTestCase extends TestCase {
 
@@ -74,8 +74,7 @@ public class PlannerTestCase extends TestCase {
         return paramCount;
     }
 
-    protected void failToCompile(String sql, String... patterns)
-    {
+    protected void failToCompile(String sql, String... patterns) {
         int paramCount = countQuestionMarks(sql);
         try {
             List<AbstractPlanNode> unexpected = m_aide.compile(sql, paramCount,
@@ -152,8 +151,11 @@ public class PlannerTestCase extends TestCase {
 
     /** A helper here where the junit test can assert success */
     protected List<AbstractPlanNode> compileToFragments(String sql) {
-        boolean planForSinglePartitionFalse = false;
-        return compileWithJoinOrderToFragments(sql, planForSinglePartitionFalse, m_noJoinOrder);
+        return compileToFragments(sql, false);
+    }
+
+    protected List<AbstractPlanNode> compileToFragments(String sql, boolean planForSinglePartition) {
+        return compileWithJoinOrderToFragments(sql, planForSinglePartition, m_noJoinOrder);
     }
 
     protected List<AbstractPlanNode> compileToFragmentsForSinglePartition(String sql) {
@@ -193,6 +195,10 @@ public class PlannerTestCase extends TestCase {
         assertFalse(pn.isEmpty());
         assertTrue(pn.get(0) != null);
         if (planForSinglePartition) {
+            if (pn.size() != 1) {
+                System.err.printf("Plan: %s\n", pn);
+                System.err.printf("Error: pn.size == %d, should be 1\n", pn.size());
+            }
             assertTrue(pn.size() == 1);
         }
         return pn;
@@ -219,6 +225,34 @@ public class PlannerTestCase extends TestCase {
         // Yes, we ARE assuming that test queries don't contain quoted question marks.
         int paramCount = StringUtils.countMatches(sql, "?");
         return compileSPWithJoinOrder(sql, paramCount, joinOrder);
+    }
+
+    /**
+     * Assert that the plan for a statement produces a plan that meets some
+     * basic expectations.
+     * @param sql a statement to plan
+     *            as if for a single-partition stored procedure
+     * @param nOutputColumns the expected number of plan result columns,
+     *                       because of the planner's history of such errors
+     * @param nodeTypes the expected node types of the resulting plan tree
+     *                  listed in top-down order with wildcard support.
+     *                  See assertTopDownTree.
+     * @return the plan for more detailed testing.
+     */
+    protected AbstractPlanNode compileToTopDownTree(String sql,
+            int nOutputColumns, PlanNodeType... nodeTypes) {
+        return compileToTopDownTree(sql, nOutputColumns, false, nodeTypes);
+    }
+
+    protected AbstractPlanNode compileToTopDownTree(String sql,
+            int nOutputColumns, boolean hasOptionalSelectProjection, PlanNodeType... nodeTypes) {
+        // Yes, we ARE assuming that test queries don't
+        // contain quoted question marks.
+        int paramCount = StringUtils.countMatches(sql, "?");
+        AbstractPlanNode result = compileSPWithJoinOrder(sql, paramCount, null);
+        assertEquals(nOutputColumns, result.getOutputSchema().size());
+        assertTopDownTree(result, hasOptionalSelectProjection, nodeTypes);
+        return result;
     }
 
     /** A helper here where the junit test can assert success */
@@ -291,6 +325,10 @@ public class PlannerTestCase extends TestCase {
         return m_aide.getCatalogString();
     }
 
+    public Catalog getCatalog() {
+        return m_aide.getCatalog();
+    }
+
     Database getDatabase() {
         return m_aide.getDatabase();
     }
@@ -340,486 +378,409 @@ public class PlannerTestCase extends TestCase {
         List<SortDirectionType>  dirs  = orderByPlanNode.getSortDirections();
         assertEquals(exprs.size(), dirs.size());
         assertEquals(columnDescrs.length/2, exprs.size());
-        for (int idx = 0; idx < exprs.size(); idx += 1) {
+        for (int idx = 0; idx < exprs.size(); ++idx) {
+            // Assert that an expected one-part name matches a tve by column name
+            // and an expected two-part name matches a tve by table and column name.
             AbstractExpression expr = exprs.get(idx);
-            SortDirectionType  dir  = dirs.get(idx);
             assertTrue(expr instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)expr;
             String expectedNames[] = ((String)columnDescrs[2*idx]).split("\\.");
-            String tableName = null;
             String columnName = null;
-            if (expectedNames.length == 2) {
-                tableName = expectedNames[0].toUpperCase();
-                columnName = expectedNames[1].toUpperCase();
-            } else {
-                columnName = expectedNames[0].toUpperCase();
-            }
-            assertEquals(columnName, tve.getColumnName().toUpperCase());
-            if (tableName != null) {
+            int nParts = expectedNames.length;
+            if (nParts > 1) {
+                assertEquals(2, nParts);
+                String tableName = expectedNames[0].toUpperCase();
                 assertEquals(tableName, tve.getTableName().toUpperCase());
             }
-            assertEquals(columnDescrs[2*idx+1],       dir);
+            // In either case, the column name must match the LAST part.
+            columnName = expectedNames[nParts-1].toUpperCase();
+            assertEquals(columnName, tve.getColumnName().toUpperCase());
+
+            SortDirectionType dir = dirs.get(idx);
+            assertEquals(columnDescrs[2*idx+1], dir);
         }
     }
 
-    /** Given a list of Class objects for plan node subclasses, asserts
-     * if the given plan doesn't contain instances of those classes.
+    /**
+     * Assert that a plan's left-most branch is made up of plan nodes of
+     * specified classes.
+     * @param expectedClasses a list of expected AbstractPlanNode classes
+     * @param actualPlan the top of a plan node tree expected to have instances
+     *                   of the expected classes along its left-most branch
+     *                   listed from top to bottom.
      */
     static protected void assertClassesMatchNodeChain(
             List<Class<? extends AbstractPlanNode>> expectedClasses,
             AbstractPlanNode actualPlan) {
         AbstractPlanNode pn = actualPlan;
         for (Class<? extends AbstractPlanNode> c : expectedClasses) {
-            assertFalse("Actual plan shorter than expected",
+            assertFalse("The actual plan is shallower than expected",
                     pn == null);
             assertTrue("Expected plan to contain an instance of " + c.getSimpleName() +", "
                     + "instead found " + pn.getClass().getSimpleName(),
                     c.isInstance(pn));
-            if (pn.getChildCount() > 0)
+            if (pn.getChildCount() > 0) {
                 pn = pn.getChild(0);
-            else
+            }
+            else {
                 pn = null;
+            }
         }
 
         assertTrue("Actual plan longer than expected", pn == null);
     }
 
-    /*
-     * Everything below this is for generating EE Unit tests from
-     * java.  We start with a newline because the licensescheck.py
-     * program sometimes adds a license without a trailing newline, and
-     * that make the "#include" start in the middle of a line.
-     */
-    private static final String TESTFILE_TEMPLATE =
-        "\n" +
-        "/******************************************************************************************\n" +
-        " *\n" +
-        " * NOTA BENE: This file is automagically generated from the source class named\n" +
-        " *                @SOURCE_PACKAGE_NAME@.@SOURCE_CLASS_NAME@.\n" +
-        " *            Please do not edit it unless you abandon all hope of regenerating it.\n" +
-        " *\n" +
-        " ******************************************************************************************/\n" +
-        "#include \"harness.h\"\n" +
-        "\n" +
-        "#include \"catalog/cluster.h\"\n" +
-        "#include \"catalog/table.h\"\n" +
-        "#include \"plannodes/abstractplannode.h\"\n" +
-        "#include \"storage/persistenttable.h\"\n" +
-        "#include \"storage/temptable.h\"\n" +
-        "#include \"storage/tableutil.h\"\n" +
-        "#include \"test_utils/plan_testing_config.h\"\n" +
-        "#include \"test_utils/LoadTableFrom.hpp\"\n" +
-        "#include \"test_utils/plan_testing_baseclass.h\"\n" +
-        "\n" +
-        "\n" +
-        "namespace {\n" +
-        "extern TestConfig allTests[];\n" +
-        "};\n" +
-        "\n" +
-        "class @TEST_CLASS_NAME@ : public PlanTestingBaseClass<EngineTestTopend> {\n" +
-        "public:\n" +
-        "    /*\n" +
-        "     * This constructor lets us set the global random seed for the\n" +
-        "     * random number generator.  It would be better to have a seed\n" +
-        "     * just for this test.  But that is not easily done.\n" +
-        "     */\n" +
-        "    @TEST_CLASS_NAME@(uint32_t randomSeed = (unsigned int)time(NULL)) {\n" +
-        "        initialize(m_PartitionByExecutorDB, randomSeed);\n" +
-        "    }\n" +
-        "\n" +
-        "    ~@TEST_CLASS_NAME@() { }\n" +
-        "protected:\n" +
-        "    static DBConfig         m_PartitionByExecutorDB;\n" +
-        "};\n" +
-        "\n" +
-        "@TEST_CASES@\n" +
-        "\n" +
-        "namespace {\n" +
-        "@TABLE_COLUMN_NAMES@\n" +
-        "\n" +
-        "@TABLE_DATA@\n" +
-        "\n" +
-        "@TABLE_CONFIGS@\n" +
-        "\n" +
-        "const TableConfig *allTables[] = {\n" +
-        "@TABLE_DEFINITIONS@\n" +
-        "};\n" +
-        "\n" +
-        "@TEST_RESULT_DATA@\n" +
-        "\n" +
-        "@ALL_TESTS@\n" +
-        "}\n" +
-        "\n" +
-        "DBConfig @TEST_CLASS_NAME@::m_PartitionByExecutorDB =\n" +
-        "\n" +
-        "@DATABASE_CONFIG_BODY@\n" +
-        "\n" +
-        "int main() {\n" +
-        "     return TestSuite::globalInstance()->runAll();\n" +
-        "}\n";
-
-    protected String getPlanString(String sqlStmt) throws JSONException {
-        AbstractPlanNode node = compile(sqlStmt);
-        String planString = PlanSelector.outputPlanDebugString(node);
-        return planString;
-    }
-
-    private static void ensureTable(int data[][]) {
-        // Ensure there is at least one row, and that
-        // all rows have the same length.
-        for (int idx = 1; idx < data.length; idx += 1) {
-            assertTrue(data[idx].length == data[0].length);
-        }
-    }
-
     /**
-     * Define a table.
+     * Find a specific node in a plan tree following the left-most path,
+     * (child[0]), and asserting the expected class of each plan node along the
+     * way, inclusive of the start and end.
+     * @param expectedClasses a list of expected AbstractPlanNode classes
+     * @param actualPlan the top of a plan node tree expected to have instances
+     *                   of the expected classes along its left-most branch
+     *                   listed in top-down order.
+     * @return the child node matching the last expected class in the list.
+     *                   It need not be a leaf node.
      */
-    protected static class TableConfig {
-        TableConfig(String tableName,
-                    String columnNames[],
-                    int    data[][]) {
-            m_tableName   = tableName;
-            m_columnNames = columnNames;
-            m_data        = data;
-            ensureTable(data);
-        }
-        String m_tableName;
-        String m_columnNames[];
-        int    m_data[][];
-        public String getTableRowCountName() {
-            return String.format("NUM_TABLE_ROWS_%s", m_tableName.toUpperCase());
-        }
-        public String getTableColCountName() {
-            return String.format("NUM_TABLE_COLS_%s", m_tableName.toUpperCase());
-        }
-        public int getRowCount() {
-            return m_data.length;
-        }
-        public int getColCount() {
-            // TODO Auto-generated method stub
-            if (m_data.length == 0) {
-                return 0;
+    protected static AbstractPlanNode followAssertedLeftChain(
+            AbstractPlanNode start,
+            PlanNodeType startType, PlanNodeType... nodeTypes) {
+        return followAssertedLeftChain(start, false, startType, nodeTypes);
+    }
+
+    protected static AbstractPlanNode followAssertedLeftChain(
+            AbstractPlanNode start,
+            boolean hasOptionalProjection,
+            PlanNodeType startType,
+            PlanNodeType... nodeTypes)
+    {
+        AbstractPlanNode result = start;
+        assertEquals(startType, result.getPlanNodeType());
+        for (int nodeNumber = 0; nodeNumber < nodeTypes.length; nodeNumber += 1) {
+            PlanNodeType type = nodeTypes[nodeNumber];
+            assertTrue(result.getChildCount() > 0);
+            result = result.getChild(0);
+            if (hasOptionalProjection
+                    && (nodeNumber == 0)
+                    && (result.getPlanNodeType() == PlanNodeType.PROJECTION)) {
+                nodeNumber -= 1;
+            } else {
+                assertEquals(type, result.getPlanNodeType());
             }
-            return m_data[0].length;
         }
-        public Object getColumnNamesName() {
-            return String.format("%s_ColumnNames", m_tableName);
+        return result;
+    }
+
+    /**
+     * Assert that a plan's left-most branch is made up of plan nodes of
+     * expected classes.
+     * @param expectedClasses a list of expected AbstractPlanNode classes
+     * @param actualPlan the top of a plan node tree expected to have instances
+     *                   of the expected classes along its left-most branch
+     *                   listed from top to bottom.
+     */
+    protected static void assertLeftChain(
+            AbstractPlanNode start, PlanNodeType... nodeTypes) {
+        AbstractPlanNode pn = start;
+        for (PlanNodeType type : nodeTypes) {
+            assertFalse("Child node(s) are missing from the actual plan chain.",
+                    pn == null);
+            if ( ! type.equals(pn.getPlanNodeType())) {
+                fail("Expecting plan node of type " + type + ", " +
+                        "instead found " + pn.getPlanNodeType() + ".");
+            }
+            pn = (pn.getChildCount() > 0) ? pn.getChild(0) : null;
         }
-        public Object getTableConfigName() {
-            return String.format("%sConfig", m_tableName);
+        assertTrue("Actual plan chain was longer than expected",
+                pn == null);
+    }
+
+    /**
+     * Assert that a two-fragment plan's coordinator fragment does a simple
+     * projection.  Sometimes the projection is optimized away, and
+     * that's ok.
+     **/
+    protected static void assertProjectingCoordinator(
+            List<AbstractPlanNode> lpn) {
+        AbstractPlanNode pn;
+        pn = lpn.get(0);
+        assertTopDownTreeWithOptionalSelectProjection(pn, PlanNodeType.SEND,
+                PlanNodeType.RECEIVE);
+    }
+
+    /**
+     * Assert that a two-fragment plan's coordinator fragment does a left join
+     * with a specific replicated table on its outer side.
+     **/
+    protected static void assertReplicatedLeftJoinCoordinator(
+            List<AbstractPlanNode> lpn, String replicatedTable) {
+        AbstractPlanNode pn;
+        AbstractPlanNode node;
+        NestLoopPlanNode nlj;
+        SeqScanPlanNode seqScan;
+        pn = lpn.get(0);
+        assertTopDownTree(pn,
+                true,
+                PlanNodeType.SEND,
+                PlanNodeType.NESTLOOP,
+                PlanNodeType.SEQSCAN,
+                PlanNodeType.RECEIVE);
+        node = followAssertedLeftChain(pn, true,
+                PlanNodeType.SEND,
+                PlanNodeType.NESTLOOP);
+        nlj = (NestLoopPlanNode) node;
+        assertEquals(JoinType.LEFT, nlj.getJoinType());
+        assertEquals(2, nlj.getChildCount());
+        seqScan = (SeqScanPlanNode) nlj.getChild(0);
+        assertEquals(replicatedTable, seqScan.getTargetTableName().toUpperCase());
+    }
+
+    // Print a tree of plan nodes by type.
+    protected void printPlanNodes(AbstractPlanNode root, int fragmentNumber, int numberOfFragments) {
+        System.out.printf("  Plan for fragment %d of %d\n",
+                          fragmentNumber,
+                          numberOfFragments);
+        String lines[] = root.toExplainPlanString().split("\n");
+        System.out.printf("    Explain:\n");
+        for (String line : lines) {
+            System.out.printf("      %s\n", line);
+        }
+        System.out.printf("    Nodes:\n");
+        for (;root != null;
+                root = (root.getChildCount() > 0) ? root.getChild(0) : null) {
+            System.out.printf("      Node type %s\n", root.getPlanNodeType());
+            for (int idx = 1; idx < root.getChildCount(); idx += 1) {
+                System.out.printf("        Child %d: %s\n", idx, root.getChild(idx).getPlanNodeType());
+            }
+            for (Entry<PlanNodeType, AbstractPlanNode> entry : root.getInlinePlanNodes().entrySet()) {
+                System.out.printf("        Inline %s\n", entry.getKey());
+            }
+            for (Entry<PlanNodeType, AbstractPlanNode> entry : root.getInlinePlanNodes().entrySet()) {
+                System.out.printf("        Inline %s\n", entry.getKey());
+            }
         }
     }
 
     /**
-     * Define a database.
-     */
-    protected class DBConfig {
-        DBConfig(Class<? extends PlannerTestCase>    klass,
-                 URL                                 ddlURL,
-                 String                              catalogString,
-                 TableConfig ...                     tables) {
-            m_class  = klass;
-            m_ddlURL = ddlURL;
-            m_catalogString = catalogString;
-            m_tables = Arrays.asList(tables);
-            m_testConfigs = new ArrayList<>();
-        }
-
-        /**
-         * Clean up a string used to write a C++ string.  Escape double
-         * quotes and newlines.
-         *
-         * @param input
-         * @return
-         */
-        private String cleanString(String input, String indent) {
-            String quotedInput = input.replace("\"", "\\\"");
-            quotedInput = "\"" + quotedInput.replace("\n", "\\n\"\n" + indent + "\"") + "\"";
-            return quotedInput;
-        }
-
-        /**
-         * Given a URL, from Class.getResource(), pull in the contents of the DDL file.
-         *
-         * @param ddlURL
-         * @return
-         * @throws Exception
-         */
-        private String getDDLStringFromURL() throws Exception {
-            InputStream inputStream = null;
+     * Assert that an expression tree contains the expected types of expressions
+     * in the order listed, assuming a top-down left-to-right depth-first
+     * traversal through left, right, and args children.
+     * A null expression type in the list will match any expression
+     * node or tree at the corresponding position.
+     **/
+    protected static void assertExprTopDownTree(AbstractExpression start,
+            ExpressionType... exprTypes) {
+        assertNotNull(start);
+        Stack<AbstractExpression> stack = new Stack<>();
+        stack.push(start);
+        for (ExpressionType type : exprTypes) {
+            // Process each node before its children or later siblings.
+            AbstractExpression parent;
             try {
-                inputStream = m_ddlURL.openStream();
-                ByteArrayOutputStream result = new ByteArrayOutputStream();
-                byte[] buffer = new byte[1024];
-                int length;
-                while ((length = inputStream.read(buffer)) != -1) {
-                    result.write(buffer, 0, length);
-                }
-                return result.toString("UTF-8");
-            } finally {
-                try {
-                    if (inputStream != null) {
-                        inputStream.close();
-                    }
-                } catch (Exception ex) {
-                    ;
-                }
+                parent = stack.pop();
+            }
+            catch (EmptyStackException ese) {
+                fail("No expression was found in the tree to match type " + type);
+                return; // This dead code hushes warnings.
+            }
+            List<AbstractExpression> args = parent.getArgs();
+            AbstractExpression rightExpr = parent.getRight();
+            AbstractExpression leftExpr = parent.getLeft();
+            int argCount = (args == null) ? 0 : args.size();
+            int childCount = argCount +
+                    (rightExpr == null ? 0 : 1) +
+                    (leftExpr == null ? 0 : 1);
+            if (type == null) {
+                // A null type wildcard matches any child TREE or NODE.
+                System.out.println("DEBUG: Suggestion -- expect " +
+                        parent.getExpressionType() +
+                        " with " + childCount + " direct children.");
+                continue;
+            }
+            assertEquals(type, parent.getExpressionType());
+            // Iterate from the last child to the first.
+            while (argCount > 0) {
+                // Push each child to be processed before its parent's
+                // or its own later siblings (already pushed).
+                stack.push(parent.getArgs().get(--argCount));
+            }
+            if (rightExpr != null) {
+                stack.push(rightExpr);
+            }
+            if (leftExpr != null) {
+                stack.push(leftExpr);
             }
         }
-
-        /**
-         * Add a test configuration to the database.
-         *
-         * @param testConfig
-         */
-        public void addTest(TestConfig testConfig) {
-            System.out.printf("Adding test %d: %s\n", m_testConfigs.size(), testConfig.m_testName);
-            m_testConfigs.add(testConfig);
-        }
-
-        private URL                                   m_ddlURL;
-        private String                                m_catalogString;
-        private List<TableConfig>                     m_tables;
-        private List<TestConfig>                      m_testConfigs;
-        private Class<? extends PlannerTestCase>      m_class;
-
-        public String getTestCases(Map<String, String> params) {
-            StringBuffer sb = new StringBuffer();
-            for (int testIdx = 0; testIdx < m_testConfigs.size(); testIdx += 1) {
-                TestConfig tc = m_testConfigs.get(testIdx);
-                sb.append(String.format("TEST_F(%s, %s) {\n" +
-                                        "    static int testIndex = %d;\n" +
-                                        "    executeTest(allTests[testIndex]);\n" +
-                                        "}\n",
-                                        params.get("TEST_CLASS_NAME"),
-                                        tc.m_testName,
-                                        testIdx));
-            }
-            return sb.toString();
-        }
-
-        public String getTableColumnNames(Map<String, String> params) {
-            StringBuffer sb = new StringBuffer();
-            for (TableConfig tc : m_tables) {
-                sb.append(String.format("const char *%s[] = {\n", tc.getColumnNamesName()));
-                String sep = "";
-                for (String colName : tc.m_columnNames) {
-                    sb.append("    \"" + colName + "\"" + sep + "\n");
-                    sep = ",";
-                }
-                sb.append("};\n");
-            }
-            return sb.toString();
-        }
-
-        private void writeTable(StringBuffer sb,
-                                String       tableName,
-                                String       rowCountName,
-                                int          rowCount,
-                                String       colCountName,
-                                int          colCount,
-                                int          data[][]) {
-            sb.append(String.format("const int %s = %d;\n", rowCountName, rowCount));
-            sb.append(String.format("const int %s = %d;\n", colCountName, colCount));
-            sb.append(String.format("const int %s[%s * %s] = {\n",
-                                    tableName,
-                                    rowCountName,
-                                    colCountName));
-            for (int ridx = 0; ridx < data.length; ridx += 1) {
-                sb.append("    ");
-                for (int cidx = 0; cidx < data[ridx].length; cidx += 1) {
-                    sb.append(String.format("%3d,", data[ridx][cidx]));
-                }
-                sb.append("\n");
-            }
-            sb.append("};\n\n");
-        }
-
-        public String getTableData(Map<String, String> params) {
-            StringBuffer sb = new StringBuffer();
-            for (TableConfig tc : m_tables) {
-                String rowCountName = tc.getTableRowCountName();
-                String colCountName = tc.getTableColCountName();
-                writeTable(sb,
-                           String.format("%sData", tc.m_tableName),
-                           rowCountName,
-                           tc.getRowCount(),
-                           colCountName,
-                           tc.getColCount(),
-                           tc.m_data);
-            }
-            return sb.toString();
-        }
-
-        public String getTableConfigs(Map<String, String> params) {
-            StringBuffer sb = new StringBuffer();
-            for (TableConfig tc : m_tables) {
-                sb.append(String.format("const TableConfig %s = {\n", tc.getTableConfigName()))
-                  .append(String.format("    \"%s\",\n", tc.m_tableName))
-                  .append(String.format("    %s,\n", tc.getColumnNamesName()))
-                  .append(String.format("    %s,\n", tc.getTableRowCountName()))
-                  .append(String.format("    %s,\n", tc.getTableColCountName()))
-                  .append(String.format("    %sData\n", tc.m_tableName))
-                  .append("};\n");
-            }
-            return sb.toString();
-        }
-
-        public String getTableDefinitions(Map<String, String> params) {
-            StringBuffer sb = new StringBuffer();
-            for (TableConfig tc : m_tables) {
-                sb.append(String.format("    &%s,\n", tc.getTableConfigName()));
-            }
-            return sb.toString();
-        }
-
-        public String getTestResultData(Map<String, String> params) {
-            StringBuffer sb = new StringBuffer();
-            for (int testIdx = 0; testIdx < m_testConfigs.size(); testIdx += 1) {
-                TestConfig tc = m_testConfigs.get(testIdx);
-                String rowCountName = tc.getRowCountName();
-                String colCountName = tc.getColCountName();
-                String tableName    = tc.getOutputTableName();
-                writeTable(sb,
-                           tableName,
-                           rowCountName,
-                           tc.getRowCount(),
-                           colCountName,
-                           tc.getColCount(),
-                           tc.m_expectedOutput);
-            }
-            return sb.toString();
-        }
-
-        public String getAllTests(Map<String, String> params) throws JSONException {
-            StringBuffer sb = new StringBuffer();
-            sb.append(String.format("TestConfig allTests[%d] = {\n", m_testConfigs.size()));
-            for (TestConfig tc : m_testConfigs) {
-                sb.append("    {\n")
-                  .append("        // SQL Statement\n")
-                  .append(String.format("        %s,\n", cleanString(tc.m_sqlString, "        ")))
-                  .append("        // Plan String\n")
-                  .append(String.format("        %s,\n", cleanString(getPlanString(tc.m_sqlString), "        ")))
-                  .append(String.format("        %s,\n", tc.getRowCountName()))
-                  .append(String.format("        %s,\n", tc.getColCountName()))
-                  .append(String.format("        %s\n",  tc.getOutputTableName()))
-                  .append("    },\n");
-            }
-            sb.append("};\n");
-            return sb.toString();
-        }
-
-        public String getDatabaseConfigBody(Map<String, String> params) throws Exception {
-            StringBuffer sb = new StringBuffer();
-            sb.append("{\n");
-            sb.append("    //\n    // DDL.\n    //\n");
-            sb.append(String.format("    %s,\n", cleanString(getDDLStringFromURL(), "    ")));
-            sb.append("    //\n    // Catalog String\n    //\n");
-            sb.append(String.format("    %s,\n", cleanString(m_catalogString, "    ")));
-            sb.append(String.format("    %d,\n", m_tables.size()));
-            sb.append("    allTables\n");
-            sb.append("};\n");
-            return sb.toString();
-        }
-
-        public String getClassPackageName() {
-            return m_class.getPackage().getName();
-        }
-
-        public String getClassName() {
-            return m_class.getSimpleName();
-        }
-
+        assertTrue("Extra expression node(s) (" + stack.size() +
+                ") were found in the tree with no expression type to match",
+                stack.isEmpty());
     }
 
     /**
-     * Define a test.  We need the sql string and the expected tabular output.
-     * @author bwhite
-     */
-    protected static class TestConfig {
-        TestConfig(String       testName,
-                   String       sqlString,
-                   int          expectedOutput[][]) {
-            m_testName       = testName;
-            m_sqlString      = sqlString;
-            m_expectedOutput = expectedOutput;
-            ensureTable(expectedOutput);
-        }
+     * Assert that a plan node tree contains the expected types of plan nodes
+     * in the order listed, assuming a top-down left-to-right depth-first
+     * traversal through the child vector. A null plan node type in the list
+     * will match any plan node or subtree at the corresponding position.
+     **/
+    protected static void assertTopDownTree(AbstractPlanNode start,
+            PlanNodeType... nodeTypes) {
+        assertTopDownTree(start, false, nodeTypes);
+    }
 
-        public int    getRowCount() {
-            return m_expectedOutput.length;
-        }
-        public int    getColCount() {
-            if (m_expectedOutput.length > 0) {
-                return m_expectedOutput[0].length;
+    protected static void assertTopDownTreeWithOptionalSelectProjection(AbstractPlanNode start,
+            PlanNodeType... nodeTypes) {
+        assertTopDownTree(start, true, nodeTypes);
+    }
+
+    protected static void assertTopDownTree(AbstractPlanNode start,
+                                            boolean hasOptionalProjection,
+                                            PlanNodeType ... nodeTypes) {
+        Stack<AbstractPlanNode> stack = new Stack<>();
+        stack.push(start);
+
+        for (int nodeNumber = 0; nodeNumber < nodeTypes.length; nodeNumber += 1) {
+            PlanNodeType type = nodeTypes[nodeNumber];
+            // Process each node before its children or later siblings.
+            AbstractPlanNode parent;
+            try {
+                parent = stack.pop();
             }
-            return 0;
+            catch (EmptyStackException ese) {
+                fail("No node was found in the tree to match node type " + type);
+                return; // This dead code hushes warnings.
+            }
+            int childCount = parent.getChildCount();
+            if (type == null) {
+                // A null type wildcard matches any child TREE or NODE.
+                System.out.println("DEBUG: Suggestion -- expect " +
+                        parent.getPlanNodeType() +
+                        " with " + childCount + " direct children.");
+                continue;
+            }
+            // If we have specified that this has an optional
+            // projection node, then we may find a projection
+            // node at node number 1.  This is from the select
+            // list projection, but we may have optimized it away.
+            if (nodeNumber == 1 && hasOptionalProjection) {
+                if (PlanNodeType.PROJECTION == parent.getPlanNodeType()) {
+                    assertEquals(1, parent.getChildCount());
+                    // We don't actually want to use up this
+                    // type from nodeTypes.  So undo the increment
+                    // we are about to do.
+                    nodeNumber -= 1;
+                    stack.push(parent.getChild(0));
+                    continue;
+                }
+            }
+            assertEquals(type, parent.getPlanNodeType());
+            // Iterate from the last child to the first.
+            while (childCount > 0) {
+                // Push each child to be processed before its parent's
+                // or its own later (already pushed) siblings.
+                stack.push(parent.getChild(--childCount));
+            }
         }
-        public String getColCountName() {
-            return String.format("NUM_OUTPUT_COLS_%s", m_testName.toUpperCase());
+        assertTrue("Extra plan node(s) (" + stack.size() +
+                ") were found in the tree with no node type to match",
+                stack.isEmpty());
+    }
+
+    protected class PlanWithInlineNodes {
+        PlanNodeType m_type = null;
+
+        List<PlanNodeType> m_branches = new ArrayList<>();
+        public PlanWithInlineNodes(PlanNodeType mainType, PlanNodeType ... nodes) {
+            m_type = mainType;
+            for (PlanNodeType node : nodes) {
+                m_branches.add(node);
+            }
         }
 
-        public String getRowCountName() {
-            return String.format("NUM_OUTPUT_ROWS_%s", m_testName.toUpperCase());
+        public String match(AbstractPlanNode node) {
+            PlanNodeType mainNodeType = node.getPlanNodeType();
+            if (m_type != mainNodeType) {
+                return String.format("PlanWithInlineNode: expected main plan node type %s, got %s",
+                                     m_type, mainNodeType);
+            }
+            for (PlanNodeType nodeType : m_branches) {
+                AbstractPlanNode inlineNode = node.getInlinePlanNode(nodeType);
+                if (inlineNode == null) {
+                    return String.format("Expected inline node type %s but didn't find it.",
+                                         nodeType.name());
+                }
+            }
+            if (m_branches.size() != node.getInlinePlanNodes().size()) {
+                return String.format("Expected %d inline nodes, found %d", m_branches.size(), node.getInlinePlanNodes().size());
+            }
+            return null;
         }
-
-        public String getOutputTableName() {
-            return String.format("outputTable_%s", m_testName);
-        }
-
-        String m_testName;
-        String m_sqlString;
-        int    m_expectedOutput[][];
     }
 
     /**
-     * Given a foldername and a class name, write a C++ file for the test.
+     * Validate a plan.  This is kind of like
+     * PlannerTestCase.compileToTopDownTree.  The differences are
+     * <ol>
+     *   <li>We can compile MP plans and SP plans, and</li>
+     *   <li>The boundaries between fragments in MP plans
+     *       are marked with PlanNodeType.INVALID.</li>
+     *   <li>We can describe inline nodes pretty easily.</li>
+     * </ol>
      *
-     * @param string
-     * @param string2
-     * @param db
-     * @throws Exception
+     * See TestWindowFunctions.testWindowFunctionWithIndex for examples
+     * of the use of this function.
+     *
+     * @param SQL The statement text.
+     * @param numberOfFragments The number of expected fragments.
+     * @param types The plan node types of the inline and out-of-line nodes.
+     *              If types[idx] is a PlanNodeType, then the node should
+     *              have no inline children.  If types[idx] is an object of
+     *              type PlanWithInlineNode then it has the main node type,
+     *              and node types of the inline children as well.
      */
-    protected void generateTests(String testFolder, String testClassName, DBConfig db) throws Exception {
-        Map<String, String> params = new HashMap<>();
-        params.put("SOURCE_PACKAGE_NAME",   db.getClassPackageName());
-        params.put("SOURCE_CLASS_NAME",     db.getClassName());
-        params.put("TEST_CLASS_NAME",       testClassName);
-        params.put("TEST_CASES",            db.getTestCases(params));
-        params.put("TABLE_COLUMN_NAMES",    db.getTableColumnNames(params));
-        params.put("TABLE_DATA",            db.getTableData(params));
-        params.put("TABLE_CONFIGS",         db.getTableConfigs(params));
-        params.put("TABLE_DEFINITIONS",     db.getTableDefinitions(params));
-        params.put("TEST_RESULT_DATA",      db.getTestResultData(params));
-        params.put("ALL_TESTS",             db.getAllTests(params));
-        params.put("DATABASE_CONFIG_BODY",  db.getDatabaseConfigBody(params));
-        writeTestFile(testFolder, testClassName, params);
-    }
-
-    private void writeFile(File path, String contents) throws Exception {
-        PrintWriter out = null;
-        try {
-            out = new PrintWriter(path);
-            out.print(contents);
-        } finally {
-            if (out != null) {
-                try {
-                    out.close();
-                } catch (Exception ex) {
-                    ;
+    protected void validatePlan(String SQL,
+                                int numberOfFragments,
+                                Object ...types) {
+        List<AbstractPlanNode> fragments = compileToFragments(SQL);
+        assertEquals(String.format("Expected %d fragments, not %d",
+                                   numberOfFragments,
+                                   fragments.size()),
+                     numberOfFragments,
+                     fragments.size());
+        int idx = 0;
+        int fragment = 1;
+        // The index of the last PlanNodeType in types.
+        int nchildren = types.length;
+        System.out.printf("Plan for <%s>\n", SQL);
+        for (AbstractPlanNode plan : fragments) {
+            printPlanNodes(plan, fragment, numberOfFragments);
+            // The boundaries between fragments are
+            // marked with PlanNodeType.INVALID.
+            if (fragment > 1) {
+                assertEquals("Expected a fragment to start here",
+                             PlanNodeType.INVALID,
+                             types[idx]);
+                idx += 1;
+            }
+            fragment += 1;
+            for (;plan != null; idx += 1) {
+                if (types.length <= idx) {
+                    fail(String.format("Expected %d plan nodes, but found more.", types.length));
                 }
+                if (types[idx] instanceof PlanNodeType) {
+                    assertEquals(String.format("Expected %s plan node but found %s", types[idx], plan.getPlanNodeType()),
+                                 types[idx], plan.getPlanNodeType());
+                } else if (types[idx] instanceof PlanWithInlineNodes) {
+                    PlanWithInlineNodes branch = (PlanWithInlineNodes)types[idx];
+                    String error = branch.match(plan);
+                    if (error != null) {
+                        fail(error);
+                    }
+                } else {
+                    fail("Expected a PlanNodeType or an array of PlanNodeTypes here.");
+                }
+                plan = (plan.getChildCount() > 0) ? plan.getChild(0) : null;
             }
         }
+        assertEquals(nchildren, idx);
     }
 
-    private void writeTestFile(String testFolder, String testClassName, Map<String, String> params) throws Exception {
-        String template = TESTFILE_TEMPLATE;
-        for (Map.Entry<String, String> entry : params.entrySet()) {
-            String pattern = "@" + entry.getKey() + "@";
-            String value   = params.get(entry.getKey());
-            template = template.replace(pattern, value);
-        }
-        writeFile(new File(String.format("tests/ee/%s/%s.cpp", testFolder, testClassName)), template);
-    }
 }

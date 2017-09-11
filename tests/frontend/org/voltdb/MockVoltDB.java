@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -46,7 +46,6 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltZK.MailboxType;
@@ -80,7 +79,7 @@ public class MockVoltDB implements VoltDBInterface
     final String m_clusterName = "cluster";
     final String m_databaseName = "database";
     StatsAgent m_statsAgent = null;
-    HostMessenger m_hostMessenger = new HostMessenger(new HostMessenger.Config(), null);
+    HostMessenger m_hostMessenger = new HostMessenger(new HostMessenger.Config(false), null);
     private OperationMode m_mode = OperationMode.RUNNING;
     private volatile String m_localMetadata;
     final SnapshotCompletionMonitor m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
@@ -294,7 +293,8 @@ public class MockVoltDB implements VoltDBInterface
         long now = System.currentTimeMillis();
         DbSettings settings = new DbSettings(ClusterSettings.create().asSupplier(), NodeSettings.create());
 
-        m_context = new CatalogContext( now, now, m_catalog, settings, new byte[] {}, null, new byte[] {}, 0) {
+        m_context = new CatalogContext(m_catalog, settings, 0, now,
+                new byte[] {}, null, new byte[] {}, m_hostMessenger) {
             @Override
             public long getCatalogCRC() {
                 return 13;
@@ -383,6 +383,13 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public void initialize(Configuration config)
+    {
+        m_noLoadLib = config.m_noLoadLibVOLTDB;
+        voltconfig = config;
+    }
+
+    @Override
+    public void cli(Configuration config)
     {
         m_noLoadLib = config.m_noLoadLibVOLTDB;
         voltconfig = config;
@@ -482,16 +489,16 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands,
-            byte[] catalogBytes, byte[] catalogHash, int expectedCatalogVersion,
-            long currentTxnId, long currentTxnTimestamp, byte[] deploymentBytes,
-            byte[] deploymentHash)
+    public CatalogContext catalogUpdate(String diffCommands,
+            int expectedCatalogVersion, long genId,
+            boolean isForReplay, boolean requireCatalogDiffCmdsApplyToEE,
+            boolean hasSchemaChange, boolean requiresNewExportGeneration)
     {
         throw new UnsupportedOperationException("unimplemented");
     }
 
     @Override
-    public Pair<CatalogContext, CatalogSpecificPlanner> settingsUpdate(ClusterSettings settings, int expectedVersionId)
+    public CatalogContext settingsUpdate(ClusterSettings settings, int expectedVersionId)
     {
         throw new UnsupportedOperationException("unimplemented");
     }
@@ -502,7 +509,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void logUpdate(String xmlConfig, long currentTxnId)
+    public void logUpdate(String xmlConfig, long currentTxnId, File voltroot)
     {
     }
 
@@ -604,9 +611,9 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void setReplicationRole(ReplicationRole role)
+    public void promoteToMaster()
     {
-        m_replicationRole = role;
+        m_replicationRole = ReplicationRole.NONE;
     }
 
     @Override
@@ -672,7 +679,17 @@ public class MockVoltDB implements VoltDBInterface
             }
 
             @Override
-            public boolean isTrial() {
+            public boolean isAnyKindOfTrial() {
+                return false;
+            }
+
+            @Override
+            public boolean isProTrial() {
+                return false;
+            }
+
+            @Override
+            public boolean isEnterpriseTrial() {
                 return false;
             }
 
@@ -809,7 +826,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public boolean isShuttingdown() {
+    public boolean isPreparingShuttingdown() {
         return false;
     }
 
@@ -825,5 +842,9 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public SnmpTrapSender getSnmpTrapSender() {
         return new DummySnmpTrapSender();
+    }
+
+    @Override
+    public void swapTables(String oneTable, String otherTable) {
     }
 }

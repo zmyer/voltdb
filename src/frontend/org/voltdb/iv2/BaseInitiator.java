@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,11 +25,10 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
-import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
-import org.voltdb.ProcedureRunnerFactory;
+import org.voltdb.QueueDepthTracker;
 import org.voltdb.StartAction;
 import org.voltdb.StarvationTracker;
 import org.voltdb.StatsAgent;
@@ -109,6 +108,10 @@ public abstract class BaseInitiator implements Initiator
         agent.registerStatsSource(StatsSelector.STARVATION,
                                   getInitiatorHSId(),
                                   st);
+        QueueDepthTracker qdt = m_scheduler.setupQueueDepthTracker(getInitiatorHSId());
+        agent.registerStatsSource(StatsSelector.QUEUE,
+                                  getInitiatorHSId(),
+                                  qdt);
 
         String partitionString = " ";
         if (m_partitionId != -1) {
@@ -121,7 +124,6 @@ public abstract class BaseInitiator implements Initiator
     protected void configureCommon(BackendTarget backend,
                           CatalogContext catalogContext,
                           String serializedCatalog,
-                          CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           StartAction startAction,
                           StatsAgent agent,
@@ -161,16 +163,10 @@ public abstract class BaseInitiator implements Initiator
                                        coreBindIds,
                                        taskLog,
                                        hasMPDRGateway);
-            ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
-            prf.configure(m_executionSite, m_executionSite.m_sysprocContext);
-
-            LoadedProcedureSet procSet = new LoadedProcedureSet(
-                    m_executionSite,
-                    prf,
-                    m_initiatorMailbox.getHSId(),
-                    0); // this has no meaning
-            procSet.loadProcedures(catalogContext, backend, csp);
+            LoadedProcedureSet procSet = new LoadedProcedureSet(m_executionSite);
+            procSet.loadProcedures(catalogContext);
             m_executionSite.setLoadedProcedures(procSet);
+            m_scheduler.setProcedureSet(procSet);
             m_scheduler.setCommandLog(cl);
 
             m_siteThread = new Thread(m_executionSite);

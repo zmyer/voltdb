@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -77,6 +77,7 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+import org.voltdb.CatalogContext.CatalogJarWriteMode;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
@@ -434,7 +435,8 @@ public class SnapshotUtil {
         String filename = SnapshotUtil.constructCatalogFilenameForNonce(nonce);
         try
         {
-            return VoltDB.instance().getCatalogContext().writeCatalogJarToFile(path, filename);
+            return VoltDB.instance().getCatalogContext().writeCatalogJarToFile(path, filename,
+                    CatalogJarWriteMode.RECOVER);
         }
         catch (IOException ioe)
         {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,19 +19,30 @@ package org.voltdb.iv2;
 
 import java.io.IOException;
 
+import org.voltdb.SiteProcedureConnection;
 import org.voltdb.rejoin.TaskLog;
 
-import org.voltdb.SiteProcedureConnection;
-
 public abstract class SiteTasker {
+
+    private long queueOfferTime = -1L;
+
+    public void setQueueOfferTime() {
+        queueOfferTime = System.nanoTime();
+    }
+
+    public long getQueueOfferTime() {
+        return queueOfferTime;
+    }
 
     public static abstract class SiteTaskerRunnable extends SiteTasker {
         abstract void run();
 
+        @Override
         public void run(SiteProcedureConnection siteConnection) {
             run();
         }
 
+        @Override
         public void runForRejoin(SiteProcedureConnection siteConnection,
                 TaskLog rejoinTaskLog) throws IOException {
             run();

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,19 +19,18 @@ package org.voltdb.plannodes;
 
 import java.util.List;
 
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DatabaseEstimates.TableEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.planner.ScanPlanNodeWhichCanHaveInlineInsert;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 
-public class SeqScanPlanNode extends AbstractScanPlanNode {
+public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNodeWhichCanHaveInlineInsert {
 
     public SeqScanPlanNode() {
         super();
@@ -75,7 +74,7 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
 
     private static final TableEstimates SUBQUERY_TABLE_ESTIMATES_HACK = new TableEstimates();
     @Override
-    public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeCostEstimates(long childOutputTupleCountEstimate, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
         if (m_isSubQuery) {
             // Get estimates from the sub-query
             // @TODO For the sub-query the cost estimates will be calculated separately
@@ -121,4 +120,13 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
         return "SEQUENTIAL SCAN of \"" + tableName + "\"" + explainPredicate("\n" + indent + " filter by ");
     }
 
+    @Override
+    public boolean hasInlineAggregateNode() {
+        return AggregatePlanNode.getInlineAggregationNode(this) != null;
+    }
+
+    @Override
+    public AbstractPlanNode getAbstractNode() {
+        return this;
+    }
 }

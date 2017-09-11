@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -100,7 +100,7 @@ public class TestMemoryResourceMonitor extends TestCase
                 "-20",
                 "abc"
         };
-        ResourceUsageMonitor monitor = new ResourceUsageMonitor(null, new DummySnmpTrapSender());
+        HealthMonitor monitor = new HealthMonitor(null, new DummySnmpTrapSender());
         for (int i=0; i<badValues.length; i++) {
             try {
                 monitor.getMemoryLimitSize(badValues[i]);
@@ -119,7 +119,7 @@ public class TestMemoryResourceMonitor extends TestCase
         configToExpectedRss.put("15%", totalSize*15/100.0);
         configToExpectedRss.put("40", 40.0*1073741824L);
         configToExpectedRss.put("1.5", 1.5*1073741824L);
-        ResourceUsageMonitor monitor = new ResourceUsageMonitor(null, new DummySnmpTrapSender());
+        HealthMonitor monitor = new HealthMonitor(null, new DummySnmpTrapSender());
         for (String str : configToExpectedRss.keySet()) {
             Assert.assertEquals(configToExpectedRss.get(str), monitor.getMemoryLimitSize(str));
         }
@@ -245,7 +245,7 @@ public class TestMemoryResourceMonitor extends TestCase
     {
         setUpServer("0.5", true); // set up server with rss limit
         m_mockStatsProducer.m_rss = 2048L*1024*1024;
-        resumeAndWait(MONITORING_INTERVAL+1);
+        resumeAndWait(MONITORING_INTERVAL+3);
         assertEquals(OperationMode.PAUSED, VoltDB.instance().getMode());
 
         // update server with rss limit

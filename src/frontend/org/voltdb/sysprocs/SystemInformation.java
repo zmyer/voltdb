@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -91,12 +91,14 @@ public class SystemInformation extends VoltSystemProcedure
     };
 
     @Override
-    public void init()
+    public long[] getPlanFragmentIds()
     {
-        registerPlanFragment(SysProcFragmentId.PF_systemInformationOverview);
-        registerPlanFragment(SysProcFragmentId.PF_systemInformationOverviewAggregate);
-        registerPlanFragment(SysProcFragmentId.PF_systemInformationDeployment);
-        registerPlanFragment(SysProcFragmentId.PF_systemInformationAggregate);
+        return new long[]{
+            SysProcFragmentId.PF_systemInformationOverview,
+            SysProcFragmentId.PF_systemInformationOverviewAggregate,
+            SysProcFragmentId.PF_systemInformationDeployment,
+            SysProcFragmentId.PF_systemInformationAggregate
+        };
     }
 
     @Override
@@ -121,12 +123,12 @@ public class SystemInformation extends VoltSystemProcedure
                                        new ColumnInfo("KEY", VoltType.STRING),
                                        new ColumnInfo("VALUE", VoltType.STRING));
             }
-            return new DependencyPair(DEP_DISTRIBUTE, result);
+            return new DependencyPair.TableDependencyPair(DEP_DISTRIBUTE, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_systemInformationOverviewAggregate)
         {
             VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_DISTRIBUTE));
-            return new DependencyPair(DEP_AGGREGATE, result);
+            return new DependencyPair.TableDependencyPair(DEP_AGGREGATE, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_systemInformationDeployment)
         {
@@ -142,7 +144,7 @@ public class SystemInformation extends VoltSystemProcedure
             {
                 result = new VoltTable(clusterInfoSchema);
             }
-            return new DependencyPair(DEP_systemInformationDeployment, result);
+            return new DependencyPair.TableDependencyPair(DEP_systemInformationDeployment, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_systemInformationAggregate)
         {
@@ -181,7 +183,7 @@ public class SystemInformation extends VoltSystemProcedure
                     }
                 }
             }
-            return new DependencyPair(DEP_systemInformationAggregate, result);
+            return new DependencyPair.TableDependencyPair(DEP_systemInformationAggregate, result);
         }
         assert(false);
         return null;
@@ -431,8 +433,6 @@ public class SystemInformation extends VoltSystemProcedure
         String replication_role = VoltDB.instance().getReplicationRole().toString();
         vt.addRow(hostId, "REPLICATIONROLE", replication_role);
 
-        vt.addRow(hostId, "LASTCATALOGUPDATETXNID",
-                  Long.toString(VoltDB.instance().getCatalogContext().m_transactionId));
         vt.addRow(hostId, "CATALOGCRC",
                 Long.toString(VoltDB.instance().getCatalogContext().getCatalogCRC()));
 
@@ -440,6 +440,9 @@ public class SystemInformation extends VoltSystemProcedure
         long startTimeMs = VoltDB.instance().getHostMessenger().getInstanceId().getTimestamp();
         vt.addRow(hostId, "STARTTIME", Long.toString(startTimeMs));
         vt.addRow(hostId, "UPTIME", MiscUtils.formatUptime(VoltDB.instance().getClusterUptime()));
+
+        vt.addRow(hostId, "LAST_UPDATECORE_DURATION",
+                Long.toString(VoltDB.instance().getCatalogContext().m_lastUpdateCoreDuration));
 
         SocketHubAppender hubAppender =
             (SocketHubAppender) Logger.getRootLogger().getAppender("hub");
@@ -452,6 +455,11 @@ public class SystemInformation extends VoltSystemProcedure
             vt.addRow(hostId, "LICENSE", VoltDB.instance().getLicenseInformation());
         }
         populatePartitionGroups(hostId, vt);
+
+        // root path
+        vt.addRow(hostId, "VOLTDBROOT", VoltDB.instance().getVoltDBRootPath());
+        vt.addRow(hostId, "FULLCLUSTERSIZE", Integer.toString(VoltDB.instance().getCatalogContext().getClusterSettings().hostcount()));
+        vt.addRow(hostId, "CLUSTERID", Integer.toString(VoltDB.instance().getCatalogContext().getCluster().getDrclusterid()));
         return vt;
     }
 
@@ -526,25 +534,11 @@ public class SystemInformation extends VoltSystemProcedure
         if (cluster.getNetworkpartition())
         {
             partition_detect_enabled = "true";
-            String partition_detect_snapshot_path = VoltDB.instance().getSnapshotPath();
-            String partition_detect_snapshot_prefix =
-                cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPrefix();
-            results.addRow("snapshotpath",
-                           partition_detect_snapshot_path);
-            results.addRow("partitiondetectionsnapshotprefix",
-                           partition_detect_snapshot_prefix);
         }
         results.addRow("partitiondetection", partition_detect_enabled);
 
         results.addRow("heartbeattimeout", Integer.toString(cluster.getHeartbeattimeout()));
-
         results.addRow("adminport", Integer.toString(VoltDB.instance().getConfig().m_adminPort));
-        String adminstartup = "false";
-        if (cluster.getAdminstartup())
-        {
-            adminstartup = "true";
-        }
-        results.addRow("adminstartup", adminstartup);
 
         String command_log_enabled = "false";
         // log name is MAGIC, you knoooow

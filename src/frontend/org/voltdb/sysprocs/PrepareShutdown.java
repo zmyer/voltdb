@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -52,9 +52,8 @@ public class PrepareShutdown extends Pause {
     private final static VoltLogger LOG = new VoltLogger("HOST");
 
     @Override
-    public void init() {
-        registerPlanFragment(PF_prepareShutdown);
-        registerPlanFragment(PF_prepareShutdownAggregate);
+    public long[] getPlanFragmentIds() {
+        return new long[]{PF_prepareShutdown, PF_prepareShutdownAggregate};
     }
 
     @Override
@@ -74,7 +73,7 @@ public class PrepareShutdown extends Pause {
                     LOG.debug("@PrepareShutdown returning sigil " + ll(m_stat.getMzxid()));
                 }
             }
-            return new DependencyPair(DEP_prepareShutdown, t);
+            return new DependencyPair.TableDependencyPair(DEP_prepareShutdown, t);
 
         } else if (fragmentId == PF_prepareShutdownAggregate) {
 
@@ -90,7 +89,7 @@ public class PrepareShutdown extends Pause {
                 t.addRow(zktxnid);
             }
 
-            return new DependencyPair(DEP_prepareShutdonwAggregate, t);
+            return new DependencyPair.TableDependencyPair(DEP_prepareShutdonwAggregate, t);
 
         } else {
 

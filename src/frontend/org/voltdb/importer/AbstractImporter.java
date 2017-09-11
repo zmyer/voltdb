@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,7 +18,7 @@
 package org.voltdb.importer;
 
 import java.net.URI;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -46,17 +46,22 @@ import org.voltdb.client.ProcedureCallback;
  * because of addition/deletion of nodes to the cluster.
  */
 public abstract class AbstractImporter
-    implements InternalConnectionContext {
+    implements InternalConnectionContext, ImporterLifecycle, ImporterLogger {
 
     private static final int LOG_SUPPRESSION_INTERVAL_SECONDS = 60;
 
     private final VoltLogger m_logger;
     private ImporterServerAdapter m_importServerAdapter;
     private volatile boolean m_stopping;
-    private AtomicInteger m_backPressureCount = new AtomicInteger(0);
+    private final Function<Integer, Boolean> m_backPressurePredicate = (x) -> shouldRun();
 
     protected AbstractImporter() {
         m_logger = new VoltLogger(getName());
+    }
+
+    @Override
+    public boolean hasTransaction() {
+        return true;
     }
 
     /**
@@ -76,7 +81,8 @@ public abstract class AbstractImporter
      *
      * @return returns true if the importer execution should continue; false otherwise
      */
-    protected final boolean shouldRun()
+    @Override
+    public final boolean shouldRun()
     {
         return !m_stopping;
     }
@@ -99,49 +105,18 @@ public abstract class AbstractImporter
      * @param callback the callback that will receive procedure invocation status
      * @return returns true if the procedure execution went through successfully; false otherwise
      */
-    protected final boolean callProcedure(Invocation invocation, ProcedureCallback callback)
+    public final boolean callProcedure(Invocation invocation, ProcedureCallback callback)
     {
         try {
-            boolean result = m_importServerAdapter.callProcedure(this, callback, invocation.getProcedure(), invocation.getParams());
+            boolean result = m_importServerAdapter.callProcedure(this,
+                                                                 m_backPressurePredicate,
+                                                                 callback, invocation.getProcedure(), invocation.getParams());
             reportStat(result, invocation.getProcedure());
-            applyBackPressureAsNeeded();
             return result;
         } catch (Exception ex) {
             rateLimitedLog(Level.ERROR, ex, "%s: Error trying to import", getName());
             reportFailureStat(invocation.getProcedure());
             return false;
-        }
-    }
-
-    private void applyBackPressureAsNeeded()
-    {
-        int count = m_backPressureCount.get();
-        if (count > 0) {
-            try { // increase sleep time exponentially to a max of 256ms
-                if (count > 8) {
-                    Thread.sleep(256);
-                } else {
-                    Thread.sleep(1<<count);
-                }
-            } catch(InterruptedException e) {
-                if (m_logger.isDebugEnabled()) {
-                    m_logger.debug("Sleep for back pressure interrupted", e);
-                }
-            }
-        }
-    }
-
-    /**
-     * Called by the internal framework code to indicate if back pressure must
-     * be applied on the importer because the server is busy.
-     */
-    @Override
-    public void setBackPressure(boolean hasBackPressure)
-    {
-        if (hasBackPressure) {
-            m_backPressureCount.incrementAndGet();
-        } else {
-            m_backPressureCount.set(0);
         }
     }
 
@@ -175,12 +150,14 @@ public abstract class AbstractImporter
      * @param format error message format
      * @param args arguments to format the error message
      */
-    protected void rateLimitedLog(Level level, Throwable cause, String format, Object... args)
+    @Override
+    public void rateLimitedLog(Level level, Throwable cause, String format, Object... args)
     {
         m_logger.rateLimitedLog(LOG_SUPPRESSION_INTERVAL_SECONDS, level, cause, format, args);
     }
 
-    protected boolean isDebugEnabled()
+    @Override
+    public boolean isDebugEnabled()
     {
         return m_logger.isDebugEnabled();
     }
@@ -198,10 +175,11 @@ public abstract class AbstractImporter
     /**
      * Log a DEBUG level log message.
      *
-     * @param message
-     * @param t
+     * @param msgFormat Format
+     * @param t Throwable to log
      */
-    protected void debug(Throwable t, String msgFormat, Object... args)
+    @Override
+    public void debug(Throwable t, String msgFormat, Object... args)
     {
         m_logger.debug(String.format(msgFormat, args), t);
     }
@@ -209,10 +187,11 @@ public abstract class AbstractImporter
     /**
      * Log a ERROR level log message.
      *
-     * @param message
-     * @param t
+     * @param msgFormat Format
+     * @param t Throwable to log
      */
-    protected void error(Throwable t, String msgFormat, Object... args)
+    @Override
+    public void error(Throwable t, String msgFormat, Object... args)
     {
         m_logger.error(String.format(msgFormat, args), t);
     }
@@ -220,10 +199,11 @@ public abstract class AbstractImporter
     /**
      * Log a INFO level log message.
      *
-     * @param message
-     * @param t
+     * @param msgFormat Format
+     * @param t Throwable to log
      */
-    protected void info(Throwable t, String msgFormat, Object... args)
+    @Override
+    public void info(Throwable t, String msgFormat, Object... args)
     {
         m_logger.info(String.format(msgFormat, args), t);
     }
@@ -231,8 +211,8 @@ public abstract class AbstractImporter
     /**
      * Log a TRACE level log message.
      *
-     * @param message
-     * @param t
+     * @param msgFormat Format
+     * @param t Throwable to log
      */
     protected void trace(Throwable t, String msgFormat, Object... args)
     {
@@ -242,10 +222,11 @@ public abstract class AbstractImporter
     /**
      * Log a WARN level log message.
      *
-     * @param message
-     * @param t
+     * @param msgFormat Format
+     * @param t Throwable to log
      */
-    protected void warn(Throwable t, String msgFormat, Object... args)
+    @Override
+    public void warn(Throwable t, String msgFormat, Object... args)
     {
         m_logger.warn(String.format(msgFormat, args), t);
     }
@@ -275,5 +256,6 @@ public abstract class AbstractImporter
      * This is called by the importer framework to stop the importer. Any importer
      * specific resources should be closed and released here.
      */
-    protected abstract void stop();
+    @Override
+    public abstract void stop();
 }

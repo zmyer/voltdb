@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -47,6 +47,15 @@ template<typename K, typename V> V findInMapOrNull(const K& key, std::map<K, V> 
     return (V)NULL;
 }
 
+template<typename K, typename V> V findInMapOrNull(const K& key, std::unordered_map<K, V> const &the_map)
+{
+    typename std::unordered_map<K, V>::const_iterator lookup = the_map.find(key);
+    if (lookup != the_map.end()) {
+        return lookup->second;
+    }
+    return (V)NULL;
+}
+
 /*
  * Implementation of CatalogDelgate for Table
  */
@@ -65,7 +74,8 @@ class TableCatalogDelegate {
     void deleteCommand();
 
     void init(catalog::Database const &catalogDatabase,
-            catalog::Table const &catalogTable);
+              catalog::Table const &catalogTable,
+              bool isXDCR);
     PersistentTable *createDeltaTable(catalog::Database const &catalogDatabase,
             catalog::Table const &catalogTable);
     void evaluateExport(catalog::Database const &catalogDatabase,
@@ -73,10 +83,11 @@ class TableCatalogDelegate {
 
     void processSchemaChanges(catalog::Database const &catalogDatabase,
                              catalog::Table const &catalogTable,
-                             std::map<std::string, TableCatalogDelegate*> const &tablesByName);
+                              std::map<std::string, TableCatalogDelegate*> const &tablesByName,
+                              bool isXDCR);
 
-    static TupleSchema *createTupleSchema(catalog::Database const &catalogDatabase,
-                                          catalog::Table const &catalogTable);
+    static TupleSchema *createTupleSchema(catalog::Table const &catalogTable,
+                                          bool isXDCR);
 
     static bool getIndexScheme(catalog::Table const &catalogTable,
                                catalog::Index const &catalogIndex,
@@ -132,7 +143,12 @@ class TableCatalogDelegate {
   private:
     Table *constructTableFromCatalog(catalog::Database const &catalogDatabase,
                                      catalog::Table const &catalogTable,
-                                     int tableAllocationTargetSize = 0);
+                                     bool isXDCR,
+                                     int tableAllocationTargetSize = 0,
+                                     /* indicates whether the constructed table should inherit isDRed attributed from
+                                      * the provided catalog table or set isDRed to false forcefully. Currently, only
+                                      * delta tables for joins in materialized views use the second option */
+                                     bool forceNoDR = false);
 
     voltdb::Table *m_table;
     bool m_exportEnabled;

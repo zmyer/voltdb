@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -259,10 +259,21 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
 
     @Override
     protected String explainPlanForNode(String indent) {
-        return("WindowFunctionPlanNode: ops: " + m_aggregateTypes.get(0).name() + "()");
+        return("WINDOW FUNCTION AGGREGATION: ops: " + m_aggregateTypes.get(0).name() + "()");
     }
 
     public List<AbstractExpression> getPartitionByExpressions() {
         return m_partitionByExpressions;
+    }
+    public final List<ExpressionType> getAggregateTypes() {
+        return m_aggregateTypes;
+    }
+
+    public final void setAggregateTypes(List<ExpressionType> aggregateTypes) {
+        m_aggregateTypes = aggregateTypes;
+    }
+
+    public final List<List<AbstractExpression>> getAggregateExpressions() {
+        return m_aggregateExpressions;
     }
 }

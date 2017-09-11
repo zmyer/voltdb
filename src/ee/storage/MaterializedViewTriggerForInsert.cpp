@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -33,9 +33,9 @@ namespace voltdb {
 
 MaterializedViewTriggerForInsert::MaterializedViewTriggerForInsert(PersistentTable *destTable,
                                                                    catalog::MaterializedViewInfo *mvInfo)
-    : m_target(destTable)
+    : m_filterPredicate(parsePredicate(mvInfo))
+    , m_dest(destTable)
     , m_index(destTable->primaryKeyIndex())
-    , m_filterPredicate(parsePredicate(mvInfo))
     , m_groupByColumnCount(parseGroupBy(mvInfo)) // also loads m_groupByExprs/Columns as needed
     , m_searchKeyValue(m_groupByColumnCount)
     , m_aggColumnCount(parseAggregation(mvInfo))
@@ -46,14 +46,14 @@ MaterializedViewTriggerForInsert::MaterializedViewTriggerForInsert(PersistentTab
 
     // best not to have to worry about the destination table disappearing
     // out from under the source table that feeds it.
-    m_target->incrementRefcount();
+    m_dest->incrementRefcount();
 
     // When updateTupleWithSpecificIndexes needs to be called,
     // the context is lost that identifies which base table columns potentially changed.
     // So the minimal set of indexes that MIGHT need to be updated must include
     // any that are not solely based on primary key components.
     // Until the DDL compiler does this analysis and marks the indexes accordingly,
-    // include all target table indexes except the actual primary key index on the group by columns.
+    // include all dest table indexes except the actual primary key index on the group by columns.
     initUpdatableIndexList();
     allocateBackedTuples();
 
@@ -61,22 +61,22 @@ MaterializedViewTriggerForInsert::MaterializedViewTriggerForInsert(PersistentTab
 }
 
 MaterializedViewTriggerForInsert::~MaterializedViewTriggerForInsert() {
-    for (int ii = 0; ii < m_groupByExprs.size(); ++ii) {
-        delete m_groupByExprs[ii];
+    BOOST_FOREACH (auto groupByExpr, m_groupByExprs) {
+        delete groupByExpr;
     }
-    for (int ii = 0; ii < m_aggExprs.size(); ++ii) {
-        delete m_aggExprs[ii];
+    BOOST_FOREACH (auto aggExpr, m_aggExprs) {
+        delete aggExpr;
     }
-    m_target->decrementRefcount();
+    m_dest->decrementRefcount();
 }
 
 void MaterializedViewTriggerForInsert::initUpdatableIndexList() {
     // Note that if the way we initialize this m_updatableIndexList changes in the future,
     //   we will also need to change the condition to detect when the m_updatableIndexList
     //   should be refreshed in the updateDefinition() function.
-    const std::vector<TableIndex*>& targetIndexes = m_target->allIndexes();
+    const std::vector<TableIndex*>& destIndexes = m_dest->allIndexes();
     m_updatableIndexList.clear();
-    BOOST_FOREACH(TableIndex *index, targetIndexes) {
+    BOOST_FOREACH (auto index, destIndexes) {
         if (index != m_index) {
             m_updatableIndexList.push_back(index);
         }
@@ -84,14 +84,16 @@ void MaterializedViewTriggerForInsert::initUpdatableIndexList() {
 }
 
 void MaterializedViewTriggerForInsert::updateDefinition(PersistentTable *destTable, catalog::MaterializedViewInfo *mvInfo) {
-    setTargetTable(destTable);
+    setDestTable(destTable);
     initUpdatableIndexList();
 }
 
+// numCountStar is needed because COUNT(*) is not part of m_aggExprs
 NValue MaterializedViewTriggerForInsert::getAggInputFromSrcTuple(int aggIndex,
+                                                                 int numCountStar,
                                                                  const TableTuple& tuple) {
     if (m_aggExprs.size() != 0) {
-        AbstractExpression* aggExpr = m_aggExprs[aggIndex];
+        AbstractExpression* aggExpr = m_aggExprs[aggIndex - numCountStar];
         return aggExpr->eval(&tuple, NULL);
     }
 
@@ -113,11 +115,11 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
     }
 
     // clear the tuple that will be built to insert or overwrite
-    memset(m_updatedTuple.address(), 0, m_target->getTupleLength());
+    memset(m_updatedTuple.address(), 0, m_dest->getTupleLength());
 
     // set up the first n columns, based on group-by columns
     for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
-        // note that if the tuple is in the mv's target table,
+        // note that if the tuple is in the mv's dest table,
         // tuple values should be pulled from the existing tuple in
         // that table. This works around a memory ownership issue
         // related to out-of-line strings.
@@ -125,17 +127,27 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
         m_updatedTuple.setNValue(colindex, value);
     }
 
-    int aggOffset = (int)m_groupByColumnCount + 1;
+    int aggOffset = (int)m_groupByColumnCount;
+    // m_aggExprs has complex aggregation operations which does not include COUNT(*)
+    // but COUNT(*) is included in m_aggColumnCount
+    int numCountStar = 0;
     // set values for the other columns
     // update or insert the row
     if (exists) {
-        // increment the next column, which is a count(*)
-        m_updatedTuple.setNValue((int)m_groupByColumnCount,
-                                 m_existingTuple.getNValue((int)m_groupByColumnCount).op_increment());
 
         for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
+
             NValue existingValue = m_existingTuple.getNValue(aggOffset+aggIndex);
-            NValue newValue = getAggInputFromSrcTuple(aggIndex, newTuple);
+
+            if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT_STAR) {
+                m_updatedTuple.setNValue( (int)(aggOffset+aggIndex),
+                                 m_existingTuple.getNValue( (int)(aggOffset+aggIndex) ).op_increment());
+                numCountStar++;
+                continue;
+            }
+
+            // get new value for all other aggregate ops other than COUNT(*)
+            NValue newValue = getAggInputFromSrcTuple(aggIndex, numCountStar, newTuple);
             if (newValue.isNull()) {
                 newValue = existingValue;
             }
@@ -171,18 +183,22 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
 
         // Shouldn't need to update group-key-only indexes such as the primary key
         // since their keys shouldn't ever change, but do update other indexes.
-        m_target->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
-                                                 m_updatableIndexList, fallible);
+        m_dest->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
+                                               m_updatableIndexList, fallible);
     }
     else {
-        // set the next column, which is a count(*), to 1
-        m_updatedTuple.setNValue((int)m_groupByColumnCount, ValueFactory::getBigIntValue(1));
-
+        int numCountStar = 0;
         // A new group row gets its initial agg values copied directly from the first source row
         // except for user-defined COUNTs which get set to 0 or 1 depending on whether the
         // source column value is null.
         for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
-            NValue newValue = getAggInputFromSrcTuple(aggIndex, newTuple);
+            // set the count(*) column(s) to 1
+            if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT_STAR) {
+                m_updatedTuple.setNValue((int) (aggOffset+aggIndex), ValueFactory::getBigIntValue(1));
+                numCountStar++;
+                continue;
+            }
+            NValue newValue = getAggInputFromSrcTuple(aggIndex, numCountStar, newTuple);
             if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
                 if (newValue.isNull()) {
                     newValue = ValueFactory::getBigIntValue(0);
@@ -193,21 +209,21 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
             }
             m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
         }
-        m_target->insertPersistentTuple(m_updatedTuple, fallible);
+        m_dest->insertPersistentTuple(m_updatedTuple, fallible);
     }
 }
 
-void MaterializedViewTriggerForInsert::setTargetTable(PersistentTable * target) {
-    PersistentTable * oldTarget = m_target;
-    m_target = target;
-    target->incrementRefcount();
+void MaterializedViewTriggerForInsert::setDestTable(PersistentTable * dest) {
+    PersistentTable * oldDest = m_dest;
+    m_dest = dest;
+    dest->incrementRefcount();
 
-    // Re-initialize dependencies on the target table, allowing for widened columns
-    m_index = m_target->primaryKeyIndex();
+    // Re-initialize dependencies on the dest table, allowing for widened columns
+    m_index = m_dest->primaryKeyIndex();
 
     allocateBackedTuples();
 
-    oldTarget->decrementRefcount();
+    oldDest->decrementRefcount();
 }
 
 void MaterializedViewTriggerForInsert::allocateBackedTuples() {
@@ -227,17 +243,17 @@ void MaterializedViewTriggerForInsert::allocateBackedTuples() {
         m_searchKeyTuple.move(backingStore);
     }
 
-    m_existingTuple = TableTuple(m_target->schema());
+    m_existingTuple = TableTuple(m_dest->schema());
 
-    m_updatedTuple = TableTuple(m_target->schema());
-    storeLength = m_target->getTupleLength();
+    m_updatedTuple = TableTuple(m_dest->schema());
+    storeLength = m_dest->getTupleLength();
     backingStore = new char[storeLength];
     memset(backingStore, 0, storeLength);
     m_updatedTupleBackingStore.reset(backingStore);
     m_updatedTuple.move(backingStore);
 
-    m_emptyTuple = TableTuple(m_target->schema());
-    storeLength = m_target->getTupleLength();
+    m_emptyTuple = TableTuple(m_dest->schema());
+    storeLength = m_dest->getTupleLength();
     backingStore = new char[storeLength];
     memset(backingStore, 0, storeLength);
     m_emptyTupleBackingStore.reset(backingStore);
@@ -285,36 +301,38 @@ std::size_t MaterializedViewTriggerForInsert::parseAggregation(catalog::Material
     bool usesComplexAgg = expressionsAsText.length() > 0;
     // set up the mapping from input col to output col
     const catalog::CatalogMap<catalog::Column>& columns = mvInfo->dest()->columns();
-    m_aggTypes.resize(columns.size() - m_groupByColumnCount - 1);
+    m_aggTypes.resize(columns.size() - m_groupByColumnCount);
     if ( ! usesComplexAgg) {
         m_aggColIndexes.resize(m_aggTypes.size());
     }
     for (catalog::CatalogMap<catalog::Column>::field_map_iter colIterator = columns.begin();
          colIterator != columns.end(); colIterator++) {
-        const catalog::Column *destCol = colIterator->second;
-        if (destCol->index() < m_groupByColumnCount + 1) {
+        auto destCol = colIterator->second;
+        if (destCol->index() < m_groupByColumnCount) {
             continue;
         }
         // The index into the per-agg metadata starts as a materialized view column index
         // but needs to be shifted down for each column that has no agg option
         // -- that is, -1 for each "group by" AND -1 for the COUNT(*).
-        std::size_t aggIndex = destCol->index() - m_groupByColumnCount - 1;
+        std::size_t aggIndex = destCol->index() - m_groupByColumnCount;
         m_aggTypes[aggIndex] = static_cast<ExpressionType>(destCol->aggregatetype());
         switch(m_aggTypes[aggIndex]) {
-        case EXPRESSION_TYPE_AGGREGATE_SUM:
-        case EXPRESSION_TYPE_AGGREGATE_COUNT:
-        case EXPRESSION_TYPE_AGGREGATE_MIN:
-        case EXPRESSION_TYPE_AGGREGATE_MAX:
-            break; // legal value
-        default: {
-            char message[128];
-            snprintf(message, 128, "Error in materialized view aggregation %d expression type %s",
-                     (int)aggIndex, expressionToString(m_aggTypes[aggIndex]).c_str());
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          message);
+            case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
+                m_countStarColumnIndex = destCol->index();
+            case EXPRESSION_TYPE_AGGREGATE_SUM:
+            case EXPRESSION_TYPE_AGGREGATE_COUNT:
+            case EXPRESSION_TYPE_AGGREGATE_MIN:
+            case EXPRESSION_TYPE_AGGREGATE_MAX:
+                break; // legal value
+            default: {
+                char message[128];
+                snprintf(message, 128, "Error in materialized view aggregation %d expression type %s",
+                         (int)aggIndex, expressionToString(m_aggTypes[aggIndex]).c_str());
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                              message);
+            }
         }
-        }
-        if (usesComplexAgg) {
+        if (usesComplexAgg || (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT_STAR) ) {
             continue;
         }
         // Not used for Complex Aggregation case
@@ -338,18 +356,17 @@ NValue MaterializedViewTriggerForInsert::getGroupByValueFromSrcTuple(int colInde
 
     int gbColIdx = m_groupByColIndexes[colIndex];
     return tuple.getNValue(gbColIdx);
-
 }
 
 void MaterializedViewTriggerForInsert::initializeTupleHavingNoGroupBy(bool fallible) {
     // clear the tuple that will be built to insert or overwrite
-    memset(m_updatedTuple.address(), 0, m_target->getTupleLength());
-    // COUNT(*) column will be zero.
-    m_updatedTuple.setNValue((int)m_groupByColumnCount, ValueFactory::getBigIntValue(0));
-    int aggOffset = (int)m_groupByColumnCount + 1;
+    memset(m_updatedTuple.address(), 0, m_dest->getTupleLength());
+    int aggOffset = (int)m_groupByColumnCount;
     NValue newValue;
     for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
-        if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
+        // COUNT(*) column will be zero
+        if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT ||
+            m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT_STAR) {
             newValue = ValueFactory::getBigIntValue(0);
         }
         else {
@@ -357,14 +374,14 @@ void MaterializedViewTriggerForInsert::initializeTupleHavingNoGroupBy(bool falli
         }
         m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
     }
-    m_target->insertPersistentTuple(m_updatedTuple, fallible);
+    m_dest->insertPersistentTuple(m_updatedTuple, fallible);
 }
 
 bool MaterializedViewTriggerForInsert::findExistingTuple(const TableTuple &tuple) {
     // For the case where there is no grouping column, like SELECT COUNT(*) FROM T;
     // We directly return the only row in the view. See ENG-7872.
     if (m_groupByColumnCount == 0) {
-        TableIterator iterator = m_target->iterator();
+        TableIterator iterator = m_dest->iterator();
         iterator.next(m_existingTuple);
         assert( ! m_existingTuple.isNullTuple());
         return true;

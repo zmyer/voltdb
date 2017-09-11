@@ -46,7 +46,7 @@ CTX.CPPFLAGS += """-Wall -Wextra -Werror -Woverloaded-virtual
             -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK
             -fno-omit-frame-pointer
             -fvisibility=default
-            -DBOOST_SP_DISABLE_THREADS -DBOOST_DISABLE_THREADS -DBOOST_ALL_NO_LIB"""
+            -DBOOST_SP_DISABLE_THREADS -DBOOST_DISABLE_THREADS -DBOOST_ALL_NO_LIB -D_USE_MATH_DEFINES"""
 
 # clang doesn't seem to want this
 if CTX.compilerName() == 'gcc':
@@ -71,8 +71,8 @@ if CTX.compilerName() == 'gcc':
         # Do we want -Wno-conversion?
         if (CTX.compilerMinorVersion() == 8):
             CTX.CPPFLAGS += " -Wno-conversion"
-    # GCC 5 warning disablement options
-    if (CTX.compilerMajorVersion() == 5):
+    # GCC 5/6 warning disablement options
+    if (CTX.compilerMajorVersion() >= 5):
         CTX.CPPFLAGS += " -Wno-unused-local-typedefs"
 
 if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 3 and CTX.compilerMinorVersion() >= 4):
@@ -81,7 +81,7 @@ if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 3 and CTX.
 if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() >= 7):
     CTX.CPPFLAGS += " -Wno-unused-local-typedefs -Wno-absolute-value"
 
-if (CTX.compilerName() != 'gcc') or (CTX.compilerMajorVersion() == 4 and CTX.compilerMinorVersion() >= 3) or (CTX.compilerMajorVersion() == 5):
+if (CTX.compilerName() != 'gcc') or (CTX.compilerMajorVersion() == 4 and CTX.compilerMinorVersion() >= 3) or (CTX.compilerMajorVersion() >= 5):
     CTX.CPPFLAGS += " -Wno-ignored-qualifiers -fno-strict-aliasing"
 
 
@@ -113,6 +113,7 @@ if CTX.compilerName() == 'gcc':
                % (CTX.compilerMajorVersion(),
                   CTX.compilerMinorVersion(),
                   CTX.compilerPatchLevel()))
+	CTX.CXX_VERSION_FLAG = "c++11"
 elif CTX.compilerName() == 'clang':
     CTX.CXX_VERSION_FLAG="c++11"
 else:
@@ -161,16 +162,17 @@ if "VOLT_LOG_LEVEL" in os.environ:
 else:
     LOG_LEVEL = "500"
 
+CTX.LOG_LEVEL = LOG_LEVEL
 if CTX.LEVEL == "MEMCHECK":
-    CTX.CPPFLAGS += " -g3 -DDEBUG -DMEMCHECK -DVOLT_LOG_LEVEL=%s" % LOG_LEVEL
+    CTX.CPPFLAGS += " -g3 -DDEBUG -DMEMCHECK -DVOLT_LOG_LEVEL=${VOLT_LOG_LEVEL}"
     CTX.OUTPUT_PREFIX = "obj/memcheck"
 
 if CTX.LEVEL == "DEBUG":
-    CTX.CPPFLAGS += " -g3 -DDEBUG -DVOLT_LOG_LEVEL=%s" % LOG_LEVEL
+    CTX.CPPFLAGS += " -g3 -DDEBUG -DVOLT_LOG_LEVEL=${VOLT_LOG_LEVEL}"
     CTX.OUTPUT_PREFIX = "obj/debug"
 
 if CTX.LEVEL == "RELEASE":
-    CTX.CPPFLAGS += " -g3 -O3 -mmmx -msse -msse2 -msse3 -DNDEBUG -DVOLT_LOG_LEVEL=%s" % LOG_LEVEL
+    CTX.CPPFLAGS += " -g3 -O3 -mmmx -msse -msse2 -msse3 -DNDEBUG -DVOLT_LOG_LEVEL=${VOLT_LOG_LEVEL}"
     CTX.OUTPUT_PREFIX = "obj/release"
 
 # build in parallel directory instead of subdir so that relative paths work
@@ -232,6 +234,8 @@ CTX.INPUT['catalog'] = """
  constraint.cpp
  constraintref.cpp
  database.cpp
+ function.cpp
+ functionparameter.cpp
  index.cpp
  indexref.cpp
  materializedviewhandlerinfo.cpp
@@ -258,6 +262,7 @@ CTX.INPUT['common'] = """
  TupleSchema.cpp
  types.cpp
  UndoLog.cpp
+ LargeTempTableBlockCache.cpp
  NValue.cpp
  RecoveryProtoMessage.cpp
  RecoveryProtoMessageBuilder.cpp
@@ -301,6 +306,7 @@ CTX.INPUT['executors'] = """
  receiveexecutor.cpp
  sendexecutor.cpp
  seqscanexecutor.cpp
+ swaptablesexecutor.cpp
  tablecountexecutor.cpp
  tuplescanexecutor.cpp
  unionexecutor.cpp
@@ -347,6 +353,7 @@ CTX.INPUT['plannodes'] = """
  SchemaColumn.cpp
  sendnode.cpp
  seqscannode.cpp
+ swaptablesnode.cpp
  tuplescannode.cpp
  unionnode.cpp
  updatenode.cpp
@@ -363,8 +370,6 @@ CTX.INPUT['storage'] = """
  AbstractDRTupleStream.cpp
  BinaryLogSink.cpp
  BinaryLogSinkWrapper.cpp
- CompatibleBinaryLogSink.cpp
- CompatibleDRTupleStream.cpp
  ConstraintFailureException.cpp
  constraintutil.cpp
  CopyOnWriteContext.cpp
@@ -375,6 +380,8 @@ CTX.INPUT['storage'] = """
  ElasticIndexReadContext.cpp
  ElasticScanner.cpp
  ExportTupleStream.cpp
+ LargeTempTable.cpp
+ LargeTempTableBlock.cpp
  MaterializedViewHandler.cpp
  MaterializedViewTriggerForInsert.cpp
  MaterializedViewTriggerForWrite.cpp
@@ -474,6 +481,7 @@ if whichtests in ("${eetestsuite}", "common"):
     CTX.TESTS['common'] = """
      debuglog_test
      elastic_hashinator_test
+     PerFragmentStatsTest
      nvalue_test
      pool_test
      serializeio_test
@@ -495,9 +503,6 @@ if whichtests in ("${eetestsuite}", "executors"):
     CTX.TESTS['executors'] = """
     OptimizedProjectorTest
     MergeReceiveExecutorTest
-    TestGeneratedPlans
-    TestWindowedRank
-    TestWindowedCount
     """
 
 if whichtests in ("${eetestsuite}", "expressions"):
@@ -523,6 +528,7 @@ if whichtests in ("${eetestsuite}", "storage"):
      DRBinaryLog_test
      DRTupleStream_test
      ExportTupleStream_test
+     LargeTempTableTest
      PersistentTableMemStatsTest
      StreamedTable_test
      TempTableLimitsTest
@@ -548,10 +554,19 @@ if whichtests in ("${eetestsuite}", "structures"):
 
 if whichtests in ("${eetestsuite}", "plannodes"):
     CTX.TESTS['plannodes'] = """
-     WindowFunctionPlanNodeTest
      PlanNodeFragmentTest
+     PlanNodeUtilTest
+     WindowFunctionPlanNodeTest
     """
-
+#
+# This is set to a list of class names.  Each of
+# these will be run to (1) find out the names of
+# all tests for the makefile and (2) generate the
+# tests.
+#
+CTX.GENERATOR_CLASSES = [
+    "org.voltdb.planner.eegentests.GenerateEETests"
+]
 ###############################################################################
 #
 # Print some configuration information.  This is useful for debugging.
@@ -606,6 +621,5 @@ if CTX.TARGET == "TEST":
     retval = runTests(CTX)
 elif CTX.TARGET == "VOLTDBIPC":
     retval = buildIPC(CTX)
-
 if retval != 0:
     sys.exit(-1)

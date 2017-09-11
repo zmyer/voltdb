@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -44,14 +44,13 @@ import org.voltdb.Consistency;
 import org.voltdb.ProcInfoData;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
-import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
-import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.ConnectionType;
 import org.voltdb.compiler.deploymentfile.ConsistencyType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DiskLimitType;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.DrType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
@@ -59,7 +58,6 @@ import org.voltdb.compiler.deploymentfile.FeatureNameType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
-import org.voltdb.compiler.deploymentfile.HttpsType;
 import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
@@ -76,6 +74,7 @@ import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.ServerImportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SnmpType;
+import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
@@ -237,19 +236,12 @@ public class VoltProjectBuilder {
         final int hostCount;
         final int sitesPerHost;
         final int replication;
-        final boolean useCustomAdmin;
-        final int adminPort;
-        final boolean adminOnStartup;
         final int clusterId;
 
-        public DeploymentInfo(int hostCount, int sitesPerHost, int replication,
-                boolean useCustomAdmin, int adminPort, boolean adminOnStartup, int id) {
+        public DeploymentInfo(int hostCount, int sitesPerHost, int replication, int id) {
             this.hostCount = hostCount;
             this.sitesPerHost = sitesPerHost;
             this.replication = replication;
-            this.useCustomAdmin = useCustomAdmin;
-            this.adminPort = adminPort;
-            this.adminOnStartup = adminOnStartup;
             this.clusterId = id;
         }
     }
@@ -263,7 +255,9 @@ public class VoltProjectBuilder {
     // be omitted from the deployment XML.
     int m_httpdPortNo = -1;
     boolean m_jsonApiEnabled = true;
-    boolean m_httpsEnabled = false;
+    boolean m_sslEnabled = false;
+    boolean m_sslExternal = false;
+
     String m_keystore;
     String m_keystorePassword;
     String m_certstore;
@@ -315,6 +309,7 @@ public class VoltProjectBuilder {
     private Integer m_elasticThroughput = null;
     private Integer m_elasticDuration = null;
     private Integer m_queryTimeout = null;
+    private Integer m_procedureLogThreshold = null;
     private String m_rssLimit = null;
     private String m_snmpRssLimit = null;
     private Integer m_resourceCheckInterval = null;
@@ -324,10 +319,18 @@ public class VoltProjectBuilder {
     private boolean m_useDDLSchema = false;
 
     private String m_drMasterHost;
+    private Integer m_preferredSource;
+    private Boolean m_drConsumerConnectionEnabled = null;
     private Boolean m_drProducerEnabled = null;
+    private DrRoleType m_drRole = DrRoleType.MASTER;
 
     public VoltProjectBuilder setQueryTimeout(int target) {
         m_queryTimeout = target;
+        return this;
+    }
+
+    public VoltProjectBuilder setProcedureLogThreshold(int target) {
+        m_procedureLogThreshold = target;
         return this;
     }
 
@@ -477,16 +480,23 @@ public class VoltProjectBuilder {
         addSchema(schemaURL.getPath());
     }
 
-    /**
-     * This is test code written by Ryan, even though it was
-     * committed by John.
+    /** Creates a temporary file for the supplied schema text.
+     * The file is not left open, and will be deleted upon process exit.
      */
-    public void addLiteralSchema(String ddlText) throws IOException {
-        File temp = File.createTempFile("literalschema", "sql");
+    public static File createFileForSchema(String ddlText) throws IOException {
+        File temp = File.createTempFile("literalschema", ".sql");
         temp.deleteOnExit();
         FileWriter out = new FileWriter(temp);
         out.write(ddlText);
         out.close();
+        return temp;
+    }
+
+    /**
+     * Adds the supplied schema by creating a temp file for it.
+     */
+    public void addLiteralSchema(String ddlText) throws IOException {
+        File temp = createFileForSchema(ddlText);
         addSchema(URLEncoder.encode(temp.getAbsolutePath(), "UTF-8"));
     }
 
@@ -611,17 +621,21 @@ public class VoltProjectBuilder {
         m_jsonApiEnabled = enabled;
     }
 
-    public void setHttpsEnabled(final boolean enabled) {
-        m_httpsEnabled = enabled;
+    public void setSslEnabled(final boolean enabled) {
+        m_sslEnabled = enabled;
+    }
+
+    public void setSslExternal(final boolean enabled) {
+        m_sslExternal = enabled;
     }
 
     public void setKeyStoreInfo(final String path, final String password) {
-        m_keystore = path;
+        m_keystore = getResourcePath(path);
         m_keystorePassword = password;
     }
 
     public void setCertStoreInfo(final String path, final String password) {
-        m_certstore = path;
+        m_certstore = getResourcePath(path);;
         m_certstorePassword = password;
     }
 
@@ -725,17 +739,6 @@ public class VoltProjectBuilder {
         addExport(enabled, null, null);
     }
 
-    public void setTableAsExportOnly(String name) {
-        assert(name != null);
-        transformer.append("Export TABLE " + name + ";");
-    }
-
-    public void setTableAsExportOnly(String name, String stream) {
-        assert(name != null);
-        assert(stream != null);
-        transformer.append("Export TABLE " + name + " TO STREAM " + stream + ";");
-    }
-
     public void setCompilerDebugPrintStream(final PrintStream out) {
         m_compilerDebugPrintStream = out;
     }
@@ -749,6 +752,18 @@ public class VoltProjectBuilder {
         m_drMasterHost = drMasterHost;
     }
 
+    public void setPreferredSource(int preferredSource) {
+        m_preferredSource = preferredSource;
+    }
+
+    public void setDrConsumerConnectionEnabled() {
+        m_drConsumerConnectionEnabled = true;
+    }
+
+    public void setDrConsumerConnectionDisabled() {
+        m_drConsumerConnectionEnabled = false;
+    }
+
     public void setDrProducerEnabled()
     {
         m_drProducerEnabled = true;
@@ -757,6 +772,18 @@ public class VoltProjectBuilder {
     public void setDrProducerDisabled()
     {
         m_drProducerEnabled = false;
+    }
+
+    public void setDrNone() {
+        m_drRole = DrRoleType.NONE;
+    }
+
+    public void setDrReplica() {
+        m_drRole = DrRoleType.REPLICA;
+    }
+
+    public void setXDCR() {
+        m_drRole = DrRoleType.XDCR;
     }
 
     /**
@@ -794,6 +821,14 @@ public class VoltProjectBuilder {
     public Catalog compile(final String jarPath,
             final int sitesPerHost,
             final int hostCount,
+            final int replication, final int clusterId) {
+        return compile(jarPath, sitesPerHost, hostCount,
+                replication, null, clusterId);
+    }
+
+    public Catalog compile(final String jarPath,
+            final int sitesPerHost,
+            final int hostCount,
             final int replication,
             final String voltRoot) {
        return compile(jarPath, sitesPerHost, hostCount, replication, voltRoot, 0);
@@ -805,9 +840,9 @@ public class VoltProjectBuilder {
             final int replication,
             final String voltRoot,
             final int clusterId) {
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(m_drRole == DrRoleType.XDCR);
         if (compile(compiler, jarPath, voltRoot,
-                       new DeploymentInfo(hostCount, sitesPerHost, replication, false, 0, false, clusterId),
+                       new DeploymentInfo(hostCount, sitesPerHost, replication, clusterId),
                        m_ppdEnabled, m_snapshotPath, m_ppdPrefix)) {
             return compiler.getCatalog();
         } else {
@@ -822,20 +857,10 @@ public class VoltProjectBuilder {
             final boolean ppdEnabled, final String snapshotPath,
             final String ppdPrefix)
     {
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(m_drRole == DrRoleType.XDCR);
         return compile(compiler, jarPath, voltRoot,
-                       new DeploymentInfo(hostCount, sitesPerHost, replication, false, 0, false, clusterId),
+                       new DeploymentInfo(hostCount, sitesPerHost, replication, clusterId),
                        ppdEnabled, snapshotPath, ppdPrefix);
-    }
-
-    public boolean compile(final String jarPath, final int sitesPerHost,
-            final int hostCount, final int replication,
-            final int adminPort, final boolean adminOnStartup, final int clusterId)
-    {
-        VoltCompiler compiler = new VoltCompiler();
-        return compile(compiler, jarPath, null,
-                       new DeploymentInfo(hostCount, sitesPerHost, replication, true, adminPort, adminOnStartup, clusterId),
-                       m_ppdEnabled,  m_snapshotPath, m_ppdPrefix);
     }
 
     public boolean compile(final VoltCompiler compiler,
@@ -895,12 +920,7 @@ public class VoltProjectBuilder {
         }
 
         boolean success = false;
-        try {
-            success = compiler.compileFromDDL(jarPath, schemaPath);
-        } catch (VoltCompilerException e1) {
-            e1.printStackTrace();
-            return false;
-        }
+        success = compiler.compileFromDDL(jarPath, schemaPath);
 
         m_diagnostics = compiler.harvestCapturedDetail();
         if (m_compilerDebugPrintStream != null) {
@@ -911,29 +931,50 @@ public class VoltProjectBuilder {
             }
         }
         if (deployment != null) {
-            try {
-                m_pathToDeployment = writeDeploymentFile(deploymentVoltRoot, deployment);
-            } catch (Exception e) {
-                System.out.println("Failed to create deployment file in testcase.");
-                e.printStackTrace();
-                System.out.println("hostcount: " + deployment.hostCount);
-                System.out.println("sitesPerHost: " + deployment.sitesPerHost);
-                System.out.println("clusterId: " + deployment.clusterId);
-                System.out.println("replication: " + deployment.replication);
-                System.out.println("voltRoot: " + deploymentVoltRoot);
-                System.out.println("ppdEnabled: " + ppdEnabled);
-                System.out.println("snapshotPath: " + snapshotPath);
-                System.out.println("ppdPrefix: " + ppdPrefix);
-                System.out.println("adminEnabled: " + deployment.useCustomAdmin);
-                System.out.println("adminPort: " + deployment.adminPort);
-                System.out.println("adminOnStartup: " + deployment.adminOnStartup);
-
-                // sufficient to escape and fail test cases?
-                throw new RuntimeException(e);
-            }
+            compileDeploymentOnly(deploymentVoltRoot, deployment);
         }
 
         return success;
+    }
+
+    /** Generate a deployment file based on the options passed and set in this object.
+     * @pre This VoltProjectBuilder has all its options set, except those passed as arguments to this method.
+     * @param voltDbRoot
+     * @param hostCount
+     * @param sitesPerHost
+     * @param replication
+     * @param clusterId
+     * @return path to deployment file that was written
+     */
+    public String compileDeploymentOnly(String voltDbRoot,
+                                        int hostCount,
+                                        int sitesPerHost,
+                                        int replication,
+                                        int clusterId)
+    {
+        DeploymentInfo deployment = new DeploymentInfo(hostCount, sitesPerHost, replication, clusterId);
+        return compileDeploymentOnly(voltDbRoot, deployment);
+    }
+
+    private String compileDeploymentOnly(String voltDbRoot, DeploymentInfo deployment)
+    {
+        try {
+            m_pathToDeployment = writeDeploymentFile(voltDbRoot, deployment);
+        } catch (Exception e) {
+            System.out.println("Failed to create deployment file in testcase.");
+            e.printStackTrace();
+            System.out.println("hostcount: " + deployment.hostCount);
+            System.out.println("sitesPerHost: " + deployment.sitesPerHost);
+            System.out.println("clusterId: " + deployment.clusterId);
+            System.out.println("replication: " + deployment.replication);
+            System.out.println("voltRoot: " + voltDbRoot);
+            System.out.println("ppdEnabled: " + m_ppdEnabled);
+            System.out.println("snapshotPath: " + m_snapshotPath);
+            System.out.println("ppdPrefix: " + m_ppdPrefix);
+            // sufficient to escape and fail test cases?
+            throw new RuntimeException(e);
+        }
+        return m_pathToDeployment;
     }
 
     /**
@@ -944,7 +985,7 @@ public class VoltProjectBuilder {
      * @return true if successful
      */
     public boolean compileWithDefaultDeployment(final String jarPath) {
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         return compile(compiler, jarPath, null, null, m_ppdEnabled, m_snapshotPath, m_ppdPrefix);
     }
 
@@ -1022,9 +1063,11 @@ public class VoltProjectBuilder {
         // <paths>
         PathsType paths = factory.createPathsType();
         deployment.setPaths(paths);
-        Voltdbroot voltdbroot = factory.createPathsTypeVoltdbroot();
-        paths.setVoltdbroot(voltdbroot);
-        voltdbroot.setPath(voltRoot);
+        if ((voltRoot != null) && !voltRoot.trim().isEmpty()) {
+            Voltdbroot voltdbroot = factory.createPathsTypeVoltdbroot();
+            paths.setVoltdbroot(voltdbroot);
+            voltdbroot.setPath(voltRoot);
+        }
 
         if (m_snapshotPath != null) {
             PathsType.Snapshots snapshotPathElement = factory.createPathsTypeSnapshots();
@@ -1110,17 +1153,6 @@ public class VoltProjectBuilder {
             ct.setReadlevel(m_consistencyReadLevel.toReadLevelType());
         }
 
-        // <admin-mode>
-        // can't be disabled, but only write out the non-default config if
-        // requested by a test. otherwise, take the implied defaults (or
-        // whatever local cluster overrides on the command line).
-        if (dinfo.useCustomAdmin) {
-            AdminModeType admin = factory.createAdminModeType();
-            deployment.setAdminMode(admin);
-            admin.setPort(dinfo.adminPort);
-            admin.setAdminstartup(dinfo.adminOnStartup);
-        }
-
         deployment.setSystemsettings(createSystemSettingsType(factory));
 
         // <users>
@@ -1149,6 +1181,23 @@ public class VoltProjectBuilder {
             }
         }
 
+        SslType ssl = factory.createSslType();
+        deployment.setSsl(ssl);
+        ssl.setEnabled(m_sslEnabled);
+        ssl.setExternal(m_sslExternal);
+        if (m_keystore!=null) {
+            KeyOrTrustStoreType store = factory.createKeyOrTrustStoreType();
+            store.setPath(m_keystore);
+            store.setPassword(m_keystorePassword);
+            ssl.setKeystore(store);
+        }
+        if (m_certstore!=null) {
+            KeyOrTrustStoreType store = factory.createKeyOrTrustStoreType();
+            store.setPath(m_certstore);
+            store.setPassword(m_certstorePassword);
+            ssl.setTruststore(store);
+        }
+
         // <httpd>. Disabled unless port # is configured by a testcase
         // Omit element(s) when null.
         HttpdType httpd = factory.createHttpdType();
@@ -1158,23 +1207,6 @@ public class VoltProjectBuilder {
         Jsonapi json = factory.createHttpdTypeJsonapi();
         httpd.setJsonapi(json);
         json.setEnabled(m_jsonApiEnabled);
-        if (m_httpsEnabled) {
-            HttpsType httpsType = factory.createHttpsType();
-            httpsType.setEnabled(m_httpsEnabled);
-            if (m_keystore!=null) {
-                KeyOrTrustStoreType store = factory.createKeyOrTrustStoreType();
-                store.setPath(m_keystore);
-                store.setPassword(m_keystorePassword);
-                httpsType.setKeystore(store);
-            }
-            if (m_certstore!=null) {
-                KeyOrTrustStoreType store = factory.createKeyOrTrustStoreType();
-                store.setPath(m_certstore);
-                store.setPassword(m_certstorePassword);
-                httpsType.setTruststore(store);
-            }
-            httpd.setHttps(httpsType);
-        }
 
         //SNMP
         SnmpType snmpType = factory.createSnmpType();
@@ -1268,10 +1300,13 @@ public class VoltProjectBuilder {
         DrType dr = factory.createDrType();
         deployment.setDr(dr);
         dr.setListen(m_drProducerEnabled);
+        dr.setRole(m_drRole);
         if (m_drMasterHost != null && !m_drMasterHost.isEmpty()) {
             ConnectionType conn = factory.createConnectionType();
             dr.setConnection(conn);
             conn.setSource(m_drMasterHost);
+            conn.setPreferredSource(m_preferredSource);
+            conn.setEnabled(m_drConsumerConnectionEnabled);
         }
 
         // Have some yummy boilerplate!
@@ -1307,6 +1342,11 @@ public class VoltProjectBuilder {
             SystemSettingsType.Query query = factory.createSystemSettingsTypeQuery();
             query.setTimeout(m_queryTimeout);
             systemSettingType.setQuery(query);
+        }
+        if (m_procedureLogThreshold != null) {
+            SystemSettingsType.Procedure procedure = factory.createSystemSettingsTypeProcedure();
+            procedure.setLoginfo(m_procedureLogThreshold);
+            systemSettingType.setProcedure(procedure);
         }
         if (m_rssLimit != null || m_snmpRssLimit != null) {
             ResourceMonitorType monitorType = initializeResourceMonitorType(systemSettingType, factory);
@@ -1390,6 +1430,11 @@ public class VoltProjectBuilder {
         List<String> result = m_diagnostics;
         m_diagnostics = null;
         return result;
+    }
+
+    private String getResourcePath(String resource) {
+        URL res = this.getClass().getResource(resource);
+        return res == null ? resource : res.getPath();
     }
 
 }

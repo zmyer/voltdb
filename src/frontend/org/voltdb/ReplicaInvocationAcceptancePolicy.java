@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -49,13 +49,13 @@ public class ReplicaInvocationAcceptancePolicy extends InvocationValidationPolic
 
         if (isReadOnly) {
             return null;
-        } else {
-            return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                    new VoltTable[0],
-                    "Write procedure " + invocation.getProcName() +
-                    " is not allowed in replica cluster",
-                    invocation.clientHandle);
         }
+
+        return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                new VoltTable[0],
+                "Write procedure " + invocation.getProcName() +
+                " is not allowed in replica cluster",
+                invocation.clientHandle);
     }
 
     @Override

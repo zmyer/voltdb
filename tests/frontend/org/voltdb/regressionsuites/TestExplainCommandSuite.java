@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -188,6 +188,91 @@ public class TestExplainCommandSuite extends RegressionSuite {
             assertTrue(plan.contains("NESTLOOP INDEX INNER JOIN"));
             assertTrue(plan.contains("inline INDEX SCAN of \"TSRC1\" using its primary key index"));
             assertTrue(plan.contains("SEQUENTIAL SCAN of \"TSRC2\""));
+        }
+    }
+
+    public void testExplainMultiStmtProc() throws IOException, ProcCallException {
+        Client client = getClient();
+        VoltTable vt = null;
+
+        // test for multi partition query
+        String[] sql = new String[]{
+                "insert into t1 values (?, ?, ?);",
+                "select * from t1;"};
+        vt = client.callProcedure("@ExplainProc", "MultiSP" ).getResults()[0];
+        assertEquals(sql.length, vt.getRowCount());
+
+        // -1- insert into t1
+        // -2- select * from t1
+        for (int i = 0; i < sql.length; i++) {
+            vt.advanceRow();
+            String task = vt.getString(0);
+            String plan = vt.getString(1);
+            assertEquals(sql[i], task);
+            assertTrue(plan.contains("RECEIVE FROM ALL PARTITIONS"));
+            assertTrue(plan.contains("SEND PARTITION RESULTS TO COORDINATOR"));
+            if (i == 0) {
+                assertTrue(plan.contains("INSERT into \"T1\""));
+                assertTrue(plan.contains("MATERIALIZE TUPLE from parameters and/or literals"));
+            } else if (i == 1) {
+                assertTrue(plan.contains("SEQUENTIAL SCAN of \"T1\""));
+            }
+        }
+
+        // test for single partition query
+        sql = new String[]{
+                "insert into t2 values (?, ?, ?);",
+                "select * from t2;"};
+        vt = client.callProcedure("@ExplainProc", "MultiSPSingle" ).getResults()[0];
+        assertEquals(sql.length, vt.getRowCount());
+
+        // -1- insert into t2
+        // -2- select * from t2
+        // t2 is partitioned on PKEY
+        for (int i = 0; i < sql.length; i++) {
+            vt.advanceRow();
+            String task = vt.getString(0);
+            String plan = vt.getString(1);
+            assertEquals(sql[i], task);
+            // note that there is no send and receive data from all partitions unlike above query
+            assertFalse(plan.contains("RECEIVE FROM ALL PARTITIONS"));
+            assertFalse(plan.contains("SEND PARTITION RESULTS TO COORDINATOR"));
+            if (i == 0) {
+                assertTrue(plan.contains("INSERT into \"T2\""));
+                assertTrue(plan.contains("MATERIALIZE TUPLE from parameters and/or literals"));
+            } else if (i == 1) {
+                assertTrue(plan.contains("SEQUENTIAL SCAN of \"T2\""));
+            }
+        }
+
+        // test for single partition query
+        sql = new String[]{
+                "select * from t2 where PKEY = ? AND A_INT = ?;",
+                "insert into t2 values (?, ?, ?);",
+                "select * from t2;"};
+        vt = client.callProcedure("@ExplainProc", "MultiSPSingle1" ).getResults()[0];
+        assertEquals(sql.length, vt.getRowCount());
+
+        // -1- select * from t2 where PKEY = ? AND A_INT = ?
+        // -2- insert into t2
+        // -3- select * from t2
+        // t2 is partitioned on PKEY
+        for (int i = 0; i < sql.length; i++) {
+            vt.advanceRow();
+            String task = vt.getString(0);
+            String plan = vt.getString(1);
+            assertEquals(sql[i], task);
+            // note that there is no send and receive data from all partitions unlike above query
+            assertFalse(plan.contains("RECEIVE FROM ALL PARTITIONS"));
+            assertFalse(plan.contains("SEND PARTITION RESULTS TO COORDINATOR"));
+            if (i == 0) {
+                assertTrue(plan.contains("INDEX SCAN of \"T2\" using its primary key index"));
+            } else if (i == 1) {
+                assertTrue(plan.contains("INSERT into \"T2\""));
+                assertTrue(plan.contains("MATERIALIZE TUPLE from parameters and/or literals"));
+            } else if (i == 2) {
+                assertTrue(plan.contains("SEQUENTIAL SCAN of \"T2\""));
+            }
         }
     }
 

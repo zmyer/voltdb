@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -65,6 +65,7 @@ import org.mockito.Mockito;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 
 /** Hack subclass of VoltClient that fakes callProcedure. */
@@ -299,13 +300,24 @@ public class MockVoltClient implements Client {
     }
 
     @Override
-    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack blfcb) {
+    public boolean isAutoReconnectEnabled() {
+        return false;
+    }
+
+    @Override
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack callback) {
         return null;
     }
 
     @Override
     public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize,
-            boolean upsert, BulkLoaderFailureCallBack blfcb) throws Exception {
+            boolean upsert, BulkLoaderFailureCallBack callback) throws Exception {
+        return null;
+    }
+
+    @Override
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsertMode,
+            BulkLoaderFailureCallBack failureCallback, BulkLoaderSuccessCallback successCallback) throws Exception {
         return null;
     }
 

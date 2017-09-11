@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -98,23 +98,27 @@ public class TestProcCompiler extends TestCase {
     }
 
     public void testStmtForStackOverflowCondition() throws Exception {
-        String schema =  "Create Table foo ( " +
-                         "id BIGINT DEFAULT 0 NOT NULL, " +
-                         "name VARCHAR(255) NOT NULL, " +
-                         "PRIMARY KEY(id));";
+        boolean success = true;
+        ByteArrayOutputStream capturer = null;
+        for (int npreds = 2000; success && npreds < 100000; npreds += 1000) {
+            String schema =  "Create Table foo ( " +
+                             "id BIGINT DEFAULT 0 NOT NULL, " +
+                             "name VARCHAR(255) NOT NULL, " +
+                             "PRIMARY KEY(id));";
 
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        ByteArrayOutputStream capturer = new ByteArrayOutputStream();
-        PrintStream capturing = new PrintStream(capturer);
-        builder.setCompilerDebugPrintStream(capturing);
-        builder.addLiteralSchema(schema);
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            capturer = new ByteArrayOutputStream();
+            PrintStream capturing = new PrintStream(capturer);
+            builder.setCompilerDebugPrintStream(capturing);
+            builder.addLiteralSchema(schema);
 
-        // Test that a stored procedure with more than the max allowable predicates
-        // results in an error and does not crash or hang the system.
-        String sql = getQueryForFoo(2000);
-        builder.addStmtProcedure("StmtForStackOverFlow", sql, null);
+            // Test that a stored procedure with more than the max allowable predicates
+            // results in an error and does not crash or hang the system.
+            String sql = getQueryForFoo(npreds);
+            builder.addStmtProcedure("StmtForStackOverFlow", sql, null);
+            success = builder.compile(Configuration.getPathToCatalogForTest("max_plus_predicates.jar"));
+        }
 
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("max_plus_predicates.jar"));
         assert(!success);
         String captured = capturer.toString("UTF-8");
         String errMsg = "Encountered stack overflow error. " +

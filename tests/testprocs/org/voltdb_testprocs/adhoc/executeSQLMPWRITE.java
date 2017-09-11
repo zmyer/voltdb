@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -32,6 +32,7 @@ package org.voltdb_testprocs.adhoc;
 
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
+import org.voltdb.SQLStmtAdHocHelper;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
@@ -40,8 +41,10 @@ import org.voltdb.VoltTable;
 )
 public class executeSQLMPWRITE extends VoltProcedure {
     public static final SQLStmt marker = new SQLStmt("INSERT into PARTED1 values (?, ?)");
+
+    @SuppressWarnings("deprecation")
     public VoltTable[] run(long partval, String sql) {
-        voltQueueSQLExperimental(sql);
+        SQLStmtAdHocHelper.voltQueueSQLExperimental(this, sql);
         //voltQueueSQL("select * from PARTED1 where partval = ?", partval);
         return voltExecuteSQL(true);
     }

@@ -1,4 +1,20 @@
 /* This file is part of VoltDB.
+ * Copyright (C) 2008-2017 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+/* This file is part of VoltDB.
  * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -47,20 +63,24 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
  package org.voltdb.sqlparser.semantics.symtab;
-import java.util.*; // Uses arrayList, maybe j.u.* is too much.
+// Uses arrayList, maybe j.u.* is too much.
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 
 import org.voltdb.sqlparser.syntax.grammar.IIndex;
 import org.voltdb.sqlparser.syntax.symtab.IColumn;
+import org.voltdb.sqlparser.syntax.symtab.ISourceLocation;
 import org.voltdb.sqlparser.syntax.symtab.ITable;
-import org.voltdb.sqlparser.syntax.symtab.IType;
 
 public class Table extends Top implements ITable {
     Map<String, Column>   m_lookupByName = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
     Map<Integer, Column > m_lookupByIndex = new HashMap<>();
     Map<String, IIndex> m_lookupIndexByName = new HashMap<>();
 
-    public Table(String aTableName) {
-        super(aTableName);
+    public Table(ISourceLocation aLoc, String aTableName) {
+        super(aLoc, aTableName);
     }
 
     /* (non-Javadoc)
@@ -76,6 +96,7 @@ public class Table extends Top implements ITable {
     /* (non-Javadoc)
      * @see org.voltdb.sqlparser.symtab.ITable#toString()
      */
+    @Override
     public String toString() {
         StringBuffer str = new StringBuffer();
         str.append("create table ")
@@ -100,6 +121,7 @@ public class Table extends Top implements ITable {
         return str.toString();
     }
 
+    @Override
     public IColumn getColumnByName(String aName) {
         return m_lookupByName.get(aName);
     }
@@ -114,6 +136,7 @@ public class Table extends Top implements ITable {
         return m_lookupByName.keySet();
     }
 
+    @Override
     public int getColumnCount() {
         return m_lookupByName.size();
     }
@@ -121,6 +144,6 @@ public class Table extends Top implements ITable {
     @Override
     public void addIndex(String name, IIndex index) {
         assert(index instanceof Index);
-        m_lookupIndexByName.put(name, (Index)index);
+        m_lookupIndexByName.put(name, index);
     }
 }

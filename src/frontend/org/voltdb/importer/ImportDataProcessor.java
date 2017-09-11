@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -49,10 +49,11 @@ public interface ImportDataProcessor  {
 
     /**
      * Pass processor specific processor configuration properties
-     * @param context current catalog context
      * @param config an instance of {@linkplain Properties}
+     * @param list of abstract importer factory
      */
-    public void setProcessorConfig(CatalogContext context, Map<String, ImportConfiguration> config);
+
+    public void setProcessorConfig(Map<String, ImportConfiguration> config, final Map<String, AbstractImporterFactory> importers);
 
     public int getPartitionsCount();
 

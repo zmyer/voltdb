@@ -1,4 +1,20 @@
 /* This file is part of VoltDB.
+ * Copyright (C) 2008-2017 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+/* This file is part of VoltDB.
  * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -35,12 +51,11 @@ package org.voltdb.sqlparser.semantics.grammar;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.voltdb.sqlparser.semantics.symtab.Column;
 import org.voltdb.sqlparser.semantics.symtab.ExpressionParser;
 import org.voltdb.sqlparser.semantics.symtab.Semantino;
 import org.voltdb.sqlparser.semantics.symtab.SymbolTable;
-import org.voltdb.sqlparser.semantics.symtab.SymbolTable.TablePair;
 import org.voltdb.sqlparser.semantics.symtab.Table;
+import org.voltdb.sqlparser.syntax.grammar.IJoinTree;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
 import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
 import org.voltdb.sqlparser.syntax.grammar.ISemantino;
@@ -56,7 +71,7 @@ import org.voltdb.sqlparser.syntax.util.ErrorMessageSet;
 
 
 public class SimpleTableSelectQuery implements ISelectQuery, IDQLStatement {
-    List<Projection> m_projections = new ArrayList<Projection>();
+    List<Projection> m_projections = new ArrayList<>();
 
     private ExpressionParser m_expressionParser;
     private SymbolTable m_tables;
@@ -74,6 +89,7 @@ public class SimpleTableSelectQuery implements ISelectQuery, IDQLStatement {
         m_errorMessages = aErrorMessages;
     }
 
+    @Override
     public List<Projection> getProjections() {
         return m_projections;
     }
@@ -237,5 +253,11 @@ public class SimpleTableSelectQuery implements ISelectQuery, IDQLStatement {
     @Override
     public ISelectQuery getRightQuery() {
         return null;
+    }
+
+    @Override
+    public void addJoinTree(IJoinTree joinTree) {
+        // TODO Auto-generated method stub
+
     }
 }

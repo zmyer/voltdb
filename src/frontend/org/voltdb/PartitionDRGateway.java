@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,6 +28,7 @@ import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.jni.ExecutionEngine.EventType;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * Stub class that provides a gateway to the DRProducer when
@@ -69,13 +70,20 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
     }
 
     public static ImmutableMap<Integer, PartitionDRGateway> m_partitionDRGateways = ImmutableMap.of();
-
-    // all partial MP txns go into SP streams
-    public static final byte DR_NO_MP_START_PROTOCOL_VERSION = 3;
-    // all partial MP txns except those with table truncation record go to MP stream separately without coordination
-    public static final byte DR_UNCOORDINATED_MP_START_PROTOCOL_VERSION = 4;
-    // partial MP txns of the same MP txn coordinated and combined before going to MP stream
-    public static final byte DR_COORDINATED_MP_START_PROTOCOL_VERSION = 6;
+    public static final DRConflictManager m_conflictManager;
+    static {
+        if (MiscUtils.isPro()) {
+            DRConflictManager tmpObj = null;
+            try {
+                Class<?> klass = Class.forName("org.voltdb.dr2.DRConflictManagerImpl");
+                Constructor<?> constructor = klass.getConstructor();
+                tmpObj = (DRConflictManager) constructor.newInstance();
+            } catch (Exception e) {}
+            m_conflictManager = tmpObj;
+        } else {
+            m_conflictManager = null;
+        }
+    }
 
     /**
      * Load the full subclass if it should, otherwise load the
@@ -134,12 +142,8 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
                         ProducerDRGateway producerGateway,
                         StartAction startAction) throws IOException, ExecutionException, InterruptedException
     {}
-    public void onSuccessfulProcedureCall(long txnId, long uniqueId, int hash,
-                                          StoredProcedureInvocation spi,
-                                          ClientResponseImpl response) {}
-    public void onSuccessfulMPCall(long spHandle, long txnId, long uniqueId, int hash,
-                                   StoredProcedureInvocation spi,
-                                   ClientResponseImpl response) {}
+    public void onSuccessfulProcedureCall(StoredProcedureInvocation spi) {}
+    public void onSuccessfulMPCall(StoredProcedureInvocation spi) {}
     public long onBinaryDR(int partitionId, long startSequenceNumber, long lastSequenceNumber,
             long lastSpUniqueId, long lastMpUniqueId, EventType eventType, ByteBuffer buf) {
         final BBContainer cont = DBBPool.wrapBB(buf);
@@ -150,14 +154,6 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
 
     @Override
     public void lastUniqueIdsMadeDurable(long spUniqueId, long mpUniqueId) {}
-
-    public int processDRConflict(int partitionId, int remoteClusterId, long remoteTimestamp, String tableName, DRRecordType action,
-                                 DRConflictType deleteConflict, ByteBuffer existingMetaTableForDelete, ByteBuffer existingTupleTableForDelete,
-                                 ByteBuffer expectedMetaTableForDelete, ByteBuffer expectedTupleTableForDelete,
-                                 DRConflictType insertConflict, ByteBuffer existingMetaTableForInsert, ByteBuffer existingTupleTableForInsert,
-                                 ByteBuffer newMetaTableForInsert, ByteBuffer newTupleTableForInsert) {
-        return 0;
-    }
 
     public static long pushDRBuffer(
             int partitionId,
@@ -182,15 +178,17 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
                                        ByteBuffer expectedMetaTableForDelete, ByteBuffer expectedTupleTableForDelete,
                                        int insertConflict, ByteBuffer existingMetaTableForInsert, ByteBuffer existingTupleTableForInsert,
                                        ByteBuffer newMetaTableForInsert, ByteBuffer newTupleTableForInsert) {
-        final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
-        if (pdrg == null) {
-            VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
-        }
-
-        return pdrg.processDRConflict(partitionId, remoteClusterId, remoteTimestamp, tableName, DRRecordType.values()[action],
-                DRConflictType.values()[deleteConflict], existingMetaTableForDelete, existingTupleTableForDelete,
-                expectedMetaTableForDelete, expectedTupleTableForDelete,
-                DRConflictType.values()[insertConflict], existingMetaTableForInsert, existingTupleTableForInsert,
-                newMetaTableForInsert, newTupleTableForInsert);
+        assert m_conflictManager != null : "Community edition should not have any conflicts";
+        return m_conflictManager.resolveConflict(partitionId,
+                                                 remoteClusterId,
+                                                 remoteTimestamp,
+                                                 tableName,
+                                                 DRRecordType.values()[action],
+                                                 DRConflictType.values()[deleteConflict],
+                                                 existingMetaTableForDelete, existingTupleTableForDelete,
+                                                 expectedMetaTableForDelete, expectedTupleTableForDelete,
+                                                 DRConflictType.values()[insertConflict],
+                                                 existingMetaTableForInsert, existingTupleTableForInsert,
+                                                 newMetaTableForInsert, newTupleTableForInsert);
     }
 }

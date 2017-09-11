@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -63,6 +63,7 @@ import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 import org.voltdb.types.QuantifierType;
 import org.voltdb.types.SortDirectionType;
+import org.voltdb.types.VoltDecimalHelper;
 
 public abstract class AbstractParsedStmt {
 
@@ -73,8 +74,7 @@ public abstract class AbstractParsedStmt {
 
      // Internal statement counter
     public static int NEXT_STMT_ID = 0;
-    // Internal parameter counter
-    public static int NEXT_PARAMETER_ID = 0;
+
     // The unique id to identify the statement
     public int m_stmtId;
 
@@ -120,11 +120,12 @@ public abstract class AbstractParsedStmt {
     // mark whether the statement's parent is UNION clause or not
     private boolean m_isChildOfUnion = false;
 
-    static final String INSERT_NODE_NAME = "insert";
-    static final String UPDATE_NODE_NAME = "update";
-    static final String DELETE_NODE_NAME = "delete";
+    private static final String INSERT_NODE_NAME = "insert";
+    private static final String UPDATE_NODE_NAME = "update";
+    private static final String DELETE_NODE_NAME = "delete";
     static final String SELECT_NODE_NAME = "select";
     static final String UNION_NODE_NAME  = "union";
+    private static final String SWAP_NODE_NAME = "swap";
 
     /**
     * Class constructor
@@ -167,17 +168,20 @@ public abstract class AbstractParsedStmt {
                 retval.m_isUpsert = true;
             }
         }
-        else if (stmtTypeElement.name.equalsIgnoreCase(UPDATE_NODE_NAME)) {
+        else if (stmtTypeElement.name.equals(UPDATE_NODE_NAME)) {
             retval = new ParsedUpdateStmt(paramValues, db);
         }
-        else if (stmtTypeElement.name.equalsIgnoreCase(DELETE_NODE_NAME)) {
+        else if (stmtTypeElement.name.equals(DELETE_NODE_NAME)) {
             retval = new ParsedDeleteStmt(paramValues, db);
         }
-        else if (stmtTypeElement.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
+        else if (stmtTypeElement.name.equals(SELECT_NODE_NAME)) {
             retval = new ParsedSelectStmt(paramValues, db);
         }
-        else if (stmtTypeElement.name.equalsIgnoreCase(UNION_NODE_NAME)) {
+        else if (stmtTypeElement.name.equals(UNION_NODE_NAME)) {
             retval = new ParsedUnionStmt(paramValues, db);
+        }
+        else if (stmtTypeElement.name.equals(SWAP_NODE_NAME)) {
+            retval = new ParsedSwapStmt(paramValues, db);
         }
         else {
             throw new RuntimeException("Unexpected Element: " + stmtTypeElement.name);
@@ -191,11 +195,10 @@ public abstract class AbstractParsedStmt {
      * @param parsedStmt
      * @param sql
      * @param xmlSQL
-     * @param db
      * @param joinOrder
      */
     private static void parse(AbstractParsedStmt parsedStmt, String sql,
-            VoltXMLElement stmtTypeElement, Database db, String joinOrder) {
+            VoltXMLElement stmtTypeElement, String joinOrder) {
         // parse tables and parameters
         parsedStmt.parseTablesAndParams(stmtTypeElement);
 
@@ -219,10 +222,9 @@ public abstract class AbstractParsedStmt {
 
         // reset the statement counters
         NEXT_STMT_ID = 0;
-        NEXT_PARAMETER_ID = 0;
         AbstractParsedStmt retval = getParsedStmt(stmtTypeElement, paramValues, db);
 
-        parse(retval, sql, stmtTypeElement, db, joinOrder);
+        parse(retval, sql, stmtTypeElement, joinOrder);
         return retval;
     }
 
@@ -251,7 +253,14 @@ public abstract class AbstractParsedStmt {
                 VoltXMLElement subChild = child.children.get(0);
                 expr = parseExpressionTree(subChild);
                 assert(expr != null);
-                expr.refineValueType(VoltType.get((byte)col.getType()), col.getSize());
+                try {
+                    expr.refineValueType(VoltType.get((byte)col.getType()), col.getSize());
+                } catch (PlanningErrorException ex) {
+                    String errorMsg = ex.getMessage()
+                                      + " for column '" + col.getTypeName()
+                                      + "' in the table '" + table.getTypeName() + "'";
+                    throw new PlanningErrorException(errorMsg);
+                }
                 ExpressionUtil.finalizeValueTypes(expr);
             }
             columns.put(col, expr);
@@ -415,7 +424,14 @@ public abstract class AbstractParsedStmt {
      */
     private AbstractExpression parseValueExpression(VoltXMLElement exprNode) {
         String isParam = exprNode.attributes.get("isparam");
-        String isPlannerGenerated = exprNode.attributes.get("isplannergenerated");
+        String isPlannerGeneratedAttr = exprNode.attributes.get("isplannergenerated");
+        boolean isPlannerGenerated;
+        if (isPlannerGeneratedAttr != null) {
+            isPlannerGenerated = isPlannerGeneratedAttr.equalsIgnoreCase("true");
+        }
+        else {
+            isPlannerGenerated = false;
+        }
 
         // A ParameterValueExpression is needed to represent any user-provided or planner-injected parameter.
         boolean needParameter = (isParam != null) && (isParam.equalsIgnoreCase("true"));
@@ -423,8 +439,7 @@ public abstract class AbstractParsedStmt {
         // A ConstantValueExpression is needed to represent a constant in the statement,
         // EVEN if that constant has been "parameterized" by the plan caching code.
         ConstantValueExpression cve = null;
-        boolean needConstant = (needParameter == false) ||
-            ((isPlannerGenerated != null) && (isPlannerGenerated.equalsIgnoreCase("true")));
+        boolean needConstant = (needParameter == false) || isPlannerGenerated;
 
         if (needConstant) {
             String type = exprNode.attributes.get("valuetype");
@@ -439,6 +454,37 @@ public abstract class AbstractParsedStmt {
             }
             if ( ! needParameter && vt != VoltType.NULL) {
                 String valueStr = exprNode.attributes.get("value");
+                // Verify that this string can represent the
+                // desired type, by converting it into the
+                // given type.
+                if (valueStr != null) {
+                    try {
+                        switch (vt) {
+                        case BIGINT:
+                        case TIMESTAMP:
+                            Long.valueOf(valueStr);
+                            break;
+                        case FLOAT:
+                            Double.valueOf(valueStr);
+                            break;
+                        case DECIMAL:
+                            VoltDecimalHelper.stringToDecimal(valueStr);
+                            break;
+                        default:
+                            break;
+                        }
+                    } catch (PlanningErrorException ex) {
+                        // We're happy with these.
+                        throw ex;
+                    } catch (NumberFormatException ex) {
+                        throw new PlanningErrorException("Numeric conversion error to type "
+                                                            + vt.name()
+                                                            + " "
+                                                            + ex.getMessage().toLowerCase());
+                    } catch (Exception ex) {
+                        throw new PlanningErrorException(ex.getMessage());
+                    }
+                }
                 cve.setValue(valueStr);
             }
         }
@@ -516,7 +562,7 @@ public abstract class AbstractParsedStmt {
         }
 
         // This is a TVE from the correlated expression
-        int paramIdx = NEXT_PARAMETER_ID++;
+        int paramIdx = ParameterizationInfo.getNextParamIndex();
         ParameterValueExpression pve = new ParameterValueExpression(paramIdx, resolvedExpr);
         m_parameterTveMap.put(paramIdx, resolvedExpr);
         return pve;
@@ -546,7 +592,7 @@ public abstract class AbstractParsedStmt {
         return m_windowFunctionExpressions;
     }
     /**
-     * Parse the rank expression.  This actually just returns a TVE.  The
+     * Parse a windowed expression.  This actually just returns a TVE.  The
      * WindowFunctionExpression is squirreled away in the m_windowFunctionExpressions
      * object, though, because we will need it later.
      *
@@ -729,7 +775,7 @@ public abstract class AbstractParsedStmt {
         // If there is no usable alias because the subquery is inside an expression,
         // generate a unique one for internal use.
         if (tableAlias == null) {
-            tableAlias = "VOLT_TEMP_TABLE_" + subquery.m_stmtId;
+            tableAlias = AbstractParsedStmt.TEMP_TABLE_NAME + "_" + subquery.m_stmtId;
         }
         StmtSubqueryScan subqueryScan =
                 new StmtSubqueryScan(subquery, tableAlias, m_stmtId);
@@ -769,7 +815,7 @@ public abstract class AbstractParsedStmt {
         int tableCount = 0;
         StmtTargetTableScan simpler = null;
         for (Map.Entry<String, StmtTableScan> entry : selectSubquery.m_tableAliasMap.entrySet()) {
-            if (entry.getKey().contains("VOLT_TEMP_TABLE")) {
+            if (entry.getKey().startsWith(AbstractParsedStmt.TEMP_TABLE_NAME)) {
                 // This is an artificial table for a subquery expression
                 continue;
             }
@@ -952,7 +998,7 @@ public abstract class AbstractParsedStmt {
         // The only known-safe case is where each (column) argument to a
         // RowSubqueryExpression is based on exactly one column value.
         for (AbstractExpression arg : rowExpression.getArgs()) {
-            Collection<AbstractExpression> tves = arg.findAllTupleValueSubexpressions();
+            Collection<TupleValueExpression> tves = arg.findAllTupleValueSubexpressions();
             if (tves.size() != 1) {
                 if (tves.isEmpty()) {
                     throw new PlanningErrorException(
@@ -1072,14 +1118,14 @@ public abstract class AbstractParsedStmt {
     protected AbstractExpression replaceExpressionsWithPve(AbstractExpression expr) {
         assert(expr != null);
         if (expr instanceof TupleValueExpression) {
-            int paramIdx = NEXT_PARAMETER_ID++;
+            int paramIdx = ParameterizationInfo.getNextParamIndex();
             ParameterValueExpression pve = new ParameterValueExpression(paramIdx, expr);
             m_parameterTveMap.put(paramIdx, expr);
             return pve;
         }
 
         if (expr instanceof AggregateExpression) {
-            int paramIdx = NEXT_PARAMETER_ID++;
+            int paramIdx = ParameterizationInfo.getNextParamIndex();
             ParameterValueExpression pve = new ParameterValueExpression(paramIdx, expr);
             // Disallow aggregation of parent columns in a subquery.
             // except the case HAVING AGG(T1.C1) IN (SELECT T2.C2 ...)
@@ -1379,9 +1425,13 @@ public abstract class AbstractParsedStmt {
      * the type and vector parameter indication. We add the pve to two maps,
      * m_paramsById and m_paramsByIndex.
      *
-     * We also set a counter, MAX_PARAMETER_ID, to the largest id in the
-     * expression. This helps give ids to references to correlated expressions
-     * of subqueries.
+     * A parameter's index attribute is its offset in the parameters array which
+     * is used to determine the parameter's value in the EE at runtime.
+     *
+     * Some parameters are generated after we generate VoltXML but before we plan (constants may
+     * become parameters in ad hoc queries so their plans may be cached).  In this case
+     * the index of the parameter is already set.  Otherwise, the parameter's index will have been
+     * set in HSQL.
      *
      * @param paramsNode
      */
@@ -1397,17 +1447,17 @@ public abstract class AbstractParsedStmt {
             return;
         }
 
-        long max_parameter_id = -1;
-
         for (VoltXMLElement node : paramsNode.children) {
             if (node.name.equalsIgnoreCase("parameter")) {
                 long id = Long.parseLong(node.attributes.get("id"));
-                int index = Integer.parseInt(node.attributes.get("index"));
-                if (index > max_parameter_id) {
-                    max_parameter_id = index;
-                }
                 String typeName = node.attributes.get("valuetype");
                 String isVectorParam = node.attributes.get("isvector");
+
+                // Get the index for this parameter in the EE's parameter vector
+                String indexAttr = node.attributes.get("index");
+                assert(indexAttr != null);
+                int index = Integer.parseInt(indexAttr);
+
                 VoltType type = VoltType.typeFromString(typeName);
                 ParameterValueExpression pve = new ParameterValueExpression();
                 pve.setParameterIndex(index);
@@ -1418,9 +1468,6 @@ public abstract class AbstractParsedStmt {
                 m_paramsById.put(id, pve);
                 m_paramsByIndex.put(index, pve);
             }
-        }
-        if (max_parameter_id >= NEXT_PARAMETER_ID) {
-            NEXT_PARAMETER_ID = (int)max_parameter_id + 1;
         }
     }
 
@@ -1522,7 +1569,7 @@ public abstract class AbstractParsedStmt {
         subquery.m_paramsById.putAll(m_paramsById);
         subquery.m_paramsByIndex = m_paramsByIndex;
 
-        AbstractParsedStmt.parse(subquery, m_sql, queryNode, m_db, m_joinOrder);
+        AbstractParsedStmt.parse(subquery, m_sql, queryNode, m_joinOrder);
         subquery.m_parentStmt = this;
         return subquery;
     }
@@ -1533,7 +1580,7 @@ public abstract class AbstractParsedStmt {
         subQuery.m_parentStmt = this;
         subQuery.m_paramsById.putAll(m_paramsById);
 
-        AbstractParsedStmt.parse(subQuery, m_sql, suqueryElmt, m_db, m_joinOrder);
+        AbstractParsedStmt.parse(subQuery, m_sql, suqueryElmt, m_joinOrder);
         updateContentDeterminismMessage(subQuery.calculateContentDeterminismMessage());
         return subQuery;
     }
@@ -1743,12 +1790,11 @@ public abstract class AbstractParsedStmt {
             //      The table must have an alias.  It might not have a name.
             //   3. If the HashSet has size > 1 we can't use this expression.
             //
-            List<AbstractExpression> baseTVEExpressions = expr.findAllTupleValueSubexpressions();
+            List<TupleValueExpression> baseTVEExpressions =
+                    expr.findAllTupleValueSubexpressions();
             Set<String> baseTableNames = new HashSet<>();
-            for (AbstractExpression ae : baseTVEExpressions) {
-                assert(ae instanceof TupleValueExpression);
-                TupleValueExpression atve = (TupleValueExpression)ae;
-                String tableAlias = atve.getTableAlias();
+            for (TupleValueExpression tve : baseTVEExpressions) {
+                String tableAlias = tve.getTableAlias();
                 assert(tableAlias != null);
                 baseTableNames.add(tableAlias);
             }
@@ -1976,6 +2022,13 @@ public abstract class AbstractParsedStmt {
         return null;
     }
 
+    /**
+     * Return the number of window function expressions.  This
+     * is non-zero for ParsedSelectStmt only.
+     */
+    public int getWindowFunctionExpressionCount() {
+        return m_windowFunctionExpressions.size();
+    }
     /*
      *  Extract all subexpressions of a given expression class from this statement
      */

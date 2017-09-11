@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -204,9 +204,9 @@ public class AdHocPlannedStatement {
         return extractedParamValues.size() > 0;
     }
 
-    int getPartitioningParameterIndex() { return core.getPartitioningParamIndex(); }
+    public int getPartitioningParameterIndex() { return core.getPartitioningParamIndex(); }
 
-    Object getPartitioningParameterValue() {
+    public Object getPartitioningParameterValue() {
         int paramIndex = core.getPartitioningParamIndex();
         if (paramIndex != -1 && extractedParamValues != null && extractedParamValues.size() > paramIndex ) {
             return extractedParamValues.toArray()[paramIndex];

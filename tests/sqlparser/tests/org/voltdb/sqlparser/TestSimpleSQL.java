@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -40,7 +40,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  *//* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -82,12 +82,13 @@ import org.voltdb.sqlparser.syntax.SQLKind;
 
 import org.voltdb.sqlparser.assertions.semantics.VoltXMLElementAssert.IDTable;
 import static org.voltdb.sqlparser.assertions.semantics.VoltXMLElementAssert.*;
+import org.voltdb.planner.ParameterizationInfo;
 
 public class TestSimpleSQL {
     HSQLInterface m_HSQLInterface = null;
     String        m_schema = null;
     public TestSimpleSQL() {
-        m_HSQLInterface = HSQLInterface.loadHsqldb();
+        m_HSQLInterface = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         String m_schema = "create table alpha ( id integer, beta integer );create table gamma ( id integer not null, zooba integer );create table fargle ( id integer not null, dooba integer )";
         try {
             m_HSQLInterface.processDDLStatementsUsingVoltSQLParser(m_schema, null);
@@ -128,7 +129,8 @@ public class TestSimpleSQL {
     //....|....|...ELEMENT: index
     //....|....|.....assumeunique = false
     //....|....|.....columns =
-    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....ishashindex = false
+    //....|....|.....name = SYS_IDX_10002
     //....|....|.....unique = true
     //....|....ELEMENT: constraints
     //....|....|.name = constraints
@@ -137,6 +139,7 @@ public class TestSimpleSQL {
     //....|....|.....assumeunique = false
     //....|....|.....constrainttype = NOT_NULL
     //....|....|.....name = SYS_CT_10001
+    //....|....|.....nameisauto = true
     //....|....|.....rowslimit = 2147483647
     //
     //
@@ -146,7 +149,7 @@ public class TestSimpleSQL {
     public void testCreateTable() throws Exception {
         String ddl    = "create table alpha ( id integer not null, beta integer)";
         IDTable idTable = new IDTable();
-        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        HSQLInterface hif = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
         VoltXMLElement element = hif.getVoltCatalogXML(null);
         assertThat(element)
@@ -172,9 +175,16 @@ public class TestSimpleSQL {
                             withAttribute(17, "size", "10"),
                             withAttribute(18, "valuetype", "INTEGER"))),
                     withChildNamed(19, "indexes",
-                        withAttribute(20, "name", "indexes")),
-                    withChildNamed(21, "constraints",
-                        withAttribute(22, "name", "constraints"))));
+                        withAttribute(20, "name", "indexes"),
+                        withChildNamed(21, "index",
+                                       "name", "SYS_IDX_10002",
+                            withAttribute(22, "assumeunique", "false"),
+                            withAttribute(23, "columns", ""),
+                            withAttribute(24, "ishashindex", "false"),
+                            withAttribute(25, "name", "SYS_IDX_10002"),
+                            withAttribute(26, "unique", "true"))),
+                    withChildNamed(27, "constraints",
+                        withAttribute(28, "name", "constraints"))));
     }
 
     //
@@ -209,7 +219,8 @@ public class TestSimpleSQL {
     //....|....|...ELEMENT: index
     //....|....|.....assumeunique = false
     //....|....|.....columns =
-    //....|....|.....name = VOLTDB_AUTOGEN_IDX_ALPHA
+    //....|....|.....ishashindex = false
+    //....|....|.....name = SYS_IDX_10002
     //....|....|.....unique = true
     //....|....ELEMENT: constraints
     //....|....|.name = constraints
@@ -218,6 +229,7 @@ public class TestSimpleSQL {
     //....|....|.....assumeunique = false
     //....|....|.....constrainttype = NOT_NULL
     //....|....|.....name = SYS_CT_10001
+    //....|....|.....nameisauto = true
     //....|....|.....rowslimit = 2147483647
     //
     //
@@ -227,7 +239,7 @@ public class TestSimpleSQL {
     public void testCreateTableWithDecimal() throws Exception {
         String ddl    = "create table alpha ( id integer not null, beta Decimal)";
         IDTable idTable = new IDTable();
-        HSQLInterface hif = HSQLInterface.loadHsqldb();
+        HSQLInterface hif = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         hif.processDDLStatementsUsingVoltSQLParser(ddl, null);
         VoltXMLElement element = hif.getVoltCatalogXML(null);
         assertThat(element)
@@ -253,9 +265,16 @@ public class TestSimpleSQL {
                             withAttribute(17, "size", "100"),
                             withAttribute(18, "valuetype", "DECIMAL"))),
                     withChildNamed(19, "indexes",
-                        withAttribute(20, "name", "indexes")),
-                    withChildNamed(21, "constraints",
-                        withAttribute(22, "name", "constraints"))));
+                        withAttribute(20, "name", "indexes"),
+                        withChildNamed(21, "index",
+                                       "name", "SYS_IDX_10002",
+                            withAttribute(22, "assumeunique", "false"),
+                            withAttribute(23, "columns", ""),
+                            withAttribute(24, "ishashindex", "false"),
+                            withAttribute(25, "name", "SYS_IDX_10002"),
+                            withAttribute(26, "unique", "true"))),
+                    withChildNamed(27, "constraints",
+                        withAttribute(28, "name", "constraints"))));
     }
 
     // Pattern XML:

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -34,7 +34,7 @@ import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 
-public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
+public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements IndexSortablePlanNode {
 
     public enum Members {
         SORT_DIRECTION,
@@ -54,6 +54,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     protected AbstractExpression m_wherePredicate = null;
 
     protected NodeSchema m_outputSchemaPreInlineAgg = null;
+    private final IndexUseForOrderBy m_indexUse = new IndexUseForOrderBy();
 
     protected AbstractJoinPlanNode() {
         super();
@@ -203,6 +204,8 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
 
         final NodeSchema outer_schema = m_children.get(0).getOutputSchema();
         final NodeSchema inner_schema = m_children.get(1).getOutputSchema();
+        final int outerSize = outer_schema.size();
+        final int innerSize = inner_schema.size();
 
         // resolve predicates
         resolvePredicate(m_preJoinPredicate, outer_schema, inner_schema);
@@ -220,11 +223,12 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
             assert(col.getExpression() instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
             int index;
-            if (i < outer_schema.size()) {
+            if (i < outerSize) {
                 index = tve.setColumnIndexUsingSchema(outer_schema);
             }
             else {
                 index = tve.setColumnIndexUsingSchema(inner_schema);
+                index += outerSize;
             }
 
             if (index == -1) {
@@ -233,6 +237,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
             }
 
             tve.setColumnIndex(index);
+            tve.setDifferentiator(index);
         }
 
         // We want the output columns to be ordered like [outer table columns][inner table columns],
@@ -286,13 +291,8 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
             m_sortDirection = SortDirectionType.INVALID;
             return;
         }
-        if (outerTable.getPlanNodeType() == PlanNodeType.INDEXSCAN) {
-            m_sortDirection = ((IndexScanPlanNode)outerTable).getSortDirection();
-            return;
-        }
-        if (outerTable instanceof AbstractJoinPlanNode) {
-            ((AbstractJoinPlanNode)outerTable).resolveSortDirection();
-            m_sortDirection = ((AbstractJoinPlanNode)outerTable).getSortDirection();
+        if (outerTable instanceof IndexSortablePlanNode) {
+            m_sortDirection = ((IndexSortablePlanNode)outerTable).indexUse().getSortOrderFromIndexScan();
         }
     }
 
@@ -462,4 +462,15 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     public void adjustDifferentiatorField(TupleValueExpression tve) {
         tve.setDifferentiator(tve.getColumnIndex());
     }
+
+    @Override
+    public IndexUseForOrderBy indexUse() {
+        return m_indexUse;
+    }
+
+    @Override
+    public AbstractPlanNode planNode() {
+        return this;
+    }
+
 }

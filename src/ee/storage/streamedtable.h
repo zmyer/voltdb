@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -48,7 +48,7 @@ class StreamedTable : public Table {
 public:
     StreamedTable(bool exportEnabled, int partitionColumn = -1);
     StreamedTable(bool exportEnabled, ExportTupleStream* wrapper);
-    static StreamedTable* createForTest(size_t, ExecutorContext*);
+    static StreamedTable* createForTest(size_t, ExecutorContext*, TupleSchema *schema, std::vector<std::string> & columnNames);
 
     //This returns true if a stream was created thus caller can setSignatureAndGeneration to push.
     bool enableStream();

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -238,6 +238,9 @@ class NValue {
     /* Release memory associated to object type NValues */
     void free() const;
 
+    /* Get the serialized size of this NValue. */
+    int32_t serializedSize() const;
+
     /* Release memory associated to object type tuple columns */
     static void freeObjectsFromTupleStorage(std::vector<char*> const &oldObjects);
 
@@ -382,6 +385,7 @@ class NValue {
     NValue op_add(const NValue& rhs) const;
     NValue op_multiply(const NValue& rhs) const;
     NValue op_divide(const NValue& rhs) const;
+    NValue op_unary_minus() const;
     /*
      * This NValue must be VARCHAR and the rhs must be VARCHAR.
      * This NValue is the value and the rhs is the pattern
@@ -1142,7 +1146,7 @@ private:
     }
 
     /**
-     * This funciton does not check NULL value.
+     * This function does not check NULL value.
      */
     double getNumberFromString() const
     {
@@ -1497,6 +1501,7 @@ private:
         // byte[] as string parameters...
         // In the future, it would be nice to check this is a decent string here...
             NValue retval(VALUE_TYPE_VARCHAR);
+            retval.m_sourceInlined = m_sourceInlined;
             memcpy(retval.m_data, m_data, sizeof(m_data));
             return retval;
         }
@@ -1695,13 +1700,13 @@ private:
                 std::ostringstream oss;
                 oss <<  "The size " << objLength << " of the value exceeds the size of ";
                 if (type == VALUE_TYPE_VARBINARY) {
-                    oss << "the VARBINARY(" << maxLength << ") column.";
+                    oss << "the VARBINARY(" << maxLength << ") column";
                     throw SQLException(SQLException::data_exception_string_data_length_mismatch,
                                        oss.str().c_str(),
                                        SQLException::TYPE_VAR_LENGTH_MISMATCH);
                 }
                 else {
-                    oss << "the GEOGRAPHY column (" << maxLength << " bytes).";
+                    oss << "the GEOGRAPHY column (" << maxLength << " bytes)";
                     throw SQLException(SQLException::data_exception_string_data_length_mismatch,
                                        oss.str().c_str());
                 }
@@ -1718,7 +1723,7 @@ private:
                     }
                     char msg[1024];
                     snprintf(msg, 1024,
-                            "The size %d of the value '%s' exceeds the size of the VARCHAR(%d BYTES) column.",
+                            "The size %d of the value '%s' exceeds the size of the VARCHAR(%d BYTES) column",
                             objLength, inputValue.c_str(), maxLength);
                     throw SQLException(SQLException::data_exception_string_data_length_mismatch,
                                        msg, SQLException::TYPE_VAR_LENGTH_MISMATCH);
@@ -1735,7 +1740,7 @@ private:
                     inputValue = std::string(ptr, objLength);
                 }
                 snprintf(msg, 1024,
-                        "The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column.",
+                        "The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column",
                         charLength, inputValue.c_str(), maxLength);
 
                 throw SQLException(SQLException::data_exception_string_data_length_mismatch,
@@ -2134,39 +2139,45 @@ private:
         return getBigIntValue(lhs - rhs);
     }
 
-    static NValue opMultiplyBigInts(const int64_t lhs, const int64_t rhs) {
-        bool overflow = false;
+    static int64_t multiplyAndCheckOverflow(const int64_t lhs, const int64_t rhs, bool *overflowed) {
+        *overflowed = false;
         //Scary overflow check from https://www.securecoding.cert.org/confluence/display/cplusplus/INT32-CPP.+Ensure+that+operations+on+signed+integers+do+not+result+in+overflow
         if (lhs > 0){  /* lhs is positive */
             if (rhs > 0) {  /* lhs and rhs are positive */
                 if (lhs > (INT64_MAX / rhs)) {
-                    overflow= true;
+                    *overflowed = true;
                 }
             } /* end if lhs and rhs are positive */
             else { /* lhs positive, rhs non-positive */
                 if (rhs < (INT64_MIN / lhs)) {
-                    overflow = true;
+                    *overflowed = true;
                 }
             } /* lhs positive, rhs non-positive */
         } /* end if lhs is positive */
         else { /* lhs is non-positive */
             if (rhs > 0) { /* lhs is non-positive, rhs is positive */
                 if (lhs < (INT64_MIN / rhs)) {
-                    overflow = true;
+                    *overflowed = true;
                 }
             } /* end if lhs is non-positive, rhs is positive */
             else { /* lhs and rhs are non-positive */
                 if ( (lhs != 0) && (rhs < (INT64_MAX / lhs))) {
-                    overflow = true;
+                    *overflowed = true;
                 }
             } /* end if lhs and rhs non-positive */
         } /* end if lhs is non-positive */
 
         const int64_t result = lhs * rhs;
-
         if (result == INT64_NULL) {
-            overflow = true;
+            *overflowed = true;
         }
+
+        return result;
+    }
+
+    static NValue opMultiplyBigInts(const int64_t lhs, const int64_t rhs) {
+        bool overflow = false;
+        int64_t result = multiplyAndCheckOverflow(lhs, rhs, &overflow);
 
         if (overflow) {
             char message[4096];
@@ -3499,6 +3510,36 @@ inline void* NValue::castAsAddress() const {
     }
     throwDynamicSQLException("Type %s not a recognized type for casting as an address",
                              getValueTypeString().c_str());
+}
+
+inline NValue NValue::op_unary_minus() const {
+    const ValueType type = getValueType();
+    NValue retval(type);
+    switch(type) {
+    case VALUE_TYPE_TINYINT:
+        retval.getTinyInt() = static_cast<int8_t>(-getTinyInt());
+        break;
+    case VALUE_TYPE_SMALLINT:
+        retval.getSmallInt() = static_cast<int16_t>(-getSmallInt());
+        break;
+    case VALUE_TYPE_INTEGER:
+        retval.getInteger() = -getInteger();
+        break;
+    case VALUE_TYPE_BIGINT:
+    case VALUE_TYPE_TIMESTAMP:
+        retval.getBigInt() = -getBigInt();
+        break;
+    case VALUE_TYPE_DECIMAL:
+        retval.getDecimal() = -getDecimal();
+        break;
+    case VALUE_TYPE_DOUBLE:
+        retval.getDouble() = -getDouble();
+        break;
+    default:
+        throwDynamicSQLException( "unary minus cannot be applied to type %s", getValueTypeString().c_str());
+        break;
+    }
+    return retval;
 }
 
 inline NValue NValue::op_increment() const {

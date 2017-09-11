@@ -1,4 +1,20 @@
 /* This file is part of VoltDB.
+ * Copyright (C) 2008-2017 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+/* This file is part of VoltDB.
  * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -54,6 +70,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.voltdb.sqlparser.syntax.symtab.IColumn;
+import org.voltdb.sqlparser.syntax.symtab.ISourceLocation;
 import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
 import org.voltdb.sqlparser.syntax.symtab.ITop;
 import org.voltdb.sqlparser.syntax.symtab.TypeKind;
@@ -72,26 +89,19 @@ import org.voltdb.sqlparser.syntax.symtab.TypeKind;
  *
  */
 public class SymbolTable implements ISymbolTable {
-    private static ErrorType   m_errorType;
-    private static BooleanType m_booleanType;
-    private static VoidType    m_voidType;
+    private static final SourceLocation m_noSourceLocation = new SourceLocation(-1, -1);
+    private static final ErrorType      m_errorType        = new ErrorType(m_noSourceLocation, "$error", TypeKind.ERROR);
+    private static final BooleanType    m_booleanType      = new BooleanType(m_noSourceLocation, "boolean", TypeKind.BOOLEAN);
+    private static final VoidType       m_voidType         = new VoidType(m_noSourceLocation, "$void", TypeKind.VOID);
+
     public static VoidType getVoidType() {
-        if (m_voidType == null) {
-            m_voidType = new VoidType("$void", TypeKind.VOID);
-        }
         return m_voidType;
     }
 
     public static final ErrorType getErrorType() {
-        if (m_errorType == null) {
-            m_errorType = new ErrorType("$error", TypeKind.ERROR);
-        }
         return m_errorType;
     }
     public static final BooleanType getBooleanType() {
-        if (m_booleanType == null) {
-            m_booleanType = new BooleanType("$boolean", TypeKind.BOOLEAN);
-        }
         return m_booleanType;
     }
     ISymbolTable m_parent = null;
@@ -109,8 +119,8 @@ public class SymbolTable implements ISymbolTable {
             return m_alias;
         }
     }
-    List<TablePair> m_tables = new ArrayList<TablePair>();
-    Map<String, Top> m_lookup = new TreeMap<String, Top>(String.CASE_INSENSITIVE_ORDER);
+    List<TablePair> m_tables = new ArrayList<>();
+    Map<String, Top> m_lookup = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
 
     public SymbolTable(SymbolTable aParent) {
         m_parent = aParent;
@@ -130,6 +140,7 @@ public class SymbolTable implements ISymbolTable {
         }
     }
 
+    @Override
     public String toString() {
         return m_lookup.toString();
     }
@@ -201,6 +212,7 @@ public class SymbolTable implements ISymbolTable {
         return null;
     }
 
+    @Override
     public final Table getTable(String aName) {
         Top table = get(aName);
         if (table != null && table instanceof Table)
@@ -209,25 +221,27 @@ public class SymbolTable implements ISymbolTable {
     }
 
     public static ISymbolTable newStandardPrelude() {
+        ISourceLocation noSourceLocation = new SourceLocation(-1, -1);
         ISymbolTable answer = new SymbolTable(null);
-        answer.define(new IntegerType("bigint",      TypeKind.BIGINT));
-        answer.define(new IntegerType("integer",     TypeKind.INTEGER));
-        answer.define(new IntegerType("tinyint",     TypeKind.TINYINT));
-        answer.define(new IntegerType("smallint",    TypeKind.SMALLINT));
-        answer.define(new DecimalType("decimal",     TypeKind.DECIMAL));
-        answer.define(new FloatingPointType("float", TypeKind.FLOAT));
-        answer.define(new StringType("varchar",      TypeKind.VARCHAR));
-        answer.define(new StringType("varbinary",    TypeKind.VARBINARY));
-        answer.define(new TimestampType("timestamp", TypeKind.TIMESTAMP));
-        answer.define(new GeographyPointType("geography_point",
-                                                     TypeKind.GEOPOINT));
-        answer.define(new GeographyType("geography", TypeKind.GEOGRAPHY));
-        answer.define(getErrorType());
-        answer.define(getBooleanType());
-        answer.define(getVoidType());
+        answer.define(new IntegerType(noSourceLocation, "bigint",      TypeKind.BIGINT));
+        answer.define(new IntegerType(noSourceLocation, "integer",     TypeKind.INTEGER));
+        answer.define(new IntegerType(noSourceLocation, "tinyint",     TypeKind.TINYINT));
+        answer.define(new IntegerType(noSourceLocation, "smallint",    TypeKind.SMALLINT));
+        answer.define(new DecimalType(noSourceLocation, "decimal",     TypeKind.DECIMAL));
+        answer.define(new FloatingPointType(noSourceLocation, "float", TypeKind.FLOAT));
+        answer.define(new StringType(noSourceLocation, "varchar",      TypeKind.VARCHAR));
+        answer.define(new StringType(noSourceLocation, "varbinary",    TypeKind.VARBINARY));
+        answer.define(new TimestampType(noSourceLocation, "timestamp", TypeKind.TIMESTAMP));
+        answer.define(new GeographyPointType(noSourceLocation, "geography_point",
+                                             TypeKind.GEOPOINT));
+        answer.define(new GeographyType(noSourceLocation, "geography", TypeKind.GEOGRAPHY));
+        answer.define(new ErrorType(noSourceLocation, "$error",        TypeKind.ERROR));
+        answer.define(new BooleanType(noSourceLocation, "boolean",     TypeKind.BOOLEAN));
+        answer.define(new VoidType(noSourceLocation, "$void",          TypeKind.VOID));
         return answer;
     }
 
+    @Override
     public String getTableAliasByColumn(String aColName) {
         for (TablePair tp : m_tables) {
             IColumn col = tp.getTable().getColumnByName(aColName);
@@ -321,4 +335,10 @@ public class SymbolTable implements ISymbolTable {
         }
         return getType(conversionName);
     }
+
+    @Override
+    public ISourceLocation getNoSourceLocation() {
+        return m_noSourceLocation;
+    }
+
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,12 +25,14 @@ package org.voltdb.planner;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
+import static org.mockito.Mockito.mock;
 
 import java.io.File;
 import java.io.IOException;
 
 import org.junit.Before;
 import org.junit.Test;
+import org.voltcore.messaging.HostMessenger;
 import org.voltdb.AdHocQueryTester;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
@@ -54,14 +56,14 @@ public class TestAdHocPlans extends AdHocQueryTester {
         // For planner-only testing, we shouldn't care about IV2
         VoltDB.Configuration config = setUpSPDB();
         byte[] bytes = MiscUtils.fileToBytes(new File(config.m_pathToCatalog));
-        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
+        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, false).getFirst());
         Catalog catalog = new Catalog();
         catalog.execute(serializedCatalog);
         DbSettings dbSettings = new DbSettings(
                 config.asClusterSettings().asSupplier(),
                 NodeSettings.create(config.asPathSettingsMap()));
-        CatalogContext context = new CatalogContext(0, 0, catalog, dbSettings, bytes, null, new byte[] {}, 0);
-        m_pt = new PlannerTool(context.cluster, context.database, context.getCatalogHash());
+        CatalogContext context = new CatalogContext(catalog, dbSettings, 0, 0, bytes, null, new byte[] {}, mock(HostMessenger.class));
+        m_pt = new PlannerTool(context.database, context.getCatalogHash());
     }
 
     @Test
@@ -77,9 +79,11 @@ public class TestAdHocPlans extends AdHocQueryTester {
         runQueryTest(sql, 1, 1, 1, VALIDATING_SP_RESULT);
 
         // generate query with lots of predicate to simulate stack overflow when parsing the expression
-        sql = getQueryForLongQueryTable(2000);
         try {
-            runQueryTest(sql, 1, 1, 1, VALIDATING_SP_RESULT);
+            for (int numberPredicates = 2000; numberPredicates < 100000; numberPredicates += 1000) {
+                sql = getQueryForLongQueryTable(numberPredicates);
+                runQueryTest(sql, 1, 1, 1, VALIDATING_SP_RESULT);
+            }
             fail("Query was expected to generate stack over flow error");
         }
         catch (StackOverflowError error) {

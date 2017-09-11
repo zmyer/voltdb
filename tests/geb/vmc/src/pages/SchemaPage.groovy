@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -329,7 +329,7 @@ class SchemaPage extends VoltDBManagementCenterPage {
         while((line = br.readLine()) != "#view") {
         }
 
-        while ((line = br.readLine()) != null) {
+        while ((line = br.readLine()) != "#createStoredProcedure") {
             query = query + line + "\n"
         }
 

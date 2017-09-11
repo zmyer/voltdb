@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2016 VoltDB Inc.
+# Copyright (C) 2008-2017 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -120,11 +120,10 @@ class UploadConfiguration(Database):
             value = response.json()
 
             if value:
-                self.assertEqual(value['deployment']['admin-mode']['adminstartup'], False)
-                self.assertEqual(value['deployment']['admin-mode']['port'], 21211)
                 self.assertEqual(value['deployment']['dr']['id'], 6)
                 self.assertEqual(value['deployment']['dr']['listen'], True)
                 self.assertEqual(value['deployment']['dr']['port'], 12112)
+                self.assertEqual(value['deployment']['dr']['role'], 'master')
                 self.assertEqual(value['deployment']['snapshot']['enabled'], True)
                 self.assertEqual(value['deployment']['snapshot']['frequency'], '24h')
                 self.assertEqual(value['deployment']['snapshot']['retain'], 2)

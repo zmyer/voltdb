@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -37,11 +37,20 @@ import org.voltdb.client.ProcCallException;
 public class MatchChecks {
     static VoltLogger log = new VoltLogger("Benchmark.matchChecks");
 
-    protected static long getMirrorTableRowCount(boolean alltypes, Client client) {
+    protected static long getMirrorTableRowCount(boolean alltypes, long streams, Client client) {
         // check row count in mirror table -- the "master" of what should come back
         // eventually via import
-        String table = alltypes ? "KafkaMirrorTable2" : "KafkaMirrorTable1";
-        ClientResponse response = doAdHoc(client, "select count(*) from " + table);
+        String table = null;
+        String query = null;
+        if (alltypes) {
+            table = "KafkaMirrorTable2";
+            query = "select count(*) from " + table;
+        } else {
+            table = "KafkaMirrorTable1";
+            query = "select count(*) from " + table + " where import_count <> " + streams;
+        }
+
+        ClientResponse response = doAdHoc(client, query);
         VoltTable[] countQueryResult = response.getResults();
         VoltTable data = countQueryResult[0];
         if (data.asScalarLong() == VoltType.NULL_BIGINT)
@@ -87,7 +96,7 @@ public class MatchChecks {
                         )) {}
                 else if (ss.matches(".*Server is currently unavailable; try again later.*") ||
                          ss.matches(".*Server is paused.*") ||
-                         ss.matches("(?s).*Server shutdown in progress.*")) {
+                         ss.matches("(?s).*Server is shutting down.*")) {
                     sleep = true;
                 }
                 else {
@@ -103,6 +112,20 @@ public class MatchChecks {
                 noConnections = false;
             }
         }
+    }
+
+    protected static long[] getStats(Client client) {
+        // check the start time, end time, and row count to calculate TPS
+        long[] stats = new long[3];
+        ClientResponse response = doAdHoc(client,
+                "select count(*), since_epoch(Second, max(insert_time)), since_epoch(Second, min(insert_time)) from KAFKAIMPORTTABLE1;");
+        VoltTable countQueryResult = response.getResults()[0];
+        countQueryResult.advanceRow();
+        stats[0] = (long) countQueryResult.get(0, VoltType.BIGINT);
+        stats[1] = (long) countQueryResult.get(1, VoltType.BIGINT);
+        stats[2] = (long) countQueryResult.get(2, VoltType.BIGINT);
+        // double tps = (double) importRowCount / (double) elapsedMicroSecs;
+        return stats;
     }
 
     protected static long getExportRowCount(Client client) {
@@ -134,10 +157,9 @@ public class MatchChecks {
         return result[0].asScalarLong();
     }
 
-    public static long getImportTableRowCount(boolean alltypes, Client client) {
-        // check row count in import table
-        String table = alltypes ? "KafkaImportTable2" : "KafkaImportTable1";
-        ClientResponse response = doAdHoc(client, "select count(*) from " + table);
+    public static long getImportTableRowCount(int tablenum, Client client) {
+        // check row count in import table (kafkaimporttable<tablenum>)
+        ClientResponse response = doAdHoc(client, "select count(*) from KafkaImportTable" + tablenum);
         VoltTable[] countQueryResult = response.getResults();
         VoltTable data = countQueryResult[0];
         if (data.asScalarLong() == VoltType.NULL_BIGINT)

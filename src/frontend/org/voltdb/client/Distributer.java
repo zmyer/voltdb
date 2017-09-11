@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -49,11 +49,14 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
 import javax.security.auth.Subject;
 
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.network.CipherExecutor;
 import org.voltcore.network.Connection;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltNetworkPool;
@@ -61,8 +64,10 @@ import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
+import org.voltdb.client.ClientStatusListenerExt.AutoConnectionStatus;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.common.Constants;
@@ -70,7 +75,9 @@ import org.voltdb.common.Constants;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.ImmutableSortedMap;
 import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Sets;
 
 import jsr166y.ThreadLocalRandom;
 
@@ -85,6 +92,7 @@ class Distributer {
     static int RESUBSCRIPTION_DELAY_MS = Integer.getInteger("RESUBSCRIPTION_DELAY_MS", 10000);
     static final long PING_HANDLE = Long.MAX_VALUE;
     public static final Long ASYNC_TOPO_HANDLE = PING_HANDLE - 1;
+    public static final Long ASYNC_PROC_HANDLE = PING_HANDLE - 2;
     static final long USE_DEFAULT_CLIENT_TIMEOUT = 0;
     static long PARTITION_KEYS_INFO_REFRESH_FREQUENCY = Long.getLong("PARTITION_KEYS_INFO_REFRESH_FREQUENCY", 1000);
 
@@ -99,6 +107,8 @@ class Distributer {
 
     //Selector and connection handling, does all work in blocking selection thread
     private final VoltNetworkPool m_network;
+
+    private final SSLContext m_sslContext;
 
     // Temporary until a distribution/affinity algorithm is written
     private int m_nextConnection = 0;
@@ -127,8 +137,8 @@ class Distributer {
     private final Map<Integer, NodeConnection> m_partitionMasters = new HashMap<>();
     private final Map<Integer, NodeConnection[]> m_partitionReplicas = new HashMap<>();
     private final Map<Integer, NodeConnection> m_hostIdToConnection = new HashMap<>();
-    private final Map<String, Procedure> m_procedureInfo = new HashMap<>();
-
+    private final AtomicReference<ImmutableSortedMap<String, Procedure>> m_procedureInfo =
+                                new AtomicReference<ImmutableSortedMap<String, Procedure>>();
     private final AtomicReference<ImmutableSet<Integer>> m_partitionKeys = new AtomicReference<ImmutableSet<Integer>>();
     private final AtomicLong m_lastPartitionKeyFetched = new AtomicLong(0);
     private final AtomicReference<ClientResponse> m_partitionUpdateStatus = new AtomicReference<ClientResponse>();
@@ -176,6 +186,9 @@ class Distributer {
      * JAAS Authentication Subject
      */
     private final Subject m_subject;
+
+    // executor service for ssl encryption/decryption, if ssl is enabled.
+    private CipherExecutor m_cipherService;
 
     /**
      * Handles topology updates for client affinity
@@ -594,7 +607,6 @@ class Distributer {
         /**
          * Update the procedures statistics
          * @param procName Name of procedure being updated
-         * @param roundTrip round trip from client queued to client response callback invocation
          * @param clusterRoundTrip round trip measured within the VoltDB cluster
          * @param abort true of the procedure was aborted
          * @param failure true if the procedure failed
@@ -654,6 +666,14 @@ class Distributer {
                 }
 
                 return;
+            } else if (handle == ASYNC_PROC_HANDLE) {
+                ProcedureCallback cb = new ProcUpdateCallback();
+                try {
+                    cb.clientCallback(response);
+                } catch (Exception e) {
+                    uncaughtException(cb, response, e);
+                }
+                return;
             }
 
             //Race with expiration thread to be the first to remove the callback
@@ -692,7 +712,7 @@ class Distributer {
                 m_rateLimiter.transactionResponseReceived(nowNanos, clusterRoundTrip, stuff.ignoreBackpressure);
                 updateStats(stuff.name, deltaNanos, clusterRoundTrip, abort, error, false);
                 response.setClientRoundtrip(deltaNanos);
-                assert(response.getHash() == null); // make sure it didn't sneak into wire protocol
+                assert(response.getHashes() == null) : "A determinism hash snuck into the client wire protocol";
                 try {
                     cb.clientCallback(response);
                 } catch (Exception e) {
@@ -714,6 +734,14 @@ class Distributer {
             return m_connection.writeStream().hadBackPressure();
         }
 
+        public void setConnection(Connection c) {
+            m_connection = c;
+            for (ClientStatusListenerExt listener : m_listeners) {
+                listener.connectionCreated(m_connection.getHostnameOrIP(),
+                                           m_connection.getRemotePort(),
+                                           AutoConnectionStatus.SUCCESS);
+            }
+        }
 
         @Override
         public void stopping(Connection c) {
@@ -907,7 +935,7 @@ class Distributer {
         this( false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
-                false, false, null);
+                false, false, null, null);
     }
 
     Distributer(
@@ -916,8 +944,16 @@ class Distributer {
             long connectionResponseTimeoutMS,
             boolean useClientAffinity,
             boolean sendReadsToReplicasBytDefault,
-            Subject subject) {
+            Subject subject,
+            SSLContext sslContext) {
         m_useMultipleThreads = useMultipleThreads;
+        m_sslContext = sslContext;
+        if (m_sslContext != null) {
+            m_cipherService = CipherExecutor.CLIENT;
+            m_cipherService.startup();
+        } else {
+            m_cipherService = null;
+        }
         m_network = new VoltNetworkPool(
                 m_useMultipleThreads ? Math.max(1, CoreUtils.availableProcessors() / 4 ) : 1,
                 1, null, "Client");
@@ -942,15 +978,47 @@ class Distributer {
     void createConnectionWithHashedCredentials(String host, String program, byte[] hashedPassword, int port, ClientAuthScheme scheme)
     throws UnknownHostException, IOException
     {
+        SSLEngine sslEngine = null;
+
+        if (m_sslContext != null) {
+            sslEngine = m_sslContext.createSSLEngine("client", port);
+            sslEngine.setUseClientMode(true);
+
+            Set<String> enabled = ImmutableSet.copyOf(sslEngine.getEnabledCipherSuites());
+            Set<String> intersection = Sets.intersection(SSLConfiguration.GCM_CIPHERS, enabled);
+            if (intersection.isEmpty()) {
+                intersection = Sets.intersection(SSLConfiguration.PREFERRED_CIPHERS, enabled);
+            }
+            if (intersection.isEmpty()) {
+                intersection = enabled;
+            }
+            sslEngine.setEnabledCipherSuites(intersection.toArray(new String[0]));
+        }
+
         final Object socketChannelAndInstanceIdAndBuildString[] =
-            ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port, m_subject, scheme);
+            ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port, m_subject, scheme, sslEngine,
+                                                      TimeUnit.NANOSECONDS.toMillis(m_connectionResponseTimeoutNanos));
         final SocketChannel aChannel = (SocketChannel)socketChannelAndInstanceIdAndBuildString[0];
         final long instanceIdWhichIsTimestampAndLeaderIp[] = (long[])socketChannelAndInstanceIdAndBuildString[1];
         final int hostId = (int)instanceIdWhichIsTimestampAndLeaderIp[0];
 
         NodeConnection cxn = new NodeConnection(instanceIdWhichIsTimestampAndLeaderIp);
-        Connection c = m_network.registerChannel( aChannel, cxn);
-        cxn.m_connection = c;
+        Connection c = null;
+        try {
+            if (aChannel != null) {
+                c = m_network.registerChannel(aChannel, cxn, m_cipherService, sslEngine);
+            }
+        }
+        catch (Exception e) {
+            // Need to clean up the socket if there was any failure
+            try {
+                aChannel.close();
+            } catch (IOException e1) {
+                //Don't care connection is already lost anyways
+            }
+            Throwables.propagate(e);
+        }
+        cxn.setConnection(c);
 
         synchronized (this) {
 
@@ -1094,7 +1162,11 @@ class Distributer {
              * affinity and known topology (hashinator initialized).
              */
             if (m_useClientAffinity && (m_hashinator != null)) {
-                final Procedure procedureInfo = m_procedureInfo.get(invocation.getProcName());
+                final ImmutableSortedMap<String, Procedure> procedures = m_procedureInfo.get();
+                Procedure procedureInfo = null;
+                if (procedures != null) {
+                    procedureInfo = procedures.get(invocation.getProcName());
+                }
                 Integer hashedPartition = -1;
 
                 if (procedureInfo != null) {
@@ -1215,9 +1287,17 @@ class Distributer {
         // stop the old proc call reaper
         m_timeoutReaperHandle.cancel(false);
         m_ex.shutdown();
-        m_ex.awaitTermination(365, TimeUnit.DAYS);
+        if (CoreUtils.isJunitTest()) {
+            m_ex.awaitTermination(1, TimeUnit.SECONDS);
+        } else {
+            m_ex.awaitTermination(365, TimeUnit.DAYS);
+        }
 
         m_network.shutdown();
+        if (m_cipherService != null) {
+            m_cipherService.shutdown();
+            m_cipherService = null;
+        }
     }
 
     void uncaughtException(ProcedureCallback cb, ClientResponse r, Throwable t) {
@@ -1399,7 +1479,7 @@ class Distributer {
     }
 
     private void updateProcedurePartitioning(VoltTable vt) {
-        m_procedureInfo.clear();
+        Map<String, Procedure> procs = Maps.newHashMap();
         while (vt.advanceRow()) {
             try {
                 //Data embedded in JSON object in remarks column
@@ -1411,11 +1491,11 @@ class Distributer {
                     int partitionParameter = jsObj.getInt(Constants.JSON_PARTITION_PARAMETER);
                     int partitionParameterType =
                         jsObj.getInt(Constants.JSON_PARTITION_PARAMETER_TYPE);
-                    m_procedureInfo.put(procedureName,
+                    procs.put(procedureName,
                             new Procedure(false,readOnly, partitionParameter, partitionParameterType));
                 } else {
                     // Multi Part procedure JSON descriptors omit the partitionParameter
-                    m_procedureInfo.put(procedureName, new Procedure(true, readOnly, Procedure.PARAMETER_NONE,
+                    procs.put(procedureName, new Procedure(true, readOnly, Procedure.PARAMETER_NONE,
                                 Procedure.PARAMETER_NONE));
                 }
 
@@ -1423,6 +1503,8 @@ class Distributer {
                 e.printStackTrace();
             }
         }
+        ImmutableSortedMap<String, Procedure> oldProcs = m_procedureInfo.get();
+        m_procedureInfo.compareAndSet(oldProcs, ImmutableSortedMap.copyOf(procs));
     }
 
     private void updatePartitioning(VoltTable vt) {

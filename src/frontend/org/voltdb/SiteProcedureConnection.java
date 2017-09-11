@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,7 +26,9 @@ import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.iv2.JoinProducerBase;
+import org.voltdb.messaging.FastDeserializer;
 
 /**
  * VoltProcedures invoke SiteProcedureConnection methods to
@@ -107,16 +109,26 @@ public interface SiteProcedureConnection {
      * Note: it's ok to pass null for inputDepIds if the fragments
      * have no dependencies.
      */
-    public VoltTable[] executePlanFragments(
+    public FastDeserializer executePlanFragments(
             int numFragmentIds,
             long[] planFragmentIds,
             long[] inputDepIds,
             Object[] parameterSets,
+            DeterminismHash determinismHash,
             String[] sqlTexts,
+            boolean[] isWriteFrags,
+            int[] sqlCRCs,
             long txnId,
             long spHandle,
             long uniqueId,
-            boolean readOnly) throws EEException;
+            boolean readOnly,
+            boolean traceOn) throws EEException;
+
+    /**
+     * Allows caller to determine that a 50MB temporary (deallocated on next call) buffer
+     * was used to generate the EE result table.
+     */
+    public boolean usingFallbackBuffer();
 
     /**
      * Let the EE know which batch of sql is running so it can include this
@@ -167,6 +179,11 @@ public interface SiteProcedureConnection {
      */
     public ProcedureRunner getProcedureRunner(String procedureName);
 
+    /**
+     * @return SystemProcedureExecutionContext
+     */
+    public SystemProcedureExecutionContext getSystemProcedureExecutionContext();
+
     /*
      * This isn't just a simple setter, it has behavior side effects
      * as well because it causes the Site to start replaying log data
@@ -211,4 +228,11 @@ public interface SiteProcedureConnection {
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle);
     public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte logData[]);
     public void setDRProtocolVersion(int drVersion);
+    /*
+     * Starting in DR version 7.0, we also generate a special event indicating the beginning of
+     * binary log stream when we set protocol version.
+     */
+    public void setDRProtocolVersion(int drVersion, long spHandle, long uniqueId);
+
+    public void setDRStreamEnd(long spHandle, long uniqueId);
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,6 +30,12 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 
+/**
+ * This type of plan node wraps a subquery expression for queries like this
+ *
+ *  SELECT * FROM T WHERE (T.f, T.f) > (SELECT R.f R.g FROM R LIMIT 1);
+ *
+ */
 public class TupleScanPlanNode extends AbstractScanPlanNode {
 
     public enum Members {

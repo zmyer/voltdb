@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -415,6 +415,9 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_DELETE: {
         return "DELETE";
     }
+    case PLAN_NODE_TYPE_SWAPTABLES: {
+        return "SWAPTABLES";
+    }
     case PLAN_NODE_TYPE_SEND: {
         return "SEND";
     }
@@ -483,6 +486,8 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_INSERT;
     } else if (str == "DELETE") {
         return PLAN_NODE_TYPE_DELETE;
+    } else if (str == "SWAPTABLES") {
+        return PLAN_NODE_TYPE_SWAPTABLES;
     } else if (str == "SEND") {
         return PLAN_NODE_TYPE_SEND;
     } else if (str == "RECEIVE") {
@@ -550,6 +555,9 @@ string expressionToString(ExpressionType type)
     }
     case EXPRESSION_TYPE_OPERATOR_EXISTS: {
         return "OPERATOR_EXISTS";
+    }
+    case EXPRESSION_TYPE_OPERATOR_UNARY_MINUS: {
+        return "OPERATOR_UNARY_MINUS";
     }
     case EXPRESSION_TYPE_COMPARE_EQUAL: {
         return "COMPARE_EQUAL";
@@ -626,6 +634,15 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT: {
         return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT";
     }
+    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_MAX: {
+        return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_MAX";
+    }
+    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_MIN: {
+        return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_MIN";
+    }
+    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_SUM: {
+        return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_SUM";
+    }
     case EXPRESSION_TYPE_AGGREGATE_SUM: {
         return "AGGREGATE_SUM";
     }
@@ -685,6 +702,8 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_OPERATOR_NOT;
     } else if (str == "OPERATOR_IS_NULL") {
         return EXPRESSION_TYPE_OPERATOR_IS_NULL;
+    } else if (str == "OPERATOR_UNARY_MINUS") {
+        return EXPRESSION_TYPE_OPERATOR_UNARY_MINUS;
     } else if (str == "OPERATOR_EXISTS") {
         return EXPRESSION_TYPE_OPERATOR_EXISTS;
     } else if (str == "COMPARE_EQUAL") {
@@ -737,6 +756,12 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_AGGREGATE_WINDOWED_DENSE_RANK;
     } else if (str == "AGGREGATE_WINDOWED_COUNT") {
         return EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT;
+    } else if (str == "AGGREGATE_WINDOWED_MAX") {
+        return EXPRESSION_TYPE_AGGREGATE_WINDOWED_MAX;
+    } else if (str == "AGGREGATE_WINDOWED_MIN") {
+        return EXPRESSION_TYPE_AGGREGATE_WINDOWED_MIN;
+    } else if (str == "AGGREGATE_WINDOWED_SUM") {
+        return EXPRESSION_TYPE_AGGREGATE_WINDOWED_SUM;
     } else if (str == "AGGREGATE_SUM") {
         return EXPRESSION_TYPE_AGGREGATE_SUM;
     } else if (str == "AGGREGATE_MIN") {
@@ -757,6 +782,8 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_OPERATOR_ALTERNATIVE;
     } else if (str == "ROW_SUBQUERY") {
         return EXPRESSION_TYPE_ROW_SUBQUERY;
+    } else if (str == "SELECT_SUBQUERY") {
+        return EXPRESSION_TYPE_SELECT_SUBQUERY;
     } else if (str == "SELECT_SUBQUERY") {
         return EXPRESSION_TYPE_SELECT_SUBQUERY;
     }

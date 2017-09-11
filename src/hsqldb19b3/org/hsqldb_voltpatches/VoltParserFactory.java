@@ -12,16 +12,20 @@ import org.voltdb.sqlparser.semantics.symtab.SymbolTable.TablePair;
 import org.voltdb.sqlparser.semantics.symtab.Table;
 import org.voltdb.sqlparser.semantics.symtab.Type;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
+import org.voltdb.sqlparser.syntax.grammar.IColumnIdent;
 import org.voltdb.sqlparser.syntax.grammar.IIndex;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
+import org.voltdb.sqlparser.syntax.grammar.IJoinTree;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
 import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
 import org.voltdb.sqlparser.syntax.grammar.ISemantino;
+import org.voltdb.sqlparser.syntax.grammar.JoinOperator;
 import org.voltdb.sqlparser.syntax.grammar.Projection;
 import org.voltdb.sqlparser.syntax.grammar.QuerySetOp;
 import org.voltdb.sqlparser.syntax.symtab.IAST;
 import org.voltdb.sqlparser.syntax.symtab.IColumn;
 import org.voltdb.sqlparser.syntax.symtab.IParserFactory;
+import org.voltdb.sqlparser.syntax.symtab.ISourceLocation;
 import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
 import org.voltdb.sqlparser.syntax.symtab.ITable;
 import org.voltdb.sqlparser.syntax.symtab.IType;
@@ -149,8 +153,9 @@ public class VoltParserFactory extends ParserFactory implements IParserFactory {
                 String tableAlias = proj.getTableName();
                 String tableName = symtab.getTableNameByColumn(colName);
                 if (tableName == null) {
-                    getErrorMessages().addError(proj.getLineNo(),
-                                                proj.getColNo(),
+                    ISourceLocation aloc = newSourceLocation(proj.getLineNo(),
+                                                             proj.getColNo());
+                    getErrorMessages().addError(aloc,
                                                 "Cannot find column named \"%s\"",
                                                 colName);
                     tableName = "<<NOT_FOUND>>";
@@ -234,7 +239,7 @@ public class VoltParserFactory extends ParserFactory implements IParserFactory {
 	}
 
 	@Override
-	public IAST makeUnaryAST(IType type, 
+	public IAST makeUnaryAST(IType type,
 							 IOperator aOperator,
 							 ISemantino aOperand) {
         VoltXMLElement answer = new VoltXMLElement("operation");
@@ -253,14 +258,15 @@ public class VoltParserFactory extends ParserFactory implements IParserFactory {
 	}
 
 	@Override
-	public IIndex newIndex(String indexName, 
-						   ITable table, 
+	public IIndex newIndex(ISourceLocation aLoc,
+	                       String indexName,
+						   ITable table,
 						   IColumn column,
 						   IndexType indexType) {
 		if (indexName == null) {
 			indexName = makeIndexName(table.getName(), column.getName(), indexType);
 		}
-		return new Index(indexName, indexType);
+		return new Index(aLoc, indexName, indexType);
 	}
 
 	private String makeIndexName(String tableName,
@@ -284,4 +290,22 @@ public class VoltParserFactory extends ParserFactory implements IParserFactory {
 	public ISelectQuery newCompoundQuery(QuerySetOp op, ISelectQuery left, ISelectQuery right) {
 		return new CompoundSelectQuery(op, left, right);
 	}
+
+    @Override
+    public ISelectQuery newSimpleTableSelectQuery(ISymbolTable aSymbolTable, int aLineNo, int aColNo) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public IJoinTree newJoinTree(JoinOperator op, IJoinTree joinTree, IJoinTree right, ISemantino condition) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public IColumnIdent makeColumnRef(String colName, ISourceLocation newSourceLocation) {
+        // TODO: Define this.
+        return null;
+    }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -46,7 +46,9 @@ public class Pause extends VoltSystemProcedure {
     private final static OperationMode PAUSED = OperationMode.PAUSED;
 
     @Override
-    public void init() {}
+    public long[] getPlanFragmentIds() {
+        return new long[]{};
+    }
 
     @Override
     public DependencyPair executePlanFragment(
@@ -121,6 +123,10 @@ public class Pause extends VoltSystemProcedure {
                 throw new RuntimeException(e);
             }
         }
+
+        // Force a tick so that stats will be updated.
+        // Primarily added to get latest table stats for DR pause and empty db check.
+        ctx.getSiteProcedureConnection().tick();
 
         VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
         t.addRow(VoltSystemProcedure.STATUS_OK);

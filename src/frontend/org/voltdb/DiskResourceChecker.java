@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -211,7 +211,7 @@ public class DiskResourceChecker
                                 "SNMP resource limit exceeded. Disk for path %s (%s) limit %s on %s. Current disk usage is %s.",
                                 filePath, featureName.value(),
                                 (percThreshold > 0 ? percThreshold + "%" : sizeThreshold + " GB"),
-                                CoreUtils.getHostnameOrAddress(), ResourceUsageMonitor.getValueWithUnit(usedSpace)));
+                                CoreUtils.getHostnameOrAddress(), HealthMonitor.getValueWithUnit(usedSpace)));
                 m_snmpDiskTrapSent = true;
             }
             m_logger.error(String.format(
@@ -220,7 +220,7 @@ public class DiskResourceChecker
                     filePath, featureName.value(), (percThreshold > 0 ? percThreshold + "%" : sizeThreshold + " GB"),
                     CoreUtils.getHostnameOrAddress()));
             m_logger.error(String.format("Resource limit exceeded. Current disk usage for path %s (%s) is %s.",
-                    filePath, featureName.value(), ResourceUsageMonitor.getValueWithUnit(usedSpace)));
+                    filePath, featureName.value(), HealthMonitor.getValueWithUnit(usedSpace)));
             return false;
         } else {
             if (forSnmp && m_snmpDiskTrapSent) {
@@ -229,7 +229,7 @@ public class DiskResourceChecker
                                 "SNMP resource limit cleared. Disk for path %s (%s) limit %s on %s. Current disk usage is %s.",
                                 filePath, featureName.value(),
                                 (percThreshold > 0 ? percThreshold + "%" : sizeThreshold + " GB"),
-                                CoreUtils.getHostnameOrAddress(), ResourceUsageMonitor.getValueWithUnit(usedSpace)));
+                                CoreUtils.getHostnameOrAddress(), HealthMonitor.getValueWithUnit(usedSpace)));
                 m_snmpDiskTrapSent = false;
             }
             return true;

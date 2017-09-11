@@ -37,8 +37,8 @@
       <xs:element name="cluster" minOccurs="1" maxOccurs="1" type="clusterType"/>
       <xs:element name="paths" minOccurs="0" maxOccurs="1" type="pathsType" />
       <xs:element name="partition-detection" minOccurs="0" type="partitionDetectionType"/>
-      <xs:element name="admin-mode" minOccurs="0" type="adminModeType"/>
       <xs:element name="heartbeat" minOccurs="0" maxOccurs="1" type="heartbeatType"/>
+      <xs:element name="ssl" minOccurs="0" maxOccurs="1" type="sslType"/>
       <xs:element name="httpd" minOccurs="0" maxOccurs="1" type="httpdType"/>
       <xs:element name="snapshot" type="snapshotType" minOccurs="0" maxOccurs="1" />
       <xs:element name="export" minOccurs="0" maxOccurs="1" type="exportType"/>
@@ -227,6 +227,11 @@
                 <xs:attribute name="timeout" type="latencyType" default="10000"/>
             </xs:complexType>
         </xs:element>
+         <xs:element name="procedure" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+                <xs:attribute name="loginfo" type="latencyType" default="10000"/>
+            </xs:complexType>
+        </xs:element>
         <xs:element name="resourcemonitor" minOccurs="0" maxOccurs="1" type="resourceMonitorType"/>
     </xs:all>
   </xs:complexType>
@@ -235,12 +240,6 @@
   <xs:complexType name="securityType">
     <xs:attribute name="enabled" type="xs:boolean" default="false"/>
     <xs:attribute name="provider" type="SecurityProviderString" default="hash"/>
-  </xs:complexType>
-
-  <!-- <admin-mode> (always enabled.) -->
-  <xs:complexType name="adminModeType">
-    <xs:attribute name="port" type="xs:int" default="21211"/>
-    <xs:attribute name="adminstartup" type="xs:boolean" default="false"/>
   </xs:complexType>
 
   <!-- <command log> -->
@@ -258,15 +257,8 @@
     <xs:attribute name="logsize" type="logSizeType" default="1024" />
   </xs:complexType>
 
-  <!-- <partition-detection>/<snapshot> -->
+  <!-- <partition-detection> -->
   <xs:complexType name="partitionDetectionType">
-      <xs:all>
-          <xs:element name="snapshot" minOccurs="0" maxOccurs="1">
-             <xs:complexType>
-                 <xs:attribute name="prefix" type="xs:string" use="optional" default="partition_detection" />
-             </xs:complexType>
-          </xs:element>
-      </xs:all>
       <xs:attribute name="enabled" type="xs:boolean" default="true"/>
    </xs:complexType>
 
@@ -330,24 +322,24 @@
           <xs:attribute name="enabled" type="xs:boolean" default="true"/>
         </xs:complexType>
       </xs:element>
-      <xs:element name="https" minOccurs="0" maxOccurs="1" type="httpsType"/>
     </xs:sequence>
     <xs:attribute name="port" type="xs:int"/>
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
   </xs:complexType>
 
-  <!-- configuration for HTTPS -->
-  <xs:complexType name="httpsType">
+  <xs:complexType name="keyOrTrustStoreType">
+      <xs:attribute name="path" type="xs:string" use="required"/>
+      <xs:attribute name="password" type="xs:string"/>
+  </xs:complexType>
+
+  <!-- ssl -->
+  <xs:complexType name="sslType">
     <xs:sequence>
       <xs:element name="keystore" minOccurs="0" maxOccurs="1" type="keyOrTrustStoreType"/>
       <xs:element name="truststore" minOccurs="0" maxOccurs="1" type="keyOrTrustStoreType"/>
     </xs:sequence>
     <xs:attribute name="enabled" type="xs:boolean" default="false"/>
-  </xs:complexType>
-
-  <xs:complexType name="keyOrTrustStoreType">
-      <xs:attribute name="path" type="xs:string" use="required"/>
-      <xs:attribute name="password" type="xs:string"/>
+    <xs:attribute name="external" type="xs:boolean" default="false"/>
   </xs:complexType>
 
   <!-- <snapshot> -->
@@ -363,18 +355,13 @@
     <xs:sequence>
       <xs:element name="configuration" type="ExportConfigurationType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
-    <xs:attribute name="enabled" type="xs:boolean"/>
-    <xs:attribute name="target" type="ServerExportEnum"/>
-    <xs:attribute name="exportconnectorclass" type="xs:string"/>
   </xs:complexType>
 
   <xs:complexType name="ExportConfigurationType">
     <xs:sequence>
       <xs:element name="property" type="PropertyType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
-    <xs:attribute name="target" type="xs:string" />
-    <!-- stream is deprecated. Use target instead. -->
-    <xs:attribute name="stream" type="xs:string" />
+    <xs:attribute name="target" type="xs:string" use="required" />
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
     <xs:attribute name="type" type="ServerExportEnum" default="file"/>
     <xs:attribute name="exportconnectorclass" type="xs:string" default=""/>
@@ -478,7 +465,18 @@
             </xs:restriction>
         </xs:simpleType>
     </xs:attribute>
+    <xs:attribute name="role" type="drRoleType" default="master" />
   </xs:complexType>
+
+  <!-- DR cluster role -->
+  <xs:simpleType name="drRoleType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="master"/>
+      <xs:enumeration value="replica"/>
+      <xs:enumeration value="xdcr"/>
+      <xs:enumeration value="none"/>
+    </xs:restriction>
+  </xs:simpleType>
 
   <xs:complexType name="connectionType">
     <xs:attribute name="source" use="required">
@@ -490,6 +488,7 @@
         </xs:restriction>
       </xs:simpleType>
     </xs:attribute>
+    <xs:attribute name="preferred-source" type="clusterIdType"/>
     <xs:attribute name="enabled" type="xs:boolean" default="true" />
   </xs:complexType>
 

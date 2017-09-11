@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -123,7 +123,6 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         // respond to the coordinator with the sink HSID
         RejoinMessage msg = new RejoinMessage(m_mailbox.getHSId(), -1, sinkHSId);
         m_mailbox.send(m_coordinatorHsId, msg);
-
         m_taskQueue.offer(this);
         JOINLOG.info("P" + m_partitionId + " received initiation");
     }

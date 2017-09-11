@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -167,7 +167,7 @@ public class TestStateMachine extends ZKTestBase {
     }
 
     public void recoverSite(int site) throws Exception {
-        HostMessenger.Config config = new HostMessenger.Config();
+        HostMessenger.Config config = new HostMessenger.Config(false);
         config.internalPort += site;
         config.acceptor = criteria;
         int clientPort = m_ports.next();
