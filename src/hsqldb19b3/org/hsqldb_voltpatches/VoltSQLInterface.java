@@ -7,8 +7,6 @@ import org.voltdb.sqlparser.semantics.symtab.CatalogAdapter;
 import org.voltdb.sqlparser.syntax.SQLKind;
 import org.voltdb.sqlparser.syntax.SQLParserDriver;
 import org.voltdb.sqlparser.syntax.symtab.IColumn;
-import org.voltdb.sqlparser.semantics.symtab.CatalogAdapter;
-import org.voltdb.sqlparser.semantics.symtab.Column;
 
 public class VoltSQLInterface {
     public static final String XML_SCHEMA_NAME = "databaseschema";
@@ -31,6 +29,9 @@ public class VoltSQLInterface {
     public void processSQLWithListener(String aSQL, VoltDDLVisitor aVisitor, SQLKind aKind) throws HSQLParseException {
         SQLParserDriver driver;
         try {
+            if ( ! aSQL.endsWith(";") ) {
+                aSQL = aSQL + "\n;";
+            }
             driver = new SQLParserDriver(aSQL, aVisitor, aKind);
         } catch (IOException e) {
             throw new HSQLParseException(e.getMessage());

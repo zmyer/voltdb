@@ -122,7 +122,10 @@ public interface IParserFactory {
      * @param aLineNo
      * @return
      */
-    ISelectQuery newSimpleTableSelectQuery(ISymbolTable aSymbolTable, int aLineNo, int aColNo);
+    ISelectQuery newSimpleTableSelectQuery(ISourceLocation aLoc,
+                                           ISymbolTable aSymbolTable,
+                                           IParserFactory aFactory,
+                                           ErrorMessageSet aErrorMessages);
 
     /**
      * Create a new compound query object.  This is a boolean combination

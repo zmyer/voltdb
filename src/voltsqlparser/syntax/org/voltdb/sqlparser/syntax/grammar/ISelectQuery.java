@@ -66,8 +66,10 @@
 
 import java.util.List;
 
+import org.voltdb.sqlparser.syntax.SetQuantifier;
 import org.voltdb.sqlparser.syntax.symtab.IAST;
 import org.voltdb.sqlparser.syntax.symtab.IExpressionParser;
+import org.voltdb.sqlparser.syntax.symtab.ISourceLocation;
 import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
 import org.voltdb.sqlparser.syntax.symtab.ITable;
 import org.voltdb.sqlparser.syntax.symtab.IType;
@@ -80,33 +82,6 @@ import org.voltdb.sqlparser.syntax.symtab.IType;
 public interface ISelectQuery {
 
     /**
-     * True iff this is a simple table.  Simple tables
-     * are select statements, with no boolean operations.
-     * @return
-     */
-    boolean isSimpleTable();
-
-    /**
-     * If this is a not a simple table, it's the
-     * combination of two other select queries.  Return
-     * the set operation combining them.  It's an error
-     * if this is called on a simple table query.
-     */
-    QuerySetOp getSetOp() throws Exception;
-
-    /**
-     * Return the left hand query of a compound query.
-     *
-     * @return
-     */
-    ISelectQuery getLeftQuery();
-    /**
-     * Return the right hand query of a compound query.
-     * @return
-     */
-    ISelectQuery getRightQuery();
-
-    /**
      * Add a projection.  This is a select list element.
      *
      * @param aTableName
@@ -115,14 +90,13 @@ public interface ISelectQuery {
      * @param aLineNo
      * @param aColNo
      */
-    void addProjection(String aTableName, String aColumnName, String aAlias, int aLineNo, int aColNo);
+    void addProjection(ISourceLocation aLoc, ISemantino aSemantino, String aAlias);
 
     /**
-     * Add a projection.
-     * @param aLineNo
-     * @param aColNo
+     * Add a star projection.  This is also a select list element.
+     * @param aLoc
      */
-    void addProjection(int aLineNo, int aColNo);
+    void addStarProjection(ISourceLocation aLoc);
 
     void pushSemantino(ISemantino aColumnSemantino);
 
@@ -170,4 +144,21 @@ public interface ISelectQuery {
      * @param joinTree
      */
     void addJoinTree(IJoinTree joinTree);
+
+    /**
+     * Get the next display list alias for this
+     * select statement.
+     * @return
+     */
+    String getNextDisplayAlias();
+
+    void setQuantifier(SetQuantifier q);
+
+    boolean isSimpleTable();
+
+    QuerySetOp getSetOp() throws Exception;
+
+    ISelectQuery getLeftQuery();
+
+    ISelectQuery getRightQuery();
 }

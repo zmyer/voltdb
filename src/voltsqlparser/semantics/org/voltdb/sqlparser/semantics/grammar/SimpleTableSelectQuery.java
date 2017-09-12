@@ -52,9 +52,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.voltdb.sqlparser.semantics.symtab.ExpressionParser;
+import org.voltdb.sqlparser.semantics.symtab.JoinTree;
 import org.voltdb.sqlparser.semantics.symtab.Semantino;
 import org.voltdb.sqlparser.semantics.symtab.SymbolTable;
 import org.voltdb.sqlparser.semantics.symtab.Table;
+import org.voltdb.sqlparser.syntax.SetQuantifier;
 import org.voltdb.sqlparser.syntax.grammar.IJoinTree;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
 import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
@@ -64,6 +66,7 @@ import org.voltdb.sqlparser.syntax.grammar.QuerySetOp;
 import org.voltdb.sqlparser.syntax.symtab.IAST;
 import org.voltdb.sqlparser.syntax.symtab.IExpressionParser;
 import org.voltdb.sqlparser.syntax.symtab.IParserFactory;
+import org.voltdb.sqlparser.syntax.symtab.ISourceLocation;
 import org.voltdb.sqlparser.syntax.symtab.ITable;
 import org.voltdb.sqlparser.syntax.symtab.IType;
 import org.voltdb.sqlparser.syntax.util.ErrorMessageSet;
@@ -75,44 +78,23 @@ public class SimpleTableSelectQuery implements ISelectQuery, IDQLStatement {
 
     private ExpressionParser m_expressionParser;
     private SymbolTable m_tables;
-    private Semantino m_whereCondition;
+    private Semantino m_whereCondition = null;
     private IAST m_ast;
     private ErrorMessageSet m_errorMessages;
+    private JoinTree m_joinTree = null;
 
-    public SimpleTableSelectQuery(SymbolTable aParent,
-                       IParserFactory aFactory,
-                       ErrorMessageSet aErrorMessages,
-                       int aLineNo,
-                       int aColNo) {
-        m_whereCondition = null;
+    public SimpleTableSelectQuery(ISourceLocation aLoc,
+                                  SymbolTable aParent,
+                                  IParserFactory aFactory,
+                                  ErrorMessageSet aErrorMessages) {
         m_tables = new SymbolTable(aParent);
         m_errorMessages = aErrorMessages;
+        m_expressionParser = new ExpressionParser(aFactory, aParent);
     }
 
     @Override
     public List<Projection> getProjections() {
         return m_projections;
-    }
-
-    /**
-     * This is called when a '*' is in the select list.
-     *
-     * @param aLineNo
-     * @param aColNo
-     */
-    @Override
-    public void addProjection(int     aLineNumber,
-                              int     aColumnNumber) {
-        m_projections.add(new Projection(aLineNumber, aColumnNumber));
-    }
-
-    @Override
-    public void addProjection(String aTableName,
-                              String aColumnName,
-                              String aAlias,
-                              int    aLineNo,
-                              int    aColNo) {
-        m_projections.add(new Projection(aTableName, aColumnName, aAlias, aLineNo, aColNo));
     }
 
     @Override
@@ -257,6 +239,30 @@ public class SimpleTableSelectQuery implements ISelectQuery, IDQLStatement {
 
     @Override
     public void addJoinTree(IJoinTree joinTree) {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public void addProjection(ISourceLocation aLoc, ISemantino aSemantino, String aAlias) {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public void addStarProjection(ISourceLocation aLoc) {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public String getNextDisplayAlias() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public void setQuantifier(SetQuantifier q) {
         // TODO Auto-generated method stub
 
     }

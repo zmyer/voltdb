@@ -147,6 +147,7 @@ import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
 import org.voltdb.sqlparser.syntax.symtab.ITable;
 import org.voltdb.sqlparser.syntax.symtab.IType;
 import org.voltdb.sqlparser.syntax.symtab.IndexType;
+import org.voltdb.sqlparser.syntax.util.ErrorMessageSet;
 
 public class MockParserFactory extends ParserFactory implements
         IParserFactory {
@@ -240,7 +241,10 @@ public class MockParserFactory extends ParserFactory implements
         return null;
     }
     @Override
-    public ISelectQuery newSimpleTableSelectQuery(ISymbolTable aSymbolTable, int aLineNo, int aColNo) {
+    public ISelectQuery newSimpleTableSelectQuery(ISourceLocation aLoc,
+                                                  ISymbolTable aSymbolTable,
+                                                  IParserFactory aFactory,
+                                                  ErrorMessageSet aErrorMessages) {
         unimplementedOperation("newSimpleTableSelectQuery");
         return null;
     }

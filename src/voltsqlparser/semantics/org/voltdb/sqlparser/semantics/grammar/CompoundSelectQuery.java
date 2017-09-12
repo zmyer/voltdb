@@ -34,6 +34,7 @@ package org.voltdb.sqlparser.semantics.grammar;
 
 import java.util.List;
 
+import org.voltdb.sqlparser.syntax.SetQuantifier;
 import org.voltdb.sqlparser.syntax.grammar.IJoinTree;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
 import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
@@ -42,6 +43,7 @@ import org.voltdb.sqlparser.syntax.grammar.Projection;
 import org.voltdb.sqlparser.syntax.grammar.QuerySetOp;
 import org.voltdb.sqlparser.syntax.symtab.IAST;
 import org.voltdb.sqlparser.syntax.symtab.IExpressionParser;
+import org.voltdb.sqlparser.syntax.symtab.ISourceLocation;
 import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
 import org.voltdb.sqlparser.syntax.symtab.ITable;
 import org.voltdb.sqlparser.syntax.symtab.IType;
@@ -77,16 +79,6 @@ public class CompoundSelectQuery implements ISelectQuery, IDQLStatement {
     public ISelectQuery getRightQuery() {
         // TODO Auto-generated method stub
         return m_right;
-    }
-
-    @Override
-    public void addProjection(String aTableName, String aColumnName, String aAlias, int aLineNo, int aColNo) {
-        assert(false);
-    }
-
-    @Override
-    public void addProjection(int aLineNo, int aColNo) {
-        assert(false);
     }
 
     @Override
@@ -200,6 +192,27 @@ public class CompoundSelectQuery implements ISelectQuery, IDQLStatement {
 
     @Override
     public void addJoinTree(IJoinTree joinTree) {
+        assert(false);
+    }
+
+    @Override
+    public void addProjection(ISourceLocation aLoc, ISemantino aSemantino, String aAlias) {
+        assert(false);
+    }
+
+    @Override
+    public void addStarProjection(ISourceLocation aLoc) {
+        assert(false);
+    }
+
+    @Override
+    public String getNextDisplayAlias() {
+        assert(false);
+        return null;
+    }
+
+    @Override
+    public void setQuantifier(SetQuantifier q) {
         assert(false);
     }
 

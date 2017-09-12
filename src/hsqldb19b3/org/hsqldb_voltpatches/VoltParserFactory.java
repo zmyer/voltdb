@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.voltdb.sqlparser.semantics.grammar.CompoundSelectQuery;
 import org.voltdb.sqlparser.semantics.grammar.InsertStatement;
+import org.voltdb.sqlparser.semantics.grammar.SimpleTableSelectQuery;
 import org.voltdb.sqlparser.semantics.symtab.Index;
 import org.voltdb.sqlparser.semantics.symtab.ParserFactory;
 import org.voltdb.sqlparser.semantics.symtab.Semantino;
@@ -30,6 +31,7 @@ import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
 import org.voltdb.sqlparser.syntax.symtab.ITable;
 import org.voltdb.sqlparser.syntax.symtab.IType;
 import org.voltdb.sqlparser.syntax.symtab.IndexType;
+import org.voltdb.sqlparser.syntax.util.ErrorMessageSet;
 
 /**
  * This is the most derived class of the parser factory hierarchy.  Its
@@ -292,9 +294,11 @@ public class VoltParserFactory extends ParserFactory implements IParserFactory {
 	}
 
     @Override
-    public ISelectQuery newSimpleTableSelectQuery(ISymbolTable aSymbolTable, int aLineNo, int aColNo) {
-        // TODO Auto-generated method stub
-        return null;
+    public ISelectQuery newSimpleTableSelectQuery(ISourceLocation aLoc,
+                                                  ISymbolTable aSymbolTable,
+                                                  IParserFactory aFactory,
+                                                  ErrorMessageSet aErrorMessages) {
+        return new SimpleTableSelectQuery(aLoc, (SymbolTable)aSymbolTable, aFactory, aErrorMessages);
     }
 
     @Override

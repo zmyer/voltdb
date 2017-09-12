@@ -29,6 +29,8 @@ dml_statement:
         update_statement
     |
         delete_statement
+    |
+        /* empty */
     ;
 
 ddl_statement:
@@ -57,10 +59,14 @@ ddl_statement:
         truncate_table_statement
     |
     	set_statement
+    |
+        /* empty */
     ;
 
 dql_statement:
         cursor_specification
+    |
+        /* empty */
     ;
 
 
@@ -429,8 +435,6 @@ set_quantifier:
     ;
 
 select_list:
-        ASTERISK
-    |
         select_sublist ( ',' select_sublist )*
     ;
 
@@ -445,6 +449,8 @@ select_sublist:
     ;
 
 derived_column:
+        ASTERISK
+    |
         value_expression ( AS column_alias_name )?
     ;
 
@@ -627,17 +633,17 @@ datatype:
 value_expression:
                 '(' value_expression ')'                #null_expr
         |
-                value_expression op=timesop value_expression  #times_expr
+                value_expression mop=timesop value_expression  #times_expr
         |
-                value_expression op=addop value_expression    #add_expr
+                value_expression sop=addop value_expression    #add_expr
         |
-                value_expression op=relop value_expression    #rel_expr
+                value_expression rop=relop value_expression    #rel_expr
         |
                 NOT value_expression                    #not_expr
         |
-                value_expression AND value_expression          #conjunction_expr
+                value_expression cop=AND value_expression          #conjunction_expr
         |
-                value_expression OR value_expression          #disjunction_expr
+                value_expression dop=OR value_expression          #disjunction_expr
         |
                 boolconst=TRUE                    #true_expr
         |

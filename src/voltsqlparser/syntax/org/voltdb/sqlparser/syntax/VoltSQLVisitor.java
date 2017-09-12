@@ -64,6 +64,7 @@ import org.voltdb.sqlparser.syntax.grammar.IGeographyType;
 import org.voltdb.sqlparser.syntax.grammar.IIndex;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
 import org.voltdb.sqlparser.syntax.grammar.IJoinTree;
+import org.voltdb.sqlparser.syntax.grammar.IOperator;
 import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
 import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.grammar.IStringType;
@@ -494,136 +495,97 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
         }
     }
 
-    /*
-     * Cursor_expression is fine with the inherited_definition.
-     */
-    /*
-     * query_expression is fine with the inherited definition.
-     */
     /**
      * {@inheritDoc}
      */
     @Override public T visitQuery_expression_body(SQLParserParser.Query_expression_bodyContext ctx) {
-        // TODO: Define this.
-        return m_state;
-    }
-
-    /*
-    ///**
-    // * {@inheritDoc}
-    // * /
-    @Override public T visitSelect_statement(SQLParserParser.Select_statementContext ctx) {
-        pushSelectQuery();
-        //
-        // Walk the table_clause first.
-        //
-        visitTable_clause(ctx.table_clause());
-        visitProjection_clause(ctx.projection_clause());
-        if (ctx.where_clause() != null) {
-            visitWhere_clause(ctx.where_clause());
-        }
-        if (getTopSelectQuery().validate()) {
-            m_factory.processQuery(getTopSelectQuery());
-        }
-        ISelectQuery query = popSelectQueryStack();
-        ISemantino querySemantino = m_factory.makeQuerySemantino(query);
-        getTopExpressionParser().pushSemantino(querySemantino);
-        return m_state;
-    }
-
-    ///**
-    // * {@inheritDoc}
-    // * /
-    @Override public T visitProjection(SQLParserParser.ProjectionContext ctx) {
-        //
-        // Walk the subtree.
-        //
-        super.visitProjection(ctx);
-
-        if (ctx.STAR() != null) {
-            getTopSelectQuery().addProjection(ctx.STAR().getSymbol().getLine(),
-                                              ctx.STAR().getSymbol().getCharPositionInLine());
+        if ( ctx.query_primary() != null) {
+            visitQuery_primary(ctx.query_primary());
         } else {
-            String tableName = null;
-            String columnName = ctx.projection_ref().column_name().IDENTIFIER().getText();
-            String alias = null;
-            if (ctx.projection_ref().table_name() != null) {
-                tableName = ctx.projection_ref().table_name().IDENTIFIER().getText();
-            }
-            if (ctx.column_name() != null) {
-                alias = ctx.column_name().IDENTIFIER().getText();
-            }
-            getTopSelectQuery().addProjection(tableName,
-                                        columnName,
-                                        alias,
-                                        ctx.start.getLine(),
-                                        ctx.start.getCharPositionInLine());
-        }
-        return m_state;
-    }
-    ///**
-    // * {@inheritDoc}
-    // *
-    // * /
-    @Override public T visitTable_clause(SQLParserParser.Table_clauseContext ctx) {
-        //
-        // Walk the subtree.
-        //
-        super.visitTable_clause(ctx);
-
-        for (SQLParserParser.Table_refContext tr : ctx.table_ref()) {
-            String tableName = tr.table_name().get(0).IDENTIFIER().getText();
-            String alias = tableName;
-            if (tr.table_name().size() > 1) {
-                alias = tr.table_name().get(1).IDENTIFIER().getText();
-            }
-            ITable table = m_catalog.getTableByName(tableName);
-            if (table == null) {
-                addError(tr.start.getLine(),
-                         tr.start.getCharPositionInLine(),
-                         "Cannot find table %s",
-                         tableName);
+            QuerySetOp qSetOp;
+            if (ctx.query_intersect_op() != null) {
+                qSetOp = QuerySetOp.INTERSECT_OP;
+            } else if (ctx.query_union_op().UNION() != null) {
+                if (ctx.query_union_op().ALL() != null) {
+                    qSetOp = QuerySetOp.UNION_ALL_OP;
+                } else {
+                    qSetOp = QuerySetOp.UNION_OP;
+                }
             } else {
-                getTopSelectQuery().addTable(table, alias);
+                qSetOp = QuerySetOp.EXCEPT_OP;
+            }
+            visitQuery_expression_body(ctx.query_expression_body(1));
+            visitQuery_expression_body(ctx.query_expression_body(0));
+            ISelectQuery leftOp = popSelectQueryStack();
+            ISelectQuery rightOp = popSelectQueryStack();
+            pushSelectQuery(m_factory.newCompoundQuery(qSetOp, leftOp, rightOp));
+        }
+        return m_state;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public T visitSimple_table(SQLParserParser.Simple_tableContext ctx) {
+        if (ctx.explicit_table() != null) {
+            m_errorMessages.addError(newSourceLocation(ctx.explicit_table().start),
+                                     "Explicit tables are not allowed in select statements.");
+        } else {
+            pushSelectQuery(m_factory.newSimpleTableSelectQuery(newSourceLocation(ctx.start),
+                                                                m_symbolTable,
+                                                                m_factory,
+                                                                m_errorMessages));
+            assert(ctx.query_specification() != null);
+            visitQuery_specification(ctx.query_specification());
+        }
+        return m_state;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public T visitQuery_specification(SQLParserParser.Query_specificationContext ctx) {
+        SetQuantifier q = SetQuantifier.NO_QUANTIFIER;
+        if (ctx.set_quantifier() != null) {
+            if (ctx.set_quantifier().ALL() != null) {
+                q = SetQuantifier.ALL_QUANTIFIER;
+            } else if (ctx.set_quantifier().DISTINCT() != null) {
+                q = SetQuantifier.DISTINCT_QUANTIFIER;
             }
         }
+        getTopSelectQuery().setQuantifier(q);
+        visitSelect_list(ctx.select_list());
+        visitTable_expression(ctx.table_expression());
         return m_state;
     }
 
-    ///**
-    // * {@inheritDoc}
-    // *
-    // * <p>The default implementation does nothing.</p>
-    // * /
-    @Override public T visitWhere_clause(SQLParserParser.Where_clauseContext ctx) {
-        IExpressionParser expr = m_factory.makeExpressionParser(getTopSelectQuery().getTables());
-        m_expressionStack.add(expr);
-        getTopSelectQuery().setExpressionParser(expr);
-        //
-        // Walk the subtree.
-        //
-        super.visitWhere_clause(ctx);
-
-        assert(m_expressionStack.size() > 0);
-        expr = popExpressionStack();
-        assert(expr == getTopSelectQuery().getExpressionParser());
-        ISemantino ret = expr.popSemantino();
-        if (!(ret != null && ret.getType().isBooleanType())) {
-                addError(ctx.start.getLine(),
-                        ctx.start.getCharPositionInLine(),
-                        "Boolean expression expected");
+    /**
+     * @{inheritDoc}
+     */
+    @Override
+    public T visitDerived_column(SQLParserParser.Derived_columnContext ctx) {
+        assert(m_expressionStack.size() == 0);
+        super.visitDerived_column(ctx);
+        ISelectQuery topQuery = getTopSelectQuery();
+        if (ctx.ASTERISK() != null) {
+            getTopSelectQuery().addStarProjection(newSourceLocation(ctx.ASTERISK().getSymbol()));
         } else {
-                // Push where statement, select knows if where exists and can pop it off if it does.
-                getTopSelectQuery().setWhereCondition(ret);
+            String alias = (ctx.column_alias_name() != null)
+                                ? ctx.column_alias_name().getText()
+                                : topQuery.getNextDisplayAlias();
+            getTopSelectQuery().addProjection(newSourceLocation(ctx.start),
+                                              getTopExpressionParser().popSemantino(),
+                                              alias);
         }
-        getTopSelectQuery().setExpressionParser(null);
         return m_state;
     }
 
-    private void binOp(String opString, int lineno, int colno) {
+    private void binOp(String opString, ISourceLocation aLoc) {
         IOperator op = m_factory.getExpressionOperator(opString);
         if (op == null) {
-            addError(lineno, colno,
+            addError(aLoc,
                      "Unknown operator \"%s\"",
                      opString);
             return;
@@ -632,8 +594,8 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
         //
         // Now, given the kind of operation, calculate the output.
         //
-        ISemantino rightoperand = (ISemantino) getTopExpressionParser().popSemantino();
-        ISemantino leftoperand = (ISemantino) getTopExpressionParser().popSemantino();
+        ISemantino rightoperand = getTopExpressionParser().popSemantino();
+        ISemantino leftoperand = getTopExpressionParser().popSemantino();
         ISemantino answer;
         if (op.isArithmetic()) {
             answer = getTopExpressionParser().getSemantinoMath(op,
@@ -648,13 +610,13 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
                                                                  leftoperand,
                                                                  rightoperand);
         } else {
-            addError(lineno, colno,
+            addError(aLoc,
                     "Internal Error: Unknown operation kind for operator \"%s\"",
                     opString);
             return;
         }
         if (answer == null) {
-            addError(lineno, colno,
+            addError(aLoc,
                      "Incompatible argument types %s and %s",
                      leftoperand.getType().getName(),
                      rightoperand.getType().getName());
@@ -663,10 +625,10 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
         getTopExpressionParser().pushSemantino(answer);
     }
 
-    private void unaryOp(String aOpString, int aLineNo, int aCharPositionInLine) {
+    private void unaryOp(String aOpString, ISourceLocation aLoc) {
         IOperator op = m_factory.getExpressionOperator(aOpString);
         if (op == null) {
-            addError(aLineNo, aCharPositionInLine,
+            addError(aLoc,
                      "Unknown operator \"%s\"",
                      aOpString);
             return;
@@ -675,13 +637,13 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
         //
         // Now, given the kind of operation, calculate the output.
         //
-        ISemantino operand = (ISemantino) getTopExpressionParser().popSemantino();
+        ISemantino operand = getTopExpressionParser().popSemantino();
         ISemantino answer;
         if (op.isBoolean()) {
             answer = getTopExpressionParser().getSemantinoBoolean(op,
-                                                                 operand);
+                                                                  operand);
         } else {
-            addError(aLineNo, aCharPositionInLine,
+            addError(aLoc,
                     "Internal Error: Unknown operation kind for operator \"%s\"",
                     aOpString);
             answer = m_factory.getErrorSemantino();
@@ -694,17 +656,18 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
     // *
     // * <p>Combine two Semantinos with a product op.</p>
     // * /
-    @Override public T visitTimes_expr(SQLParserParser.Times_exprContext ctx) {
+    @Override
+    public T visitTimes_expr(SQLParserParser.Times_exprContext ctx) {
         //
         // Walk the subtree.
         //
         super.visitTimes_expr(ctx);
 
-        binOp(ctx.op.start.getText(),
-              ctx.op.start.getLine(),
-              ctx.op.start.getCharPositionInLine());
+        binOp(ctx.mop.getText(),
+              newSourceLocation(ctx.mop.start));
         return m_state;
     }
+
     ///**
     // * {@inheritDoc}
     // *
@@ -715,11 +678,11 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
         // Walk the subtree.
         //
         super.visitAdd_expr(ctx);
-        binOp(ctx.op.start.getText(),
-              ctx.op.start.getLine(),
-              ctx.op.start.getCharPositionInLine());
+        binOp(ctx.sop.getText(),
+              newSourceLocation(ctx.sop.start));
         return m_state;
     }
+
     ///**
     // * {@inheritDoc}
     // *
@@ -731,11 +694,11 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
         //
         super.visitRel_expr(ctx);
 
-        binOp(ctx.op.start.getText(),
-              ctx.op.start.getLine(),
-              ctx.op.start.getCharPositionInLine());
+        binOp(ctx.rop.getText(),
+              newSourceLocation(ctx.rop.start));
         return m_state;
     }
+
     ///**
     // * {@inheritDoc}
     // *
@@ -746,11 +709,11 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
         //
         super.visitDisjunction_expr(ctx);
 
-        binOp(ctx.OR().getSymbol().getText(),
-              ctx.OR().getSymbol().getLine(),
-              ctx.OR().getSymbol().getCharPositionInLine());
+        binOp(ctx.OR().getText(),
+              newSourceLocation(ctx.OR().getSymbol()));
         return m_state;
     }
+
     ///**
     // * {@inheritDoc}
     // *
@@ -761,9 +724,8 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
         //
         super.visitConjunction_expr(ctx);
 
-        binOp(ctx.AND().getSymbol().getText(),
-              ctx.AND().getSymbol().getLine(),
-              ctx.AND().getSymbol().getCharPositionInLine());
+        binOp(ctx.AND().getText(),
+              newSourceLocation(ctx.AND().getSymbol()));
         return m_state;
     }
     ///**
@@ -775,8 +737,7 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
         //
         super.visitNot_expr(ctx);
         unaryOp(ctx.NOT().getText(),
-                ctx.NOT().getSymbol().getLine(),
-                ctx.NOT().getSymbol().getCharPositionInLine());
+                newSourceLocation(ctx.NOT().getSymbol()));
         return m_state;
     };
 
@@ -804,6 +765,7 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
         return m_state;
     }
 
+    /*
     ///**
     // * {@inheritDoc}
     // * /
@@ -830,6 +792,14 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
                                                                      intType));
         return m_state;
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The default implementation returns the result of calling
+     * {@link #visitChildren} on {@code ctx}.</p>
+     * /
+    @Override public T visitString_expr(SQLParserParser.String_exprContext ctx) { return visitChildren(ctx); }
     */
 
     /**
@@ -888,11 +858,6 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
         return makeQuery(ctx.simple_table().query_specification());
     }
 
-    enum SetQuantifier {
-        ALL_QUANTIFIER,
-        DISTINCT_QUANTIFIER
-    }
-
     /**
      * This constructs leaf queries.  These are the actual select
      * statements.  We start by creating a select statement object,
@@ -906,9 +871,10 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
      * @return The parsed ISelectQuery object.
      */
     private ISelectQuery makeQuery(Query_specificationContext ctx) {
-        ISelectQuery answer = m_factory.newSimpleTableSelectQuery(m_symbolTable,
-                                                                  ctx.start.getLine(),
-                                                                  ctx.start.getCharPositionInLine());
+        ISelectQuery answer = m_factory.newSimpleTableSelectQuery(newSourceLocation(ctx.start),
+                                                                  m_symbolTable,
+                                                                  m_factory,
+                                                                  m_errorMessages);
 
         SetQuantifier q = makeSetQuantifier(ctx.set_quantifier());
         assert(ctx.table_expression() != null);
