@@ -14,38 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-/* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
- */
-/* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
- */
+
 package org.voltdb.sqlparser.syntax;
 
 import java.util.ArrayList;
@@ -63,31 +32,14 @@ import org.voltdb.sqlparser.syntax.grammar.IColumnIdent;
 import org.voltdb.sqlparser.syntax.grammar.IGeographyType;
 import org.voltdb.sqlparser.syntax.grammar.IIndex;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
-import org.voltdb.sqlparser.syntax.grammar.IJoinTree;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
 import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
 import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.grammar.IStringType;
-import org.voltdb.sqlparser.syntax.grammar.JoinOperator;
 import org.voltdb.sqlparser.syntax.grammar.QuerySetOp;
 import org.voltdb.sqlparser.syntax.grammar.SQLParserBaseVisitor;
 import org.voltdb.sqlparser.syntax.grammar.SQLParserParser;
-import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Derived_tableContext;
-import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.From_clauseContext;
-import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Group_by_clauseContext;
-import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Having_clauseContext;
-import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Join_conditionContext;
-import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Join_operatorContext;
-import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Query_expression_bodyContext;
-import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Query_intersect_opContext;
-import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Query_primaryContext;
-import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Query_specificationContext;
-import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Query_union_opContext;
-import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Select_listContext;
-import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Table_expressionContext;
-import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Table_factorContext;
-import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Table_referenceContext;
-import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Where_clauseContext;
+import org.voltdb.sqlparser.syntax.grammar.SetQuantifier;
 import org.voltdb.sqlparser.syntax.symtab.IColumn;
 import org.voltdb.sqlparser.syntax.symtab.IExpressionParser;
 import org.voltdb.sqlparser.syntax.symtab.IParserFactory;
@@ -529,6 +481,7 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
     @Override
     public T visitSimple_table(SQLParserParser.Simple_tableContext ctx) {
         if (ctx.explicit_table() != null) {
+            // This seems stingy.  Maybe we should implement this.
             m_errorMessages.addError(newSourceLocation(ctx.explicit_table().start),
                                      "Explicit tables are not allowed in select statements.");
         } else {
@@ -556,8 +509,11 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
             }
         }
         getTopSelectQuery().setQuantifier(q);
-        visitSelect_list(ctx.select_list());
+        // We have to visit the table expression before the
+        // select list, because the select list will have references
+        // to tables.
         visitTable_expression(ctx.table_expression());
+        visitSelect_list(ctx.select_list());
         return m_state;
     }
 
@@ -801,213 +757,6 @@ public class VoltSQLVisitor<T> extends SQLParserBaseVisitor<T> implements ANTLRE
      * /
     @Override public T visitString_expr(SQLParserParser.String_exprContext ctx) { return visitChildren(ctx); }
     */
-
-    /**
-     * This could be done with visitors, but we end up storing
-     * values in VoltSQLVisitor fields that can be confusing.  I
-     * tried this initially, and it was a PITA.   So now I construct
-     * the boolean combinations recursively.  See makeQuery on query_primary
-     * for the leaf select statement algorithm.
-     * @param ctx
-     * @return
-     */
-    private ISelectQuery makeQuery(Query_expression_bodyContext ctx) {
-        if (ctx.query_primary() != null) {
-            return makeQuery(ctx.query_primary());
-        }
-        QuerySetOp op = QuerySetOp.INVALID_OP;
-        if (ctx.query_intersect_op() != null) {
-            op = makeQueryOp(ctx.query_intersect_op());
-        } else if (ctx.query_union_op() != null) {
-            op = makeQueryOp(ctx.query_union_op());
-        } else {
-            addError(newSourceLocation(ctx.start),
-                     "Unknown query set operation.");
-        }
-        assert(op != QuerySetOp.INVALID_OP);
-        ISelectQuery left = makeQuery(ctx.query_expression_body().get(0));
-        ISelectQuery right = makeQuery(ctx.query_expression_body().get(1));
-        return m_factory.newCompoundQuery(op, left, right);
-    }
-
-    private QuerySetOp makeQueryOp(Query_intersect_opContext ctx) {
-        if (ctx.INTERSECT() != null) {
-            return QuerySetOp.INTERSECT_OP;
-        }
-        return QuerySetOp.INVALID_OP;
-    }
-
-    /**
-     * If this is a parenthesized query expression body, just recurse
-     * on it.  Otherwise, it has to be a simple table, so make a
-     * leaf query using it.
-     *
-     * @param ctx
-     * @return
-     */
-    private ISelectQuery makeQuery(Query_primaryContext ctx) {
-        if (ctx.query_expression_body() != null) {
-            return makeQuery(ctx.query_expression_body());
-        }
-        assert(ctx.simple_table() != null);
-        if (ctx.simple_table().explicit_table() != null) {
-            addError(newSourceLocation(ctx.simple_table().start),
-                     "Explict tables are not supported");
-        }
-        assert(ctx.simple_table().query_specification() != null);
-        return makeQuery(ctx.simple_table().query_specification());
-    }
-
-    /**
-     * This constructs leaf queries.  These are the actual select
-     * statements.  We start by creating a select statement object,
-     * the ISelectQuery, and add things to it in readTableExpression
-     * and readSelectList.
-     *
-     * Note that the table_expression contains join conditions,
-     * where conditions, group by expressions and having conditions.
-     *
-     * @param ctx The context.
-     * @return The parsed ISelectQuery object.
-     */
-    private ISelectQuery makeQuery(Query_specificationContext ctx) {
-        ISelectQuery answer = m_factory.newSimpleTableSelectQuery(newSourceLocation(ctx.start),
-                                                                  m_symbolTable,
-                                                                  m_factory,
-                                                                  m_errorMessages);
-
-        SetQuantifier q = makeSetQuantifier(ctx.set_quantifier());
-        assert(ctx.table_expression() != null);
-        makeTableExpression(answer, ctx.table_expression());
-        assert(ctx.select_list() != null);
-        makeSelectList(answer, ctx.select_list());
-        return answer;
-    }
-
-    private void makeSelectList(ISelectQuery answer, Select_listContext select_list) {
-
-    }
-
-    private void makeTableExpression(ISelectQuery answer, Table_expressionContext ctx) {
-        assert(ctx.from_clause() != null);
-        readFromClause(answer, ctx.from_clause());
-        readWhereClause(answer, ctx.where_clause());
-        readGroupByClause(answer, ctx.group_by_clause());
-        readHavingClause(answer, ctx.having_clause());
-    }
-
-    private void readHavingClause(ISelectQuery answer, Having_clauseContext ctx) {
-        if (ctx == null) {
-            return;
-        }
-
-    }
-
-    private void readGroupByClause(ISelectQuery answer, Group_by_clauseContext ctx) {
-        if (ctx == null) {
-            return;
-        }
-
-    }
-
-    private void readWhereClause(ISelectQuery answer, Where_clauseContext ctx) {
-        if (ctx == null) {
-            return;
-        }
-
-    }
-
-    private void readFromClause(ISelectQuery answer, From_clauseContext ctx) {
-        for (SQLParserParser.Table_referenceContext ref : ctx.table_reference_list().table_reference()) {
-            IJoinTree joinTree = readTableReference(answer, ref);
-            assert(joinTree != null);
-            answer.addJoinTree(joinTree);
-        }
-
-    }
-
-    private JoinOperator readJoinOperator(Join_operatorContext ctx) {
-        if (ctx.INNER() != null) {
-            return JoinOperator.INNER_JOIN;
-        }
-        if (ctx.RIGHT() != null) {
-            return JoinOperator.RIGHT_OUTER_JOIN;
-        }
-        if (ctx.LEFT() != null) {
-            return JoinOperator.LEFT_OUTER_JOIN;
-        }
-        if (ctx.FULL() != null) {
-            return JoinOperator.FULL_OUTER_JOIN;
-        }
-        //
-        // If we don't get any hint, it must be an INNER join.
-        return JoinOperator.INNER_JOIN;
-    }
-
-    private IJoinTree readTableReference(ISelectQuery query, Table_referenceContext ctx) {
-        IJoinTree joinTree = readTableFactor(query, ctx.table_factor().get(0));
-        for (int idx = 0; idx < ctx.join_operator().size(); idx += 1) {
-            JoinOperator op = readJoinOperator(ctx.join_operator(idx));
-            IJoinTree right = readTableFactor(query, ctx.table_factor(idx+1));
-            ISemantino condition = readJoinCondition(ctx.join_condition(idx));
-            joinTree = m_factory.newJoinTree(op, joinTree, right, condition);
-        }
-        return joinTree;
-    }
-
-    private ISemantino readJoinCondition(Join_conditionContext join_condition) {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    private IJoinTree readTableFactor(ISelectQuery query, Table_factorContext ctx) {
-        if (ctx.table_name() != null) {
-            String tableName = ctx.table_name().IDENTIFIER().getText();
-            String tableAlias
-                = ((ctx.table_alias_name() != null)
-                        ? ctx.table_alias_name().IDENTIFIER().getText()
-                        : tableName);
-            return m_factory.newTableReference(tableName, tableAlias);
-        } else if (ctx.derived_table() != null) {
-            // The grammar should enforce this.
-            assert(ctx.table_alias_name()  != null);
-            ISelectQuery derivedTable = readDerivedTable(ctx.derived_table());
-            return m_factory.newDerivedJoinTree(derivedTable, ctx.table_alias_name().IDENTIFIER().getText());
-        } else {
-            assert (ctx.table_reference() != null);
-            return readTableReference(query, ctx.table_reference());
-        }
-    }
-
-    private ISelectQuery readDerivedTable(Derived_tableContext ctx) {
-        assert(ctx.table_subquery() != null);
-        assert(ctx.table_subquery().subquery() != null);
-        assert(ctx.table_subquery().subquery().query_specification() != null);
-        return makeQuery(ctx.table_subquery().subquery().query_specification());
-    }
-
-    private SetQuantifier makeSetQuantifier(SQLParserParser.Set_quantifierContext ctx) {
-        if (ctx == null) {
-            return null;
-        }
-        if (ctx.ALL() != null) {
-            return SetQuantifier.ALL_QUANTIFIER;
-        }
-        if (ctx.DISTINCT() != null) {
-            return SetQuantifier.DISTINCT_QUANTIFIER;
-        }
-        return SetQuantifier.ALL_QUANTIFIER;
-    }
-
-    private QuerySetOp makeQueryOp(Query_union_opContext ctx) {
-        if (ctx.UNION() != null) {
-            return QuerySetOp.UNION_OP;
-        }
-        if (ctx.EXCEPT() != null) {
-            return QuerySetOp.EXCEPT_OP;
-        }
-        return QuerySetOp.INVALID_OP;
-    }
 
     @Override
     public void reportAmbiguity(Parser aArg0, DFA aArg1, int aArg2, int aArg3,
