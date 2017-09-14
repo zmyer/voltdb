@@ -26,7 +26,7 @@ import sys
                            'block transactions and wait until the snapshot completes',
                            default = False),
         VOLT.EnumOption('-f', '--format', 'format',
-                        'snapshot format', 'native', 'csv',
+                        'snapshot format', 'native', 'csv', 'avro',
                         default = 'native'),
         VOLT.StringListOption(None, '--tables', 'tables',
                               'tables to include in the snapshot',

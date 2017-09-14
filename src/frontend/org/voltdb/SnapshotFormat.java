@@ -24,7 +24,8 @@ public enum SnapshotFormat {
     NATIVE (true,  true,  TableStreamType.SNAPSHOT),
     CSV    (true,  true,  TableStreamType.SNAPSHOT),
     STREAM (false, false, TableStreamType.SNAPSHOT),
-    INDEX  (false, false, TableStreamType.ELASTIC_INDEX);
+    INDEX  (false, false, TableStreamType.ELASTIC_INDEX),
+    AVRO   (true,  true,  TableStreamType.SNAPSHOT);
 
     private final boolean m_isFileBased;
     private final boolean m_canCloseEarly;

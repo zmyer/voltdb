@@ -74,10 +74,12 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
     private volatile boolean m_writeFailed = false;
     private volatile Throwable m_writeException = null;
     private volatile IOException m_reportedSerializationFailure = null;
+    private final SnapshotFormat m_format;
 
     public SimpleFileSnapshotDataTarget(
-            File file, boolean needsFinalClose) throws IOException {
+            File file, boolean needsFinalClose, SnapshotFormat format) throws IOException {
         m_file = file;
+        m_format = format;
         m_tempFile = new File(m_file.getParentFile(), m_file.getName() + ".incomplete");
         m_ras = new RandomAccessFile(m_tempFile, "rw");
         m_fc = m_ras.getChannel();
@@ -130,7 +132,10 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
                     /*
                      * If a filter nulled out the buffer do nothing.
                      */
-                    if (data == null) return null;
+                    if (data == null) {
+                        System.out.println("null Data for snapshot.");
+                        return null;
+                    }
                     if (m_writeFailed) {
                         data.discard();
                         return null;
@@ -148,6 +153,7 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
                                 totalWritten += written;
                             }
                         }
+                        m_fc.force(false);
                         if (m_bytesSinceLastSync.addAndGet(totalWritten) > m_bytesAllowedBeforeSync) {
                             m_fc.force(false);
                             m_bytesSinceLastSync.set(0);
@@ -211,7 +217,7 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
 
     @Override
     public SnapshotFormat getFormat() {
-        return SnapshotFormat.CSV;
+        return m_format;
     }
 
     @Override

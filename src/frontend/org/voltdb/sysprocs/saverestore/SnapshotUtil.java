@@ -1185,6 +1185,8 @@ public class SnapshotUtil {
         String extension = ".vpt";
         if (format == SnapshotFormat.CSV) {
             extension = ".csv";
+        } else if (format == SnapshotFormat.AVRO) {
+            extension = ".avro";
         }
 
         StringBuilder filename_builder = new StringBuilder(fileNonce);

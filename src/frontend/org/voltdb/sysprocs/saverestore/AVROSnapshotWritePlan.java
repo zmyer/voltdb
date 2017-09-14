@@ -32,7 +32,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.CSVSnapshotFilter;
 import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.SimpleFileSnapshotDataTarget;
 import org.voltdb.SnapshotDataFilter;
@@ -49,6 +48,7 @@ import org.voltdb.utils.CatalogUtil;
 
 import com.google_voltpatches.common.primitives.Ints;
 import com.google_voltpatches.common.primitives.Longs;
+import org.voltdb.AVROSnapshotFilter;
 
 /**
  * Create a snapshot write plan for a CSV snapshot.  This will attempt to write
@@ -61,7 +61,7 @@ import com.google_voltpatches.common.primitives.Longs;
  * same conclusion about whether or not it is writing a given partition.  Each
  * partitioned table is written to the same target per table by each selected
  * site on a node. */
-public class CSVSnapshotWritePlan extends SnapshotWritePlan
+public class AVROSnapshotWritePlan extends SnapshotWritePlan
 {
 
     static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
@@ -86,7 +86,7 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
          * a random replica to do the work. Will not work in failure
          * cases, but we don't use dedupe when we want durability.
          */
-        List<Long> sitesToInclude = CSVSnapshotWritePlan.computeDedupedLocalSites(txnId, tracker);
+        List<Long> sitesToInclude = AVROSnapshotWritePlan.computeDedupedLocalSites(txnId, tracker);
         // If there's no work to do on this host, just claim success and get out:
         if (sitesToInclude.isEmpty() && !tracker.isFirstHost()) {
             return null;
@@ -100,7 +100,7 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
                     context.getHostId(),
                     file_path,
                     file_nonce,
-                    SnapshotFormat.CSV,
+                    SnapshotFormat.AVRO,
                     config.tables);
 
         boolean noTargetsCreated = true;
@@ -124,7 +124,7 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
             }
 
             List<SnapshotDataFilter> filters = new ArrayList<SnapshotDataFilter>();
-            filters.add(new CSVSnapshotFilter(CatalogUtil.getVoltTable(table), ',', null));
+            filters.add(new AVROSnapshotFilter(table.getTypeName(), CatalogUtil.getVoltTable(table)));
 
             final SnapshotTableTask task =
                     new SnapshotTableTask(
@@ -215,10 +215,10 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
                 table,
                 file_path,
                 file_nonce,
-                SnapshotFormat.CSV,
+                SnapshotFormat.AVRO,
                 hostId);
 
-        sdt = new SimpleFileSnapshotDataTarget(saveFilePath, !table.getIsreplicated(), SnapshotFormat.CSV);
+        sdt = new SimpleFileSnapshotDataTarget(saveFilePath, !table.getIsreplicated(), SnapshotFormat.AVRO);
 
         m_targets.add(sdt);
         final Runnable onClose = new TargetStatsClosure(sdt, table.getTypeName(), numTables, snapshotRecord);
@@ -264,7 +264,7 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
         }
 
         if (sitesToInclude.isEmpty()) {
-            SNAP_LOG.info("This host was not selected to write CSV data for any partition");
+            SNAP_LOG.info("This host was not selected to write AVRO data for any partition");
         }
 
         return sitesToInclude;

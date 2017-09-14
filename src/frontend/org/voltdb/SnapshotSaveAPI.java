@@ -55,6 +55,7 @@ import org.voltdb.sysprocs.saverestore.StreamSnapshotWritePlan;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import org.voltdb.sysprocs.saverestore.AVROSnapshotWritePlan;
 
 /**
  * SnapshotSaveAPI extracts reusuable snapshot production code
@@ -492,6 +493,9 @@ public class SnapshotSaveAPI
         }
         else if (format == SnapshotFormat.CSV) {
             plan = new CSVSnapshotWritePlan();
+        }
+        else if (format == SnapshotFormat.AVRO) {
+            plan = new AVROSnapshotWritePlan();
         }
         else if (format == SnapshotFormat.STREAM) {
             plan = new StreamSnapshotWritePlan();

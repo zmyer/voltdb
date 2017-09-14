@@ -39,6 +39,7 @@ public interface SnapshotDataTarget {
      * @param tupleData Tuple data in a <code>ByteBuffer</code> with the required number of bytes available
      * for a header
      * @param tableId   The catalog tableId
+     * @return
      */
     public ListenableFuture<?> write(Callable<BBContainer> tupleData, int tableId);
 

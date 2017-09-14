@@ -147,6 +147,98 @@ public class VoltTableUtil {
         csv.flush();
     }
 
+    public static Pair<String[], Object[]> valuesAsList(VoltTable vt, List<VoltType> columnTypes) throws IOException {
+        Object[] fields = new Object[vt.getColumnCount()];
+        String[] names = new String[vt.getColumnCount()];
+        for (int ii = 0; ii < vt.getColumnCount(); ii++) {
+            final VoltType type = columnTypes.get(ii);
+            names[ii] = vt.getColumnName(ii).toUpperCase();
+            if (type == VoltType.BIGINT) {
+                final long value = vt.getLong(ii);
+                if (vt.wasNull()) {
+                    fields[ii] = VoltType.NULL;
+                } else {
+                    fields[ii] = value;
+                }
+            } else if (type == VoltType.TINYINT) {
+                final long value = vt.getLong(ii);
+                if (vt.wasNull()) {
+                    fields[ii] = VoltType.NULL;
+                } else {
+                    fields[ii] = (short )value;
+                }
+            } else if (type == VoltType.SMALLINT) {
+                final long value = vt.getLong(ii);
+                if (vt.wasNull()) {
+                    fields[ii] = VoltType.NULL;
+                } else {
+                    fields[ii] = (short )value;
+                }
+            } else if (type == VoltType.INTEGER) {
+                final long value = vt.getLong(ii);
+                if (vt.wasNull()) {
+                    fields[ii] = VoltType.NULL;
+                } else {
+                    fields[ii] = (int )value;
+                }
+            } else if (type == VoltType.FLOAT) {
+                final double value = vt.getDouble(ii);
+                if (vt.wasNull()) {
+                    fields[ii] = VoltType.NULL;
+                } else {
+                    fields[ii] = value;
+                }
+            } else if (type == VoltType.DECIMAL) {
+                final BigDecimal bd = vt.getDecimalAsBigDecimal(ii);
+                if (vt.wasNull()) {
+                    fields[ii] = VoltType.NULL;
+                } else {
+                    fields[ii] = bd;
+                }
+            } else if (type == VoltType.STRING) {
+                final String str = vt.getString(ii);
+                if (vt.wasNull()) {
+                    fields[ii] = VoltType.NULL;
+                } else {
+                    fields[ii] = str;
+                }
+            } else if (type == VoltType.TIMESTAMP) {
+                final TimestampType timestamp = vt.getTimestampAsTimestamp(ii);
+                if (vt.wasNull()) {
+                    fields[ii] = VoltType.NULL;
+                } else {
+                    fields[ii] = timestamp;
+                }
+            } else if (type == VoltType.VARBINARY) {
+               byte bytes[] = vt.getVarbinary(ii);
+               if (vt.wasNull()) {
+                    fields[ii] = VoltType.NULL;
+               } else {
+                   fields[ii] = Encoder.hexEncode(bytes);
+               }
+            }
+            else if (type == VoltType.GEOGRAPHY_POINT) {
+                final GeographyPointValue pt = vt.getGeographyPointValue(ii);
+                if (vt.wasNull()) {
+                    fields[ii] = VoltType.NULL;
+                }
+                else {
+                    fields[ii] = pt;
+                }
+            }
+            else if (type == VoltType.GEOGRAPHY) {
+                final GeographyValue gv = vt.getGeographyValue(ii);
+                if (vt.wasNull()) {
+                    fields[ii] = VoltType.NULL;
+                }
+                else {
+                    fields[ii] = gv;
+                }
+            }
+        }
+        return new Pair(names, fields);
+    }
+
     public static Pair<Integer,byte[]>  toCSV(
             VoltTable vt,
             char delimiter,
