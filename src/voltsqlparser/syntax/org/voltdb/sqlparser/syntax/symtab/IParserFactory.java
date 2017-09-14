@@ -373,4 +373,20 @@ public interface IParserFactory {
      * @return
      */
     IType makeType(String upperCase, String v0, String v1);
+    /**
+     * Make a new Column with the given attributes.  Don't insert
+     * it into anything, just return it.
+     *
+     * @param aColumnName The column name.
+     * @param aType The column type.
+     * @param aDefaultValue The Semantino for the default value.
+     * @param aNotNull Whether the column can be null.
+     * @param aKeyType What kind of key this column is, if it is a key.
+     * @return
+     */
+    IColumn makeColumn(String aColumnName,
+                       IType aType,
+                       ISemantino aDefaultValue,
+                       boolean aNotNull,
+                       IndexType aKeyType);
 }

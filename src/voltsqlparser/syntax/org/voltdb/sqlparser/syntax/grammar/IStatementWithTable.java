@@ -16,10 +16,22 @@
  */
 package org.voltdb.sqlparser.syntax.grammar;
 
+import org.voltdb.sqlparser.syntax.symtab.ITable;
+
 /**
- * Object implementing this interface are Create Table statements.
- *
- * @author bwhite
+ * Objects which implement this interface are statements which have a natural
+ * associated table.  Examples are create table, create view and create index.
  */
-public interface ICreateTableStatement extends ISQLStatement, IStatementWithTable {
+public interface IStatementWithTable {
+    /**
+     * Set the table object itself.
+     *
+     * @param makeTable
+     */
+    void setTable(ITable makeTable);
+    /**
+     * Get the table object.
+     * @return
+     */
+    ITable getTable();
 }

@@ -58,9 +58,9 @@ import org.voltdb.sqlparser.syntax.grammar.ISemantino;
  */
 public interface IType extends ITop {
 
-    boolean isBooleanType();
-
     TypeKind getTypeKind();
+
+    boolean isBooleanType();
 
     boolean isErrorType();
 

@@ -2,6 +2,7 @@ package org.hsqldb_voltpatches;
 
 import java.util.List;
 
+import org.voltdb.sqlparser.semantics.grammar.CreateTableStatement;
 import org.voltdb.sqlparser.semantics.symtab.ParserFactory;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
 import org.voltdb.sqlparser.syntax.grammar.IColumnIdent;
@@ -165,7 +166,6 @@ public class VoltParserFactory extends ParserFactory implements IParserFactory {
     }
     @Override
     public ICreateTableStatement makeCreateTableStatement() {
-        // TODO Auto-generated method stub
-        return null;
+        return new CreateTableStatement();
     }
 }

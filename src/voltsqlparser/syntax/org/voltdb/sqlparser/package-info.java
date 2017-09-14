@@ -93,8 +93,8 @@
  * is an object which implements a particular interface, as shown in
  * this table.
  *
- * <table>
- *   <tr><th>DDL STATEMENTS     </th> <th                           </th> </tr>
+ * <table border="1">
+ *   <tr><th colspan="2">DDL STATEMENTS     </th>                         </tr>
  *   <tr><th>Statement Kind     </th><th>Processor Interface</th></tr>
  *   <tr> <td> ALTER TABLE      </td> <td> IAlterTableStatement     </td> </tr>
  *   <tr> <td> CREATE TABLE     </td> <td> ICreateTableStatement    </td> </tr>
@@ -109,12 +109,12 @@
  *   <tr> <td> PARTITION ...    </td> <td> IPartitionStatement      </td> </tr>
  *   <tr> <td> TRUNCATE TABLE   </td> <td> ITruncateStatement       </td> </tr>
  *   <tr> <td> SET ...          </td> <td> ISetStatement            </td> </tr>
- *   <tr> <th>DML STATEMENTS    </td> <td>                          </th> </tr>
+ *   <tr> <th colspan="2">DML STATEMENTS    </th>                         </tr>
  *   <tr><th>Statement Kind     </th><th>Processor Interface</th></tr>
  *   <tr> <td> INSERT INTO ...  </td> <td> IInsertStatement         </td> </tr>
  *   <tr> <td> UPDATE ...       </td> <td> IUpdateStatement         </td> </tr>
  *   <tr> <td> DELETE ...       </td> <td> IDeleteStatement         </td> </tr>
- *   <tr> <th>DQL STATEMENTS    </th>                                     </tr>
+ *   <tr> <th colspan="2">DQL STATEMENTS    </th>                         </tr>
  *   <tr><th>Statement Kind     </th><th>Processor Interface</th></tr>
  *   <tr> <td> SELECT ...       </td> <td> ISelectQuery             </td> </tr>
  * </table>
@@ -166,7 +166,7 @@
  *
  *
  *
- * <h2>Expressions and ISemantinos.</h2>
+ * <h2>Expressions and {@link org.voltdb.sqlparser.syntax.grammar.ISemantino}s.</h2>
  *
  * The representation of an expression is an ISemantino.  This is an
  * indivisble unit of semantics, something like a Neutrino is an indivisble
@@ -179,7 +179,36 @@
  *   <li>We can tell if an ISemantino is the error semantino.</li>
  * </ol>
  *
+ * <h2>Types</h2>
+ * A type is represented by objects which implement the IType interface. The set
+ * of types is pretty much fixed by the SQL standard, and by VoltDB.  There are
+ * no user defined types, and no types created with DDL.  This simplifies the
+ * type system a great deal.
  *
+ * All the types are created in the <em>StandardPrelude</em>, which is an {@link org.voltdb.sqlparser.syntax.symtab.ISymbolTable}.
+ * There are the usual integer and float types, VARCHAR and VARBINARY types and geospatial types.
+ * There are also some internally useful types.  These are the Types
+ * {@link org.voltdb.sqlparser.semantics.symtab.VoidType}
+ * and {@link org.voltdb.sqlparser.semantics.symtab.ErrorType}.
+ * The former is used for operations which do not return values.  The latter are used when
+ * errors occur for which the type is not obvious.
+ *
+ * There are some common operations that help to classify types.
+ * <ol>
+ *   <li>{@link org.voltdb.sqlparser.syntax.symtab.IType#isBooleanType}, {@link org.voltdb.sqlparser.syntax.symtab.IType#isVoidType}, {@link IType.isErrorType}
+ *       and {@link IType.isFixedSizeType} classify types as boolean, void and error types.
+ *       Others are logically necessary.</li>
+ *   <li>
+ * </ol>
+ *
+ * The only non-trivial operation on an IType is {@link evalConstant}.  This operation takes a
+ * string and returns a semantino for the value of the type represented by the string.
+ * For example, if <code>b</code> is an object of type {@link IBoolean}, then
+ * <code>b.evalConstant("false")</code> would return the false ISemantino.
+ *
+ * <h2>Symbol Tables</h2>
+ * An {@link ISymbolTable} performs name lookups.  Names are introduced by <code>FROM</code>
+ * clauses in SELECT statements.
  */
  package org.voltdb.sqlparser;
 

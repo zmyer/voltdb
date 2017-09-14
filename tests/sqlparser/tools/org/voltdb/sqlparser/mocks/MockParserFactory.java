@@ -145,9 +145,11 @@ import org.voltdb.sqlparser.syntax.symtab.IParserFactory;
 import org.voltdb.sqlparser.syntax.symtab.ISourceLocation;
 import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
 import org.voltdb.sqlparser.syntax.symtab.ITable;
+import org.voltdb.sqlparser.syntax.symtab.ITop;
 import org.voltdb.sqlparser.syntax.symtab.IType;
 import org.voltdb.sqlparser.syntax.symtab.IndexType;
 import org.voltdb.sqlparser.syntax.util.ErrorMessageSet;
+import org.voltdb.sqlparser.tools.VoltSQLParserException;
 
 public class MockParserFactory extends ParserFactory implements
         IParserFactory {
@@ -157,23 +159,24 @@ public class MockParserFactory extends ParserFactory implements
         // TODO Auto-generated constructor stub
     }
 
+    private ITop unimplementedMethod(String aMethodName) {
+        throw new VoltSQLParserException(aMethodName);
+    }
+
     @Override
     public ICatalogAdapter getCatalog() {
-        // TODO Auto-generated method stub
-        return null;
+        return (ICatalogAdapter)unimplementedMethod("getCatalog");
     }
 
     @Override
     public ITable makeTable(ISourceLocation aSourceLocation, String aTableName) {
-        // TODO Auto-generated method stub
-        return null;
+        return (ITable)unimplementedMethod("makeTable");
     }
 
     @Override
     public ISelectQuery newSimpleTableSelectQuery(ISourceLocation aLoc, ISymbolTable aSymbolTable,
             IParserFactory aFactory, ErrorMessageSet aErrorMessages) {
-        // TODO Auto-generated method stub
-        return null;
+        return (ISelectQuery)unimplementedMethod("newSimpleTableSelectQuery");
     }
 
     @Override
@@ -286,8 +289,7 @@ public class MockParserFactory extends ParserFactory implements
 
     @Override
     public ISourceLocation newSourceLocation(int aLineNumber, int aColumnNumber) {
-        // TODO Auto-generated method stub
-        return null;
+        unimplementedMethod("newSourceLocation");
     }
 
     @Override
@@ -298,13 +300,22 @@ public class MockParserFactory extends ParserFactory implements
 
     @Override
     public ICreateTableStatement makeCreateTableStatement() {
-        // TODO Auto-generated method stub
-        return null;
+        return (ICreateTableStatement)unimplementedMethod("makeCreateTableStatement");
     }
 
     @Override
     public IType makeType(String upperCase, String v0, String v1) {
         // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public IColumn makeColumn(String aColumnName,
+                              IType aType,
+                              ISemantino aDefaultValue,
+                              boolean aNotNull,
+                              IndexType aKeyType) {
+        unimplementedMethod("makeColumn");
         return null;
     }
 }

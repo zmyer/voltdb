@@ -14,12 +14,22 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.voltdb.sqlparser.syntax.grammar;
+package org.voltdb.sqlparser.semantics.grammar;
 
-/**
- * Object implementing this interface are Create Table statements.
- *
- * @author bwhite
- */
-public interface ICreateTableStatement extends ISQLStatement, IStatementWithTable {
+import org.voltdb.sqlparser.semantics.symtab.Table;
+import org.voltdb.sqlparser.syntax.grammar.ICreateTableStatement;
+import org.voltdb.sqlparser.syntax.symtab.ITable;
+
+public class CreateTableStatement implements ICreateTableStatement {
+    Table m_table;
+    @Override
+    public void setTable(ITable aTable) {
+        assert(aTable != null && (aTable instanceof Table));
+        m_table = (Table)aTable;
+    }
+
+    @Override
+    public ITable getTable() {
+        return m_table;
+    }
 }

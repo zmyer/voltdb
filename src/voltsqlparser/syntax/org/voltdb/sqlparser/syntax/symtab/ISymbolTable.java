@@ -48,6 +48,11 @@
  */
  package org.voltdb.sqlparser.syntax.symtab;
 
+ /**
+  * An ISymbolTable object matches names to entities.  Mostly
+  * the binding of names to entities happens in FROM clauses of
+  * SELECT statements.  But some
+  */
 public interface ISymbolTable {
 
     /**
@@ -55,9 +60,15 @@ public interface ISymbolTable {
      * @param aEntity
      */
     public void define(ITop aEntity);
-
+    /**
+     * Return the number of names defined in this symbol table.
+     */
     public int size();
 
+    /**
+     * Return true iff no names are defined in the {@link ISymbolTable}.
+     * @return
+     */
     public boolean isEmpty();
 
     /**
