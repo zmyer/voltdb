@@ -49,6 +49,8 @@ import org.hsqldb_voltpatches.result.ResultMetaData;
 import org.hsqldb_voltpatches.types.NumberType;
 // End of VoltDB extension
 
+import org.hsqldb_voltpatches.AJG;
+
 /**
  * Statement implementation for DML and base DQL statements.
  *
@@ -1349,6 +1351,8 @@ public abstract class StatementDMQL extends Statement {
                 }
                 VoltXMLElement parameter = new VoltXMLElement("parameter");
                 parameterXML.children.add(parameter);
+                
+
                 int index = session.getParameterStateManager().getNextParamIndex();
                 parameter.attributes.put("index", String.valueOf(index));
                 parameter.attributes.put("id", expr.getUniqueId(session));

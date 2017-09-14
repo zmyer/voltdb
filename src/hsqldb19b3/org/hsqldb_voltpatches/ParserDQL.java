@@ -50,6 +50,7 @@ import org.hsqldb_voltpatches.types.Charset;
 import org.hsqldb_voltpatches.types.DTIType;
 import org.hsqldb_voltpatches.types.IntervalType;
 import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.AJG;
 
 /**
  * Parser for DQL statements
@@ -1727,12 +1728,7 @@ public class ParserDQL extends ParserBase {
 
             // $FALL-THROUGH$
             case Tokens.QUESTION :
-                e = new ExpressionColumn(OpTypes.DYNAMIC_PARAM);
-
-                compileContext.parameters.add(e);
-                read();
-
-                return e;
+                return XreadAndCheckParam();
 
             case Tokens.COLLATION :
                 return XreadCurrentCollationSpec();
@@ -1773,18 +1769,15 @@ public class ParserDQL extends ParserBase {
 
             case Tokens.X_VALUE :
                 e = new ExpressionValue(token.tokenValue, token.dataType);
-
+   
                 read();
 
                 return e;
 
             case Tokens.QUESTION :
-                e = new ExpressionColumn(OpTypes.DYNAMIC_PARAM);
-
-                compileContext.parameters.add(e);
-                read();
-
-                return e;
+            
+                return XreadAndCheckParam();
+                
 
             default :
                 return null;
@@ -3116,9 +3109,8 @@ public class ParserDQL extends ParserBase {
         // A VoltDB extension to add support for x IN ?
         if (token.tokenType == Tokens.QUESTION &&
             ! isCheckOrTriggerCondition) {
-            read();
-            e = new ExpressionColumn(OpTypes.DYNAMIC_PARAM);
-            compileContext.parameters.add(e);
+
+            e = XreadAndCheckParam();
             e.nodeDataTypes = new Type[degree];
             ExpressionLogical r = new ExpressionLogical(OpTypes.EQUAL, l, e);
             r.exprSubType = OpTypes.ANY_QUANTIFIED;
@@ -5053,6 +5045,30 @@ public class ParserDQL extends ParserBase {
             return set;
         }
     }
+
+    /************************* Volt DB Extension *************************/
+
+    /** Check to see if a parameter has an index.
+    */
+
+    Expression XreadAndCheckParam() {
+
+        Expression e;
+        
+                AJG.log("Param check.");
+
+                e = new ExpressionColumn(OpTypes.DYNAMIC_PARAM);
+
+                 if (token.tokenValue != null) {
+                   AJG.log("Param index is " + String.valueOf(token.tokenValue));
+                   e.parameterIndex = (int) token.tokenValue;
+                }
+               compileContext.parameters.add(e);
+                read();
+
+                return e;
+   }
+
 
     /************************* Volt DB Extensions *************************/
 

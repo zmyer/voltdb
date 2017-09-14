@@ -57,6 +57,9 @@ import org.voltdb.types.QueryType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 
+import org.hsqldb_voltpatches.AJG;
+
+
 import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
@@ -82,6 +85,7 @@ public abstract class ProcedureCompiler {
             compileJavaProcedure(compiler, hsql, estimates, db, procedureDescriptor, jarOutput);
         }
         else {
+            AJG.log("Compile single statement!");
             compileSingleStmtProcedure(compiler, hsql, estimates, db, procedureDescriptor);
         }
     }
@@ -844,9 +848,11 @@ public abstract class ProcedureCompiler {
 
             // compile the statement
             // default to FASTER detmode because stmt procs can't feed read output into writes
+        AJG.log("Before StmtCompiler");
             StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, db,
                     estimates, catalogStmt, curStmt,//procedureDescriptor.m_singleStmt,
                     procedureDescriptor.m_joinOrder, DeterminismMode.FASTER, partitioning);
+        AJG.log("After StmtCompiler");
 
             // if a single stmt is not read only, then the proc is not read only
             if (catalogStmt.getReadonly() == false) {
@@ -863,13 +869,17 @@ public abstract class ProcedureCompiler {
 
             // set the procedure parameter types from the statement parameter types
             int paramCount = params.size();
+            AJG.log("Walking through parameters...");
             for (StmtParameter stmtParam : CatalogUtil.getSortedCatalogItems(stmtParams, "index")) {
                 // name each parameter "param1", "param2", etc...
                 ProcParameter procParam = params.add("param" + String.valueOf(paramCount));
+                //stmtParam.setIndex(0);
                 procParam.setIndex(paramCount);
                 procParam.setIsarray(stmtParam.getIsarray());
                 procParam.setType(stmtParam.getJavatype());
                 paramCount++;
+                AJG.log("Count: " + String.valueOf(paramCount) + " index: " + String.valueOf(stmtParam.getIndex()));
+              
             }
         }
 

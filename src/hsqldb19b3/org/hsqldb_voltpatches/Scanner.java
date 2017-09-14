@@ -55,6 +55,9 @@ import org.hsqldb_voltpatches.types.TimeData;
 import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.types.Type;
 
+import org.hsqldb_voltpatches.AJG;
+
+
 /**
  * Scans for SQL tokens.
  *
@@ -1345,6 +1348,22 @@ public class Scanner {
                     return;
                 }
             case '?' :
+                int m_nextchar = currentPosition;
+                String m_paramvalue = "";
+                
+                // See if the Question mark is followed by digits
+                while (Character.isDigit(charAt(m_nextchar+1))) { 
+                     m_nextchar++; 
+                     m_paramvalue += (char)charAt(m_nextchar);
+                }
+                if (m_nextchar > currentPosition) {
+                   AJG.log("Parameter with digits [?" + m_paramvalue +"]");
+                   currentPosition = m_nextchar;
+                   token.tokenValue = Integer.parseInt(m_paramvalue);
+                } else {
+                   AJG.log("Parameter");
+                }
+                
                 if (charAt(currentPosition + 1) == '?') {
                     if (charAt(currentPosition + 2) == '(') {
                         token.tokenString = Tokens.T_OPENBRACKET;
