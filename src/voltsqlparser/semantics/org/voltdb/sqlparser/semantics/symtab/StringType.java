@@ -48,6 +48,7 @@
  */
 package org.voltdb.sqlparser.semantics.symtab;
 
+import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.grammar.IStringType;
 import org.voltdb.sqlparser.syntax.symtab.ISourceLocation;
 import org.voltdb.sqlparser.syntax.symtab.ITop;
@@ -68,5 +69,10 @@ public class StringType extends Type implements ITop, IStringType {
         assert(aSize.length == 1);
         StringType answer = new StringType(aLoc, getName(), getTypeKind(), aSize[0]);
         return answer;
+    }
+    @Override
+    public ISemantino evalConstant(String aString) {
+        // TODO Auto-generated method stub
+        return null;
     }
 }

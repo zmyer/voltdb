@@ -33,6 +33,7 @@
 package org.voltdb.sqlparser.semantics.symtab;
 
 import org.voltdb.sqlparser.syntax.grammar.IGeographyType;
+import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.symtab.ISourceLocation;
 import org.voltdb.sqlparser.syntax.symtab.IType;
 import org.voltdb.sqlparser.syntax.symtab.TypeKind;
@@ -52,6 +53,11 @@ public class GeographyType extends Type implements IGeographyType {
             return null;
         }
         return new GeographyType(aLoc, getName(), getTypeKind(), params[0]);
+    }
+    @Override
+    public ISemantino evalConstant(String aString) {
+        // TODO Auto-generated method stub
+        return null;
     }
 
 }

@@ -48,6 +48,7 @@
  */
  package org.voltdb.sqlparser.semantics.symtab;
 
+import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.symtab.INumericType;
 import org.voltdb.sqlparser.syntax.symtab.ISourceLocation;
 import org.voltdb.sqlparser.syntax.symtab.TypeKind;
@@ -55,5 +56,11 @@ import org.voltdb.sqlparser.syntax.symtab.TypeKind;
 public class NumericType extends Type implements INumericType {
     public NumericType(ISourceLocation aLoc, String aName, TypeKind aKind) {
         super(aLoc, aName, aKind);
+    }
+
+    @Override
+    public ISemantino evalConstant(String aString) {
+        // TODO Auto-generated method stub
+        return null;
     }
 }

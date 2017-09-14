@@ -643,39 +643,45 @@ datatype:
  * Expressions.
  *************************************************************************/
 value_expression:
-                '(' value_expression ')'                #null_expr
+                '(' value_expression ')'                   #null_expr
         |
-                value_expression mop=timesop value_expression  #times_expr
+                value_expression timesop value_expression  #times_expr
         |
-                value_expression sop=addop value_expression    #add_expr
+                value_expression addop value_expression    #add_expr
         |
-                value_expression rop=relop value_expression    #rel_expr
+                value_expression relop value_expression    #rel_expr
         |
-                NOT value_expression                    #not_expr
+                NOT value_expression                       #not_expr
         |
-                value_expression cop=AND value_expression          #conjunction_expr
+                value_expression AND value_expression      #conjunction_expr
         |
-                value_expression dop=OR value_expression          #disjunction_expr
+                value_expression OR value_expression       #disjunction_expr
         |
-                boolconst=TRUE                    #true_expr
+                boolconst                                  #boolconst_expr
         |
-                boolconst=FALSE                   #false_expr
+                column_reference                           #colref_expr
         |
-                col=column_reference              #colref_expr
+                NUMBER                                     #numeric_expr
         |
-                num=NUMBER                        #numeric_expr
+        		STRING	                                   #string_expr
         |
-        		str=STRING	                      #string_expr
+                scalar_subquery                            #scalar_subquery_expr
         |
         		scalar_function_name '(' ( value_expression (',' value_expression )* )? ')'
-        		                                  #scalar_function
+        		                                           #scalar_function
         |
         		aggregate_function_name '(' ( value_expression ( ',' value_expression )? )? ')'
-        		( OVER window_ref )
-        										  #aggregate_function
+        		( OVER window_ref )?
+        										           #aggregate_function
        	//
        	// There are some other time/date functions with
        	// eccentric syntax which need to be put here.
+        ;
+        
+boolconst:
+            TRUE
+        |
+            FALSE
         ;
         
 timesop:

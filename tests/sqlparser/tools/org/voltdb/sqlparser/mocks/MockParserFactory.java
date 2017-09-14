@@ -127,9 +127,9 @@ package org.voltdb.sqlparser.mocks;
 import java.util.List;
 
 import org.voltdb.sqlparser.semantics.symtab.ParserFactory;
-import org.voltdb.sqlparser.semantics.symtab.Semantino;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
 import org.voltdb.sqlparser.syntax.grammar.IColumnIdent;
+import org.voltdb.sqlparser.syntax.grammar.ICreateTableStatement;
 import org.voltdb.sqlparser.syntax.grammar.IIndex;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
 import org.voltdb.sqlparser.syntax.grammar.IJoinTree;
@@ -156,116 +156,155 @@ public class MockParserFactory extends ParserFactory implements
         super(aCatalog);
         // TODO Auto-generated constructor stub
     }
-    /*
-     * All of these need to be implemented in VoltDB.  We define
-     * them here instead of making them abstract to help with testing.
-     * This makes it possible to test the parser and static semantics
-     * checker without the rest of VoltDB and without mocking these
-     * methods.
-     */
+
     @Override
-    public IAST makeQueryAST(List<Projection> aProjections,
-                              IAST aWhereCondition,
-                              ISymbolTable aTables) {
-        unimplementedOperation("makeQueryAST");
+    public ICatalogAdapter getCatalog() {
+        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
-    public IAST makeInsertAST(IInsertStatement aInsertStatement) {
-        unimplementedOperation("makeInsertAST");
+    public ITable makeTable(ISourceLocation aSourceLocation, String aTableName) {
+        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
-    public IAST makeUnaryAST(IType t, boolean b) {
-        unimplementedOperation("makeUnaryAST(boolean)");
+    public ISelectQuery newSimpleTableSelectQuery(ISourceLocation aLoc, ISymbolTable aSymbolTable,
+            IParserFactory aFactory, ErrorMessageSet aErrorMessages) {
+        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
-    public IAST makeConstantAST(IType aIntType, Object aValueOf) {
-        unimplementedOperation("makeUnaryAST(Object)");
+    public ISelectQuery newCompoundQuery(QuerySetOp op, ISelectQuery left, ISelectQuery right) {
+        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
-    public IAST makeBinaryAST(IOperator aOp,
-                              ISemantino aLeftoperand,
-                              ISemantino aRightoperand) {
-        unimplementedOperation("makeBinaryAST");
+    public void processQuery(ISelectQuery aSelectQuery) {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public IInsertStatement newInsertStatement() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public IAST makeConstantAST(IType aIntType, Object aIntegerValue) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public IAST makeUnaryAST(IType aIntType, boolean aBoolValue) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public IAST makeColumnRef(String aRealTableName, String aTableAlias, String aColumnName) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public IAST makeBinaryAST(IOperator aOp, ISemantino aLeftoperand, ISemantino aRightoperand) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public IOperator getExpressionOperator(String aText) {
+        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
     public IAST addTypeConversion(IAST aNode, IType aSrcType, IType aTrgType) {
-        unimplementedOperation("addTypeConversion");
+        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
-    public IAST makeColumnRef(String aRealTableName,
-                              String aTableAlias,
-                              String aColumnName) {
-        unimplementedOperation("makeColumnRef");
+    public IAST makeQueryAST(List<Projection> aProjections, IAST aWhereCondition, ISymbolTable aTables) {
+        // TODO Auto-generated method stub
         return null;
     }
 
-    public void processWhereExpression(Semantino aWhereExpression) {
-            unimplementedOperation("processWhereExpression");
-    }
     @Override
-    public IAST makeUnaryAST(IType type, IOperator aOperator,
-            ISemantino aOperand) {
-        unimplementedOperation("makeUnaryAST");
+    public IAST makeInsertAST(IInsertStatement aInsertStatement) {
+        // TODO Auto-generated method stub
         return null;
     }
+
+    @Override
+    public ISemantino getErrorSemantino() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public IAST makeUnaryAST(IType type, IOperator aOperator, ISemantino aOperand) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
     @Override
     public ISemantino makeQuerySemantino(ISelectQuery query) {
-        unimplementedOperation("makeQueryAST");
+        // TODO Auto-generated method stub
         return null;
     }
+
     @Override
     public IIndex newIndex(ISourceLocation aLoc, String indexName, ITable table, IColumn column, IndexType it) {
-        unimplementedOperation("newIndex");
+        // TODO Auto-generated method stub
         return null;
     }
-    @Override
-    public ISelectQuery newCompoundQuery(QuerySetOp op, ISelectQuery left, ISelectQuery right) {
-        unimplementedOperation("newCompoundQuery");
-        return null;
-    }
+
     @Override
     public IJoinTree newJoinTree(JoinOperator op, IJoinTree joinTree, IJoinTree right, ISemantino condition) {
-        unimplementedOperation("newJoinTree");
+        // TODO Auto-generated method stub
         return null;
     }
-    @Override
-    public ISelectQuery newSimpleTableSelectQuery(ISourceLocation aLoc,
-                                                  ISymbolTable aSymbolTable,
-                                                  IParserFactory aFactory,
-                                                  ErrorMessageSet aErrorMessages) {
-        unimplementedOperation("newSimpleTableSelectQuery");
-        return null;
-    }
+
     @Override
     public IJoinTree newTableReference(String aTableName, String aTableAlias) {
-        unimplementedOperation("newTableReference");
+        // TODO Auto-generated method stub
         return null;
     }
+
     @Override
     public IJoinTree newDerivedJoinTree(ISelectQuery derivedTable, String tableName) {
-        unimplementedOperation("newDerivedJoinTree");
+        // TODO Auto-generated method stub
         return null;
     }
+
     @Override
     public ISourceLocation newSourceLocation(int aLineNumber, int aColumnNumber) {
-        unimplementedOperation("newDerivedJoinTree");
+        // TODO Auto-generated method stub
         return null;
     }
+
     @Override
     public IColumnIdent makeColumnRef(String colName, ISourceLocation newSourceLocation) {
-        unimplementedOperation("makeColumnRef");
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public ICreateTableStatement makeCreateTableStatement() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public IType makeType(String upperCase, String v0, String v1) {
+        // TODO Auto-generated method stub
         return null;
     }
 }

@@ -64,6 +64,7 @@
  */
  package org.voltdb.sqlparser.semantics.symtab;
 
+import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.symtab.ISourceLocation;
 import org.voltdb.sqlparser.syntax.symtab.TypeKind;
 
@@ -79,5 +80,11 @@ public class BooleanType extends Type {
     public BooleanType(ISourceLocation aLoc, String aName, TypeKind aKind) {
             super(aLoc, aName, aKind);
             // TODO Auto-generated constructor stub
+    }
+
+    @Override
+    public ISemantino evalConstant(String aString) {
+        // TODO Auto-generated method stub
+        return null;
     }
 }

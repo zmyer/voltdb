@@ -75,7 +75,7 @@ import org.voltdb.sqlparser.syntax.symtab.TypeKind;
  * @author bwhite
  *
  */
-public class Type extends Top implements IType {
+public abstract class Type extends Top implements IType {
     public TypeKind m_kind;
     public long     m_maxSize;
 
@@ -141,4 +141,5 @@ public class Type extends Top implements IType {
         }
         return String.format("%s(%d)", getName(), getMaxSize());
     }
+
 }

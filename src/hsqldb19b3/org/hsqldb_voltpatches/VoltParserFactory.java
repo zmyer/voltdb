@@ -2,18 +2,10 @@ package org.hsqldb_voltpatches;
 
 import java.util.List;
 
-import org.voltdb.sqlparser.semantics.grammar.CompoundSelectQuery;
-import org.voltdb.sqlparser.semantics.grammar.InsertStatement;
-import org.voltdb.sqlparser.semantics.grammar.SimpleTableSelectQuery;
-import org.voltdb.sqlparser.semantics.symtab.Index;
 import org.voltdb.sqlparser.semantics.symtab.ParserFactory;
-import org.voltdb.sqlparser.semantics.symtab.Semantino;
-import org.voltdb.sqlparser.semantics.symtab.SymbolTable;
-import org.voltdb.sqlparser.semantics.symtab.SymbolTable.TablePair;
-import org.voltdb.sqlparser.semantics.symtab.Table;
-import org.voltdb.sqlparser.semantics.symtab.Type;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
 import org.voltdb.sqlparser.syntax.grammar.IColumnIdent;
+import org.voltdb.sqlparser.syntax.grammar.ICreateTableStatement;
 import org.voltdb.sqlparser.syntax.grammar.IIndex;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
 import org.voltdb.sqlparser.syntax.grammar.IJoinTree;
@@ -50,266 +42,130 @@ public class VoltParserFactory extends ParserFactory implements IParserFactory {
     public VoltParserFactory(ICatalogAdapter aCatalog) {
         super(aCatalog);
     }
-
-    private String newId() {
-        return Integer.toString(m_id++);
-    }
-
     @Override
-    public IAST makeConstantAST(IType aType, Object aValueOf) {
-        assert(aType instanceof Type);
-        Type vtype = (Type)aType;
-        VoltXMLElement answer = new VoltXMLElement("value");
-        answer.withValue("id", newId());
-        answer.withValue("value", aValueOf.toString());
-        answer.withValue("valuetype", vtype.getName().toUpperCase());
-        return answer;
-    }
-
-    @Override
-    public IAST makeUnaryAST(IType aIntType, boolean aValueOf) {
-        Type intType = (Type)aIntType;
-        VoltXMLElement answer = new VoltXMLElement("value");
-        answer.withValue("id", newId());
-        answer.withValue("value", Boolean.toString(aValueOf));
-        answer.withValue("valuetype", intType.getName().toUpperCase());
-        return answer;
-    }
-
-    @Override
-    public IAST makeBinaryAST(IOperator aOp,
-                              ISemantino aLeftoperand,
-                              ISemantino aRightoperand) {
-        VoltXMLElement answer = new VoltXMLElement("operation");
-        answer.withValue("id", newId())
-              .withValue("optype", aOp.getVoltOperation());
-        answer.children.add((VoltXMLElement)aLeftoperand.getAST());
-        answer.children.add((VoltXMLElement)aRightoperand.getAST());
-        return answer;
-    }
-
-    /**
-     * Apparently we don't need to do anything to convert
-     * types.  Who would have thought it.
-     */
-    @Override
-    public IAST addTypeConversion(IAST aNode, IType aSrcType, IType aTrgType) {
-        return aNode;
-    }
-
-    @Override
-    public IAST makeQueryAST(List<Projection> aProjections,
-                              IAST aWhereCondition,
-                              ISymbolTable aTables) {
-        VoltXMLElement columns = makeColumns(aProjections, aTables);
-        VoltXMLElement params = makeParams();
-        VoltXMLElement joincond = makeJoinCond(aWhereCondition);
-        VoltXMLElement tablescans = makeTableScans(joincond, (SymbolTable)aTables);
-        VoltXMLElement answer = new VoltXMLElement("select");
-        answer.children.add(columns);
-        answer.children.add(params);
-        answer.children.add(tablescans);
-        return answer;
-    }
-
-    private VoltXMLElement makeParams() {
-        VoltXMLElement answer = new VoltXMLElement("parameters");
-        return answer;
-    }
-
-    private VoltXMLElement makeJoinCond(IAST aWhereCondition) {
-        if (aWhereCondition != null) {
-            VoltXMLElement answer = new VoltXMLElement("joincond");
-            answer.children.add((VoltXMLElement)aWhereCondition);
-            return answer;
-        }
+    public ITable makeTable(ISourceLocation aSourceLocation, String aTableName) {
+        // TODO Auto-generated method stub
         return null;
     }
-
-    private VoltXMLElement makeTableScans(VoltXMLElement aJoincond, SymbolTable aTables) {
-        VoltXMLElement answer = new VoltXMLElement("tablescans");
-        VoltXMLElement lastChild = null;
-        for (SymbolTable.TablePair tp : aTables.getTables()) {
-            VoltXMLElement scan = new VoltXMLElement("tablescan");
-            scan.withValue("jointype", "inner")
-                .withValue("table", tp.getTable().getName().toUpperCase())
-                .withValue("tablealias", tp.getAlias().toUpperCase());
-            answer.children.add(scan);
-            lastChild = scan;
-        }
-        if (aJoincond != null) {
-            lastChild.children.add(aJoincond);
-        }
-        return answer;
-    }
-
-    private VoltXMLElement makeColumns(List<Projection> aProjections,
-                                       ISymbolTable aTables) {
-        SymbolTable symtab = (SymbolTable)aTables;
-        VoltXMLElement answer = new VoltXMLElement("columns");
-        for (Projection proj : aProjections) {
-            if (proj.isStar()) {
-                addAllColumns(answer, aTables);
-            } else {
-                String colName = proj.getColumnName();
-                String tableAlias = proj.getTableName();
-                String tableName = symtab.getTableNameByColumn(colName);
-                if (tableName == null) {
-                    ISourceLocation aloc = newSourceLocation(proj.getLineNo(),
-                                                             proj.getColNo());
-                    getErrorMessages().addError(aloc,
-                                                "Cannot find column named \"%s\"",
-                                                colName);
-                    tableName = "<<NOT_FOUND>>";
-                }
-                String alias = proj.getAlias();
-                if (alias == null) {
-                    alias = colName;
-                }
-                addOneColumn(answer, tableName, tableAlias, colName, alias);
-            }
-        }
-        return answer;
-    }
-
-    private void addOneColumn(VoltXMLElement aAnswer, String aTableName, String aTableAlias, String aColumnName, String aColumnAlias) {
-        VoltXMLElement colref = new VoltXMLElement("columnref");
-        aAnswer.children.add(colref);
-        colref.withValue("id", newId())
-              .withValue("table", aTableName.toUpperCase())
-              .withValue("column", aColumnName.toUpperCase())
-              .withValue("alias", aColumnAlias.toUpperCase());
-        if (aTableAlias != null) {
-            colref.withValue("tablealias", aTableAlias.toUpperCase());
-        }
-    }
-
-    public void addAllColumns(VoltXMLElement aParent, ISymbolTable aTables) {
-        assert(aTables instanceof SymbolTable);
-        SymbolTable tables = (SymbolTable)aTables;
-        for (TablePair tblpair : tables.getTables()) {
-            String tableName = tblpair.getTable().getName();
-            String tableAlias = tblpair.getAlias();
-            Table tbl = tblpair.getTable();
-            for (int idx = 0; idx < tbl.getColumnCount(); idx += 1) {
-            	IColumn col = tbl.getColumnByIndex(idx);
-            	String colName = col.getName();
-                addOneColumn(aParent, tableName, tableAlias, colName, colName);
-            }
-        }
-    }
-
     @Override
-    public IAST makeColumnRef(String aRealTableName,
-                              String aTableAlias,
-                              String aColumnName) {
-        VoltXMLElement answer = new VoltXMLElement("columnref");
-        answer.withValue("alias", aColumnName.toUpperCase())
-              .withValue("column", aColumnName.toUpperCase())
-              .withValue("id", newId())
-              .withValue("table", aRealTableName.toUpperCase())
-              .withValue("tablealias", aTableAlias.toUpperCase());
-        return answer;
+    public IType makeType(String upperCase, String v0, String v1) {
+        // TODO Auto-generated method stub
+        return null;
     }
-
     @Override
-    public VoltXMLElement makeInsertAST(IInsertStatement aInsertStatement) {
-        assert(aInsertStatement instanceof InsertStatement);
-        InsertStatement insertStatement = (InsertStatement)aInsertStatement;
-        VoltXMLElement top = new VoltXMLElement("insert");
-        top.withValue("table", insertStatement.getTableName().toUpperCase());
-        VoltXMLElement columns = new VoltXMLElement("columns");
-        top.children.add(columns);
-        for (int idx = 0; idx < insertStatement.getNumberColumns(); idx += 1) {
-            VoltXMLElement col = new VoltXMLElement("column");
-            columns.children.add(col);
-            col.withValue("name", insertStatement.getColumnName(idx).toUpperCase());
-            VoltXMLElement val = new VoltXMLElement("value");
-            col.children.add(val);
-            val.withValue("id", Integer.toString(idx+1));
-            val.withValue("value", insertStatement.getColumnValue(idx));
-            val.withValue("valuetype", insertStatement.getColumnType(idx).getName().toUpperCase());
-        }
-        VoltXMLElement params = new VoltXMLElement("parameters");
-        top.children.add(params);
-        return top;
+    public ICatalogAdapter getCatalog() {
+        // TODO Auto-generated method stub
+        return null;
     }
-
-	@Override
-	public ISemantino getErrorSemantino() {
-		return Semantino.getErrorSemantino();
-	}
-
-	@Override
-	public IAST makeUnaryAST(IType type,
-							 IOperator aOperator,
-							 ISemantino aOperand) {
-        VoltXMLElement answer = new VoltXMLElement("operation");
-        answer.withValue("id", newId())
-              .withValue("optype", aOperator.getVoltOperation());
-        answer.children.add((VoltXMLElement)aOperand.getAST());
-        return answer;
-	}
-
-	@Override
-	public ISemantino makeQuerySemantino(ISelectQuery aQuery) {
-		return new Semantino(SymbolTable.getVoidType(),
-							 makeQueryAST(aQuery.getProjections(),
-									 	  aQuery.getWhereCondition(),
-									 	  aQuery.getTables()));
-	}
-
-	@Override
-	public IIndex newIndex(ISourceLocation aLoc,
-	                       String indexName,
-						   ITable table,
-						   IColumn column,
-						   IndexType indexType) {
-		if (indexName == null) {
-			indexName = makeIndexName(table.getName(), column.getName(), indexType);
-		}
-		return new Index(aLoc, indexName, indexType);
-	}
-
-	private String makeIndexName(String tableName,
-								 String columnName,
-								 IndexType indexType) {
-		switch (indexType) {
-		case PRIMARY_KEY:
-			return String.format(PRIMARY_KEY_INDEX_PATTERN, tableName.toUpperCase());
-		case UNIQUE_KEY:
-			return String.format(UNIQUE_KEY_INDEX_PATTERN, tableName.toUpperCase(), columnName.toUpperCase());
-		case ASSUMED_UNIQUE_KEY:
-			return String.format(ASSUMED_UNIQUE_KEY_INDEX_PATTERN, tableName.toUpperCase(), columnName.toUpperCase());
-		case INVALID:
-		default:
-			assert(false);
-		}
-		return null;
-	}
-
-	@Override
-	public ISelectQuery newCompoundQuery(QuerySetOp op, ISelectQuery left, ISelectQuery right) {
-		return new CompoundSelectQuery(op, left, right);
-	}
-
     @Override
-    public ISelectQuery newSimpleTableSelectQuery(ISourceLocation aLoc,
-                                                  ISymbolTable aSymbolTable,
-                                                  IParserFactory aFactory,
-                                                  ErrorMessageSet aErrorMessages) {
-        return new SimpleTableSelectQuery(aLoc, (SymbolTable)aSymbolTable, aFactory, aErrorMessages);
+    public ISelectQuery newSimpleTableSelectQuery(ISourceLocation aLoc, ISymbolTable aSymbolTable,
+            IParserFactory aFactory, ErrorMessageSet aErrorMessages) {
+        // TODO Auto-generated method stub
+        return null;
     }
+    @Override
+    public ISelectQuery newCompoundQuery(QuerySetOp op, ISelectQuery left, ISelectQuery right) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+    @Override
+    public void processQuery(ISelectQuery aSelectQuery) {
+        // TODO Auto-generated method stub
 
+    }
+    @Override
+    public IInsertStatement newInsertStatement() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+    @Override
+    public IAST makeConstantAST(IType aIntType, Object aIntegerValue) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+    @Override
+    public IAST makeUnaryAST(IType aIntType, boolean aBoolValue) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+    @Override
+    public IAST makeColumnRef(String aRealTableName, String aTableAlias, String aColumnName) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+    @Override
+    public IAST makeBinaryAST(IOperator aOp, ISemantino aLeftoperand, ISemantino aRightoperand) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+    @Override
+    public IOperator getExpressionOperator(String aText) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+    @Override
+    public IAST addTypeConversion(IAST aNode, IType aSrcType, IType aTrgType) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+    @Override
+    public IAST makeQueryAST(List<Projection> aProjections, IAST aWhereCondition, ISymbolTable aTables) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+    @Override
+    public IAST makeInsertAST(IInsertStatement aInsertStatement) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+    @Override
+    public ISemantino getErrorSemantino() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+    @Override
+    public IAST makeUnaryAST(IType type, IOperator aOperator, ISemantino aOperand) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+    @Override
+    public ISemantino makeQuerySemantino(ISelectQuery query) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+    @Override
+    public IIndex newIndex(ISourceLocation aLoc, String indexName, ITable table, IColumn column, IndexType it) {
+        // TODO Auto-generated method stub
+        return null;
+    }
     @Override
     public IJoinTree newJoinTree(JoinOperator op, IJoinTree joinTree, IJoinTree right, ISemantino condition) {
         // TODO Auto-generated method stub
         return null;
     }
-
+    @Override
+    public IJoinTree newTableReference(String aTableName, String aTableAlias) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+    @Override
+    public IJoinTree newDerivedJoinTree(ISelectQuery derivedTable, String tableName) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+    @Override
+    public ISourceLocation newSourceLocation(int aLineNumber, int aColumnNumber) {
+        // TODO Auto-generated method stub
+        return null;
+    }
     @Override
     public IColumnIdent makeColumnRef(String colName, ISourceLocation newSourceLocation) {
-        // TODO: Define this.
+        // TODO Auto-generated method stub
+        return null;
+    }
+    @Override
+    public ICreateTableStatement makeCreateTableStatement() {
+        // TODO Auto-generated method stub
         return null;
     }
 }

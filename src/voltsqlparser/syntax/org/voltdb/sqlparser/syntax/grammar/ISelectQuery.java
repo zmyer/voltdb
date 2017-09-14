@@ -18,98 +18,77 @@
 
 import java.util.List;
 
-import org.voltdb.sqlparser.syntax.symtab.IAST;
-import org.voltdb.sqlparser.syntax.symtab.IExpressionParser;
-import org.voltdb.sqlparser.syntax.symtab.ISourceLocation;
-import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
-import org.voltdb.sqlparser.syntax.symtab.ITable;
-import org.voltdb.sqlparser.syntax.symtab.IType;
-
 /**
  * This holds all the parts of a select statement.
+ *
+ * As we state in the package javadoc comment, an ISelect
+ * object has some parts.  As usual, we keep these things
+ * here in order to keep the grammar and grammar actions
+ * separate, to let the grammar be reusable.
+ * <ul>
+ *   <li>There is an expression parser.  Since we only build one
+ *       expression at a time in a single query, we only need one parser.
+ *       This expression parser keeps track of the expression stack.</li>
+ *   <li>There are slots for saving all the parts of the statement.
+ *       These are:
+ *     <ul>
+ *       <li>The display list, or select list.  This is a list of
+ *           {@link ISemantino}s.</li>
+ *       <li>The FROM list.  This is a list of {@link IJoinTree}s.  It
+ *           could be a single {@link IJoinTree}, with the list elements
+ *           joined with a cross join operator.</li>
+ *       <li>There are filters, for where and having expressions.  These
+ *           are {@link ISemantino}s whose type is boolean.  They may be null.</li>
+ *       <li>There is a list of group by keys and another list of order by
+ *           keys.  The elements of each of these is an {@link ISemantino}.
+ *           These may both be null.</li>
+ *       <li>An {@link ISelectQuery} also has a symbol table to which it may
+ *           add definitions.
+ *     </ul>
+ *   </li>
+ *   <li>The parser factory can create these.</li>
+ * </ul>
  *
  * @author bwhite
  */
 public interface ISelectQuery {
-
     /**
-     * Add a projection.  This is a select list element.
+     * Return the display list.  This is sometimes called the
+     * select list.
      *
-     * @param aTableName
-     * @param aColumnName
-     * @param aAlias
-     * @param aLineNo
-     * @param aColNo
+     * @return The select list.  This is never null.
      */
-    void addProjection(ISourceLocation aLoc, ISemantino aSemantino, String aAlias);
-
+    List<ISemantino> getDisplayList();
     /**
-     * Add a star projection.  This is also a select list element.
-     * @param aLoc
+     * Return the list of join trees.  For example, in the statement
+     * <p>
+     * <pre>select * from T AS A, T AS B, T AS C;</pre>
+     * </p>
+     * the join tree list would have elements from three copies of
+     * <code>T</code>, with aliases <code>A</code>, <code>B</code>
+     * and <code>C</code>.
+     *
+     * @return The list of join trees.  This is never null.
      */
-    void addStarProjection(ISourceLocation aLoc);
-
-    void pushSemantino(ISemantino aColumnSemantino);
-
-    ISemantino popSemantino();
-
-    String printProjections();
-
-    void addTable(ITable aITable, String aAlias);
-
-    String printTables();
-
-    boolean hasSemantinos();
-
-    ISemantino getColumnSemantino(String aColumnName, String aTableName);
-
-    ISemantino getConstantSemantino(Object value, IType type);
-
-    ISemantino getSemantinoMath(IOperator aOperator, ISemantino aLeftoperand,
-            ISemantino aRightoperand);
-
-    ISemantino getSemantinoCompare(IOperator aOperator, ISemantino aLeftoperand,
-            ISemantino aRightoperand);
-
-    ISemantino getSemantinoBoolean(IOperator aOperator, ISemantino aLeftoperand,
-            ISemantino aRightoperand);
-
-    List<Projection> getProjections();
-
-    void setWhereCondition(ISemantino aRet);
-
-    IAST getWhereCondition();
-
-    ISymbolTable getTables();
-
-    void setAST(IAST aMakeQueryAST);
-
-    boolean validate();
-
-    IExpressionParser getExpressionParser();
-
-    void setExpressionParser(IExpressionParser expr);
-
+    List<IJoinTree>  getJoinTreeList();
     /**
-     * Add a join condition to the select query.
-     * @param joinTree
+     * Get the order by keys.
+     * @return the order by keys.  This may be null.
      */
-    void addJoinTree(IJoinTree joinTree);
-
+    List<ISemantino> getOrderByKeys();
     /**
-     * Get the next display list alias for this
-     * select statement.
-     * @return
+     * Get the group by keys.
+     * @return the group by keys.  This may be null.
      */
-    String getNextDisplayAlias();
-
-    void setQuantifier(SetQuantifier q);
-
-    boolean isSimpleTable();
-
-    QuerySetOp getSetOp() throws Exception;
-
-    ISelectQuery getLeftQuery();
-
-    ISelectQuery getRightQuery();
+    List<ISemantino> getGroupByKeys();
+    /**
+     * Get the where filter.
+     * @return the where filter.  This may be null.
+     */
+    ISemantino       getWhereFilter();
+    /**
+     * Get the having filter.
+     * @return the having filter.  This may be null.
+     */
+    ISemantino       getHavingFilter();
 }
