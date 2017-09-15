@@ -100,16 +100,7 @@ public class AVROSnapshotFilter implements SnapshotDataFilter {
             }
         }
         m_schema = fa.endRecord();
-        System.out.println("Schema is: " + m_schema.toString());
-//        try {
-//          MessageDigest digester = MessageDigest.getInstance("MD5");
-//          long time = System.currentTimeMillis();
-//          digester.update((UUID.randomUUID()+"@"+time).getBytes());
-//          m_sync = digester.digest();
-//        } catch (NoSuchAlgorithmException e) {
-//          throw new RuntimeException(e);
-//        }
-
+        //System.out.println("Schema is: " + m_schema.toString());
         m_schemaBytes = PrivateVoltTableFactory.getSchemaBytes(vt);
     }
     boolean initialized = false;
@@ -156,8 +147,9 @@ public class AVROSnapshotFilter implements SnapshotDataFilter {
                     if (firstBlock != null) {
                         bbos.write(firstBlock, 0, firstBlock.length);
                     }
-                    GenericDatumWriter<GenericRecord> writer = new GenericDatumWriter<GenericRecord>(m_schema);
+                    GenericDatumWriter<GenericRecord> writer = new GenericDatumWriter<>(m_schema);
                     Encoder e = EncoderFactory.get().jsonEncoder(m_schema, bbos);
+                    //Binary encoder writes but avro tools cant read either tool is bad or something missing on our side.
                     //Encoder e = EncoderFactory.get().binaryEncoder(bbos, m_e);
                     GenericData.Record to = new GenericData.Record(m_schema);
                     while (vt.advanceRow()) {
