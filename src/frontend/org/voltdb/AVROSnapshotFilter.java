@@ -17,19 +17,19 @@
 package org.voltdb;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.UUID;
 import java.util.concurrent.Callable;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
-import org.apache.avro.file.CodecFactory;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.BinaryEncoder;
+import org.apache.avro.io.Encoder;
+import org.apache.avro.io.EncoderFactory;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
@@ -45,7 +45,6 @@ public class AVROSnapshotFilter implements SnapshotDataFilter {
     private final ArrayList<String> m_columnNames;
     private final Schema m_schema;
     private final String m_tableName;
-    private byte[] m_sync;
 
     public AVROSnapshotFilter(
             String tableName,
@@ -102,16 +101,38 @@ public class AVROSnapshotFilter implements SnapshotDataFilter {
         }
         m_schema = fa.endRecord();
         System.out.println("Schema is: " + m_schema.toString());
-        try {
-          MessageDigest digester = MessageDigest.getInstance("MD5");
-          long time = System.currentTimeMillis();
-          digester.update((UUID.randomUUID()+"@"+time).getBytes());
-          m_sync = digester.digest();
-        } catch (NoSuchAlgorithmException e) {
-          throw new RuntimeException(e);
-        }
+//        try {
+//          MessageDigest digester = MessageDigest.getInstance("MD5");
+//          long time = System.currentTimeMillis();
+//          digester.update((UUID.randomUUID()+"@"+time).getBytes());
+//          m_sync = digester.digest();
+//        } catch (NoSuchAlgorithmException e) {
+//          throw new RuntimeException(e);
+//        }
 
         m_schemaBytes = PrivateVoltTableFactory.getSchemaBytes(vt);
+    }
+    boolean initialized = false;
+    BinaryEncoder m_e;
+    private synchronized byte[] create() {
+        if (initialized) return null;
+        try {
+            final ByteArrayOutputStream bbos = new ByteArrayOutputStream();
+            GenericDatumWriter<GenericRecord> dwriter = new GenericDatumWriter<>(m_schema);
+            final DataFileWriter<GenericRecord> fileWriter = new DataFileWriter<>(dwriter);
+            //Set codec before fileWriter is created.
+            // fileWriter.setCodec(CodecFactory.snappyCodec());
+            fileWriter.create(m_schema, bbos);
+            fileWriter.flush();
+            byte [] retval = bbos.toByteArray();
+            bbos.close();
+            m_e = EncoderFactory.get().binaryEncoder(bbos, null);
+            initialized = true;
+            return retval;
+        } catch (IOException ioe) {
+            ioe.printStackTrace();
+        }
+        return null;
     }
 
     @Override
@@ -130,14 +151,14 @@ public class AVROSnapshotFilter implements SnapshotDataFilter {
                     buf.put(cont.b());
 
                     VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer(buf, true);
-                    final ByteArrayOutputStream bbos = new ByteArrayOutputStream();
-                    GenericDatumWriter<GenericRecord> dwriter = new GenericDatumWriter<>(m_schema);
-                    final DataFileWriter<GenericRecord> fileWriter = new DataFileWriter<>(dwriter);
-                    //Set codec before fileWriter is created.
-                    fileWriter.setCodec(CodecFactory.snappyCodec());
-                    fileWriter.create(m_schema, bbos, m_sync);
-                    fileWriter.setFlushOnEveryBlock(false);
-
+                    byte[] firstBlock = create();
+                    ByteArrayOutputStream bbos = new ByteArrayOutputStream();
+                    if (firstBlock != null) {
+                        bbos.write(firstBlock, 0, firstBlock.length);
+                    }
+                    GenericDatumWriter<GenericRecord> writer = new GenericDatumWriter<GenericRecord>(m_schema);
+                    Encoder e = EncoderFactory.get().jsonEncoder(m_schema, bbos);
+                    //Encoder e = EncoderFactory.get().binaryEncoder(bbos, m_e);
                     GenericData.Record to = new GenericData.Record(m_schema);
                     while (vt.advanceRow()) {
                         Pair<String[], Object[]> l = VoltTableUtil.valuesAsList(vt, m_columnTypes);
@@ -146,12 +167,14 @@ public class AVROSnapshotFilter implements SnapshotDataFilter {
                             Object val = l.getSecond()[ii];
                             to.put(key, val);
                         }
-                        fileWriter.append(to);
-                        fileWriter.flush();
+                        writer.write(to, e);
+                        e.flush();
                     }
+                    byte[] ret = bbos.toByteArray();
+                    bbos.close();
                     final BBContainer origin = cont;
                     cont = null;
-                    BBContainer retVal = new BBContainer(ByteBuffer.wrap(bbos.toByteArray())) {
+                    BBContainer retVal = new BBContainer(ByteBuffer.wrap(ret)) {
                         @Override
                         public void discard() {
                             checkDoubleFree();
