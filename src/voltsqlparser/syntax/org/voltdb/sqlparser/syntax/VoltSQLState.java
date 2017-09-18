@@ -24,14 +24,11 @@ import org.voltdb.sqlparser.syntax.grammar.ICreateTableStatement;
 import org.voltdb.sqlparser.syntax.grammar.ISQLStatement;
 import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
 import org.voltdb.sqlparser.syntax.grammar.ISemantino;
-import org.voltdb.sqlparser.syntax.grammar.IStatementWithTable;
-import org.voltdb.sqlparser.syntax.symtab.IColumn;
 import org.voltdb.sqlparser.syntax.symtab.IParserFactory;
 import org.voltdb.sqlparser.syntax.symtab.ISourceLocation;
 import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
 import org.voltdb.sqlparser.syntax.symtab.ITable;
 import org.voltdb.sqlparser.syntax.symtab.IType;
-import org.voltdb.sqlparser.syntax.symtab.IndexType;
 import org.voltdb.sqlparser.syntax.util.ErrorMessage;
 import org.voltdb.sqlparser.syntax.util.ErrorMessageSet;
 
@@ -145,17 +142,6 @@ public class VoltSQLState {
     }
 
     /**
-     * Return a statement which has a table.
-     * @param doPop
-     * @return
-     */
-    public IStatementWithTable topStatementWithTable(boolean doPop) {
-        ISQLStatement stmt = topStatement(false);
-        return (stmt instanceof IStatementWithTable)
-                ? (IStatementWithTable)stmt
-                : null;
-    }
-    /**
      * Fetch or pop the top statement if it's an ICreateTableStatement.  Otherwise
      * return null.
      *
@@ -204,15 +190,6 @@ public class VoltSQLState {
     public void addTableToCatalog(ITable aTable) {
         m_catalog.addTable(aTable);
     }
-
-    IColumn makeColumn(String aColumnName,
-                       IType  aType,
-                       ISemantino aDefaultValue,
-                       boolean    aNotNull,
-                       IndexType  aKeyType) {
-        return m_ParserFactory.makeColumn(aColumnName, aType, aDefaultValue, aNotNull, aKeyType);
-    }
-
 
     ////////////////////////////////////////////////////////////////////////
     //

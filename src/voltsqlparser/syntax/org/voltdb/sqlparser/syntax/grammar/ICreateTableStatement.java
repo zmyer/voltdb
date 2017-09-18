@@ -16,10 +16,28 @@
  */
 package org.voltdb.sqlparser.syntax.grammar;
 
+import org.voltdb.sqlparser.syntax.symtab.ITable;
+
 /**
  * Object implementing this interface are Create Table statements.
  *
  * @author bwhite
  */
-public interface ICreateTableStatement extends ISQLStatement, IStatementWithTable {
+public interface ICreateTableStatement extends ISQLStatement {
+    /**
+     * Set the table name.
+     *
+     * @param text
+     */
+    void setTableName(String text);
+    String getTableName();
+
+    /**
+     * Set the table object itself.
+     *
+     * @param makeTable
+     */
+    void setTable(ITable makeTable);
+    ITable getTable();
+
 }

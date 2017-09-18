@@ -28,7 +28,6 @@ import org.antlr.v4.runtime.atn.ATNConfigSet;
 import org.antlr.v4.runtime.dfa.DFA;
 import org.voltdb.sqlparser.syntax.grammar.ICreateTableStatement;
 import org.voltdb.sqlparser.syntax.grammar.ISemantino;
-import org.voltdb.sqlparser.syntax.grammar.IStatementWithTable;
 import org.voltdb.sqlparser.syntax.grammar.SQLParserBaseVisitor;
 import org.voltdb.sqlparser.syntax.grammar.SQLParserParser;
 import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Column_default_valueContext;
@@ -37,7 +36,6 @@ import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Column_not_nullContex
 import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.DatatypeContext;
 import org.voltdb.sqlparser.syntax.grammar.SQLParserParser.Index_typeContext;
 import org.voltdb.sqlparser.syntax.symtab.ISourceLocation;
-import org.voltdb.sqlparser.syntax.symtab.ITable;
 import org.voltdb.sqlparser.syntax.symtab.IType;
 import org.voltdb.sqlparser.syntax.symtab.IndexType;
 
@@ -70,6 +68,7 @@ public class VoltSQLVisitor<T extends VoltSQLState> extends SQLParserBaseVisitor
             = (ICreateTableStatement)m_state.pushStatement(m_state.getParserFactory().makeCreateTableStatement());
 
         String tableName = ctx.table_name().IDENTIFIER().getText().toUpperCase();
+        stmt.setTableName(tableName);
         stmt.setTable(m_state.makeTable(newSourceLocation(ctx.table_name().start), tableName));
         //
         // Walk the subtree.
@@ -95,13 +94,9 @@ public class VoltSQLVisitor<T extends VoltSQLState> extends SQLParserBaseVisitor
         List<Column_default_valueContext> mdctx_dv = mdctx.column_default_value();
         List<Column_not_nullContext> mdctx_nn = mdctx.column_not_null();
         List<Index_typeContext> mdctx_it = mdctx.index_type();
-
-        IStatementWithTable stmt = m_state.topStatementWithTable(false);
-        assert(stmt != null);
-        ITable currentTable = stmt.getTable();
         if ((mdctx_dv != null) && ( ! mdctx_dv.isEmpty())) {
             if (mdctx_dv.size() > 1) {
-                String tableName = currentTable.getName();
+                String tableName = getTableNameFromCurrentStatement();
                 m_state.addError(newSourceLocation(mdctx.start),
                                  "Column %s.%s has multiple default values.",
                                  tableName,
@@ -113,7 +108,7 @@ public class VoltSQLVisitor<T extends VoltSQLState> extends SQLParserBaseVisitor
         }
         if ((mdctx_nn != null) && ( ! mdctx_nn.isEmpty())) {
             if (mdctx_nn.size() > 1) {
-                String tableName = currentTable.getName();
+                String tableName = getTableNameFromCurrentStatement();
                 m_state.addError(newSourceLocation(mdctx.start),
                                  "Column %s.%s specifies NOT NULL multiple times.",
                                  tableName,
@@ -124,7 +119,7 @@ public class VoltSQLVisitor<T extends VoltSQLState> extends SQLParserBaseVisitor
         }
         if ((mdctx_it != null) && (! mdctx_it.isEmpty())) {
             if (mdctx_it.size() > 1) {
-                String tableName = currentTable.getName();
+                String tableName = getTableNameFromCurrentStatement();
                 m_state.addError(newSourceLocation(mdctx.start),
                                  "Column %s.%s specifies multiple key types.",
                                  tableName,
@@ -140,13 +135,17 @@ public class VoltSQLVisitor<T extends VoltSQLState> extends SQLParserBaseVisitor
                 }
             }
         }
-        currentTable.addColumn(columnName,
-                               m_state.makeColumn(columnName,
-                                                  type,
-                                                  defaultValue,
-                                                  not_null,
-                                                  keyType));
         return m_state;
+    }
+
+
+    private String getTableNameFromCurrentStatement() {
+        ICreateTableStatement ctstmt = m_state.topCreateTableStatement(false);
+        if (ctstmt != null) {
+            return ctstmt.getTableName();
+        }
+        // Similar for alter table statement.
+        return null;
     }
 
     private IType makeDataType(DatatypeContext datatype) {
