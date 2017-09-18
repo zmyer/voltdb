@@ -70,12 +70,20 @@ package org.voltdb.sqlparser.semantics.symtab;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.voltdb.sqlparser.semantics.grammar.InsertStatement;
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
 import org.voltdb.sqlparser.syntax.grammar.IColumnIdent;
+import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
+import org.voltdb.sqlparser.syntax.grammar.IJoinTree;
 import org.voltdb.sqlparser.syntax.grammar.IOperator;
+import org.voltdb.sqlparser.syntax.grammar.ISelectQuery;
 import org.voltdb.sqlparser.syntax.grammar.ISemantino;
+import org.voltdb.sqlparser.syntax.symtab.IColumn;
+import org.voltdb.sqlparser.syntax.symtab.IExpressionParser;
 import org.voltdb.sqlparser.syntax.symtab.IParserFactory;
+import org.voltdb.sqlparser.syntax.symtab.ISourceLocation;
 import org.voltdb.sqlparser.syntax.symtab.ISymbolTable;
+import org.voltdb.sqlparser.syntax.symtab.ITable;
 import org.voltdb.sqlparser.syntax.symtab.IType;
 import org.voltdb.sqlparser.syntax.util.ErrorMessageSet;
 
@@ -122,6 +130,54 @@ public abstract class ParserFactory implements IParserFactory {
     @Override
     public ISymbolTable getStandardPrelude() {
         return m_stdPrelude;
+    }
+
+    @Override
+    public IColumn newColumn(ISourceLocation aLoc, String aColName, IType aColType) {
+        assert(aColType instanceof Type);
+        return new Column(aLoc, aColName, (Type)aColType);
+    }
+
+    @Override
+    public ITable newTable(ISourceLocation aLoc, String aTableName) {
+        return new Table(aLoc, aTableName);
+    }
+
+    @Override
+    public ICatalogAdapter getCatalog() {
+        return m_catalog;
+    }
+
+    @Override
+    public IJoinTree newTableReference(String aTableName, String aTableAlias) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public IJoinTree newDerivedJoinTree(ISelectQuery derivedTable, String tableName) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+    /**
+     * Process a query.
+     */
+    @Override
+    public void processQuery(ISelectQuery aSelectQuery) {
+        // put projections onto semantino stack.
+        aSelectQuery.setAST(makeQueryAST(aSelectQuery.getProjections(),
+                                         aSelectQuery.getWhereCondition(),
+                                         aSelectQuery.getTables()));
+    }
+
+    @Override
+    public IInsertStatement newInsertStatement() {
+        return new InsertStatement();
+    }
+
+    @Override
+    public IOperator getExpressionOperator(String aText) {
+        return m_operatorMap.get(aText);
     }
 
     /*
@@ -187,6 +243,21 @@ public abstract class ParserFactory implements IParserFactory {
                                       int    aColLineNo,
                                       int    aColColNo) {
         return new ColumnIdent(aColName, aColLineNo, aColColNo);
+    }
+
+    @Override
+    public IExpressionParser makeExpressionParser(ISymbolTable aSymbolTable) {
+        return new ExpressionParser(this, aSymbolTable);
+    }
+
+    @Override
+    public ISemantino getErrorSemantino() {
+        return Semantino.getErrorSemantino();
+    }
+
+    @Override
+    public ISourceLocation newSourceLocation(int aLineNumber, int aColumnNumber) {
+        return new SourceLocation(aLineNumber, aColumnNumber);
     }
 
 }

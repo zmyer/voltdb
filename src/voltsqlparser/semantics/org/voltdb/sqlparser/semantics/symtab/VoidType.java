@@ -48,7 +48,6 @@
  */
 package org.voltdb.sqlparser.semantics.symtab;
 
-import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.symtab.ISourceLocation;
 import org.voltdb.sqlparser.syntax.symtab.TypeKind;
 
@@ -60,11 +59,5 @@ public class VoidType extends Type {
     @Override
     public boolean isVoidType() {
         return true;
-    }
-
-    @Override
-    public ISemantino evalConstant(String aString) {
-        // TODO Auto-generated method stub
-        return null;
     }
 }

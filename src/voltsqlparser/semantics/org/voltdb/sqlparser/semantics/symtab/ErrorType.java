@@ -48,7 +48,6 @@
  */
 package org.voltdb.sqlparser.semantics.symtab;
 
-import org.voltdb.sqlparser.syntax.grammar.ISemantino;
 import org.voltdb.sqlparser.syntax.symtab.ISourceLocation;
 import org.voltdb.sqlparser.syntax.symtab.ITop;
 import org.voltdb.sqlparser.syntax.symtab.TypeKind;
@@ -63,11 +62,5 @@ public class ErrorType extends Type implements ITop {
     @Override
     public boolean isErrorType() {
         return true;
-    }
-
-    @Override
-    public ISemantino evalConstant(String aString) {
-        // TODO Auto-generated method stub
-        return null;
     }
 }

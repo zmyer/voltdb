@@ -46,13 +46,15 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
- package org.voltdb.sqlparser.syntax.grammar;
+ package org.voltdb.sqlparser.semantics.grammar;
 
 /**
- * This marker interface marks DQL statements.
+ * This marker interface is the root of the SQL
+ * statement hierarchy.
+ *
  * @author bwhite
  *
  */
-public interface IDQLStatement extends ISQLStatement {
+public interface ISQLStatement {
 
 }

@@ -48,8 +48,6 @@
  */
  package org.voltdb.sqlparser.syntax.symtab;
 
-import org.voltdb.sqlparser.syntax.grammar.ISemantino;
-
 /**
  * IType is the interface of Types.
  *
@@ -69,6 +67,4 @@ public interface IType extends ITop {
     boolean isFixedSize();
 
     IType makeInstance(ISourceLocation aLoc, long ... param);
-
-    ISemantino evalConstant(String aString);
 }

@@ -53,7 +53,6 @@ import java.util.List;
 
 import org.voltdb.sqlparser.syntax.grammar.ICatalogAdapter;
 import org.voltdb.sqlparser.syntax.grammar.IColumnIdent;
-import org.voltdb.sqlparser.syntax.grammar.ICreateTableStatement;
 import org.voltdb.sqlparser.syntax.grammar.IIndex;
 import org.voltdb.sqlparser.syntax.grammar.IInsertStatement;
 import org.voltdb.sqlparser.syntax.grammar.IJoinTree;
@@ -79,28 +78,31 @@ import org.voltdb.sqlparser.syntax.util.ErrorMessageSet;
  *
  */
 public interface IParserFactory {
-    ////////////////////////////////////////////////////////////////////////
-    //
     // Environment operations
-    //
-    ////////////////////////////////////////////////////////////////////////
     /**
      * The standard prelude is the declarations of all names
      * which are built-in by the language.  Examples of these are
      * the types, INTEGER, BOOLEAN and so forth, and the
      * functions.
-     * @return A new, initial ISymboTable object.
+     * @return
      */
     ISymbolTable getStandardPrelude();
     /**
-     * A Catalog, from VoltDB, represents the schema.  It contains a set of
-     * Tables and Indices which have already been defined.  A Catalog Adapter
-     * transforms this catalog into something we can use.
-     *
-     * @return The current catalog.
+     * A Catalog represents the schema.  It contains a set of
+     * Tables and Indices which have already been defined.
+     * @return
      */
     ICatalogAdapter getCatalog();
 
+    // Semantic Object Creation Functions.
+    /**
+     * This creates a new column.
+     *
+     * @param aColName
+     * @param aColType
+     * @return
+     */
+    IColumn newColumn(ISourceLocation aLoc, String aColName, IType aColType);
     /**
      * Create a new empty table.  The columns will be filled in as the
      * parser finds them.
@@ -108,7 +110,7 @@ public interface IParserFactory {
      * @param aTableName
      * @return
      */
-    ITable makeTable(ISourceLocation aSourceLocation, String aTableName);
+    ITable newTable(ISourceLocation aSourceLocation, String aTableName);
 
     /**
      * Create a new simple table select query object.  This is a complicated
@@ -282,6 +284,13 @@ public interface IParserFactory {
                                int colColNo);
 
     /**
+     * Make a new expression parsing regime.
+     * @param factory
+     *
+     * @return
+     */
+    IExpressionParser makeExpressionParser(ISymbolTable aSymbolTable);
+    /**
      * When handling errors, we sometimes need a Semantino to represent
      * a value which is not in evidence.
      *
@@ -358,19 +367,4 @@ public interface IParserFactory {
      * @return
      */
     IColumnIdent makeColumnRef(String colName, ISourceLocation newSourceLocation);
-    /**
-     * Make a new ICreateTable object.
-     *
-     * @return The new object.
-     */
-    ICreateTableStatement makeCreateTableStatement();
-    /**
-     * Lookup or create a type with the given name and parameters.
-     *
-     * @param upperCase
-     * @param v0
-     * @param v1
-     * @return
-     */
-    IType makeType(String upperCase, String v0, String v1);
 }
