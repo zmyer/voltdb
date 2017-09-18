@@ -869,14 +869,15 @@ public abstract class ProcedureCompiler {
 
             // set the procedure parameter types from the statement parameter types
             int paramCount = params.size();
-            AJG.log("Walking through parameters...");
+            AJG.log("Walking through parameters reversing them...");
+            int totalcount = CatalogUtil.getSortedCatalogItems(stmtParams, "index").size() -1;
             for (StmtParameter stmtParam : CatalogUtil.getSortedCatalogItems(stmtParams, "index")) {
                 // name each parameter "param1", "param2", etc...
                 ProcParameter procParam = params.add("param" + String.valueOf(paramCount));
-                //stmtParam.setIndex(0);
-                procParam.setIndex(paramCount);
+                procParam.setIndex(totalcount-paramCount);
                 procParam.setIsarray(stmtParam.getIsarray());
                 procParam.setType(stmtParam.getJavatype());
+                stmtParam.setIndex(paramCount);
                 paramCount++;
                 AJG.log("Count: " + String.valueOf(paramCount) + " index: " + String.valueOf(stmtParam.getIndex()));
               
