@@ -63,8 +63,8 @@
 # AND VoltDB gives VOLTDB ERROR: Type DECIMAL can't be cast as FLOAT, so keep it disabled, for now.
 # If the only problem were HSQL HAS BAD DEFAULT PRECISION, we could USE FUZZY MATCHING.
 # Enable this test to investigate the "DECIMAL can't be cast as FLOAT" issue
-#    "advanced-decimal-fuzzy": {"schema": "decimal-schema.py",
-#                               "ddl": "DDL.sql",
-#                               "template": "advanced-decimal.sql",
-#                               "normalizer": "fuzzynormalizer.py"},
+#    "advanced-decimal": {"schema": "decimal-schema.py",
+#                         "ddl": "DDL.sql",
+#                         "template": "advanced-decimal.sql",
+#                         "normalizer": "normalizer.py"},
 }

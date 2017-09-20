@@ -23,7 +23,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 
-# This file contains the "upsert" tests (and one quick joined materialized
+# This file contains the "upsert" [and insert, for now] tests (and one quick joined materialized
 # view test suite), which are a subset of those run by the "postgis"
 # sqlcoverage Jenkins job.
 
@@ -60,6 +60,38 @@
     "upsert-geo-polygon": {"schema": "geo-polygon-schema.py",
                            "ddl": "geo-DDL.sql",
                            "template": "upsert-geo-polygon.sql",
+                           "normalizer": "normalizer.py",
+                           "precision": "8"},
+
+    # INSERT tests (may want to move these elsewhere)
+    "insert": {"schema": "schema.py",
+               "ddl": "DDL.sql",
+               "template": "insert.sql",
+               "normalizer": "nulls-lowest-normalizer.py"},
+    "insert-ints": {"schema": "int-schema.py",
+                    "ddl": "int-DDL-null.sql",
+                    "template": "insert-ints.sql",
+                    "normalizer": "nulls-lowest-normalizer.py"},
+    "insert-strings": {"schema": "strings-schema.py",
+                       "ddl": "strings-DDL-null.sql",
+                       "template": "insert-strings.sql",
+                       "normalizer": "nulls-lowest-normalizer.py"},
+    "insert-decimal": {"schema": "decimal-schema.py",
+                       "ddl": "DDL-null.sql",
+                       "template": "insert-decimal.sql",
+                       "normalizer": "nulls-lowest-normalizer.py"},
+    "insert-timestamp": {"schema": "timestamp-schema.py",
+                         "ddl": "DDL-null.sql",
+                         "template": "insert-timestamp.sql",
+                         "normalizer": "nulls-lowest-normalizer.py"},
+    "insert-geo-point": {"schema": "geo-point-schema.py",
+                         "ddl": "geo-DDL.sql",
+                         "template": "insert-geo-point.sql",
+                         "normalizer": "normalizer.py",
+                         "precision": "8"},
+    "insert-geo-polygon": {"schema": "geo-polygon-schema.py",
+                           "ddl": "geo-DDL.sql",
+                           "template": "insert-geo-polygon.sql",
                            "normalizer": "normalizer.py",
                            "precision": "8"},
 

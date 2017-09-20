@@ -60,9 +60,8 @@
 # and FUZZY MATCHING, instead.
 # Enable this test to investigate the "DECIMAL can't be cast as FLOAT" and/or "Backend DML Error" issues
 # without being thrown off by HSQL HAS BAD DEFAULT PRECISION issues.
-#    "basic-decimal-fuzzy": {"schema": "decimal-schema.py",
-#                            "ddl": "DDL.sql",
-#                            "template": "basic-decimal.sql",
-#                            "normalizer": "fuzzynormalizer.py"},
-#
+#    "basic-decimal": {"schema": "decimal-schema.py",
+#                      "ddl": "DDL.sql",
+#                      "template": "basic-decimal.sql",
+#                      "normalizer": "normalizer.py"},
 }
