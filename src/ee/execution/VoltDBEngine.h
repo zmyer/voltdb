@@ -621,10 +621,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         std::map<std::string, StreamedTable*> m_exportingTables;
         /*
-         * Map of table signatures to exporting stream wrappers.
-         */
-        std::map<std::string, ExportTupleStream*> m_exportingStreams;
-        /*
          * Map of table signatures to exporting stream wrappers which are deleted.
          */
         std::map<std::string, ExportTupleStream*> m_exportingDeletedStreams;

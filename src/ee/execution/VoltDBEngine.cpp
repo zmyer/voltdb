@@ -920,15 +920,13 @@ bool VoltDBEngine::processCatalogAdditions(bool isStreamUpdate, int64_t timestam
                 streamedtable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
                 m_exportingTables[catalogTable->signature()] = streamedtable;
                 if (tcd->exportEnabled()) {
-                    ExportTupleStream *wrapper = m_exportingStreams[catalogTable->signature()];
-                    if (!wrapper) {
-                        wrapper = new ExportTupleStream(m_executorContext->m_partitionId, m_executorContext->m_siteId, timestamp, catalogTable->signature());
-                        m_exportingStreams[catalogTable->signature()] = wrapper;
+                    if (!streamedtable->getWrapper()) {
+                        ExportTupleStream *wrapper = new ExportTupleStream(m_executorContext->m_partitionId, m_executorContext->m_siteId, timestamp, catalogTable->signature());
+                        streamedtable->setWrapper(wrapper);
                     } else {
                         //Undelete them.
                         purgedStreams[catalogTable->signature()] = NULL;
                     }
-                    streamedtable->setWrapper(wrapper);
                 }
 
                 std::vector<catalog::MaterializedViewInfo*> survivingInfos;
@@ -993,15 +991,13 @@ bool VoltDBEngine::processCatalogAdditions(bool isStreamUpdate, int64_t timestam
                             //Reset generation after stream wrapper is created.
                             streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
                             m_exportingTables[catalogTable->signature()] = streamedTable;
-                            ExportTupleStream *wrapper = m_exportingStreams[catalogTable->signature()];
-                            if (!wrapper) {
-                                wrapper = new ExportTupleStream(m_executorContext->m_partitionId, m_executorContext->m_siteId, timestamp, catalogTable->signature());
-                                m_exportingStreams[catalogTable->signature()] = wrapper;
+                            if (!streamedTable->getWrapper()) {
+                                ExportTupleStream *wrapper = new ExportTupleStream(m_executorContext->m_partitionId, m_executorContext->m_siteId, timestamp, catalogTable->signature());
+                                streamedTable->setWrapper(wrapper);
                             } else {
                                 //Undelete them.
                                 purgedStreams[catalogTable->signature()] = NULL;
                             }
-                            streamedTable->setWrapper(wrapper);
                         }
                     }
                 }
@@ -1300,7 +1296,6 @@ VoltDBEngine::purgeMissingStreams(std::map<std::string, ExportTupleStream*> & pu
     BOOST_FOREACH (LabeledStreamWrapper entry, purgedStreams) {
         //Do delete later
         if (entry.second) {
-            m_exportingStreams[entry.first] = NULL;
             m_exportingDeletedStreams[entry.first] = entry.second;
             entry.second->pushEndOfStream();
         }
