@@ -115,6 +115,7 @@ import org.voltdb.utils.VoltTableUtil;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.primitives.Longs;
+import org.voltdb.utils.MiscUtils;
 
 @ProcInfo (
         singlePartition = false
@@ -1521,7 +1522,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
             Map<Integer, Long> drSequenceNumbers,
             Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> drMixedClusterSizeConsumerState) {
         // If this is a truncation snapshot restored during recover, try to set DR protocol version
-        if (drVersion != 0) {
+        if (drVersion != 0 && MiscUtils.isPro()) {
             context.getSiteProcedureConnection().setDRProtocolVersion((int)drVersion);
         }
 
@@ -1541,9 +1542,11 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
         Long drSequenceNumber = drSequenceNumbers.get(myPartitionId);
         Long mpDRSequenceNumber = drSequenceNumbers.get(MpInitiator.MP_INIT_PID);
-        context.getSiteProcedureConnection().setDRSequenceNumbers(drSequenceNumber, mpDRSequenceNumber);
-        if (VoltDB.instance().getNodeDRGateway() != null && context.isLowestSiteId()) {
-            VoltDB.instance().getNodeDRGateway().cacheSnapshotRestoreTruncationPoint(drSequenceNumbers);
+        if (MiscUtils.isPro()) {
+            context.getSiteProcedureConnection().setDRSequenceNumbers(drSequenceNumber, mpDRSequenceNumber);
+            if (VoltDB.instance().getNodeDRGateway() != null && context.isLowestSiteId()) {
+                VoltDB.instance().getNodeDRGateway().cacheSnapshotRestoreTruncationPoint(drSequenceNumbers);
+            }
         }
     }
 

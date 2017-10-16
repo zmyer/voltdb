@@ -96,9 +96,10 @@ StreamedTable::~StreamedTable() {
     for (int i = 0; i < m_views.size(); i++) {
         delete m_views[i];
     }
-    //Dont delete wrapper
-//    delete m_wrapper;
-    m_wrapper = NULL;
+    if (m_wrapper) {
+       delete m_wrapper;
+       m_wrapper = NULL;
+    }
 }
 
 TableIterator StreamedTable::iterator() {
