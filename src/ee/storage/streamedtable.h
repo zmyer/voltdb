@@ -126,6 +126,7 @@ public:
     }
 
     void setWrapper(ExportTupleStream *wrapper) {
+        assert(m_wrapper == NULL);
         m_wrapper = wrapper;
     }
 

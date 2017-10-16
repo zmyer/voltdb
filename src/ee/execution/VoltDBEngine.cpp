@@ -821,10 +821,9 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, std::map<std::string, Exp
             auto streamedtable = dynamic_cast<StreamedTable*>(table);
             if (streamedtable) {
                 const std::string signature = tcd->signature();
-                streamedtable->setSignatureAndGeneration(signature, timestamp);
-                m_exportingTables.erase(signature);
                 //Maintain the streams that will go away for which wrapper needs to be cleaned;
                 purgedStreams[signature] = streamedtable->getWrapper();
+                m_exportingTables.erase(signature);
             }
             delete tcd;
         }
@@ -1697,15 +1696,17 @@ std::string VoltDBEngine::dumpCurrentHashinator() const {
 /** Perform once per second, non-transactional work. */
 void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
     m_executorContext->setupForTick(lastCommittedSpHandle);
-    BOOST_FOREACH (LabeledStream table, m_exportingTables) {
-        table.second->flushOldTuples(timeInMillis);
-    }
     //On Tick do cleanup of dropped streams.
     BOOST_FOREACH (LabeledStreamWrapper entry, m_exportingDeletedStreams) {
         if (entry.second) {
             entry.second->periodicFlush(-1L, lastCommittedSpHandle);
-            delete entry.second;
+            std::cout << "Tick Deleting wrapper for: " << entry.first << "\n";
+            std::cout.flush();
+            m_exportingDeletedStreams.erase(entry.first);
         }
+    }
+    BOOST_FOREACH (LabeledStream table, m_exportingTables) {
+        table.second->flushOldTuples(timeInMillis);
     }
     m_exportingDeletedStreams.clear();
 
@@ -1718,15 +1719,17 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
 /** Bring the Export and DR system to a steady state with no pending committed data */
 void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle) {
     m_executorContext->setupForQuiesce(lastCommittedSpHandle);
-    BOOST_FOREACH (LabeledStream table, m_exportingTables) {
-        table.second->flushOldTuples(-1L);
-    }
     //On quiesce do cleanup of dropped streams.
     BOOST_FOREACH (LabeledStreamWrapper entry, m_exportingDeletedStreams) {
         if (entry.second) {
             entry.second->periodicFlush(-1L, lastCommittedSpHandle);
-            delete entry.second;
+            std::cout << "Deleting wrapper for: " << entry.first << "\n";
+            std::cout.flush();
+            m_exportingDeletedStreams.erase(entry.first);
         }
+    }
+    BOOST_FOREACH (LabeledStream table, m_exportingTables) {
+        table.second->flushOldTuples(-1L);
     }
     m_exportingDeletedStreams.clear();
     m_executorContext->drStream()->periodicFlush(-1L, lastCommittedSpHandle);

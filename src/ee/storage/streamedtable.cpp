@@ -98,6 +98,7 @@ StreamedTable::~StreamedTable() {
     }
     //Dont delete wrapper
 //    delete m_wrapper;
+    m_wrapper = NULL;
 }
 
 TableIterator StreamedTable::iterator() {
