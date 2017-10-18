@@ -261,7 +261,7 @@ public class ExtensibleSnapshotDigestData {
             while (producerPartitionKeys.hasNext()) {
                 String producerPartitionIdStr = producerPartitionKeys.next();
                 int producerPartitionId = Integer.valueOf(producerPartitionIdStr);
-                DRSiteDrIdTracker producerPartitionTracker = new DRSiteDrIdTracker(producerPartitionInfo.getJSONObject(producerPartitionIdStr));
+                DRSiteDrIdTracker producerPartitionTracker = new DRSiteDrIdTracker(producerPartitionInfo.getJSONObject(producerPartitionIdStr), false);
                 perProducerPartitionTrackers.put(producerPartitionId, producerPartitionTracker);
             }
             perSiteTrackers.put(clusterId, perProducerPartitionTrackers);
