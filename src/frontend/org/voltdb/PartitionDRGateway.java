@@ -69,6 +69,8 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         EXPECTED_ROW_TIMESTAMP_MISMATCH
     }
 
+    // Warning: This flag is for debug only and is not cleared anywhere after it is set.
+    protected boolean m_debugDetectedPoisonPill = false;
     public static ImmutableMap<Integer, PartitionDRGateway> m_partitionDRGateways = ImmutableMap.of();
     public static final DRConflictManager m_conflictManager;
     static {
@@ -85,12 +87,9 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         }
     }
 
-    // all partial MP txns go into SP streams
-    public static final byte DR_NO_MP_START_PROTOCOL_VERSION = 3;
-    // all partial MP txns except those with table truncation record go to MP stream separately without coordination
-    public static final byte DR_UNCOORDINATED_MP_START_PROTOCOL_VERSION = 4;
-    // partial MP txns of the same MP txn coordinated and combined before going to MP stream
-    public static final byte DR_COORDINATED_MP_START_PROTOCOL_VERSION = 6;
+    public boolean debugDetectedPoisonPill() {
+        return m_debugDetectedPoisonPill;
+    }
 
     /**
      * Load the full subclass if it should, otherwise load the
@@ -149,18 +148,21 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
                         ProducerDRGateway producerGateway,
                         StartAction startAction) throws IOException, ExecutionException, InterruptedException
     {}
-    public void onSuccessfulProcedureCall(long txnId, long uniqueId, int hash,
-                                          StoredProcedureInvocation spi,
-                                          ClientResponseImpl response) {}
-    public void onSuccessfulMPCall(long spHandle, long txnId, long uniqueId, int hash,
-                                   StoredProcedureInvocation spi,
-                                   ClientResponseImpl response) {}
+    public void onSuccessfulProcedureCall(StoredProcedureInvocation spi) {}
+    public void onSuccessfulMPCall(StoredProcedureInvocation spi) {}
     public long onBinaryDR(int partitionId, long startSequenceNumber, long lastSequenceNumber,
             long lastSpUniqueId, long lastMpUniqueId, EventType eventType, ByteBuffer buf) {
         final BBContainer cont = DBBPool.wrapBB(buf);
         DBBPool.registerUnsafeMemory(cont.address());
         cont.discard();
         return -1;
+    }
+
+    public void onPoisonPill(int partitionId, String reason, ByteBuffer failedBuf) {
+        m_debugDetectedPoisonPill = true;
+        final BBContainer cont = DBBPool.wrapBB(failedBuf);
+        DBBPool.registerUnsafeMemory(cont.address());
+        cont.discard();
     }
 
     @Override
@@ -180,6 +182,14 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         }
         return pdrg.onBinaryDR(partitionId, startSequenceNumber, lastSequenceNumber,
                 lastSpUniqueId, lastMpUniqueId, EventType.values()[eventType], buf);
+    }
+
+    public static void pushPoisonPill(int partitionId, String reason, ByteBuffer failedBuf) {
+        final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
+        if (pdrg == null) {
+            return;
+        }
+        pdrg.onPoisonPill(partitionId, reason, failedBuf);
     }
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync) {}

@@ -35,6 +35,7 @@ import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
 
 import com.google_voltpatches.common.base.Optional;
+import java.nio.ByteBuffer;
 
 /**
  * Importer implementation for pull socket importer. At runtime, there will
@@ -45,6 +46,8 @@ public class PullSocketImporter extends AbstractImporter {
     private PullSocketImporterConfig m_config;
     private final AtomicBoolean m_eos = new AtomicBoolean(false);
     private volatile Optional<Thread> m_thread = Optional.absent();
+    private volatile Socket m_socket = null;
+    private final Object m_socketLock = new Object();
 
     PullSocketImporter(PullSocketImporterConfig config)
     {
@@ -72,6 +75,32 @@ public class PullSocketImporter extends AbstractImporter {
         return "PullSocketImporter";
     }
 
+    private void closeSocket(Socket socket) {
+        if (socket != null) {
+            try {
+                socket.close();
+            } catch (IOException unexpected){
+                error(unexpected, "Unexpected exception closing socket");
+            }
+        }
+    }
+
+    /** Set the socket to newSocket, unless we're shutting down.
+     * The most reliable way to ensure the importer thread exits is to close its socket.
+     * @param newSocket socket to replace any previous socket. May be null.
+     */
+    private void replaceSocket(Socket newSocket) {
+        synchronized (m_socketLock) {
+            closeSocket(m_socket);
+            if (m_eos.get()) {
+                closeSocket(newSocket);
+                m_socket = null;
+            } else {
+                m_socket = newSocket;
+            }
+        }
+    }
+
     private void susceptibleRun() {
         if (m_eos.get()) return;
 
@@ -79,7 +108,7 @@ public class PullSocketImporter extends AbstractImporter {
 
         m_thread = Optional.of(Thread.currentThread());
         Optional<BufferedReader> reader = null;
-        Formatter<String> formatter = (Formatter<String>) m_config.getFormatterBuilder().create();
+        Formatter formatter = m_config.getFormatterBuilder().create();
         while (!m_eos.get()) {
             try {
                 reader = attemptBufferedReader();
@@ -87,12 +116,14 @@ public class PullSocketImporter extends AbstractImporter {
                     sleep(2_000);
                     continue;
                 }
+                info(null, "Socket puller for " + m_config.getResourceID() + " connected.");
 
                 BufferedReader br = reader.get();
                 String csv = null;
                 while ((csv=br.readLine()) != null) {
                      try{
-                        Invocation invocation = new Invocation(m_config.getProcedure(), formatter.transform(csv));
+                        Object params[] = formatter.transform(ByteBuffer.wrap(csv.getBytes()));
+                        Invocation invocation = new Invocation(m_config.getProcedure(), params);
                         if (!callProcedure(invocation)) {
                             if (isDebugEnabled()) {
                                  debug(null, "Failed to process Invocation possibly bad data: " + csv);
@@ -114,6 +145,7 @@ public class PullSocketImporter extends AbstractImporter {
                 if (m_eos.get()) return;
                 rateLimitedLog(Level.ERROR, e, "Socket puller for %s was interrupted", m_config.getResourceID());
             } catch (IOException e) {
+                if (m_eos.get() && e.getMessage().contains("Socket closed")) return;
                 rateLimitedLog(Level.ERROR, e, "Read fault for %s", m_config.getResourceID());
             }
         }
@@ -143,6 +175,8 @@ public class PullSocketImporter extends AbstractImporter {
             if (isDebugEnabled()) {
                 rateLimitedLog(Level.DEBUG, e, "Unable to connect to " + m_config.getResourceID());
             }
+        } finally {
+            replaceSocket(skt);
         }
         return attempt;
     }
@@ -162,5 +196,6 @@ public class PullSocketImporter extends AbstractImporter {
         if (m_eos.compareAndSet(false, true) && m_thread.isPresent()) {
             m_thread.get().interrupt();
         }
+        replaceSocket(null);
     }
 }

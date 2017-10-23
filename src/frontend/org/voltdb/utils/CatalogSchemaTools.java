@@ -41,6 +41,7 @@ import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.ConstraintRef;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Function;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
@@ -101,8 +102,8 @@ public abstract class CatalogSchemaTools {
         // we can return the full CREATE TABLE statement, so accumulate it separately
         final StringBuilder table_sb = new StringBuilder();
 
-        final Set<Index> skip_indexes = new HashSet<Index>();
-        final Set<Constraint> skip_constraints = new HashSet<Constraint>();
+        final Set<Index> skip_indexes = new HashSet<>();
+        final Set<Constraint> skip_constraints = new HashSet<>();
 
         if (tableIsView) {
             table_sb.append("CREATE VIEW ").append(catalog_tbl.getTypeName()).append(" (");
@@ -421,16 +422,21 @@ public abstract class CatalogSchemaTools {
         sb.append(";\n");
     }
 
+    public static void toSchema(StringBuilder sb, Function func)
+    {
+        String functionDDLTemplate = "CREATE FUNCTION %s FROM METHOD %s.%s;\n\n";
+        sb.append(String.format(functionDDLTemplate, func.getFunctionname(), func.getClassname(), func.getMethodname()));
+    }
+
     /**
      * Convert a Catalog Procedure into a DDL string.
      * @param proc
      */
     public static void toSchema(StringBuilder sb, Procedure proc)
     {
-        // Groovy: hasJava (true), m_language ("GROOVY"), m_defaultproc (false)
-        // CRUD: hasJava (false), m_language (""), m_defaultproc (true)
-        // SQL: hasJava (false), m_language(""), m_defaultproc (false), m_statements.m_items."SQL"
-        // JAVA: hasJava (true, m_language ("JAVA"), m_defaultproc (false)
+        // CRUD: hasJava (false), m_defaultproc (true)
+        // SQL: hasJava (false), m_defaultproc (false), m_statements.m_items."SQL"
+        // JAVA: hasJava (true, m_defaultproc (false)
         if (proc.getDefaultproc()) {
             return;
         }
@@ -450,7 +456,7 @@ public abstract class CatalogSchemaTools {
         // Build the optional PARTITION clause.
         StringBuilder partitionClause = new StringBuilder();
         ProcedureAnnotation annot = (ProcedureAnnotation) proc.getAnnotation();
-        if (proc.getSinglepartition()) {
+        if (CatalogUtil.isProcedurePartitioned(proc)) {
             if (annot != null && annot.classAnnotated) {
                 partitionClause.append("--Annotated Partitioning Takes Precedence Over DDL Procedure Partitioning Statement\n--");
             }
@@ -467,21 +473,44 @@ public abstract class CatalogSchemaTools {
                         " PARAMETER %s",
                         String.valueOf(proc.getPartitionparameter()) ));
             }
+
+            // For the second partition clause in 2p txn
+            if (proc.getPartitioncolumn2() != null) {
+                partitionClause.append(spacer);
+                partitionClause.append(String.format(
+                        "AND ON TABLE %s COLUMN %s",
+                        proc.getPartitiontable2().getTypeName(),
+                        proc.getPartitioncolumn2().getTypeName() ));
+                if (proc.getPartitionparameter2() != 1) {
+                    partitionClause.append(String.format(
+                            " PARAMETER %s",
+                            String.valueOf(proc.getPartitionparameter2()) ));
+                }
+            }
         }
 
         // Build the appropriate CREATE PROCEDURE statement variant.
         if (!proc.getHasjava()) {
             // SQL Statement procedure
+
             sb.append(String.format(
-                    "CREATE PROCEDURE %s%s%s\n%sAS\n%s%s",
+                    "CREATE PROCEDURE %s%s%s\n%sAS\nBEGIN\n%s%s",
                     proc.getClassname(),
                     allowClause,
                     partitionClause.toString(),
                     spacer,
                     spacer,
-                    proc.getStatements().get("SQL").getSqltext().trim()));
+                    proc.getStatements().get("SQL0").getSqltext().trim()));
+
+            for (int i = 1 ; i < proc.getStatements().size() ; i++ ) {
+                sb.append(String.format(
+                        "\n%s%s",
+                        spacer,
+                        proc.getStatements().get("SQL" + String.valueOf(i)).getSqltext().trim()));
+            }
+            sb.append("\nEND");
         }
-        else if (proc.getLanguage().equals("JAVA")) {
+        else {
             // Java Class
             sb.append(String.format(
                     "CREATE PROCEDURE %s%s\n%sFROM CLASS %s",
@@ -489,16 +518,6 @@ public abstract class CatalogSchemaTools {
                     partitionClause.toString(),
                     spacer,
                     proc.getClassname()));
-        }
-        else {
-            // Groovy procedure
-            sb.append(String.format(
-                    "CREATE PROCEDURE %s%s%s\n%sAS ###%s### LANGUAGE GROOVY",
-                    proc.getClassname(),
-                    allowClause,
-                    partitionClause.toString(),
-                    spacer,
-                    annot.scriptImpl));
         }
 
         // The SQL statement variant may have terminated the CREATE PROCEDURE statement.
@@ -511,24 +530,11 @@ public abstract class CatalogSchemaTools {
     }
 
     /**
-     * Convert a List of class names into a string containing equivalent IMPORT CLASS DDL statements.
-     * @param sb The ddl being built.
-     * @param importLines The import lines to add.
-     */
-    public static void toSchema(StringBuilder sb, Set<String> importLines)
-    {
-        for (String importLine : importLines) {
-            sb.append(importLine);
-        }
-    }
-
-    /**
      * Convert a catalog into a string containing all DDL statements.
      * @param catalog
-     * @param importLines A set of importLines, should not be mutated.
      * @return String of DDL statements.
      */
-    public static String toSchema(Catalog catalog, Set<String> importLines)
+    public static String toSchema(Catalog catalog)
     {
         StringBuilder sb = new StringBuilder();
 
@@ -552,19 +558,17 @@ public abstract class CatalogSchemaTools {
 
         for (Cluster cluster : catalog.getClusters()) {
             for (Database db : cluster.getDatabases()) {
-                toSchema(sb, importLines);
-
                 for (Group grp : db.getGroups()) {
                     toSchema(sb, grp);
                 }
                 sb.append("\n");
 
-                List<Table> viewList = new ArrayList<Table>();
+                List<Table> viewList = new ArrayList<>();
 
                 CatalogMap<Table> tables = db.getTables();
                 if (! tables.isEmpty()) {
                     sb.append(startBatch);
-                    for (Table table : db.getTables()) {
+                    for (Table table : tables) {
                         Object annotation = table.getAnnotation();
                         if (annotation != null && ((TableAnnotation) annotation).ddl != null
                                 && table.getMaterializer() != null) {
@@ -583,10 +587,18 @@ public abstract class CatalogSchemaTools {
 
                 CatalogMap<Procedure> procedures = db.getProcedures();
                 if (! procedures.isEmpty()) {
-                    for (Procedure proc : db.getProcedures()) {
+                    for (Procedure proc : procedures) {
                         toSchema(sb, proc);
                     }
                 }
+
+                CatalogMap<Function> functions = db.getFunctions();
+                if (! functions.isEmpty()) {
+                    for (Function func : functions) {
+                        toSchema(sb, func);
+                    }
+                }
+
                 if (! tables.isEmpty()) {
                     sb.append(endBatch);
                 }

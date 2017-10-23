@@ -191,10 +191,18 @@ public class SysProcFragmentId
     public static final long PF_loadVoltTableAggregate = 271;
 
     // @ResetDR
-    public static final long PF_preResetDR = 280;
-    public static final long PF_preResetDRAggregate = 281;
-    public static final long PF_postResetDR = 282;
-    public static final long PF_postResetDRAggregate = 283;
+    public static final long PF_resetDR = 280;
+    public static final long PF_resetDRAggregate = 281;
+
+    // @ResetDRSingle
+    public static final long PF_preResetDRSingle = 282;
+    public static final long PF_preResetDRSingleAggregate = 283;
+    public static final long PF_postResetDRSingle = 284;
+    public static final long PF_postResetDRSingleAggregate = 285;
+
+    // @DropDRSelf
+    public static final long PF_DropDRSelf = 286;
+    public static final long PF_DropDRSelfAggregate = 287;
 
     // @ExecuteTask
     public static final long PF_executeTask = 290;
@@ -209,4 +217,8 @@ public class SysProcFragmentId
     // @PrepareShutdown
     public static final long PF_prepareShutdown = 310;
     public static final long PF_prepareShutdownAggregate = 311;
+
+    // @SwapTables
+    public static final long PF_swapTables = 320;
+    public static final long PF_swapTablesAggregate = 321;
 }

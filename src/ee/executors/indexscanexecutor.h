@@ -55,7 +55,7 @@
 
 namespace voltdb {
 
-class TempTable;
+class AbstractTempTable;
 class PersistentTable;
 
 class AbstractExpression;
@@ -68,6 +68,7 @@ class ProjectionPlanNode;
 class LimitPlanNode;
 
 class AggregateExecutorBase;
+class InsertExecutor;
 
 struct CountingPostfilter;
 
@@ -79,6 +80,7 @@ public:
         , m_projector()
         , m_searchKeyBackingStore(NULL)
         , m_aggExec(NULL)
+        , m_insertExec(NULL)
     {}
     ~IndexScanExecutor();
 
@@ -109,7 +111,7 @@ public:
 
 private:
     bool p_init(AbstractPlanNode*,
-                TempTableLimits* limits);
+                const ExecutorVector& executorVector);
     bool p_execute(const NValueArray &params);
     void outputTuple(CountingPostfilter& postfilter, TableTuple& tuple);
 
@@ -131,7 +133,7 @@ private:
     SortDirectionType m_sortDirection;
 
     // IndexScan Information
-    TempTable* m_outputTable;
+    AbstractTempTable* m_outputTable;
 
     // arrange the memory mgmt aids at the bottom to try to maximize
     // cache hits (by keeping them out of the way of useful runtime data)
@@ -141,6 +143,7 @@ private:
     char* m_searchKeyBackingStore;
 
     AggregateExecutorBase* m_aggExec;
+    InsertExecutor *m_insertExec;
 };
 
 }

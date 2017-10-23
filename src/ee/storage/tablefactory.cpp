@@ -49,6 +49,7 @@
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
 #include "storage/table.h"
+#include "storage/LargeTempTable.h"
 #include "storage/persistenttable.h"
 #include "storage/streamedtable.h"
 #include "storage/temptable.h"
@@ -156,13 +157,38 @@ TempTable* TableFactory::buildTempTable(
 /**
  * Creates a temp table with the same schema as the provided template table
  */
-TempTable* TableFactory::buildCopiedTempTable(
+AbstractTempTable* TableFactory::buildCopiedTempTable(
             const std::string &name,
             const Table* template_table,
-            TempTableLimits* limits) {
-    TempTable* table = new TempTable();
-    initCommon(0, table, name, template_table->m_schema, template_table->m_columnNames, false);
-    table->m_limits = limits;
+            const ExecutorVector& executorVector) {
+    AbstractTempTable* newTable = NULL;
+    if (executorVector.isLargeQuery()) {
+        newTable = new LargeTempTable();
+    }
+    else {
+        TempTable* newTempTable = new TempTable();
+        newTempTable->m_limits = executorVector.limits();
+        newTable = newTempTable;
+    }
+
+    initCommon(0, newTable, name, template_table->m_schema, template_table->m_columnNames, false);
+    return newTable;
+}
+
+TempTable* TableFactory::buildCopiedTempTable(
+            const std::string &name,
+            const Table* template_table) {
+    TempTable* newTable = new TempTable();
+    initCommon(0, newTable, name, template_table->m_schema, template_table->m_columnNames, false);
+    return newTable;
+}
+
+LargeTempTable* TableFactory::buildLargeTempTable(
+            const std::string &name,
+            TupleSchema* schema,
+            const std::vector<std::string> &columnNames) {
+    LargeTempTable* table = new LargeTempTable();
+    initCommon(0, table, name, schema, columnNames, true);
     return table;
 }
 

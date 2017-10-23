@@ -37,7 +37,6 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
@@ -45,6 +44,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.PlanStatistics;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StatsField;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -393,8 +393,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * TODO(XIN): It takes at least 14% planner CPU. Optimize it.
      */
     public final void computeEstimatesRecursively(PlanStatistics stats,
-                                                  Cluster cluster,
-                                                  Database db,
                                                   DatabaseEstimates estimates,
                                                   ScalarValueHints[] paramHints)
     {
@@ -406,7 +404,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         // recursively compute and collect stats from children
         long childOutputTupleCountEstimate = 0;
         for (AbstractPlanNode child : m_children) {
-            child.computeEstimatesRecursively(stats, cluster, db, estimates, paramHints);
+            child.computeEstimatesRecursively(stats, estimates, paramHints);
             m_outputColumnHints.addAll(child.m_outputColumnHints);
             childOutputTupleCountEstimate += child.m_estimatedOutputTupleCount;
         }
@@ -415,11 +413,11 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         for (Entry<PlanNodeType, AbstractPlanNode> entry : m_inlineNodes.entrySet()) {
             AbstractPlanNode inlineNode = entry.getValue();
             if (inlineNode instanceof AbstractScanPlanNode) {
-                inlineNode.computeCostEstimates(0, cluster, db, estimates, paramHints);
+                inlineNode.computeCostEstimates(0, estimates, paramHints);
             }
         }
 
-        computeCostEstimates(childOutputTupleCountEstimate, cluster, db, estimates, paramHints);
+        computeCostEstimates(childOutputTupleCountEstimate, estimates, paramHints);
         stats.incrementStatistic(0, StatsField.TUPLES_READ, m_estimatedProcessedTupleCount);
     }
 
@@ -430,8 +428,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * {@see AbstractPlanNode#computeEstimatesRecursively(PlanStatistics, Cluster, Database, DatabaseEstimates, ScalarValueHints[])}.
      */
     protected void computeCostEstimates(long childOutputTupleCountEstimate,
-                                        Cluster cluster,
-                                        Database db,
                                         DatabaseEstimates estimates,
                                         ScalarValueHints[] paramHints)
     {
@@ -472,6 +468,76 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     /**
+     * Find the true output schema.  This may be in some child
+     * node.  This seems to be the search order when constructing
+     * a plan node in the EE.
+     *
+     * There are several cases.
+     * 1.) If the child has an output schema, and if it is
+     *     not a copy of one of its children's schemas,
+     *     that's the one we want.  We know it's a copy
+     *     if m_hasSignificantOutputSchema is false.
+     * 2.) If the child has no significant output schema but it
+     *     has an inline projection node, then
+     *     a.) If it does <em>not</em> have an inline insert
+     *         node then the output schema of the child is
+     *         the output schema of the inline projection node.
+     *     b.) If the output schema has an inline insert node
+     *         then the output schema is the usual DML output
+     *         schema, which will be the schema of the inline
+     *         insert node.  I don't think we will ever see.
+     *         this case in this function.  This function is
+     *         only called from the microoptimizer to remove
+     *         projection nodes.  So we don't see a projection
+     *         node on top of a node with an inlined insert node.
+     *  3.) Otherwise, the output schema is the output schema
+     *      of the child's first child.  We should be able to
+     *      follow the first children until we get something
+     *      usable.
+     *
+     * Just for the record, if the child node has an inline
+     * insert and a projection node, the projection node's
+     * output schema is the schema of the tuples we will be
+     * inserting into the target table.  The output schema of
+     * the child node will be the output schema of the insert
+     * node, which will be the usual DML schema.  This has one
+     * long integer column counting the number of rows inserted.
+     *
+     * @param node
+     * @return The true output schema.  This will never return null.
+     */
+    public final NodeSchema getTrueOutputSchema() throws PlanningErrorException {
+        AbstractPlanNode child = this;
+        NodeSchema childSchema = getOutputSchema();
+        //
+        // Note: This code is translated from the C++ code in
+        //       AbstractExecutor::getOutputSchema.  It's considerably
+        //       different there, but I think this has the corner
+        //       cases covered correctly.
+        while (childSchema == null || ( ! child.m_hasSignificantOutputSchema) ) {
+            AbstractPlanNode childProj = child.getInlinePlanNode(PlanNodeType.PROJECTION);
+            if (childProj != null) {
+                AbstractPlanNode inlineInsertNode = childProj.getInlinePlanNode(PlanNodeType.INSERT);
+                if (inlineInsertNode != null) {
+                    child = inlineInsertNode;
+                } else {
+                    child = childProj;
+                }
+                childSchema = child.getOutputSchema();
+            } else if (child.getChildCount() > 0) {
+                child = child.getChild(0);
+            } else {
+                // We've gone to the end of the plan.  This is a
+                // failure in the EE.
+                assert(false);
+                throw new PlanningErrorException("AbstractPlanNode with no true output schema.");
+            }
+        }
+        assert(childSchema != null);
+        return childSchema;
+    }
+
+    /**
      * Add a child and link this node child's parent.
      * @param child The node to add.
      */
@@ -481,7 +547,13 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         child.m_parents.add(this);
     }
 
-    // called by PushDownLimit, re-link the child without changing the order
+    /**
+     * Used to re-link the child without changing the order.
+     *
+     * This is called by PushDownLimit and RemoveUnnecessaryProjectNodes.
+     * @param index
+     * @param child
+     */
     public void setAndLinkChild(int index, AbstractPlanNode child) {
         assert(child != null);
         m_children.set(index, child);
@@ -1186,6 +1258,75 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             m_outputSchema = loadSchemaFromJSONObject(jobj,
                     Members.OUTPUT_SCHEMA.name());
         }
+    }
+
+    /**
+     * @param jobj
+     * @param key
+     * @return
+     * @throws JSONException
+     */
+    List<String> loadStringListMemberFromJSON(JSONObject jobj, String key)
+            throws JSONException {
+        if (jobj.isNull(key)) {
+            return null;
+        }
+        JSONArray jarray = jobj.getJSONArray(key);
+        int numElems = jarray.length();
+        List<String> result = new ArrayList<>(numElems);
+        for (int ii = 0; ii < numElems; ++ii) {
+            result.add(jarray.getString(ii));
+        }
+        return result;
+    }
+
+    /**
+     * @param stringer
+     * @param key
+     * @param stringList
+     * @throws JSONException
+     */
+    void toJSONStringArrayString(JSONStringer stringer, String key,
+            List<String> stringList) throws JSONException {
+        stringer.key(key).array();
+        for (String elem : stringList) {
+            stringer.value(elem);
+        }
+        stringer.endArray();
+    }
+
+    /**
+     * @param jobj
+     * @param key
+     * @return
+     * @throws JSONException
+     */
+    int[] loadIntArrayMemberFromJSON(JSONObject jobj, String key)
+            throws JSONException {
+        if (jobj.isNull(key)) {
+            return null;
+        }
+        JSONArray jarray = jobj.getJSONArray(key);
+        int numElems = jarray.length();
+        int[] result = new int[numElems];
+        for (int ii = 0; ii < numElems; ++ii) {
+            result[ii] = jarray.getInt(ii);
+        }
+        return result;
+    }
+
+    /**
+     * @param stringer
+     * @param key
+     * @param intArray
+     * @throws JSONException
+     */
+    void toJSONIntArrayString(JSONStringer stringer, String key, int[] intArray) throws JSONException {
+        stringer.key(key).array();
+        for (int i : intArray) {
+            stringer.value(i);
+        }
+        stringer.endArray();
     }
 
     public boolean reattachFragment(AbstractPlanNode child) {

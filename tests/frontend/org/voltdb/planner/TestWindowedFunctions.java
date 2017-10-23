@@ -497,6 +497,14 @@ public class TestWindowedFunctions extends PlannerTestCase {
     public void testRankFailures() {
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY B ) FROM AAA GROUP BY A;",
                       "Use of both a windowed function call and GROUP BY in a single query is not supported.");
+        failToCompile("SELECT RANK() OVER (ORDER BY B), COUNT(*) FROM AAA;",
+                      "Use of window functions (in an OVER clause) isn't supported with other aggregate functions on the SELECT list.");
+        failToCompile("SELECT RANK() OVER (ORDER BY B), COUNT(B) FROM AAA;",
+                      "Use of window functions (in an OVER clause) isn't supported with other aggregate functions on the SELECT list.");
+        failToCompile("SELECT RANK() OVER (ORDER BY B), MAX(B) FROM AAA;",
+                      "Use of window functions (in an OVER clause) isn't supported with other aggregate functions on the SELECT list.");
+        failToCompile("SELECT RANK() OVER (ORDER BY B), AVG(B) FROM AAA;",
+                      "Use of window functions (in an OVER clause) isn't supported with other aggregate functions on the SELECT list.");
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY B ) AS R1, " +
                       "       RANK() OVER (PARTITION BY B ORDER BY A ) AS R2  " +
                       "FROM AAA;",
@@ -506,6 +514,8 @@ public class TestWindowedFunctions extends PlannerTestCase {
         // Windowed expressions can only appear in the selection list.
         failToCompile("SELECT A, B, C FROM AAA WHERE RANK() OVER (PARTITION BY A ORDER BY B) < 3;",
                       "Windowed function call expressions can only appear in the selection list of a query or subquery.");
+        failToCompile("SELECT COUNT((SELECT DISTINCT A FROM AAA)) OVER (PARTITION BY A) FROM AAA;",
+                      "Window function calls with subquery expression arguments are not allowed.");
 
         // Detect that PARTITION BY A is ambiguous when A names multiple columns.
         // Queries like this passed at one point in development, ignoring the subquery
@@ -593,7 +603,6 @@ public class TestWindowedFunctions extends PlannerTestCase {
             validatePlan("select * from vanilla_pa",
                          2,
                          PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
                          PlanNodeType.RECEIVE,
                          PlanNodeType.INVALID, // fragment marker.
                          PlanNodeType.SEND,
@@ -625,7 +634,6 @@ public class TestWindowedFunctions extends PlannerTestCase {
             validatePlan("select * from vanilla_pb_idx where a = 1",
                          2,
                          PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
                          PlanNodeType.RECEIVE,
                          PlanNodeType.INVALID, // Fragment Marker.
                          PlanNodeType.SEND,
@@ -635,7 +643,6 @@ public class TestWindowedFunctions extends PlannerTestCase {
             validatePlan("select * from vanilla_pb_idx where a < 1",
                          2,
                          PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
                          PlanNodeType.RECEIVE,
                          PlanNodeType.INVALID, // Fragment Marker.
                          PlanNodeType.SEND,
@@ -792,7 +799,6 @@ public class TestWindowedFunctions extends PlannerTestCase {
             validatePlan("select * from vanilla order by a;",
                          1,
                          PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
                          PlanNodeType.ORDERBY, // (SLOB)
                          PlanNodeType.SEQSCAN);
         }
@@ -803,7 +809,6 @@ public class TestWindowedFunctions extends PlannerTestCase {
             validatePlan("select * from vanilla_pa order by b;",
                          2,
                          PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
                          PlanNodeType.ORDERBY, // (SLOB),
                          PlanNodeType.RECEIVE,
                          PlanNodeType.INVALID, // Fragment Marker.
@@ -841,7 +846,6 @@ public class TestWindowedFunctions extends PlannerTestCase {
             validatePlan("select * from vanilla_pb_idx order by a;",
                          2,
                          PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
                          PlanNodeType.MERGERECEIVE, // SLOB
                          PlanNodeType.INVALID, // Fragment Marker.
                          PlanNodeType.SEND,
@@ -854,7 +858,6 @@ public class TestWindowedFunctions extends PlannerTestCase {
             validatePlan("select * from vanilla_pb_idx where a = 1 order by a;",
                          2,
                          PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
                          PlanNodeType.MERGERECEIVE, // SLOB
                          PlanNodeType.INVALID, // Fragment Marker.
                          PlanNodeType.SEND,
@@ -864,7 +867,6 @@ public class TestWindowedFunctions extends PlannerTestCase {
             validatePlan("select * from vanilla_pb_idx where a < 1 order by a;",
                          2,
                          PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
                          PlanNodeType.MERGERECEIVE, // SLOB
                          PlanNodeType.INVALID, // Fragment Marker.
                          PlanNodeType.SEND,
@@ -877,7 +879,6 @@ public class TestWindowedFunctions extends PlannerTestCase {
             validatePlan("select * from vanilla_idx where a = 1 order by b;",
                          1,
                          PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
                          PlanNodeType.ORDERBY, // (SLOB),
                          PlanNodeType.INDEXSCAN);
         }
@@ -885,7 +886,6 @@ public class TestWindowedFunctions extends PlannerTestCase {
             validatePlan("select * from vanilla_idx where a < 1 order by b;",
                          1,
                          PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
                          PlanNodeType.ORDERBY, // (SLOB),
                          PlanNodeType.INDEXSCAN);
         }
@@ -896,7 +896,6 @@ public class TestWindowedFunctions extends PlannerTestCase {
             validatePlan("select * from vanilla_pb_idx where a = 1 order by b;",
                          2,
                          PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
                          PlanNodeType.ORDERBY, // (SLOB),
                          PlanNodeType.RECEIVE,
                          PlanNodeType.INVALID, // Fragment Marker.
@@ -907,7 +906,6 @@ public class TestWindowedFunctions extends PlannerTestCase {
             validatePlan("select * from vanilla_pb_idx where a < 1 order by b;",
                          2,
                          PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
                          PlanNodeType.ORDERBY, // (SLOB),
                          PlanNodeType.RECEIVE,
                          PlanNodeType.INVALID, // Fragment Marker.
@@ -1160,7 +1158,6 @@ public class TestWindowedFunctions extends PlannerTestCase {
             validatePlan("SELECT * FROM O3 WHERE PK1 = 0 ORDER BY PK2 DESC;",
                          1,
                          PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
                          PlanNodeType.ORDERBY,
                          PlanNodeType.INDEXSCAN);
         }
@@ -1236,7 +1233,6 @@ public class TestWindowedFunctions extends PlannerTestCase {
             validatePlan("select * from vanilla_idx as oo, vanilla as ii order by oo.a, oo.b",
                          1,
                          PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
                          PlanNodeType.NESTLOOP,
                          PlanNodeType.INDEXSCAN);
             validatePlan("select * from vanilla as oo, vanilla_idx as ii order by ii.a, ii.b",
@@ -1260,7 +1256,6 @@ public class TestWindowedFunctions extends PlannerTestCase {
             validatePlan("select * from O4 where CTR + 100 < 1000 order by id",
                          1,
                          PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
                          PlanNodeType.ORDERBY,
                          PlanNodeType.INDEXSCAN);
             // We don't have an index on CTR + 200.
@@ -1271,7 +1266,6 @@ public class TestWindowedFunctions extends PlannerTestCase {
             validatePlan("select * from O4 where CTR + 200 < 100 order by id",
                          1,
                          PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
                          PlanNodeType.ORDERBY,
                          PlanNodeType.SEQSCAN);
         }
@@ -1285,7 +1279,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
                          PlanNodeType.SEQSCAN,
                          PlanNodeType.PROJECTION,
                          PlanNodeType.WINDOWFUNCTION,
-                         new PlanNodeType[] {PlanNodeType.MERGERECEIVE, PlanNodeType.ORDERBY},
+                         new PlanWithInlineNodes(PlanNodeType.MERGERECEIVE, PlanNodeType.ORDERBY),
                          PlanNodeType.INVALID,
                          PlanNodeType.SEND,
                          PlanNodeType.INDEXSCAN);

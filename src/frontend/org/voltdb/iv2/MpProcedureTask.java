@@ -29,6 +29,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -36,6 +37,7 @@ import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.collect.Maps;
 
@@ -102,27 +104,32 @@ public class MpProcedureTask extends ProcedureTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
+        final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.MPSITE);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.meta("thread_name", "name", threadName))
+                    .add(() -> VoltTrace.meta("thread_sort_index", "sort_index", Integer.toString(1000)))
+                    .add(() -> VoltTrace.beginDuration("mpinittask",
+                                                       "txnId", TxnEgo.txnIdToString(getTxnId())));
+        }
+
         hostLog.debug("STARTING: " + this);
         // Cast up. Could avoid ugliness with Iv2TransactionClass baseclass
         MpTransactionState txn = (MpTransactionState)m_txnState;
         // Check for restarting sysprocs
         String spName = txn.m_initiationMsg.getStoredProcedureName();
+        // could be null if not a sysproc
+        final SystemProcedureCatalog.Config sysproc = SystemProcedureCatalog.listing.get(spName);
 
         // certain system procs can and can't be restarted
         // Right now this is adhoc, catalog update, load MP table, and apply binary log MP.
-        // Since these are treated specially in a few places (here, recovery, dr),
-        // maybe we should add another metadata property the sysproc registry about
-        // whether a proc can be restarted/recovered/dr-ed
         //
         // Note that we don't restart @BalancePartitions transactions, because they do
         // partition to master HSID lookups in the run() method. When transactions are
         // restarted, the run() method is not rerun. Let the elastic join coordinator reissue it.
         if (m_isRestart &&
-                spName.startsWith("@") &&
-                !spName.startsWith("@AdHoc") &&
-                !spName.startsWith("@LoadMultipartitionTable") &&
-                !spName.equals("@UpdateApplicationCatalog") &&
-                !spName.equals("@ApplyBinaryLogMP"))
+                sysproc != null &&
+                !sysproc.isRestartable())
         {
             InitiateResponseMessage errorResp = new InitiateResponseMessage(txn.m_initiationMsg);
             errorResp.setResults(new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
@@ -179,6 +186,10 @@ public class MpProcedureTask extends ProcedureTask
             restartTransaction();
             hostLog.debug("RESTART: " + this);
         }
+
+        if (traceLog != null) {
+            traceLog.add(VoltTrace::endDuration);
+        }
     }
 
     @Override
@@ -197,6 +208,14 @@ public class MpProcedureTask extends ProcedureTask
     @Override
     void completeInitiateTask(SiteProcedureConnection siteConnection)
     {
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.MPSITE);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.instant("sendcomplete",
+                                                 "txnId", TxnEgo.txnIdToString(getTxnId()),
+                                                 "commit", Boolean.toString(!m_txnState.needsRollback()),
+                                                 "dest", CoreUtils.hsIdCollectionToString(m_initiatorHSIds)));
+        }
+
         CompleteTransactionMessage complete = new CompleteTransactionMessage(
                 m_initiator.getHSId(), // who is the "initiator" now??
                 m_initiator.getHSId(),

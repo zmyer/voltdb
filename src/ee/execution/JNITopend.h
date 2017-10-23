@@ -32,6 +32,9 @@ public:
 
     inline JNITopend* updateJNIEnv(JNIEnv *env) { m_jniEnv = env; return this; }
     int loadNextDependency(int32_t dependencyId, Pool *stringPool, Table* destination);
+    void traceLog(bool isBegin,
+                  const char *name,
+                  const char *args);
     int64_t fragmentProgressUpdate(
                 int32_t batchIndex,
                 PlanNodeType planNodeType,
@@ -51,6 +54,8 @@ public:
 
     int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block);
 
+    void pushPoisonPill(int32_t partitionId, std::string& reason, StreamBlock *block);
+
     int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
             DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
             Table *expectedMetaTableForDelete, Table *expectedTupleTableForDelete,
@@ -60,6 +65,22 @@ public:
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
 
     std::string decodeBase64AndDecompress(const std::string& buffer);
+
+    bool storeLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
+        return false;
+    }
+
+    bool loadLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
+        throwFatalException("unimplemented method \"%s\" called!", __FUNCTION__);
+        return false;;
+    }
+
+    bool releaseLargeTempTableBlock(int64_t blockId) {
+        return false;
+    }
+
+    int32_t callJavaUserDefinedFunction();
+    void resizeUDFBuffer(int32_t size);
 
 private:
     JNIEnv *m_jniEnv;
@@ -71,17 +92,21 @@ private:
     jobject m_javaExecutionEngine;
     jmethodID m_fallbackToEEAllocatedBufferMID;
     jmethodID m_nextDependencyMID;
+    jmethodID m_traceLogMID;
     jmethodID m_fragmentProgressUpdateMID;
     jmethodID m_planForFragmentIdMID;
     jmethodID m_crashVoltDBMID;
     jmethodID m_pushExportBufferMID;
     jmethodID m_getQueuedExportBytesMID;
     jmethodID m_pushDRBufferMID;
+    jmethodID m_pushPoisonPillMID;
     jmethodID m_reportDRConflictMID;
     jmethodID m_decodeBase64AndDecompressToBytesMID;
+    jmethodID m_callJavaUserDefinedFunctionMID;
+    jmethodID m_resizeUDFBufferMID;
     jclass m_exportManagerClass;
     jclass m_partitionDRGatewayClass;
-    jclass m_encoderClass;
+    jclass m_decompressionClass;
 };
 
 }

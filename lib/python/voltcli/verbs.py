@@ -586,7 +586,9 @@ class ConnectionBundle(object):
                            max_count    = self.max_count,
                            default_port = self.default_port),
             cli.StringOption('-p', '--password', 'password', "the connection password"),
-            cli.StringOption('-u', '--user', 'username', 'the connection user name'))
+            cli.StringOption('-u', '--user', 'username', 'the connection user name'),
+            cli.StringOption(None, '--ssl', 'ssl_config','''enable and config ssl''', default=None),
+            cli.BooleanOption(None, '--kerberos', 'kerberos', '''enable kerberos'''))
 
     def start(self, verb, runner):
         pass
@@ -609,7 +611,9 @@ class BaseClientBundle(ConnectionBundle):
         runner.voltdb_connect(runner.opts.host.host,
                               runner.opts.host.port,
                               username=runner.opts.username,
-                              password=runner.opts.password)
+                              password=runner.opts.password,
+                              ssl_config=runner.opts.ssl_config,
+                              kerberos=runner.opts.kerberos)
 
     def stop(self, verb, runner):
         runner.voltdb_disconnect()

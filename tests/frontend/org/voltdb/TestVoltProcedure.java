@@ -59,7 +59,6 @@ import java.util.Date;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.compiler.Language;
 import org.voltdb.types.TimestampType;
 
 import junit.framework.TestCase;
@@ -270,6 +269,7 @@ public class TestVoltProcedure extends TestCase {
 
     MockVoltDB manager;
     SiteProcedureConnection site;
+    SystemProcedureExecutionContext context;
     MockStatsAgent agent;
     ParameterSet nullParam;
     private long executionSiteId;
@@ -306,6 +306,9 @@ public class TestVoltProcedure extends TestCase {
         manager.addProcedureForTest(UnexpectedFailureFourProcedure.class.getName());
         manager.addProcedureForTest(GetClusterIdProcedure.class.getName());
         site = mock(SiteProcedureConnection.class);
+        context = mock(SystemProcedureExecutionContext.class);
+        doReturn(context).when(site).getSystemProcedureExecutionContext();
+        doReturn(0).when(context).getCatalogVersion();
         doReturn(42).when(site).getCorrespondingPartitionId();
         doReturn(executionSiteId).when(site).getCorrespondingSiteId();
         doReturn(expectedClusterId).when(site).getCorrespondingClusterId();
@@ -422,7 +425,7 @@ public class TestVoltProcedure extends TestCase {
         ClientResponse r = call(LargeNumberOfTablesProc.class);
         assertEquals(ClientResponse.GRACEFUL_FAILURE, r.getStatus());
         System.out.println(r.getStatusString());
-        assertTrue(r.getStatusString().contains("Exceeded  maximum number of VoltTables"));
+        assertTrue(r.getStatusString().contains("Exceeded maximum number of VoltTables"));
     }
 
     public void testNegativeWiderType() {
@@ -441,9 +444,8 @@ public class TestVoltProcedure extends TestCase {
     public void testProcedureStatsCollector() {
         NullProcedureWrapper wrapper = new LongProcedure();
         ProcedureRunner runner = new ProcedureRunner(
-                Language.JAVA,
-                wrapper, site, null,
-                VoltDB.instance().getCatalogContext().database.getProcedures().get(LongProcedure.class.getName()), null);
+                wrapper, site,
+                VoltDB.instance().getCatalogContext().database.getProcedures().get(LongProcedure.class.getName()));
 
         ParameterSet params = ParameterSet.fromArrayNoCopy(1L);
         assertNotNull(agent.m_selector);
@@ -470,9 +472,8 @@ public class TestVoltProcedure extends TestCase {
     public void testGetClusterId() {
         GetClusterIdProcedure gcip = new GetClusterIdProcedure();
         ProcedureRunner runner = new ProcedureRunner(
-                Language.JAVA,
-                gcip, site, null,
-                VoltDB.instance().getCatalogContext().database.getProcedures().get(GetClusterIdProcedure.class.getName()), null);
+                gcip, site,
+                VoltDB.instance().getCatalogContext().database.getProcedures().get(GetClusterIdProcedure.class.getName()));
         runner.setupTransaction(null);
         ClientResponse r = runner.call((Object) null);
         assertEquals(expectedClusterId, gcip.clusterId);
@@ -493,9 +494,8 @@ public class TestVoltProcedure extends TestCase {
             e.printStackTrace();
         }
         ProcedureRunner runner = new ProcedureRunner(
-                Language.JAVA,
-                wrapper, site, null,
-                VoltDB.instance().getCatalogContext().database.getProcedures().get(LongProcedure.class.getName()), null);
+                wrapper, site,
+                VoltDB.instance().getCatalogContext().database.getProcedures().get(LongProcedure.class.getName()));
 
         runner.setupTransaction(null);
         return runner.call(args);
@@ -511,15 +511,6 @@ public class TestVoltProcedure extends TestCase {
             m_source = source;
             m_selector = selector;
             m_catalogId = catalogId;
-        }
-
-        @Override
-        public ProcedureStatsCollector registerProcedureStatsSource(long catalogId, ProcedureStatsCollector source) {
-            m_source = source;
-            m_selector = StatsSelector.PROCEDURE;
-            m_catalogId = catalogId;
-
-            return source;
         }
     }
 }

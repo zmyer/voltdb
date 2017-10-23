@@ -30,7 +30,6 @@ import java.util.Set;
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
@@ -52,7 +51,6 @@ import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
-import org.voltdb.plannodes.IndexSortablePlanNode;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
@@ -61,6 +59,7 @@ import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.IndexSortablePlanNode;
 import org.voltdb.plannodes.IndexUseForOrderBy;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -75,6 +74,7 @@ import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.plannodes.SwapTablesPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.plannodes.WindowFunctionPlanNode;
@@ -111,8 +111,6 @@ public class PlanAssembler {
         }
     }
 
-    /** convenience pointer to the cluster object in the catalog */
-    private final Cluster m_catalogCluster;
     /** convenience pointer to the database object in the catalog */
     private final Database m_catalogDb;
 
@@ -120,15 +118,19 @@ public class PlanAssembler {
     private ParsedInsertStmt m_parsedInsert = null;
     /** parsed statement for an update */
     private ParsedUpdateStmt m_parsedUpdate = null;
-    /** parsed statement for an delete */
+    /** parsed statement for a delete */
     private ParsedDeleteStmt m_parsedDelete = null;
-    /** parsed statement for an select */
+    /** parsed statement for a swap */
+    private ParsedSwapStmt m_parsedSwap = null;
+    /** parsed statement for a select */
     private ParsedSelectStmt m_parsedSelect = null;
-    /** parsed statement for an union */
+    /** parsed statement for a union */
     private ParsedUnionStmt m_parsedUnion = null;
 
     /** plan selector */
     private final PlanSelector m_planSelector;
+
+    private final boolean m_isLargeQuery;
 
     /** Describes the specified and inferred partition context. */
     private StatementPartitioning m_partitioning;
@@ -148,19 +150,20 @@ public class PlanAssembler {
     private boolean m_bestAndOnlyPlanWasGenerated = false;
 
     /**
-     *
-     * @param catalogCluster
-     *            Catalog info about the physical layout of the cluster.
      * @param catalogDb
      *            Catalog info about schema, metadata and procedures.
      * @param partitioning
      *            Describes the specified and inferred partition context.
      */
-    PlanAssembler(Cluster catalogCluster, Database catalogDb, StatementPartitioning partitioning, PlanSelector planSelector) {
-        m_catalogCluster = catalogCluster;
+    PlanAssembler(
+            Database catalogDb,
+            StatementPartitioning partitioning,
+            PlanSelector planSelector,
+            boolean isLargeQuery) {
         m_catalogDb = catalogDb;
         m_partitioning = partitioning;
         m_planSelector = planSelector;
+        m_isLargeQuery = isLargeQuery;
     }
 
     String getSQLText() {
@@ -216,7 +219,7 @@ public class PlanAssembler {
         return false;
     }
 
-    private boolean isPartitionColumnInGroupbyList(ArrayList<ParsedColInfo> groupbyColumns) {
+    private boolean isPartitionColumnInGroupbyList(List<ParsedColInfo> groupbyColumns) {
         assert(m_parsedSelect != null);
 
         if (groupbyColumns == null) {
@@ -309,7 +312,7 @@ public class PlanAssembler {
             m_subAssembler = new SelectSubPlanAssembler(m_catalogDb, m_parsedSelect, m_partitioning);
 
             // Process the GROUP BY information, decide whether it is group by the partition column
-            if (isPartitionColumnInGroupbyList(m_parsedSelect.m_groupByColumns)) {
+            if (isPartitionColumnInGroupbyList(m_parsedSelect.groupByColumns())) {
                 m_parsedSelect.setHasPartitionColumnInGroupby();
             }
             if (isPartitionColumnInWindowedAggregatePartitionByList()) {
@@ -336,7 +339,15 @@ public class PlanAssembler {
 
         // Check that only multi-partition writes are made to replicated tables.
         // figure out which table we're updating/deleting
-        assert (parsedStmt.m_tableList.size() == 1);
+        if (parsedStmt instanceof ParsedSwapStmt) {
+            assert (parsedStmt.m_tableList.size() == 2);
+            if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
+                throw new PlanningErrorException("Illegal to swap a stream.");
+            }
+            m_parsedSwap = (ParsedSwapStmt) parsedStmt;
+            return;
+        }
+
         Table targetTable = parsedStmt.m_tableList.get(0);
         if (targetTable.getIsreplicated()) {
             if (m_partitioning.wasSpecifiedAsSingle()
@@ -666,11 +677,7 @@ public class PlanAssembler {
     private CompiledPlan getNextPlan() {
         CompiledPlan retval;
         AbstractParsedStmt nextStmt = null;
-        if (m_parsedUnion != null) {
-            nextStmt = m_parsedUnion;
-            retval = getNextUnionPlan();
-        }
-        else if (m_parsedSelect != null) {
+        if (m_parsedSelect != null) {
             nextStmt = m_parsedSelect;
             retval = getNextSelectPlan();
         }
@@ -688,6 +695,14 @@ public class PlanAssembler {
             nextStmt = m_parsedUpdate;
             retval = getNextUpdatePlan();
         }
+        else if (m_parsedUnion != null) {
+            nextStmt = m_parsedUnion;
+            retval = getNextUnionPlan();
+        }
+        else if (m_parsedSwap != null) {
+            nextStmt = m_parsedSwap;
+            retval = getNextSwapPlan();
+        }
         else {
             throw new RuntimeException(
                     "setupForNewPlans encountered unsupported statement type.");
@@ -698,7 +713,7 @@ public class PlanAssembler {
         }
 
         assert (nextStmt != null);
-        retval.parameters = nextStmt.getParameters();
+        retval.setParameters(nextStmt.getParameters());
         return retval;
     }
 
@@ -731,8 +746,7 @@ public class PlanAssembler {
             StatementPartitioning partitioning = (StatementPartitioning)m_partitioning.clone();
             PlanSelector planSelector = (PlanSelector) m_planSelector.clone();
             planSelector.m_planId = planId;
-            PlanAssembler assembler = new PlanAssembler(
-                    m_catalogCluster, m_catalogDb, partitioning, planSelector);
+            PlanAssembler assembler = new PlanAssembler(m_catalogDb, partitioning, planSelector, m_isLargeQuery);
             CompiledPlan bestChildPlan = assembler.getBestCostPlan(parsedChildStmt);
             partitioning = assembler.m_partitioning;
 
@@ -826,7 +840,7 @@ public class PlanAssembler {
             subUnionRoot = handleUnionLimitOperator(subUnionRoot);
         }
 
-        CompiledPlan retval = new CompiledPlan();
+        CompiledPlan retval = new CompiledPlan(m_isLargeQuery);
         retval.rootPlanGraph = subUnionRoot;
         retval.setReadOnly(true);
         retval.sql = m_planSelector.m_sql;
@@ -848,8 +862,7 @@ public class PlanAssembler {
         PlanSelector planSelector = (PlanSelector) m_planSelector.clone();
         planSelector.m_planId = planId;
         StatementPartitioning currentPartitioning = (StatementPartitioning)m_partitioning.clone();
-        PlanAssembler assembler = new PlanAssembler(
-                m_catalogCluster, m_catalogDb, currentPartitioning, planSelector);
+        PlanAssembler assembler = new PlanAssembler(m_catalogDb, currentPartitioning, planSelector, m_isLargeQuery);
         CompiledPlan compiledPlan = assembler.getBestCostPlan(subQuery);
         // make sure we got a winner
         if (compiledPlan == null) {
@@ -1143,7 +1156,7 @@ public class PlanAssembler {
             root = handleSelectLimitOperator(root);
         }
 
-        CompiledPlan plan = new CompiledPlan();
+        CompiledPlan plan = new CompiledPlan(m_isLargeQuery);
         plan.rootPlanGraph = root;
         plan.setReadOnly(true);
         boolean orderIsDeterministic = m_parsedSelect.isOrderDeterministic();
@@ -1151,10 +1164,11 @@ public class PlanAssembler {
         String contentDeterminismMessage = m_parsedSelect.getContentDeterminismMessage();
         plan.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic, contentDeterminismMessage);
 
-        // Apply the micro-optimization:
+        // Apply the select construction phase micro-optimizations:
         // LIMIT push down, Table count / Counting Index, Optimized Min/Max
-        MicroOptimizationRunner.applyAll(plan, m_parsedSelect);
-
+        MicroOptimizationRunner.applyAll(plan,
+                                         m_parsedSelect,
+                                         MicroOptimizationRunner.Phases.DURING_PLAN_ASSEMBLY);
         return plan;
     }
 
@@ -1304,19 +1318,10 @@ public class PlanAssembler {
             deleteNode.addAndLinkChild(root);
         }
 
-        CompiledPlan plan = new CompiledPlan();
-        if (isSinglePartitionPlan) {
-            plan.rootPlanGraph = deleteNode;
-        }
-        else {
-            // Send the local result counts to the coordinator.
-            AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(deleteNode);
-            // add a sum or a limit and send on top of the union
-            plan.rootPlanGraph = addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
-        }
+        CompiledPlan plan = new CompiledPlan(m_isLargeQuery);
+        plan.setReadOnly(false);
 
         // check non-determinism status
-        plan.setReadOnly(false);
 
         // treat this as deterministic for reporting purposes:
         // delete statements produce just one row that is the
@@ -1329,7 +1334,55 @@ public class PlanAssembler {
         // So, the last parameter is always null.
         plan.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic, null);
 
+        if (isSinglePartitionPlan) {
+            plan.rootPlanGraph = deleteNode;
+            return plan;
+        }
+
+        // Add a compensating sum of modified tuple counts or a limit 1
+        // AND a send on top of the union-like receive node.
+        boolean isReplicated = targetTable.getIsreplicated();
+        plan.rootPlanGraph = addCoordinatorToDMLNode(deleteNode, isReplicated);
         return plan;
+    }
+
+    /**
+     * Get the next (only) plan for a VoltDB SWAP TABLE statement.
+     * These are pretty simple and will only generate a single plan.
+     *
+     * @return The next (only) plan for a given SWAP TABLE statement, then null.
+     */
+    private CompiledPlan getNextSwapPlan() {
+        // there's really only one way to do a swap, so just
+        // plan it the right way once, then return null after that
+        if (m_bestAndOnlyPlanWasGenerated) {
+            return null;
+        }
+        m_bestAndOnlyPlanWasGenerated = true;
+
+        // figure out which tables we're swapping
+        assert (m_parsedSwap.m_tableList.size() == 2);
+        Table theTable = m_parsedSwap.m_tableList.get(0);
+        Table otherTable = m_parsedSwap.m_tableList.get(1);
+        CompiledPlan retval = new CompiledPlan(m_isLargeQuery);
+        retval.setReadOnly(false);
+
+        // the root of the SWAP TABLE plan is always a SwapPlanNode
+        SwapTablesPlanNode swapNode = new SwapTablesPlanNode();
+        swapNode.initializeSwapTablesPlanNode(theTable, otherTable);
+
+        // SWAP commands are only run single-partition when invoked from
+        // an explicitly declared single-partition stored procedure.
+        if (m_partitioning.wasSpecifiedAsSingle()) {
+            retval.rootPlanGraph = swapNode;
+            return retval;
+        }
+
+        // Add a compensating sum of modified tuple counts or a limit 1
+        // AND a send on top of the union-like receive node.
+        boolean isReplicated = theTable.getIsreplicated();
+        retval.rootPlanGraph = addCoordinatorToDMLNode(swapNode, isReplicated);
+        return retval;
     }
 
     private CompiledPlan getNextUpdatePlan() {
@@ -1408,19 +1461,7 @@ public class PlanAssembler {
         // connect the nodes to build the graph
         updateNode.addAndLinkChild(subSelectRoot);
 
-        AbstractPlanNode planRoot = null;
-        if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
-            planRoot = updateNode;
-        }
-        else {
-            // Send the local result counts to the coordinator.
-            AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(updateNode);
-            // add a sum or a limit and send on top of the union
-            planRoot = addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
-        }
-
-        CompiledPlan retval = new CompiledPlan();
-        retval.rootPlanGraph = planRoot;
+        CompiledPlan retval = new CompiledPlan(m_isLargeQuery);
         retval.setReadOnly (false);
 
         if (targetTable.getIsreplicated()) {
@@ -1435,6 +1476,16 @@ public class PlanAssembler {
         // no message, and the last parameter is null.
         retval.statementGuaranteesDeterminism(false, true, null);
 
+        if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
+            retval.rootPlanGraph = updateNode;
+            return retval;
+        }
+
+        // Send the local result counts to the coordinator.
+        // Add a compensating sum of modified tuple counts or a limit 1
+        // AND a send on top of the union-like receive node.
+        boolean isReplicated = targetTable.getIsreplicated();
+        retval.rootPlanGraph = addCoordinatorToDMLNode(updateNode, isReplicated);
         return retval;
     }
 
@@ -1462,13 +1513,14 @@ public class PlanAssembler {
      * Get the next (only) plan for a SQL insertion. Inserts are pretty simple
      * and this will only generate a single plan.
      *
-     * @return The next plan for a given insert statement.
+     * @return The next (only) plan for a given insert statement, then null.
      */
     private CompiledPlan getNextInsertPlan() {
         // there's really only one way to do an insert, so just
         // do it the right way once, then return null after that
-        if (m_bestAndOnlyPlanWasGenerated)
+        if (m_bestAndOnlyPlanWasGenerated) {
             return null;
+        }
         m_bestAndOnlyPlanWasGenerated = true;
 
         // The child of the insert node produces rows containing values
@@ -1508,7 +1560,7 @@ public class PlanAssembler {
             retval = subquery.getBestCostPlan();
         }
         else {
-            retval = new CompiledPlan();
+            retval = new CompiledPlan(m_isLargeQuery);
         }
         retval.setReadOnly(false);
 
@@ -1613,8 +1665,12 @@ public class PlanAssembler {
             i++;
         }
 
-        // the root of the insert plan is always an InsertPlanNode
-        InsertPlanNode insertNode = new InsertPlanNode();
+        // the root of the insert plan may be an InsertPlanNode, or
+        // it may be a scan plan node.  We may do an inline InsertPlanNode
+        // as well.  All inlining of insert nodes will be done later,
+        // in a microoptimzation.  We can't do it here, since we
+        // may need to remove uneeded projection nodes.
+        InsertPlanNode insertNode = new InsertPlanNode(m_parsedInsert.m_isUpsert);
         insertNode.setTargetTableName(targetTable.getTypeName());
         if (subquery != null) {
             insertNode.setSourceIsPartitioned(! subquery.getIsReplicated());
@@ -1629,7 +1685,6 @@ public class PlanAssembler {
                     new MaterializePlanNode(matSchema);
             // connect the insert and the materialize nodes together
             insertNode.addAndLinkChild(matNode);
-
             retval.statementGuaranteesDeterminism(false, true, isContentDeterministic);
         }
         else {
@@ -1643,23 +1698,25 @@ public class PlanAssembler {
         }
 
         insertNode.setMultiPartition(true);
-        AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(insertNode);
-
-        // add a count or a limit and send on top of the union
-        retval.rootPlanGraph = addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
+        // Add a compensating sum of modified tuple counts or a limit 1
+        // AND a send on top of a union-like receive node.
+        boolean isReplicated = targetTable.getIsreplicated();
+        retval.rootPlanGraph = addCoordinatorToDMLNode(insertNode, isReplicated);
         return retval;
     }
 
     /**
-     * Adds a sum or limit node followed by a send node to the given DML node. If the DML target
-     * is a replicated table, it will add a limit node, otherwise it adds a sum node.
+     * Add a receive node, a sum or limit node, and a send node to the given DML node.
+     * If the DML target is a replicated table, it will add a limit node,
+     * otherwise it adds a sum node.
      *
      * @param dmlRoot
      * @param isReplicated Whether or not the target table is a replicated table.
      * @return
      */
-    private static AbstractPlanNode addSumOrLimitAndSendToDMLNode(AbstractPlanNode dmlRoot, boolean isReplicated)
-    {
+    private static AbstractPlanNode addCoordinatorToDMLNode(
+            AbstractPlanNode dmlRoot, boolean isReplicated) {
+        dmlRoot = SubPlanAssembler.addSendReceivePair(dmlRoot);
         AbstractPlanNode sumOrLimitNode;
         if (isReplicated) {
             // Replicated table DML result doesn't need to be summed. All partitions should
@@ -1762,9 +1819,7 @@ public class PlanAssembler {
         projectionNode.setOutputSchemaWithoutClone(proj_schema);
 
         // If the projection can be done inline. then add the
-        // projection node inline.  Even if the rootNode is a
-        // scan, if we have a windowed expression we need to
-        // add it out of line.
+        // projection node inline.
         if (rootNode instanceof AbstractScanPlanNode) {
             rootNode.addInlinePlanNode(projectionNode);
             return rootNode;
@@ -2476,11 +2531,14 @@ public class PlanAssembler {
                 }
             }
 
-            int outputColumnIndex = 0;
             NodeSchema agg_schema = new NodeSchema();
             NodeSchema top_agg_schema = new NodeSchema();
 
-            for (ParsedColInfo col : m_parsedSelect.m_aggResultColumns) {
+
+            for ( int outputColumnIndex = 0;
+                    outputColumnIndex < m_parsedSelect.m_aggResultColumns.size();
+                    outputColumnIndex += 1) {
+                ParsedColInfo col = m_parsedSelect.m_aggResultColumns.get(outputColumnIndex);
                 AbstractExpression rootExpr = col.expression;
                 AbstractExpression agg_input_expr = null;
                 SchemaColumn schema_col = null;
@@ -2502,6 +2560,7 @@ public class PlanAssembler {
                             AbstractParsedStmt.TEMP_TABLE_NAME,
                             "", col.alias,
                             rootExpr, outputColumnIndex);
+                    tve.setDifferentiator(col.differentiator);
 
                     boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
                     aggNode.addAggregate(agg_expression_type, is_distinct, outputColumnIndex, agg_input_expr);
@@ -2509,12 +2568,12 @@ public class PlanAssembler {
                             AbstractParsedStmt.TEMP_TABLE_NAME,
                             AbstractParsedStmt.TEMP_TABLE_NAME,
                             "", col.alias,
-                            tve);
+                            tve, outputColumnIndex);
                     top_schema_col = new SchemaColumn(
                             AbstractParsedStmt.TEMP_TABLE_NAME,
                             AbstractParsedStmt.TEMP_TABLE_NAME,
                             "", col.alias,
-                            tve);
+                            tve, outputColumnIndex);
 
                     /*
                      * Special case count(*), count(), sum(), min() and max() to
@@ -2603,7 +2662,8 @@ public class PlanAssembler {
                     schema_col = new SchemaColumn(
                             col.tableName, col.tableAlias,
                             col.columnName, col.alias,
-                            col.expression);
+                            col.expression,
+                            outputColumnIndex);
                     AbstractExpression topExpr = null;
                     if (col.groupBy) {
                         topExpr = m_parsedSelect.m_groupByExpressions.get(col.alias);
@@ -2613,15 +2673,15 @@ public class PlanAssembler {
                     }
                     top_schema_col = new SchemaColumn(
                             col.tableName, col.tableAlias,
-                            col.columnName, col.alias, topExpr);
+                            col.columnName, col.alias,
+                            topExpr, outputColumnIndex);
                 }
 
                 agg_schema.addColumn(schema_col);
                 top_agg_schema.addColumn(top_schema_col);
-                outputColumnIndex++;
             }// end for each ParsedColInfo in m_aggResultColumns
 
-            for (ParsedColInfo col : m_parsedSelect.m_groupByColumns) {
+            for (ParsedColInfo col : m_parsedSelect.groupByColumns()) {
                 aggNode.addGroupByExpression(col.expression);
 
                 if (topAggNode != null) {
@@ -2661,7 +2721,7 @@ public class PlanAssembler {
                 index, fromTableAlias, bindings);
         gbInfo.m_canBeFullySerialized =
                 (gbInfo.m_coveredGroupByColumns.size() ==
-                m_parsedSelect.m_groupByColumns.size());
+                m_parsedSelect.groupByColumns().size());
     }
 
     // Turn sequential scan to index scan for group by if possible
@@ -2675,7 +2735,7 @@ public class PlanAssembler {
         String fromTableAlias = root.getTargetTableAlias();
         assert(fromTableAlias != null);
 
-        ArrayList<ParsedColInfo> groupBys = m_parsedSelect.m_groupByColumns;
+        List<ParsedColInfo> groupBys = m_parsedSelect.groupByColumns();
         Table targetTable = m_catalogDb.getTables().get(root.getTargetTableName());
         assert(targetTable != null);
         CatalogMap<Index> allIndexes = targetTable.getIndexes();
@@ -2729,7 +2789,7 @@ public class PlanAssembler {
             List<AbstractExpression> bindings) {
         List<Integer> coveredGroupByColumns = new ArrayList<>();
 
-        ArrayList<ParsedColInfo> groupBys = m_parsedSelect.m_groupByColumns;
+        List<ParsedColInfo> groupBys = m_parsedSelect.groupByColumns();
         String exprsjson = index.getExpressionsjson();
         if (exprsjson.isEmpty()) {
             List<ColumnRef> indexedColRefs =
@@ -3107,7 +3167,7 @@ public class PlanAssembler {
         AggregatePlanNode distinctAggNode = new HashAggregatePlanNode();
         distinctAggNode.setOutputSchema(m_parsedSelect.getDistinctProjectionSchema());
 
-        for (ParsedColInfo col : m_parsedSelect.m_distinctGroupByColumns) {
+        for (ParsedColInfo col : m_parsedSelect.distinctGroupByColumns()) {
             distinctAggNode.addGroupByExpression(col.expression);
         }
 

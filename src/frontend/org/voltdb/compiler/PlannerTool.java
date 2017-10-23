@@ -28,50 +28,49 @@ import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.common.Constants;
 import org.voltdb.planner.BoundPlan;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CorePlan;
+import org.voltdb.planner.ParameterizationInfo;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.TrivialCostModel;
-import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 
 /**
  * Planner tool accepts an already compiled VoltDB catalog and then
  * interactively accept SQL and outputs plans on standard out.
+ *
+ * Used only for ad hoc queries.
  */
 public class PlannerTool {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger compileLog = new VoltLogger("COMPILE");
 
-    private final Database m_database;
-    private final Cluster m_cluster;
+    private Database m_database;
+    private byte[] m_catalogHash;
+    private AdHocCompilerCache m_cache;
+
     private final HSQLInterface m_hsql;
-    private final byte[] m_catalogHash;
-    private final AdHocCompilerCache m_cache;
+
     private static PlannerStatsCollector m_plannerStats;
 
-    private static final int AD_HOC_JOINED_TABLE_LIMIT = 5;
-
-    public PlannerTool(final Cluster cluster, final Database database, byte[] catalogHash)
+    public PlannerTool(final Database database, byte[] catalogHash)
     {
-        assert(cluster != null);
         assert(database != null);
 
         m_database = database;
-        m_cluster = cluster;
         m_catalogHash = catalogHash;
         m_cache = AdHocCompilerCache.getCacheForCatalogHash(catalogHash);
 
         // LOAD HSQL
-        m_hsql = HSQLInterface.loadHsqldb();
+        m_hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         String binDDL = m_database.getSchema();
-        String ddl = Encoder.decodeBase64AndDecompress(binDDL);
+        String ddl = CompressionService.decodeBase64AndDecompress(binDDL);
         String[] commands = ddl.split("\n");
         for (String command : commands) {
             String decoded_cmd = Encoder.hexDecodeToString(command);
@@ -86,7 +85,6 @@ public class PlannerTool {
                 throw new RuntimeException("Error creating hsql: " + e.getMessage() + " in DDL statement: " + decoded_cmd);
             }
         }
-
         hostLog.debug("hsql loaded");
 
         // Create and register a singleton planner stats collector, if this is the first time.
@@ -104,9 +102,21 @@ public class PlannerTool {
         }
     }
 
+    public PlannerTool updateWhenNoSchemaChange(Database database, byte[] catalogHash) {
+        m_database = database;
+        m_catalogHash = catalogHash;
+        m_cache = AdHocCompilerCache.getCacheForCatalogHash(catalogHash);
+
+        return this;
+    }
+
+    public HSQLInterface getHSQLInterface() {
+        return m_hsql;
+    }
+
     public AdHocPlannedStatement planSqlForTest(String sqlIn) {
         StatementPartitioning infer = StatementPartitioning.inferPartitioning();
-        return planSql(sqlIn, infer, false, null);
+        return planSql(sqlIn, infer, false, null, false, false);
     }
 
     private void logException(Exception e, String fmtLabel) {
@@ -120,16 +130,19 @@ public class PlannerTool {
         TrivialCostModel costModel = new TrivialCostModel();
         DatabaseEstimates estimates = new DatabaseEstimates();
         QueryPlanner planner = new QueryPlanner(
-            sql, "PlannerTool", "PlannerToolProc", m_cluster, m_database,
+            sql, "PlannerTool", "PlannerToolProc", m_database,
             partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE,
-            AD_HOC_JOINED_TABLE_LIMIT, costModel, null, null, DeterminismMode.FASTER);
+            costModel, null, null, DeterminismMode.FASTER, false);
 
         CompiledPlan plan = null;
         try {
             // do the expensive full planning.
-            planner.parse();
-            plan = planner.plan();
-            assert(plan != null);
+            // Keep this lock until we figure out how to do parallel planning
+            synchronized (QueryPlanner.class) {
+                planner.parse();
+                plan = planner.plan();
+                assert(plan != null);
+            }
         }
         catch (Exception e) {
             /*
@@ -151,8 +164,8 @@ public class PlannerTool {
         return plan;
     }
 
-    synchronized AdHocPlannedStatement planSql(String sqlIn, StatementPartitioning partitioning,
-            boolean isExplainMode, final Object[] userParams) {
+    public synchronized AdHocPlannedStatement planSql(String sqlIn, StatementPartitioning partitioning,
+            boolean isExplainMode, final Object[] userParams, boolean isSwapTables, boolean isLargeQuery) {
 
         CacheUse cacheUse = CacheUse.FAIL;
         if (m_plannerStats != null) {
@@ -174,7 +187,11 @@ public class PlannerTool {
             // If this presents a planning performance problem, we could consider maintaining
             // separate caches for the 3 cases or maintaining up to 3 plans per cache entry
             // if the cases tended to have mostly overlapping queries.
-            if (partitioning.isInferred()) {
+            //
+            // Large queries are not cached.  Their plans are different than non-large queries
+            // with the same SQL text, and in general we expect them to be slow.  If at some
+            // point it seems worthwhile to cache such plans, we can explore it.
+            if (partitioning.isInferred() && !isLargeQuery) {
                 // Check the literal cache for a match.
                 AdHocPlannedStatement cachedPlan = m_cache.getWithSQL(sqlIn);
                 if (cachedPlan != null) {
@@ -186,9 +203,6 @@ public class PlannerTool {
                 }
             }
 
-            // Reset plan node id counter
-            AbstractPlanNode.resetPlanNodeIds();
-
             //////////////////////
             // PLAN THE STMT
             //////////////////////
@@ -196,15 +210,32 @@ public class PlannerTool {
             TrivialCostModel costModel = new TrivialCostModel();
             DatabaseEstimates estimates = new DatabaseEstimates();
             QueryPlanner planner = new QueryPlanner(
-                    sql, "PlannerTool", "PlannerToolProc", m_cluster, m_database,
-                    partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE,
-                    AD_HOC_JOINED_TABLE_LIMIT, costModel, null, null, DeterminismMode.FASTER);
+                    sql,
+                    "PlannerTool",
+                    "PlannerToolProc",
+                    m_database,
+                    partitioning,
+                    m_hsql,
+                    estimates,
+                    !VoltCompiler.DEBUG_MODE,
+                    costModel,
+                    null,
+                    null,
+                    DeterminismMode.FASTER,
+                    isLargeQuery);
 
             CompiledPlan plan = null;
             String[] extractedLiterals = null;
             String parsedToken = null;
             try {
-                planner.parse();
+                // Keep this lock until we figure out how to do parallel planning
+                synchronized (QueryPlanner.class) {
+                    if (isSwapTables) {
+                        planner.planSwapTables();
+                    } else {
+                        planner.parse();
+                    }
+                }
                 parsedToken = planner.parameterize();
 
                 // check the parameters count
@@ -221,7 +252,7 @@ public class PlannerTool {
                 hasUserQuestionMark  = planner.getAdhocUserParamsCount() > 0;
 
                 // do not put wrong parameter explain query into cache
-                if (!wrongNumberParameters && partitioning.isInferred()) {
+                if (!wrongNumberParameters && partitioning.isInferred() && !isLargeQuery) {
                     // if cacheable, check the cache for a matching pre-parameterized plan
                     // if plan found, build the full plan using the parameter data in the
                     // QueryPlanner.
@@ -262,9 +293,12 @@ public class PlannerTool {
                     }
                 }
 
-                // If not caching or there was no cache hit, do the expensive full planning.
-                plan = planner.plan();
-                assert(plan != null);
+                // Keep this lock until we figure out how to do parallel planning
+                synchronized (QueryPlanner.class) {
+                    // If not caching or there was no cache hit, do the expensive full planning.
+                    plan = planner.plan();
+                    assert(plan != null);
+                }
                 if (plan != null && plan.getStatementPartitioning() != null) {
                     partitioning = plan.getStatementPartitioning();
                 }
@@ -293,8 +327,9 @@ public class PlannerTool {
             CorePlan core = new CorePlan(plan, m_catalogHash);
             AdHocPlannedStatement ahps = new AdHocPlannedStatement(plan, core);
 
-            // do not put wrong parameter explain query into cache
-            if (!wrongNumberParameters && partitioning.isInferred()) {
+            // Do not put wrong parameter explain query into cache.
+            // Also, do not put large query plans into the cache.
+            if (!wrongNumberParameters && partitioning.isInferred() && !isLargeQuery) {
 
                 // Note either the parameter index (per force to a user-provided parameter) or
                 // the actual constant value of the partitioning key inferred from the plan.

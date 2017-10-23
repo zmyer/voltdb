@@ -29,6 +29,7 @@ import java.util.List;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
@@ -282,6 +283,15 @@ public class TestPlansDML extends PlannerTestCase {
         dmlSQL = "UPDATE P1 SET C = (SELECT C FROM R2 WHERE A = 0) ;";
         checkDMLPlanNodeAndSubqueryExpression(dmlSQL, null);
 
+        dmlSQL = "UPDATE P1 set C = ? WHERE A = (SELECT MAX(R1.C) FROM R1 WHERE R1.A = P1.A);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.COMPARE_EQUAL);
+
+        dmlSQL = "UPDATE P1 set C = (SELECT C FROM R1 WHERE R1.C = P1.C LIMIT 1);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, null);
+
+        dmlSQL = "UPSERT INTO R6 (A, C) SELECT A, C FROM R2 WHERE NOT EXISTS (SELECT 1 FROM R6 WHERE R6.A = R2.C) ORDER BY 1, 2;";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.OPERATOR_NOT);
+
         dmlSQL = "DELETE FROM R1 WHERE C IN (SELECT A FROM R2);";
         checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.OPERATOR_EXISTS);
 
@@ -325,6 +335,8 @@ public class TestPlansDML extends PlannerTestCase {
         // Distributed expression subquery with inferred partitioning
         failToCompile("DELETE FROM R1 WHERE C > ALL (SELECT A FROM P2);", PlanAssembler.IN_EXISTS_SCALAR_ERROR_MESSAGE);
 
+        // Column count mismatch between the UPDATE columns and the columns returned by the scalar subquery
+        failToCompile("UPDATE P1 set C = (SELECT (A,C) FROM R1 WHERE R1.C = P1.C LIMIT 1);", "row column count mismatch");
     }
 
     void checkDMLPlanNodeAndSubqueryExpression(String dmlSQL, ExpressionType filterType) {
@@ -338,16 +350,39 @@ public class TestPlansDML extends PlannerTestCase {
         }
 
         String dmlType = dmlSQL.substring(0, dmlSQL.indexOf(' ')).trim().toUpperCase();
-        assertEquals(dmlType, dmlNode.getPlanNodeType().toString());
+        if ("UPSERT".equalsIgnoreCase(dmlType)) {
+            // UPSERT is INSERT
+            dmlType = "INSERT";
+        }
+        // This must somehow start with a node which is named by
+        // dmlType.  It could be a sequential scan node with an
+        // inline node named by dmlType, or it could be a dmlType
+        // node just by itself.
+        //
+        // This seems somewhat fragile.  It seem like we should have
+        // a description of the expected plan which we just match
+        // here.  See the member function TestCase.validatePlan.  That
+        // member function is not actually convenient here, but perhaps
+        // it could be extended in some way.
+        if ((dmlNode instanceof SeqScanPlanNode)
+                && "INSERT".equals(dmlType)) {
+            assertNotNull("Expected an insert node.",
+                          dmlNode.getInlinePlanNode(PlanNodeType.INSERT));
+        }
+        else {
+            assertEquals(dmlType, dmlNode.getPlanNodeType().toString());
+        }
 
-        while(dmlNode.getPlanNodeType() != PlanNodeType.SEQSCAN && dmlNode.getPlanNodeType() != PlanNodeType.MATERIALIZE) {
+        PlanNodeType nodeType = dmlNode.getPlanNodeType();
+        while (nodeType != PlanNodeType.SEQSCAN && nodeType != PlanNodeType.MATERIALIZE && nodeType != PlanNodeType.INDEXSCAN) {
             dmlNode = dmlNode.getChild(0);
+            nodeType = dmlNode.getPlanNodeType();
         }
         assertNotNull(dmlNode);
 
         // Verify DML Predicate
         if (filterType != null) {
-            AbstractExpression predicate = ((SeqScanPlanNode) dmlNode).getPredicate();
+            AbstractExpression predicate = ((AbstractScanPlanNode) dmlNode).getPredicate();
             assertNotNull(predicate);
             assertEquals(filterType, predicate.getExpressionType());
             assertTrue(predicate.hasAnySubexpressionOfClass(SelectSubqueryExpression.class));

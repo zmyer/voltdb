@@ -261,6 +261,12 @@ static const int FUNC_VOLT_REGEXP_POSITION             = 20041;
 static const int FUNC_VOLT_ROUND                       = 20042;
 static const int FUNC_VOLT_STR                         = 20043;
 
+// our local function
+static const int FUNC_INET_NTOA                        = 20044;
+static const int FUNC_INET_ATON                        = 20045;
+static const int FUNC_INET6_NTOA                       = 20046;
+static const int FUNC_INET6_ATON                       = 20047;
+
 // Geospatial functions
 static const int FUNC_VOLT_POINTFROMTEXT               = 21000;
 static const int FUNC_VOLT_POLYGONFROMTEXT             = 21001;
@@ -295,6 +301,9 @@ static const int SQL_TRIM_BOTH                        = 22;
 static const int FUNC_TRIM_LEADING_CHAR               = SQL_TRIM_VOLT_FUNC_OFFSET + SQL_TRIM_LEADING;
 static const int FUNC_TRIM_TRAILING_CHAR              = SQL_TRIM_VOLT_FUNC_OFFSET + SQL_TRIM_TRAILING;
 static const int FUNC_TRIM_BOTH_CHAR                  = SQL_TRIM_VOLT_FUNC_OFFSET + SQL_TRIM_BOTH;
+
+static const int FUNC_VOLT_UDF_ID_START                = 1000000;
+#define IS_USER_DEFINED_ID(id) (FUNC_VOLT_UDF_ID_START <= (id))
 
 }
 

@@ -58,8 +58,10 @@
 
 namespace voltdb {
 
+class ExecutorVector;
 class ExportTupleStream;
 class StreamedTable;
+class LargeTempTable;
 class TempTable;
 class TempTableLimits;
 
@@ -111,22 +113,26 @@ public:
         const std::vector<std::string> &columnNames,
         TempTableLimits* limits);
 
-    // DEPRECATED name and signature. Use buildTempTable.
-    static TempTable* getTempTable(voltdb::CatalogId databaseId,
-                                   const std::string &name,
-                                   TupleSchema* schema,
-                                   const std::vector<std::string> &columnNames,
-                                   TempTableLimits* limits) {
-        return buildTempTable(name, schema, columnNames, limits);
-    }
+    static LargeTempTable* buildLargeTempTable(
+        const std::string &name,
+        TupleSchema* schema,
+        const std::vector<std::string> &columnNames);
 
     /**
      * Creates an empty temp table from the given template table.
      */
-    static TempTable* buildCopiedTempTable(
+    static AbstractTempTable* buildCopiedTempTable(
         const std::string &name,
         const Table* templateTable,
-        TempTableLimits* limits);
+        const ExecutorVector& executorVector);
+
+    /**
+     * Creates an empty (normal, non-large) temp table from the given
+     * template table.
+     */
+    static TempTable* buildCopiedTempTable(
+        const std::string &name,
+        const Table* templateTable);
 
 private:
     static void initCommon(

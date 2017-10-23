@@ -21,14 +21,15 @@ import java.util.List;
 import java.util.Map;
 
 import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.Pair;
 import org.voltdb.DRConsumerDrIdTracker;
+import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.dr2.DRIDTrackerHelper;
 import org.voltdb.jni.ExecutionEngine.TaskType;
 
 public class ExecuteTask_SP extends VoltSystemProcedure {
@@ -52,47 +53,31 @@ public class ExecuteTask_SP extends VoltSystemProcedure {
      *
      * @param ctx  execution context
      * @param partitionParam  key for routing stored procedure to correct site
-     * @param taskId          type of the task to execute
+     * @param params          additional parameter(s) for the task to execute, first one is always task type
      */
-    public void run(SystemProcedureExecutionContext ctx, byte[] partitionParam, byte taskId)
+    public void run(SystemProcedureExecutionContext ctx, byte[] partitionParam, byte[] params)
     {
+        assert params.length > 0;
+        byte taskId = params[0];
         TaskType taskType = TaskType.values()[taskId];
         switch (taskType) {
         case SP_JAVA_GET_DRID_TRACKER:
-            Map<Integer, Map<Integer, DRConsumerDrIdTracker>> drIdTrackers = ctx.getDrAppliedTrackers();
+            Map<Integer, Map<Integer, DRSiteDrIdTracker>> drIdTrackers = ctx.getDrAppliedTrackers();
             Pair<Long, Long> lastConsumerUniqueIds = ctx.getDrLastAppliedUniqueIds();
             try {
-                setAppStatusString(jsonifyTrackedDRData(lastConsumerUniqueIds, drIdTrackers));
+                setAppStatusString(DRIDTrackerHelper.jsonifyClusterTrackers(lastConsumerUniqueIds, drIdTrackers));
             } catch (JSONException e) {
                 throw new VoltAbortException("DRConsumerDrIdTracker could not be converted to JSON");
             }
 
             break;
+        case RESET_DR_APPLIED_TRACKER_SINGLE:
+            assert params.length == 2;
+            byte clusterId = params[1];
+            ctx.resetDrAppliedTracker(clusterId);
+            break;
         default:
             throw new VoltAbortException("Unable to find the task associated with the given task id");
         }
-    }
-
-    public static String jsonifyTrackedDRData(Pair<Long, Long> lastConsumerUniqueIds,
-                                              Map<Integer, Map<Integer, DRConsumerDrIdTracker>> allProducerTrackers)
-    throws JSONException {
-        JSONStringer stringer = new JSONStringer();
-        stringer.object();
-        stringer.keySymbolValuePair("lastConsumerSpUniqueId", lastConsumerUniqueIds.getFirst());
-        stringer.keySymbolValuePair("lastConsumerMpUniqueId", lastConsumerUniqueIds.getSecond());
-        stringer.key("trackers").object();
-        if (allProducerTrackers != null) {
-            for (Map.Entry<Integer, Map<Integer, DRConsumerDrIdTracker>> clusterTrackers : allProducerTrackers.entrySet()) {
-                stringer.key(Integer.toString(clusterTrackers.getKey())).object();
-                for (Map.Entry<Integer, DRConsumerDrIdTracker> e : clusterTrackers.getValue().entrySet()) {
-                    stringer.key(e.getKey().toString());
-                    stringer.value(e.getValue().toJSON());
-                }
-                stringer.endObject();
-            }
-        }
-        stringer.endObject();
-        stringer.endObject();
-        return stringer.toString();
     }
 }

@@ -46,6 +46,7 @@
 #include "persistenttable.h"
 
 #include "AbstractDRTupleStream.h"
+#include "DRTupleStream.h"
 #include "ConstraintFailureException.h"
 #include "CopyOnWriteContext.h"
 #include "DRTupleStreamUndoAction.h"
@@ -113,32 +114,43 @@ private:
     TableTuple& m_target;
 };
 
-PersistentTable::PersistentTable(int partitionColumn, char const* signature, bool isMaterialized, int tableAllocationTargetSize, int tupleLimit, bool drEnabled) :
-    Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
-    m_iter(this),
-    m_allowNulls(),
-    m_partitionColumn(partitionColumn),
-    m_tupleLimit(tupleLimit),
-    m_purgeExecutorVector(),
-    m_stats(this),
-    m_failedCompactionCount(0),
-    m_invisibleTuplesPendingDeleteCount(0),
-    m_surgeon(*this),
-    m_tableForStreamIndexing(NULL),
-    m_isMaterialized(isMaterialized),
-    m_drEnabled(drEnabled),
-    m_noAvailableUniqueIndex(false),
-    m_smallestUniqueIndex(NULL),
-    m_smallestUniqueIndexCrc(0),
-    m_drTimestampColumnIndex(-1),
-    m_pkeyIndex(NULL),
-    m_mvHandler(NULL),
-    m_deltaTable(NULL),
-    m_deltaTableActive(false)
+PersistentTable::PersistentTable(int partitionColumn,
+                                 char const* signature,
+                                 bool isMaterialized,
+                                 int tableAllocationTargetSize,
+                                 int tupleLimit,
+                                 bool drEnabled)
+    : Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize)
+    , m_data()
+    , m_iter(this, m_data.begin())
+    , m_allowNulls()
+    , m_partitionColumn(partitionColumn)
+    , m_tupleLimit(tupleLimit)
+    , m_purgeExecutorVector()
+    , m_views()
+    , m_stats(this)
+    , m_blocksNotPendingSnapshotLoad()
+    , m_blocksPendingSnapshotLoad()
+    , m_blocksNotPendingSnapshot()
+    , m_blocksPendingSnapshot()
+    , m_blocksWithSpace()
+    , m_tableStreamer()
+    , m_failedCompactionCount(0)
+    , m_invisibleTuplesPendingDeleteCount(0)
+    , m_surgeon(*this)
+    , m_tableForStreamIndexing(NULL)
+    , m_isMaterialized(isMaterialized)
+    , m_drEnabled(drEnabled && !isMaterialized)
+    , m_noAvailableUniqueIndex(false)
+    , m_smallestUniqueIndex(NULL)
+    , m_smallestUniqueIndexCrc(0)
+    , m_drTimestampColumnIndex(-1)
+    , m_pkeyIndex(NULL)
+    , m_mvHandler(NULL)
+    , m_viewHandlers()
+    , m_deltaTable(NULL)
+    , m_deltaTableActive(false)
 {
-    // this happens here because m_data might not be initialized above
-    m_iter.reset(m_data.begin());
-
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
         m_blocksPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
@@ -294,7 +306,7 @@ void PersistentTable::deleteAllTuples(bool, bool fallible) {
     // Instead of recording each tuple deletion, log it as a table truncation DR.
     ExecutorContext* ec = ExecutorContext::getExecutorContext();
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
-    if (drStream && !m_isMaterialized && m_drEnabled) {
+    if (doDRActions(drStream)) {
         int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         int64_t currentSpHandle = ec->currentSpHandle();
         int64_t currentUniqueId = ec->currentUniqueId();
@@ -318,6 +330,10 @@ void PersistentTable::deleteAllTuples(bool, bool fallible) {
     while (ti.next(tuple)) {
         deleteTuple(tuple, fallible);
     }
+}
+
+bool PersistentTable::doDRActions(AbstractDRTupleStream* drStream) {
+    return m_drEnabled && drStream && drStream->drStreamStarted();
 }
 
 void PersistentTable::truncateTableUndo(TableCatalogDelegate* tcd,
@@ -483,7 +499,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         // There is Elastic Index work going on and
         // it should continue to access the old table.
         // Add one reference count to keep the original table.
-        emptyTable->setTableForStreamIndexing(this);
+        emptyTable->setTableForStreamIndexing(this, this->tableForStreamIndexing());
     }
 
     // add matView
@@ -525,7 +541,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     ExecutorContext* ec = ExecutorContext::getExecutorContext();
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
     UndoQuantum* uq = ExecutorContext::currentUndoQuantum();
-    if (drStream && !m_isMaterialized && m_drEnabled) {
+    if (doDRActions(drStream)) {
         int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         int64_t currentSpHandle = ec->currentSpHandle();
         int64_t currentUniqueId = ec->currentUniqueId();
@@ -626,7 +642,8 @@ static bool hasNameIntegrity(std::string const& tableName,
 void PersistentTable::swapTable(PersistentTable* otherTable,
         std::vector<std::string> const& theIndexNames,
         std::vector<std::string> const& otherIndexNames,
-        bool fallible) {
+        bool fallible,
+        bool isUndo) {
     assert(hasNameIntegrity(name(), theIndexNames));
     assert(hasNameIntegrity(otherTable->name(), otherIndexNames));
     CompiledSwap compiled(*this, *otherTable,
@@ -635,18 +652,29 @@ void PersistentTable::swapTable(PersistentTable* otherTable,
     swapTableIndexes(otherTable,
             compiled.m_theIndexes,
             compiled.m_otherIndexes);
+    assert(m_drEnabled == otherTable->m_drEnabled);
+
+    if (!isUndo && m_drEnabled) {
+        ExecutorContext::getEngine()->swapDRActions(otherTable, this);
+    }
+
     if (fallible) {
+        assert(!isUndo);
         UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
-        uq->registerUndoAction(
-                new (*uq) PersistentTableUndoSwapTableAction(this, otherTable,
-                        theIndexNames,
-                        otherIndexNames));
+        if (uq) {
+            uq->registerUndoAction(
+                    new (*uq) PersistentTableUndoSwapTableAction(this, otherTable,
+                            theIndexNames,
+                            otherIndexNames));
+        }
     }
 
     // Switch arguments here to Account here for the actual table pointers
     // having been switched to use each other's table and index names.
     assert(hasNameIntegrity(name(), otherIndexNames));
     assert(hasNameIntegrity(otherTable->name(), theIndexNames));
+
+    ExecutorContext::getEngine()->rebuildTableCollections();
 }
 
 void PersistentTable::swapTableState(PersistentTable* otherTable) {
@@ -666,11 +694,21 @@ void PersistentTable::swapTableState(PersistentTable* otherTable) {
 
     std::swap(m_name, otherTable->m_name);
 
-    auto heldStreamIndexingTable = tableForStreamIndexing();
-    setTableForStreamIndexing(otherTable->tableForStreamIndexing());
-    otherTable->setTableForStreamIndexing(heldStreamIndexingTable);
+    if (m_tableStreamer &&
+            m_tableStreamer->hasStreamType(TABLE_STREAM_ELASTIC_INDEX)) {
+        // There is Elastic Index work going on and
+        // it should continue to access the old table.
+        // Add one reference count to keep the original table.
+        auto heldStreamIndexingTable = tableForStreamIndexing();
+        auto heldOtherStreamIndexingTable = otherTable->tableForStreamIndexing();
+        setTableForStreamIndexing(otherTable, heldOtherStreamIndexingTable);
+        otherTable->setTableForStreamIndexing(this, heldStreamIndexingTable);
+    }
 
-    std::swap(m_tableStreamer, otherTable->m_tableStreamer);
+    // NOTE: do not swap m_tableStreamers here... we want them to
+    // stick to their original tables, so that if a swap occurs during
+    // an ongoing snapshot, subsequent changes to the table notify the
+    // right TableStreamer instance.
 }
 
 void PersistentTable::swapTableIndexes(PersistentTable* otherTable,
@@ -793,7 +831,7 @@ void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
     }
 
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
-    if (drStream && !m_isMaterialized && m_drEnabled && shouldDRStream) {
+    if (doDRActions(drStream) && shouldDRStream) {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         int64_t currentSpHandle = ec->currentSpHandle();
@@ -827,7 +865,12 @@ void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
     }
 
     TableTuple conflict(m_schema);
-    tryInsertOnAllIndexes(&target, &conflict);
+    try {
+        tryInsertOnAllIndexes(&target, &conflict);
+    } catch (SQLException& e) {
+        deleteTupleStorage(target); // also frees object columns
+        throw;
+    }
     if (!conflict.isNullTuple()) {
         throw ConstraintFailureException(this, source, conflict, CONSTRAINT_TYPE_UNIQUE);
     }
@@ -948,7 +991,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     }
 
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
-    if (drStream && !m_isMaterialized && m_drEnabled) {
+    if (doDRActions(drStream)) {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         int64_t currentSpHandle = ec->currentSpHandle();
@@ -1148,6 +1191,9 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
 }
 
 void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
+    UndoQuantum* uq = ExecutorContext::currentUndoQuantum();
+    bool createUndoAction = fallible && (uq != NULL);
+
     // May not delete an already deleted tuple.
     assert(target.isActive());
 
@@ -1158,21 +1204,28 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
     // be left forgotten in case this throws.
     ExecutorContext* ec = ExecutorContext::getExecutorContext();
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
-    if (drStream && !m_isMaterialized && m_drEnabled) {
+    if (doDRActions(drStream)) {
         int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         int64_t currentSpHandle = ec->currentSpHandle();
         int64_t currentUniqueId = ec->currentUniqueId();
         size_t drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, m_partitionColumn, currentSpHandle,
                                               currentUniqueId, target, DR_RECORD_DELETE);
 
-        UndoQuantum* uq = ExecutorContext::currentUndoQuantum();
-        if (uq && fallible) {
+        if (createUndoAction) {
             uq->registerUndoAction(new (*uq) DRTupleStreamUndoAction(drStream, drMark, rowCostForDRRecord(DR_RECORD_DELETE)));
         }
     }
 
     // Just like insert, we want to remove this tuple from all of our indexes
     deleteFromAllIndexes(&target);
+
+    if (createUndoAction) {
+        target.setPendingDeleteOnUndoReleaseTrue();
+        ++m_tuplesPinnedByUndo;
+        ++m_invisibleTuplesPendingDeleteCount;
+        // Create and register an undo action.
+        uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), &m_surgeon), this);
+    }
 
     // handle any materialized views, insert the tuple into delta table,
     // then hide the tuple from the scan temporarily.
@@ -1194,16 +1247,8 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
         }
     }
 
-    if (fallible) {
-        UndoQuantum* uq = ExecutorContext::currentUndoQuantum();
-        if (uq) {
-            target.setPendingDeleteOnUndoReleaseTrue();
-            ++m_tuplesPinnedByUndo;
-            ++m_invisibleTuplesPendingDeleteCount;
-            // Create and register an undo action.
-            uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), &m_surgeon), this);
-            return;
-        }
+    if (createUndoAction) {
+        return;
     }
 
     // Here, for reasons of infallibility or no active UndoLog, there is no undo, there is only DO.
@@ -1411,17 +1456,6 @@ bool PersistentTable::checkUpdateOnUniqueIndexes(TableTuple& targetTupleToUpdate
     return true;
 }
 
-bool PersistentTable::checkNulls(TableTuple& tuple) const {
-    assert (m_columnCount == tuple.sizeInValues());
-    for (int i = m_columnCount - 1; i >= 0; --i) {
-        if (( ! m_allowNulls[i]) && tuple.isNull(i)) {
-            VOLT_TRACE ("%d th attribute was NULL. It is non-nillable attribute.", i);
-            return false;
-        }
-    }
-    return true;
-}
-
 /*
  * claim ownership of a view. table is responsible for this view*
  */
@@ -1474,16 +1508,17 @@ bool PersistentTable::equals(PersistentTable* other) {
     return true;
 }
 
-std::string PersistentTable::debug() {
+std::string PersistentTable::debug(const std::string& spacer) const {
     std::ostringstream buffer;
-    buffer << Table::debug();
-    buffer << "\tINDEXES: " << m_indexes.size() << "\n";
+    buffer << Table::debug(spacer);
+    std::string infoSpacer = spacer + "  |";
+    buffer << infoSpacer << "\tINDEXES: " << m_indexes.size() << "\n";
 
     // Indexes
-    buffer << "===========================================================\n";
+    buffer << infoSpacer << "===========================================================\n";
     for (int index_ctr = 0; index_ctr < m_indexes.size(); ++index_ctr) {
         if (m_indexes[index_ctr]) {
-            buffer << "\t[" << index_ctr << "] " << m_indexes[index_ctr]->debug();
+            buffer << infoSpacer << "\t[" << index_ctr << "] " << m_indexes[index_ctr]->debug();
             //
             // Primary Key
             //

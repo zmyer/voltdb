@@ -27,16 +27,17 @@ import re
 import sys
 from datetime import timedelta
 from optparse import OptionParser
-from random import randrange
+from random import randrange, seed
 from subprocess import Popen, PIPE, STDOUT
 from time import time
 from traceback import print_exc
 
-__SYMBOL_DEFN  = re.compile(r"(?P<symbolname>[\w-]+)\s*::=\s*(?P<definition>.+)")
-__SYMBOL_REF   = re.compile(r"{(?P<symbolname>[\w-]+)}")
-__OPTIONAL     = re.compile(r"\[(?P<optionaltext>[^\[\]]*)\]")
-__WEIGHTED_XOR = re.compile(r"\s+(?P<weight>\d*)(?P<xor>\|)\s+")
-__XOR          = ' | '
+__SYMBOL_DEFN      = re.compile(r"(?P<symbolname>[\w-]+)\s*::=\s*(?P<definition>.*)")
+__SYMBOL_REF       = re.compile(r"{(?P<symbolname>[\w-]+)}")
+__SYMBOL_REF_REUSE = re.compile(r"{(?P<symbolname>[\w-]*):(?P<reusename>[\w-]+)}")
+__OPTIONAL         = re.compile(r"(?<!\\)\[(?P<optionaltext>[^\[\]]*[^\[\]\\]?)\]")
+__WEIGHTED_XOR     = re.compile(r"\s+(?P<weight>\d*)(?P<xor>\|)\s+")
+__XOR              = ' | '
 
 
 def get_grammar(grammar={}, grammar_filename='sql-grammar.txt', grammar_dir='.'):
@@ -68,6 +69,12 @@ def get_grammar(grammar={}, grammar_filename='sql-grammar.txt', grammar_dir='.')
         symbol_name = grammar_defn.group('symbolname').strip()
         definition  = grammar_defn.group('definition').strip()
 
+        # Check for use of '::=' within the definition, which is an error
+        if '::=' in definition:
+            print "\n\nFATAL ERROR: Definition of '" + str(symbol_name) + "' in grammar " + \
+                  "dictionary contains illegal characters '::=':\n    " + str(definition)
+            exit(21)
+
         weights = []
         for wxor in __WEIGHTED_XOR.finditer(definition):
             weight = wxor.group('weight')
@@ -84,7 +91,7 @@ def get_grammar(grammar={}, grammar_filename='sql-grammar.txt', grammar_dir='.')
         if debug:
             if symbol_name in grammar:
                 replacing_definition = True
-                print "WARNING: replacing definition:", symbol_name, '::=', grammar[symbol_name]
+                print "WARNING: replacing definition:", symbol_name, ' ::= ', grammar[symbol_name]
 
         if len(options) is 1:
             # When there are are no alternative options (i.e., no '|'),
@@ -98,44 +105,87 @@ def get_grammar(grammar={}, grammar_filename='sql-grammar.txt', grammar_dir='.')
             grammar[symbol_name] = dict([ (options[i].strip(), weights[i]) for i in range(len(options)) ])
 
         if debug and replacing_definition:
-            print "          with new definition:", symbol_name, '::=', grammar[symbol_name]
+            print "          with new definition:", symbol_name, ' ::= ', grammar[symbol_name]
 
     return grammar
 
 
-def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth=5, optional_percent=50):
+def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth=5,
+                          optional_percent=50, final_statement=True):
     """Randomly generates one SQL statement of the specified type, using the
        specified maximum depth (meaning that recursive definitions are limited
        to that depth) and optional percent (meaning that option clauses, in
        brackets, have that percentage chance of being used).
     """
+    global symbol_depth, symbol_order, options, debug
+
     sql = '{' + sql_statement_type + '}'
-#     print 'DEBUG: sql:', sql
 
     max_count = 10000
     count = 0
-    depth = {}
-    symbol = __SYMBOL_REF.search(sql)
+    if final_statement:
+        symbol_order = []
+        symbol_depth = {}
+    symbol_reuse = {}
+    symbol = __SYMBOL_REF_REUSE.search(sql) or __SYMBOL_REF.search(sql)
     while symbol and count < max_count:
         count += 1
         bracketed_name = symbol.group(0)
         symbol_name = symbol.group('symbolname')
+        try:
+            reuse_name = symbol.group('reusename')
+        except IndexError as ex:
+            reuse_name = None
         definition  = grammar.get(symbol_name)
-        #print 'DEBUG: bracketed_name:', str(bracketed_name)
-        #print 'DEBUG: symbol_name :', str(symbol_name)
-        #print 'DEBUG: definition:', str(definition)
-        if not definition:
-            print "ERROR: Could not find symbol_name '" + str(symbol_name) + "' in grammar dictionary!!!"
-            break
+        if debug > 5:
+            print 'DEBUG: sql           :', str(sql)
+            print 'DEBUG: symbol_reuse  :', str(symbol_reuse)
+            print 'DEBUG: bracketed_name:', str(bracketed_name)
+            print 'DEBUG: symbol_name   :', str(symbol_name)
+            print 'DEBUG: reuse_name    :', str(reuse_name)
+            print 'DEBUG: definition    :', str(definition)
+
+        # For debugging purposes, we may wish to track symbol use
+        if options.echo_grammar and symbol_name:
+            symbol_order.append((symbol_name, sql))
+
+        # Handle the case where the same symbol could be used twice (or more)
+        # in the same SQL statement, e.g., {table-name:t1} can be reused to
+        # refer to the same table name more than once; the shorter {:t1} may
+        # also be used, after the first occurrence
+        if reuse_name:
+            if symbol_reuse.get(reuse_name):
+                # This reuse_name has been used before, so replace all
+                # occurrences of it with the same value used before
+                reuse_value = symbol_reuse[reuse_name]
+            else:
+                # This reuse_name has not been used before, so choose a value
+                # that will be used to replace it, throughout this SQL statement
+                reuse_value = get_one_sql_statement(grammar, symbol_name, max_depth,
+                                                    optional_percent, False)
+                symbol_reuse[reuse_name] = reuse_value
+
+            sql = sql.replace(bracketed_name, reuse_value)
+            symbol = __SYMBOL_REF_REUSE.search(sql) or __SYMBOL_REF.search(sql)
+            continue
+
+        if definition is None:
+            print "\n\nFATAL ERROR: Could not find definition of '" + str(symbol_name) + "' in grammar dictionary!!!"
+            exit(22)
+
         # Check how deep into a recursive definition we're going
-        depth[symbol_name] = depth.get(symbol_name, 0) + 1
+        if symbol_depth.get(symbol_name):
+            symbol_depth[symbol_name] += 1
+        else:
+            symbol_depth[symbol_name] = 1
+
         if isinstance(definition, list):
             random_index = randrange(0, len(definition))
             #print 'DEBUG: len(definition):', str(len(definition))
             #print 'DEBUG: random_index:', str(random_index)
             # Avoid going too deep into a recursive definition, if possible:
             # if there are alternatives, pick one
-            if (depth[symbol_name] > max_depth and bracketed_name in definition[random_index] and
+            if (symbol_depth[symbol_name] > max_depth and bracketed_name in definition[random_index] and
                     any(bracketed_name not in definition[i] for i in range(len(definition)) ) ):
                 while bracketed_name in definition[random_index]:
                     random_index = randrange(0, len(definition))
@@ -151,6 +201,7 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
                     definition = key
                     break
         #print 'DEBUG: definition:', definition
+
         # Check for any optional text [in brackets], and decide whether to include it or not
         optional = __OPTIONAL.search(definition)
         while optional:
@@ -165,28 +216,78 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
                 definition = definition.replace(bracketed_optionaltext, '', 1)
             #print 'DEBUG: definition:', definition
             optional = __OPTIONAL.search(definition)
+
         sql = sql.replace(bracketed_name, definition, 1)
         #print 'DEBUG: sql:', sql
 
-        symbol = __SYMBOL_REF.search(sql)
+        symbol = __SYMBOL_REF_REUSE.search(sql) or __SYMBOL_REF.search(sql)
 
     if count >= max_count:
         print "Gave up after", count, "iterations: possible infinite loop in grammar dictionary!!!"
+        if debug:
+            if bracketed_name:
+                print "DEBUG: bracketed_name:", bracketed_name
+            if symbol_name:
+                print "DEBUG: symbol_name   :", symbol_name
+            if definition:
+                print "DEBUG: definition    :", definition
+        if debug > 4:
+            print "DEBUG: sql:", sql.strip(), "\n"
+            print "DEBUG: symbol_depth:\n", symbol_depth, "\n\n"
+            if symbol_order:
+                print "DEBUG: symbol_order:\n", symbol_order, "\n\n"
 
-    return sql.strip() + ';'
+    if final_statement:
+        sql = sql.strip().replace('\[', '[').replace('\]', ']') + ';'
+        if debug > 5:
+            print "DEBUG: final sql     :", sql.strip(), "\n"
+
+    return sql
 
 
 def print_file_tail(from_file, to_file, number_of_lines=50):
     """Print a tail of the last 'number_of_lines' of the 'from_file', to the
-    'to_file' (typically the summary file).
+    'to_file' (typically the summary file); and a grep of the number of various
+    types of error messages.
     """
     command = 'tail -n ' + str(number_of_lines) + ' ' + from_file
     if debug > 2:
         print 'DEBUG: tail command:', command
         sys.stdout.flush()
     tail_proc = Popen(command, shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
-    tail_message = 'Last ' + str(number_of_lines) + ' lines of ' + from_file + ':\n' \
-                 + tail_proc.communicate()[0].replace('\\n', '\n') + '\n'
+    tail_message = '\n\nLast ' + str(number_of_lines) + ' lines of ' + from_file + ':\n' \
+                 + tail_proc.communicate()[0].replace('\\n', '\n')
+
+    # Note that the Java exceptions are listed after 'ERROR', and will therefore
+    # not be included in the 'ERROR' totals, since they are in a separate category;
+    # instead, they will be included in the separate Java 'Exception' total
+    error_types = ['Error compiling query', 'ERROR: IN: NodeSchema', 'ERROR', \
+                   'NullPointerException', 'ClassCastException', 'IndexOutOfBoundsException',
+                   'VoltTypeException', 'Exception']
+    error_count = 0
+    for e in error_types:
+        command = 'grep -c "' + e + '" ' + from_file
+        if debug > 2:
+            print 'DEBUG: grep command:', command
+            sys.stdout.flush()
+        grep_proc = Popen(command, shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
+        try:
+            num_errors = int(grep_proc.communicate()[0].replace('\\n', ''))
+        except Exception as ex:
+            tail_message += "Error reading file '"+from_file+"':\n   " + str(ex)
+            break
+        if e is 'ERROR':
+            tail_message += "\nNumber of all other 'ERROR' messages        : {0:4d}".format(num_errors - error_count)
+            tail_message += "\nTotal Number of all 'ERROR' messages        : {0:4d}".format(num_errors)
+            tail_message += "\n\nJava Exceptions: "
+            error_count = 0
+        elif e is 'Exception':
+            tail_message += "\nNumber of other (Java) 'Exception' messages : {0:4d}".format(num_errors - error_count)
+            tail_message += "\nTotal Number of (Java) 'Exception' messages : {0:4d}".format(num_errors)
+        else:
+            error_count  += num_errors
+            tail_message += "\nNumber of {0:27s} errors: {1:4d}".format("'"+e+"'", num_errors)
+
     print >> to_file, tail_message
 
 
@@ -202,11 +303,11 @@ def print_summary(error_message=''):
     prematurely, due a VoltDB server crash.
     """
     global start_time, sql_output_file, sqlcmd_output_file, sqlcmd_summary_file, \
-        options, count_sql_statements
+        options, echo_substrings, count_sql_statements
 
     # Generate the summary message (to be printed below)
     try:
-        last_sql_message = 'Last ' + str(len(last_n_sql_statements)) + ' SQL statements sent to sqlcmd:\n' \
+        last_sql_message = '\n\nLast ' + str(len(last_n_sql_statements)) + ' SQL statements sent to sqlcmd:\n' \
                          + '\n'.join(sql for sql in last_n_sql_statements) + '\n'
         seconds = time() - start_time
         summary_message  = '\n\nSUMMARY: in ' + re.sub('^0:', '', str(timedelta(0, round(seconds))), 1) \
@@ -215,6 +316,7 @@ def print_summary(error_message=''):
         # Check for a special case: TRUNCATE statements were all valid,
         # none invalid, as sometimes happens
         if count_sql_statements.get('TRUNCA') and \
+                count_sql_statements.get('TRUNCA').get('valid') and \
                 count_sql_statements.get('TRUNCA').get('invalid') is None:
             count_sql_statements['TRUNCA']['invalid'] = 0
 
@@ -233,6 +335,8 @@ def print_summary(error_message=''):
                     summary_message += '{0:7d} '.format(count) + validity + ' ({0:3d}%),'.format(percent)
             percent = int(round(100.0 * sql_type_count / total_count))
             summary_message += '{0:7d} '.format(sql_type_count) + 'total ({0:3d}%)'.format(percent)
+            if 'ECHO' in sql_type.upper():
+                summary_message += "  - containing " + " AND ".join("'"+x+"'" for x in echo_substrings) + "]"
     except Exception as e:
         print '\n\nCaught exception attempting to print SUMMARY message:'
         print_exc()
@@ -251,7 +355,7 @@ def print_summary(error_message=''):
                 print_file_tail(log_file, sqlcmd_summary_file, options.log_number)
         print >> sqlcmd_summary_file, last_sql_message, summary_message, error_message
         sqlcmd_summary_file.close()
-    print '\n\n', last_sql_message, summary_message, error_message
+    print last_sql_message, summary_message, error_message
 
 
 def increment_sql_statement_indexes(index1, index2):
@@ -269,18 +373,18 @@ def increment_sql_statement_indexes(index1, index2):
         count_sql_statements[index1][index2] = 1
 
 
-def increment_sql_statement_type(type=None, validity=None):
+def increment_sql_statement_type(type=None, validity=None, incrementTotal=True):
     """Increment the value of 'count_sql_statements' (a 2D dictionary, i.e.,
     a dict of dict), both for the 'total', 'total' element and for the 'type',
     if specified (i.e., for the type, 'total' element); also, if the 'validity'
     is specified (normally equal to 'valid' or 'invalid'), increment those
     values as well (i.e., the 'total', validity and type, validity elements).
     """
-    global count_sql_statements
 
-    increment_sql_statement_indexes('total', 'total')
-    if validity:
-        increment_sql_statement_indexes('total', validity)
+    if incrementTotal:
+        increment_sql_statement_indexes('total', 'total')
+        if validity:
+            increment_sql_statement_indexes('total', validity)
     if type:
         increment_sql_statement_indexes(type, 'total')
         if validity:
@@ -294,7 +398,7 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
     STDOUT).
     """
     global sql_output_file, sqlcmd_output_file, echo_output_file, sqlcmd_proc, \
-        last_n_sql_statements, options, debug
+        last_n_sql_statements, options, echo_substrings, symbol_depth, symbol_order, debug
 
     # Print the specified SQL statement to the specified output file
     print >> sql_output_file, sql
@@ -304,9 +408,9 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
     # debugging things that were recently added to the SQL grammar (e.g., a
     # new function name)
     sql_contains_echo_substring = False
-    if options.echo and options.echo in sql:
+    if options.echo and all(x in sql for x in echo_substrings):
         sql_contains_echo_substring = True
-        print >> echo_output_file, '\n' + sql
+        print >> echo_output_file, '\n', sql, '\n'
 
     # If a sqlcmd sub-process has been defined, use it
     if sqlcmd_proc:
@@ -340,6 +444,8 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                         'Command succeeded.' in output):
                     if sql_was_echoed_as_output:
                         increment_sql_statement_type(sql[0:num_chars_in_sql_type], 'valid')
+                        if sql_contains_echo_substring:
+                            increment_sql_statement_type(' [echo', 'valid', False)
                         break
                     else:  # this should never happen
                         print "\nWARNING: Unexpected condition (should never happen?!): found ", \
@@ -350,10 +456,17 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                 elif 'ERROR' in output.upper():
                     if sql_was_echoed_as_output:
                         increment_sql_statement_type(sql[0:num_chars_in_sql_type], 'invalid')
+                        if sql_contains_echo_substring:
+                            increment_sql_statement_type(' [echo', 'invalid', False)
                         break
-                    elif debug > 2:  # this can happen, though it's uncommon
-                        print 'DEBUG: Found ERROR before SQL echoed, ', \
-                              'with:\n  sql   :', sql, '\n  output:', output
+                    elif debug > 3:
+                        # this can happen, though it's uncommon, when there is a multi-line
+                        # error message, which uses the word 'ERROR' on more than one line
+                        previous = ''
+                        if last_n_sql_statements and len(last_n_sql_statements) > 1:
+                            previous = '\n  previous: ' + last_n_sql_statements[len(last_n_sql_statements) - 2]
+                        print 'DEBUG: Found ERROR before SQL echoed, with:', \
+                                '\n  sql     :', sql, previous, '\n  output  :', output
 
                 # Check if sqlcmd command not found, or if sqlcmd cannot, or
                 # can no longer, reach the VoltDB server
@@ -367,6 +480,12 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                     print_summary(error_message)
                     sqlcmd_proc.communicate('exit')
                     exit(99)
+        if sql_contains_echo_substring and options.echo_grammar:
+            print >> echo_output_file, '\nGrammar symbols used (in order), and how many times, and resulting SQL:'
+            for (symbol, partial_sql) in symbol_order:
+                print >> echo_output_file, "{0:1d}: {1:24s}: {2:s}".format(symbol_depth.get(symbol, 0), symbol, partial_sql)
+            print >> echo_output_file, "{0:27s}: {1:s}".format('Final sql', sql)
+
     else:
         increment_sql_statement_type(sql[0:num_chars_in_sql_type])
 
@@ -420,6 +539,9 @@ if __name__ == "__main__":
     parser.add_option("-g", "--grammar", dest="grammar_files", default="sql-grammar.txt",
                       help="a file path/name, or comma-separated list of files, that defines the SQL grammar "
                          + "[default: sql-grammar.txt]")
+    parser.add_option("-r", "--seed", dest="seed", default=None,
+                      help="seed for random number generator; a blank string, or None, means that the seed "
+                          + "should itself be randomly generated [default: None]")
     parser.add_option("-i", "--initial_type", dest="initial_type", default="insert-statement",
                       help="a type, or comma-separated list of types, of SQL statements to generate initially; typically "
                           + "used to initialize the database using INSERT statements [default: insert-statement]")
@@ -464,15 +586,20 @@ if __name__ == "__main__":
                       help="the number of lines to 'tail' from the 'log' file(s); only applies "
                          + "if 'summary' and 'log' are also specified [default: 100]")
     parser.add_option("-e", "--echo", dest="echo", default=None,
-                      help="a substring to be searched for in all SQL statements sent to sqlcmd: if this is specified, "
-                         + "then all SQL statements that contain this substring, and their results, will be echoed (to "
-                         + "'echo_file'); this is useful for debugging new features, e.g., if you just added the LOG10 "
-                         + "function, you can set this to 'LOG10', to see its effect [default: None]")
-    parser.add_option("-E", "--echo_file", dest="echo_file", default=100,
+                      help="a substring, or comma-separated list of substrings, to be searched for in all SQL "
+                         + "statements sent to sqlcmd: if this is specified, then all SQL statements that contain "
+                         + "this substring (or list of substrings), and their results, will be echoed (to "
+                         + "'echo_file'); this is useful for debugging new features, e.g., if you just added the "
+                         + "LOG10 function, you can set this to 'LOG10', to see its effect [default: None]")
+    parser.add_option("-E", "--echo_file", dest="echo_file", default=None,
                       help="a file path/name to which to send 'echo' output; if not specified, 'echo' output "
                          + "(if any) goes to STDOUT [default: None]")
+    parser.add_option("-G", "--echo_grammar", dest="echo_grammar", default=False,
+                      help="a boolean value (True or False), specifying whether to include, in the 'echo_file', "
+                         + "the list of grammar symbols, and how many times each one was used, for each of the "
+                         + "SQL statements that is echoed [default: False]")
     parser.add_option("-D", "--debug", dest="debug", default=0,
-                      help="print debug info: 0 for none, increasing values (1-5) for more [default: 0]")
+                      help="print debug info: 0 for none, increasing values (1-7) for more [default: 0]")
     (options, args) = parser.parse_args()
 
     # If 'minutes' is specified, change the default for 'number'
@@ -484,6 +611,7 @@ if __name__ == "__main__":
         print "DEBUG: all arguments:", " ".join(sys.argv)
         print "DEBUG: options.path          :", options.path
         print "DEBUG: options.grammar_files :", options.grammar_files
+        print "DEBUG: options.seed          :", options.seed
         print "DEBUG: options.initial_type  :", options.initial_type
         print "DEBUG: options.initial_number:", options.initial_number
         print "DEBUG: options.type          :", options.type
@@ -500,9 +628,19 @@ if __name__ == "__main__":
         print "DEBUG: options.log_number    :", options.log_number
         print "DEBUG: options.echo          :", options.echo
         print "DEBUG: options.echo_file     :", options.echo_file
+        print "DEBUG: options.echo_grammar  :", options.echo_grammar
         print "DEBUG: options.debug         :", options.debug
         print "DEBUG: options (all):\n", options
         print "DEBUG: args (all):", args
+
+    if options.seed:
+        seed_type   = 'supplied'
+        random_seed = int(options.seed)
+    else:
+        seed_type   = 'random'
+        random_seed = randrange(2 ** 63)
+    print 'Using %s seed: %d' % (seed_type, random_seed)
+    seed(random_seed)
 
     # If a maximum number of minutes was specified, compute the time at which
     # to stop execution
@@ -520,8 +658,10 @@ if __name__ == "__main__":
     grammar = {}
     for grammar_file in options.grammar_files.split(','):
         grammar = get_grammar(grammar, grammar_file, options.path)
+    symbol_depth = {}
+    symbol_order = []
 
-    if debug > 4:
+    if debug > 6:
         print 'DEBUG: grammar:'
         for key in grammar.keys():
             print '   ', key + ':', grammar[key]
@@ -534,10 +674,14 @@ if __name__ == "__main__":
 
     # Open the output file for SQL statements to be echoed, if specified
     echo_output_file = None
+    echo_substrings = []
     if options.echo:
+        echo_substrings = options.echo.split(",")
         echo_output_file = sys.stdout
         if options.echo_file:
             echo_output_file = open(options.echo_file, 'w', 0)
+            print >> echo_output_file, "SQL statements containing " \
+                + " AND ".join("'"+x+"'" for x in echo_substrings) + ":\n"
 
     # Open the sub-process used to execute SQL statements in sqlcmd,
     # and the output file for sqlcmd results, if specified
@@ -553,6 +697,7 @@ if __name__ == "__main__":
 
         if options.sqlcmd_summary:
             sqlcmd_summary_file = open(options.sqlcmd_summary, 'w', 0)
+            print >> sqlcmd_summary_file, 'Using %s seed: %d' % (seed_type, random_seed)
 
         command = 'sqlcmd --stop-on-error=false'
         if debug > 2:
@@ -569,7 +714,7 @@ if __name__ == "__main__":
         generate_sql_statements(sql_statement_type, int(options.number), int(options.max_save),
                                 options.delete_type, options.delete_number)
 
-    if debug > 3:
+    if debug > 4:
         print_sql_statement('select * from P1;')
         print_sql_statement('select * from R1;')
         print_sql_statement('select ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME from P1;')

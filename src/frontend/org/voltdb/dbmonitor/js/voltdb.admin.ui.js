@@ -413,7 +413,7 @@ function loadAdminPage() {
     //Admin Page download link
     $('#downloadAdminConfigurations').on('click', function (e) {
         var port = VoltDBConfig.GetPortId() != null ? VoltDBConfig.GetPortId() : '8080';
-        var url = window.location.protocol + '//' + VoltDBConfig.GetDefaultServerIP() + ":" + port + '/deployment/download/deployment.xml?' + VoltDBCore.shortApiCredentials;
+        var url = window.location.protocol + '//' + VoltDBConfig.GetDefaultServerIP() + ":" + port + '/deployment/download/?' + VoltDBCore.shortApiCredentials;
         $(this).attr("href", url);
         setTimeout(function () {
             $('#downloadAdminConfigurations').attr("href", "#");
@@ -1502,7 +1502,7 @@ function loadAdminPage() {
 
     var searchSnapshots = function (e) {
         $('#btnRestore').removeClass('btn').addClass('restoreBtn');
-        $('#tblSearchList').html('<tr style="border:none"><td colspan="3" align="center"><img src="css/resources/images/loader-small.GIF"></td></tr>');
+        $('#tblSearchList').html('<tr style="border:none"><td colspan="3" align="center"><img src="images/loader-small.GIF"></td></tr>');
         voltDbRenderer.GetSnapshotList($('#txtSearchSnapshots').val(), function (snapshotList) {
             var result = '';
             var searchBox = '';
@@ -2864,7 +2864,7 @@ function loadAdminPage() {
         open: function (event, ui, ele) {
             var content = '';
             if (voltDbRenderer.drTablesArray.length == 0) {
-                $("#drPopup").html("No DR tables available.");
+                $("#drPopup").html("<span style='font-size: 14px'>No DR tables available.</span>");
             } else {
                 content = "<table width='100%' border='0' cellspacing='0' cellpadding='0' class='tblPopup'><tbody id='drTableBody'>";
                 for (var i = 0; i <= voltDbRenderer.drTablesArray.length - 1; i++) {
@@ -2888,7 +2888,7 @@ function loadAdminPage() {
         open: function (event, ui, ele) {
             var content = '';
             if (voltDbRenderer.exportTablesArray.length == 0) {
-                $("#exportPopup").html("No Export tables available.");
+                $("#exportPopup").html("<span style='font-size: 14px'>No export streams available.</span>");
             } else {
                 content = "<table width='100%' border='0' cellspacing='0' cellpadding='0' class='tblPopup'><tbody id='exportTableBody'>";
                 for (var i = 0; i <= voltDbRenderer.exportTablesArray.length - 1; i++) {
@@ -2937,7 +2937,7 @@ function loadAdminPage() {
             var contents = '' +
                 '<table width="100%" cellpadding="0" cellspacing="0" class="configurTbl">' +
                 '<tr id="Tr1">' +
-                '    <td>Stream</td>' +
+                '    <td>Target</td>' +
                 '    <td width="15%">' +
                 '       <input id="txtStream" name="txtStream" type="text" size="38">' +
                 '       <label id="errorStream" for="txtStream" class="error" style="display: none;"></label>' +
@@ -3074,7 +3074,7 @@ function loadAdminPage() {
                 $("#txtType").val(config.type);
                 addExportProperties();
                 VoltDbAdminConfig.orgTypeValue = config.type;
-                $("#txtStream").val(config.stream);
+                $("#txtStream").val(config.target);
 
                 $("#chkStream").iCheck(config.enabled ? 'check' : 'uncheck');
                 $("#txtExportConnectorClass").val(config.exportconnectorclass);
@@ -3085,7 +3085,23 @@ function loadAdminPage() {
                 }
                 var count = 1;
                 var multiPropertyCount = 0;
+                var kafkaBootstrapServerStatus =  false;
+
+                if(config.type.toLowerCase() == "kafka"){
+                    for (var j = 0; j < properties.length; j++){
+                        if (properties[j].name == "bootstrap.servers"){
+                            kafkaBootstrapServerStatus = true;
+                            break;
+                        }
+                    }
+                }
+
                 for (var i = 0; i < properties.length; i++) {
+                    if (properties[i].name == "metadata.broker.list" && !kafkaBootstrapServerStatus){
+                        properties[i].name = "bootstrap.servers"
+                        kafkaBootstrapServerStatus = true;
+                    }
+
                     if (VoltDbAdminConfig.newStreamMinmPropertyName.hasOwnProperty(properties[i].name) || VoltDbAdminConfig.newStreamMinmPropertyName.hasOwnProperty(properties[i].name + '_' + config.type)) {
                         if (properties[i].name == "broker.host" || properties[i].name == "amqp.uri") {
                             $("#selectRabbitMq").val(properties[i].name);
@@ -3183,7 +3199,7 @@ function loadAdminPage() {
                             "value": encodeURIComponent($(newStreamProperties[i + 1]).val()),
                         });
                     }
-                    newConfig["stream"] = $("#txtStream").val();
+                    newConfig["target"] = $("#txtStream").val();
                     newConfig["type"] = $("#txtType").val().trim();
                     newConfig["enabled"] = $("#chkStream").is(':checked');
                     if ($("#txtType").val().trim().toUpperCase() == "CUSTOM") {
@@ -3200,7 +3216,7 @@ function loadAdminPage() {
                         adminConfigurations["export"].configuration.push(newConfig);
                     } else {
                         var updatedConfig = adminConfigurations["export"].configuration[editId * 1];
-                        updatedConfig.stream = newConfig.stream;
+                        updatedConfig.target = newConfig.target;
                         updatedConfig.type = newConfig.type;
                         updatedConfig.enabled = newConfig.enabled;
                         updatedConfig.property = newConfig.property;
@@ -3217,18 +3233,17 @@ function loadAdminPage() {
                 adminEditObjects.addNewConfigLink.hide();
                 adminEditObjects.exportConfiguration.html(loadingConfig);
                 adminEditObjects.loadingConfiguration.show();
-
+                VoltDbAdminConfig.isExportLoading = true;
                 //Close the popup
                 popup.close();
 
                 voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
-
                     if (result.status == "1") {
 
                         //Reload Admin configurations for displaying the updated value
                         voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
-                            adminEditObjects.loadingConfiguration.hide();
                             adminEditObjects.addNewConfigLink.show();
+                            adminEditObjects.loadingConfiguration.hide();
                             adminEditObjects.exportConfiguration.data("status", "value");
 
                             VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
@@ -3236,8 +3251,8 @@ function loadAdminPage() {
 
                     } else {
                         setTimeout(function () {
-                            adminEditObjects.loadingConfiguration.hide();
                             adminEditObjects.addNewConfigLink.show();
+                            adminEditObjects.loadingConfiguration.hide();
                             adminEditObjects.exportConfiguration.data("status", "value");
                             adminEditObjects.exportConfiguration.html(currentConfig);
 
@@ -3255,6 +3270,7 @@ function loadAdminPage() {
                             $("#updateErrorPopupLink").trigger("click");
                         }, 3000);
                     }
+                    VoltDbAdminConfig.isExportLoading = false;
                 });
             });
 
@@ -4058,20 +4074,20 @@ function loadAdminPage() {
                 $('#txtEndpoint').attr("disabled", "disabled");
             }
         } else if (exportType.toUpperCase() == "KAFKA") {
-            if (!$('#txtMetadataBrokerList').length) {
+            if (!$('#txtBootstrapServersList').length) {
                 exportProperties += '<tr class="newStreamMinProperty">' +
                     '   <td>' +
-                    '       <input size="15" id="txtMetadataBrokerList" name="txtMetadataBrokerList" value="metadata.broker.list" disabled="disabled" class="newStreamPropertyName newStreamProperty requiredProperty" type="text">' +
-                    '       <label id="errorMetadataBrokerList" for="txtMetadataBrokerList" class="error" style="display: none;"></label>' +
+                    '       <input size="15" id="txtBootstrapServersList" name="txtBootstrapServersList" value="bootstrap.servers" disabled="disabled" class="newStreamPropertyName newStreamProperty requiredProperty" type="text">' +
+                    '       <label id="errorMetadataBrokerList" for="txtBootstrapServersList" class="error" style="display: none;"></label>' +
                     '   </td>' +
                     '   <td>' +
-                    '       <input size="15" id="txtMetadataBrokerListValue" name="txtMetadataBrokerListValue" class="newStreamPropertyValue newStreamProperty" type="text">' +
-                    '       <label id="errorMetadataBrokerListValue" for="txtMetadataBrokerListValue" class="error" style="display: none;"></label>' +
+                    '       <input size="15" id="txtBootstrapServersListValue" name="txtBootstrapServersListValue" class="newStreamPropertyValue newStreamProperty" type="text">' +
+                    '       <label id="errorMetadataBrokerListValue" for="txtBootstrapServersListValue" class="error" style="display: none;"></label>' +
                     '   </td>' +
                     '   <td></td>' +
                     '</tr>';
             } else {
-                $('#txtMetadataBrokerList').attr("disabled", "disabled");
+                $('#txtBootstrapServersList').attr("disabled", "disabled");
             }
         } else if (exportType.toUpperCase() == "JDBC") {
             if (!$('#txtJdbcUrl').length) {
@@ -4155,8 +4171,8 @@ function loadAdminPage() {
                 removeDuplicate(this, "type");
             } else if ($(this).val() == "endpoint") {
                 removeDuplicate(this, "endpoint");
-            } else if ($(this).val() == "metadata.broker.list") {
-                removeDuplicate(this, "metadata.broker.list");
+            } else if ($(this).val() == "bootstrap.servers") {
+                removeDuplicate(this, "bootstrap.servers");
             } else if ($(this).val() == "jdbcurl") {
                 removeDuplicate(this, "jdbcurl");
             } else if ($(this).val() == "jdbcdriver") {
@@ -4210,9 +4226,9 @@ function loadAdminPage() {
         }
 
         if (exportType.toUpperCase() == "KAFKA") {
-            setDefaultDisplay($("#txtMetadataBrokerList"));
+            setDefaultDisplay($("#txtBootstrapServersList"));
         } else {
-            setNormalDisplay($("#txtMetadataBrokerList"));
+            setNormalDisplay($("#txtBootstrapServersList"));
         }
 
         if (exportType.toUpperCase() == "JDBC") {
@@ -5014,6 +5030,7 @@ function loadAdminPage() {
     var iVoltDbAdminConfig = (function () {
 
         var currentRawAdminConfigurations;
+        this.isExportLoading = false;
         this.isCommandLogEnabled = false;
         this.isAdmin = false;
         this.registeredElements = [];
@@ -5036,7 +5053,7 @@ function loadAdminPage() {
             "nonce": "#txtnonceValue",
             "type": "#txtFileTypeValue",
             "endpoint_HTTP": "#txtEndpointValue",
-            "metadata.broker.list": "#txtMetadataBrokerListValue",
+            "bootstrap.servers": "#txtBootstrapServersListValue",
             "jdbcurl": "#txtJdbcUrlValue",
             "jdbcdriver": "#txtJdbcDriverValue",
             "broker.host": "#txtRabbitMqValue",
@@ -5293,7 +5310,6 @@ function loadAdminPage() {
         };
 
         var getExportProperties = function (data) {
-
             var result = "";
             if (data != undefined) {
 
@@ -5301,9 +5317,8 @@ function loadAdminPage() {
                 if (adminEditObjects.exportConfiguration.data("status") == "loading") {
                     return;
                 }
-
                 for (var i = 0; i < data.length; i++) {
-                    var stream = VoltDbAdminConfig.escapeHtml(data[i].stream);
+                    var stream = VoltDbAdminConfig.escapeHtml(data[i].target);
                     var type = data[i].type ? (" (" + VoltDbAdminConfig.escapeHtml(data[i].type) + ")") : "";
                     var enabled = data[i].enabled;
                     var streamProperty = data[i].property;
@@ -5331,8 +5346,22 @@ function loadAdminPage() {
                             '</tr>';
 
                     if (streamProperty && streamProperty.length > 0) {
+                        var isBootstrapServer = false;
+                        if(data[i].type.toLowerCase() == 'kafka'){
+                            for(var k = 0; k < streamProperty.length; k++){
+                                if(streamProperty[k].name == 'bootstrap.servers'){
+                                    isBootstrapServer = true;
+                                    break;
+                                }
+                            }
+                        }
 
                         for (var j = 0; j < streamProperty.length; j++) {
+                            if(streamProperty[j].name == 'metadata.broker.list' && !isBootstrapServer){
+                                streamProperty[j].name = 'bootstrap.servers';
+                                isBootstrapServer = true;
+                            }
+
                             var name = streamProperty[j].name;
                             var value = streamProperty[j].value;
 
@@ -5366,6 +5395,7 @@ function loadAdminPage() {
 
         var getImportProperties = function (data) {
             var result = "";
+            var procedureName = "";
             if (data != undefined) {
                 //Do not update the data in loading condition
                 if (adminEditObjects.importConfiguration.data("status") == "loading") {
@@ -5373,6 +5403,8 @@ function loadAdminPage() {
                 }
 
                 for (var i = 0; i < data.length; i++) {
+                    var resultProperty = "";
+                    var resultSubProperty = "";
                     var type = data[i].type ? VoltDbAdminConfig.escapeHtml(data[i].type) : "";
                     var enabled = data[i].enabled;
                     var importProperty = data[i].property;
@@ -5384,10 +5416,35 @@ function loadAdminPage() {
                         VoltDbAdminConfig.toggleStates[rowId] = false;
                         style = 'style = "display:none;"';
                     }
+                    if (importProperty && importProperty.length > 0) {
+                        var isFirstProcedureProp = true;
+                        for (var j = 0; j < importProperty.length; j++) {
+                            var name = importProperty[j].name;
+                            var value = importProperty[j].value;
 
-                    result += '<tr class="child-row-5 subLabelRow parentprop" id="' + rowId + '">' +
+                            resultSubProperty += '' +
+                                '<tr class="childprop-' + rowId + ' subLabelRow" ' + style + '>' +
+                                '   <td class="configLabe2">' + name + '</td>' +
+                                '   <td class="wordBreak" align="right">' + value + '</td>' +
+                                '<td>&nbsp;</td>' +
+                                '<td>&nbsp;</td>' +
+                                '</tr>';
+
+                            if(name == 'procedure' && isFirstProcedureProp){
+                                isFirstProcedureProp = false;
+                                procedureName = value;
+                            }
+                        }
+                    } else {
+                        resultSubProperty += '<tr class="childprop-' + rowId + ' propertyLast subLabelRow" ' + style + '>' +
+                            '   <td width="67%" class="configLabe2" colspan="3">No properties available.</td>' +
+                            '   <td width="33%">&nbsp</td>' +
+                            '</tr>';
+                    }
+
+                    resultProperty += '<tr class="child-row-5 subLabelRow parentprop" id="' + rowId + '">' +
                             '   <td class="configLabel expoStream" onclick="toggleProperties(this);" title="Click to expand/collapse">' +
-                            '       <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '"> ' + type + '</a>' +
+                            '       <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '"> ' + procedureName + ' (' + type + ')</a>' +
                             '   </td>' +
                             '   <td align="right">' +
                             '       <div class="' + getOnOffClass(enabled) + '"></div>' +
@@ -5398,28 +5455,7 @@ function loadAdminPage() {
                             '       <a href="javascript:void(0)" id="importEdit' + i + '" class="edit" onclick="editImportStream(' + i + ')" title="Edit">&nbsp;</a>' +
                             '   </td>' +
                             '</tr>';
-
-                    if (importProperty && importProperty.length > 0) {
-                        for (var j = 0; j < importProperty.length; j++) {
-                            var name = importProperty[j].name;
-                            var value = importProperty[j].value;
-
-                            result += '' +
-                                '<tr class="childprop-' + rowId + ' subLabelRow" ' + style + '>' +
-                                '   <td class="configLabe2">' + name + '</td>' +
-                                '   <td class="wordBreak" align="right">' + value + '</td>' +
-                                '<td>&nbsp;</td>' +
-                                '<td>&nbsp;</td>' +
-                                '</tr>';
-                        }
-
-
-                    } else {
-                        result += '<tr class="childprop-' + rowId + ' propertyLast subLabelRow" ' + style + '>' +
-                            '   <td width="67%" class="configLabe2" colspan="3">No properties available.</td>' +
-                            '   <td width="33%">&nbsp</td>' +
-                            '</tr>';
-                    }
+                result += resultProperty + resultSubProperty;
                 }
             }
 

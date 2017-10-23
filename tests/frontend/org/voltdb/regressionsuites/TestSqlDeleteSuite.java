@@ -568,13 +568,21 @@ public class TestSqlDeleteSuite extends RegressionSuite {
 
             // delete rows where ID is IN 0..3
             VoltTable vt = client.callProcedure("@AdHoc",
-                    "DELETE FROM " + table + " WHERE ID IN (SELECT ID FROM R1)")
+                    "DELETE FROM " + table + " WHERE ID IN (SELECT NUM FROM R1)")
                     .getResults()[0];
             validateTableOfScalarLongs(vt, new long[] { 4 });
 
             String stmt = "SELECT ID FROM " + table + " ORDER BY ID";
             validateTableOfScalarLongs(client, stmt, new long[] { 4, 5, 6, 7, 8, 9 });
 
+            // delete rows where NUM is 4 and 5
+            vt = client.callProcedure("@AdHoc",
+                    "DELETE FROM " + table + " WHERE NUM IN (SELECT NUM + 2 FROM R1 WHERE R1.ID + 2 = " +
+                    table + ".ID)")
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 2 });
+            stmt = "SELECT NUM FROM " + table + " ORDER BY NUM";
+            validateTableOfScalarLongs(client, stmt, new long[] { 6, 7, 8, 9 });
         }
 
     }

@@ -17,7 +17,6 @@
 
 package org.voltdb.plannodes;
 
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
@@ -29,17 +28,15 @@ public class TableCountPlanNode extends AbstractScanPlanNode {
         super();
     }
 
-    public TableCountPlanNode(String tableName, String tableAlias) {
-        super(tableName, tableAlias);
-        assert(tableName != null && tableAlias != null);
-    }
-
     public TableCountPlanNode(AbstractScanPlanNode child, AggregatePlanNode apn) {
         super(child.getTargetTableName(), child.getTargetTableAlias());
         m_outputSchema = apn.getOutputSchema().clone();
         m_hasSignificantOutputSchema = true;
         m_estimatedOutputTupleCount = 1;
         m_tableSchema = child.getTableSchema();
+
+        m_tableScan = child.m_tableScan;
+        m_tableScanSchema = child.m_tableScanSchema;
 
         m_isSubQuery = child.isSubQuery();
         if (m_isSubQuery) {
@@ -79,7 +76,7 @@ public class TableCountPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeCostEstimates(long childOutputTupleCountEstimate, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
         m_estimatedProcessedTupleCount = 1;
         m_estimatedOutputTupleCount = 1;
     }

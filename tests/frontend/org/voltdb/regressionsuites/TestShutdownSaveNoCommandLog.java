@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.InvocationDispatcher;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ArbitraryDurationProc;
@@ -40,7 +41,6 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.MiscUtils;
 
 public class TestShutdownSaveNoCommandLog extends RegressionSuite
 {
@@ -49,7 +49,6 @@ public class TestShutdownSaveNoCommandLog extends RegressionSuite
     }
 
     public void testShutdownSave() throws Exception {
-        if (!MiscUtils.isPro()) return;
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
 
         Client client2 = this.getClient();
@@ -70,7 +69,7 @@ public class TestShutdownSaveNoCommandLog extends RegressionSuite
             //if execution reaches here, it indicates the expected exception was thrown.
             System.out.println("@SystemInformation:" + e.getMessage());
             assertEquals("incorrect status from @SystemInformation",
-                    "Server shutdown in progress - new transactions are not processed.", e.getMessage());
+                    InvocationDispatcher.SHUTDOWN_MSG, e.getMessage());
         }
 
         //test query that is not allowed
@@ -81,7 +80,7 @@ public class TestShutdownSaveNoCommandLog extends RegressionSuite
             //if execution reaches here, it indicates the expected exception was thrown.
             System.out.println("ArbitraryDurationProc:" + e.getMessage());
             assertEquals("incorrect status from ArbitraryDurationProc",
-                    "Server shutdown in progress - new transactions are not processed.", e.getMessage());
+                    InvocationDispatcher.SHUTDOWN_MSG, e.getMessage());
         }
         long sum = Long.MAX_VALUE;
         while (sum > 0) {

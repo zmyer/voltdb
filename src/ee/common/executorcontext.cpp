@@ -87,13 +87,20 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_tempStringPool(tempStringPool),
     m_undoQuantum(undoQuantum),
     m_staticParams(MAX_PARAM_COUNT),
+    m_usedParamcnt(0),
     m_tuplesModifiedStack(),
-    m_executorsMap(),
+    m_executorsMap(NULL),
+    m_subqueryContextMap(),
     m_drStream(drStream),
     m_drReplicatedStream(drReplicatedStream),
     m_engine(engine),
     m_txnId(0),
     m_spHandle(0),
+    m_uniqueId(0),
+    m_currentTxnTimestamp(0),
+    m_currentDRTimestamp(0),
+    m_lttBlockCache(engine ? engine->tempTableMemoryLimit() : 50*1024*1024), // engine may be null in unit tests
+    m_traceOn(false),
     m_lastCommittedSpHandle(0),
     m_siteId(siteId),
     m_partitionId(partitionId),
@@ -107,9 +114,10 @@ ExecutorContext::ExecutorContext(int64_t siteId,
 }
 
 ExecutorContext::~ExecutorContext() {
+    m_lttBlockCache.releaseAllBlocks();
+
     // currently does not own any of its pointers
 
-    // ... or none, now that the one is going away.
     VOLT_DEBUG("De-installing EC(%ld)", (long)this);
 
     pthread_setspecific(static_key, NULL);
@@ -145,12 +153,27 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
     try {
         BOOST_FOREACH (AbstractExecutor *executor, executorList) {
             assert(executor);
+
+            if (isTraceOn()) {
+                char name[32];
+                snprintf(name, 32, "%s", planNodeToString(executor->getPlanNode()->getPlanNodeType()).c_str());
+                m_topend->traceLog(true, name, NULL);
+            }
+
             // Call the execute method to actually perform whatever action
             // it is that the node is supposed to do...
             if (!executor->execute(m_staticParams)) {
+                if (isTraceOn()) {
+                    m_topend->traceLog(false, NULL, NULL);
+                }
                 throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                     "Unspecified execution error detected");
             }
+
+            if (isTraceOn()) {
+                m_topend->traceLog(false, NULL, NULL);
+            }
+
             ++ctr;
         }
     } catch (const SerializableEEException &e) {
@@ -192,7 +215,7 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
         executorList[i]->cleanupTempOutputTable();
     }
 
-    TempTable *result = executorList[ttl-1]->getPlanNode()->getTempOutputTable();
+    AbstractTempTable *result = executorList[ttl-1]->getPlanNode()->getTempOutputTable();
     return UniqueTempTableResult(result);
 }
 
@@ -205,10 +228,14 @@ Table* ExecutorContext::getSubqueryOutputTable(int subqueryId) const
 
 void ExecutorContext::cleanupAllExecutors()
 {
-    typedef std::map<int, std::vector<AbstractExecutor*>* >::value_type MapEntry;
-    BOOST_FOREACH(MapEntry& entry, *m_executorsMap) {
-        int subqueryId = entry.first;
-        cleanupExecutorsForSubquery(subqueryId);
+    // If something failed before we could even instantiate the plan,
+    // there won't even be an executors map.
+    if (m_executorsMap != NULL) {
+        typedef std::map<int, std::vector<AbstractExecutor*>* >::value_type MapEntry;
+        BOOST_FOREACH(MapEntry& entry, *m_executorsMap) {
+            int subqueryId = entry.first;
+            cleanupExecutorsForSubquery(subqueryId);
+        }
     }
 
     // Clear any cached results from executed subqueries
@@ -265,14 +292,17 @@ void ExecutorContext::reportProgressToTopend(const TempTableLimits *limits) {
 }
 
 bool ExecutorContext::allOutputTempTablesAreEmpty() const {
-    typedef std::map<int, std::vector<AbstractExecutor*>* >::value_type MapEntry;
-    BOOST_FOREACH (MapEntry &entry, *m_executorsMap) {
-        BOOST_FOREACH(AbstractExecutor* executor, *(entry.second)) {
-            if (! executor->outputTempTableIsEmpty()) {
-                return false;
+    if (m_executorsMap != NULL) {
+        typedef std::map<int, std::vector<AbstractExecutor*>* >::value_type MapEntry;
+        BOOST_FOREACH (MapEntry &entry, *m_executorsMap) {
+            BOOST_FOREACH(AbstractExecutor* executor, *(entry.second)) {
+                if (! executor->outputTempTableIsEmpty()) {
+                    return false;
+                }
             }
         }
     }
+
     return true;
 }
 
@@ -288,8 +318,10 @@ void ExecutorContext::setDrStream(AbstractDRTupleStream *drStream) {
 }
 
 void ExecutorContext::setDrReplicatedStream(AbstractDRTupleStream *drReplicatedStream) {
-    assert (m_drReplicatedStream != NULL);
-    assert (drReplicatedStream != NULL);
+    if (m_drReplicatedStream == NULL || drReplicatedStream == NULL) {
+        m_drReplicatedStream = drReplicatedStream;
+        return;
+    }
     assert (m_drReplicatedStream->m_committedSequenceNumber >= drReplicatedStream->m_committedSequenceNumber);
     int64_t lastCommittedSpHandle = std::max(m_lastCommittedSpHandle, drReplicatedStream->m_openSpHandle);
     m_drReplicatedStream->periodicFlush(-1L, lastCommittedSpHandle);
@@ -308,25 +340,21 @@ void ExecutorContext::setDrReplicatedStream(AbstractDRTupleStream *drReplicatedS
  */
 void ExecutorContext::checkTransactionForDR() {
     if (UniqueId::isMpUniqueId(m_uniqueId) && m_undoQuantum != NULL) {
-        if (m_drStream) {
+        if (m_drStream && m_drStream->drStreamStarted()) {
             if (m_drStream->transactionChecks(m_lastCommittedSpHandle,
-                        m_spHandle, m_uniqueId))
-            {
+                    m_spHandle, m_uniqueId)) {
                 m_undoQuantum->registerUndoAction(
                         new (*m_undoQuantum) DRTupleStreamUndoAction(m_drStream,
-                                m_drStream->m_committedUso,
-                                0));
+                                m_drStream->m_committedUso, 0));
             }
-            if (m_drReplicatedStream) {
-                if (m_drReplicatedStream->transactionChecks(m_lastCommittedSpHandle,
-                            m_spHandle, m_uniqueId))
-                {
-                    m_undoQuantum->registerUndoAction(
-                            new (*m_undoQuantum) DRTupleStreamUndoAction(
-                                    m_drReplicatedStream,
-                                    m_drReplicatedStream->m_committedUso,
-                                    0));
-                }
+        }
+        if (m_drReplicatedStream && m_drReplicatedStream->drStreamStarted()) {
+            if (m_drReplicatedStream->transactionChecks(m_lastCommittedSpHandle,
+                    m_spHandle, m_uniqueId)) {
+                m_undoQuantum->registerUndoAction(
+                        new (*m_undoQuantum) DRTupleStreamUndoAction(
+                                m_drReplicatedStream,
+                                m_drReplicatedStream->m_committedUso, 0));
             }
         }
     }

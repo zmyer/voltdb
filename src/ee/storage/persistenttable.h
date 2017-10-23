@@ -66,7 +66,7 @@
 #include "storage/TableStreamerInterface.h"
 #include "storage/RecoveryContext.h"
 #include "storage/ElasticIndex.h"
-#include "storage/CopyOnWriteIterator.h"
+#include "storage/DRTupleStream.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
 
@@ -215,9 +215,6 @@ private:
     PersistentTable(PersistentTable const&);
     PersistentTable operator=(PersistentTable const&);
 
-    // default iterator
-    TableIterator m_iter;
-
     virtual void initializeWithColumns(TupleSchema* schema,
             std::vector<std::string> const& columnNames,
             bool ownsTupleSchema,
@@ -230,26 +227,29 @@ public:
         return m_tupleCount * m_tempTuple.tupleLength();
     }
 
+    void signature(char const* signature) {
+        ::memcpy(&m_signature, signature, 20);
+    }
+
+    const char* signature() {
+        return m_signature;
+    }
+
     void notifyQuantumRelease() {
         if (compactionPredicate()) {
             doForcedCompaction();
         }
     }
 
-    // Return a table iterator by reference
-    TableIterator& iterator() {
+    TableIterator iterator() {
         m_iter.reset(m_data.begin());
         return m_iter;
     }
 
-    JumpingTableIterator* makeJumpingIterator() {
-        return new JumpingTableIterator(this, m_data.begin(), m_data.end());
-    }
-
-    TableIterator& iteratorDeletingAsWeGo() {
-        m_iter.reset(m_data.begin());
-        m_iter.setTempTableDeleteAsGo(false);
-        return m_iter;
+    TableIterator iteratorDeletingAsWeGo() {
+        // we don't delete persistent tuples "as we go",
+        // so just return a normal iterator.
+        return iterator();
     }
 
 
@@ -264,7 +264,8 @@ public:
            (PersistentTable* otherTable,
             std::vector<std::string> const& theIndexes,
             std::vector<std::string> const& otherIndexes,
-            bool fallible = true);
+            bool fallible = true,
+            bool isUndo = false);
 
     // The fallible flag is used to denote a change to a persistent table
     // which is part of a long transaction that has been vetted and can
@@ -356,7 +357,7 @@ public:
     // ------------------------------------------------------------------
     std::string tableType() const;
     bool equals(PersistentTable* other);
-    virtual std::string debug();
+    virtual std::string debug(const std::string &spacer) const;
 
     /*
      * Find the block a tuple belongs to. Returns TBPtr(NULL) if no block is found.
@@ -452,7 +453,7 @@ public:
     int getDRTimestampColumnIndex() const { return m_drTimestampColumnIndex; }
 
     // for test purpose
-    void setDR(bool flag) { m_drEnabled = flag; }
+    void setDR(bool flag) { m_drEnabled = (flag && !m_isMaterialized); }
 
     void setTupleLimit(int32_t newLimit) { m_tupleLimit = newLimit; }
 
@@ -481,15 +482,14 @@ public:
         return this;
     }
 
-    void setTableForStreamIndexing(PersistentTable* tb) {
+    void setTableForStreamIndexing(PersistentTable* tb, PersistentTable* tbForStreamIndexing) {
         if (this == tb) {
             // For example, two identical swap statements in the same XA
             // should restore the status quo.
             // Likewise, the swapTable call to undo a SWAP TABLES statement.
             unsetTableForStreamIndexing();
         }
-        m_tableForStreamIndexing = (tb->m_tableForStreamIndexing == NULL) ?
-            tb : tb->m_tableForStreamIndexing;
+        m_tableForStreamIndexing = tbForStreamIndexing;
         m_tableForStreamIndexing->incrementRefcount();
     }
 
@@ -537,6 +537,8 @@ public:
     TableStats* getTableStats() { return &m_stats; };
 
     std::vector<uint64_t> getBlockAddresses() const;
+
+    bool doDRActions(AbstractDRTupleStream* drStream);
 
 private:
     // Zero allocation size uses defaults.
@@ -600,7 +602,6 @@ private:
                                     TableTuple const& sourceTupleWithNewValues,
                                     std::vector<TableIndex*> const& indexesToUpdate);
 
-    bool checkNulls(TableTuple& tuple) const;
 
     void notifyBlockWasCompactedAway(TBPtr block);
 
@@ -655,7 +656,13 @@ private:
     TBPtr allocateNextBlock();
 
     AbstractDRTupleStream* getDRTupleStream(ExecutorContext* ec) {
-        return isReplicatedTable() ? ec->drReplicatedStream() : ec->drStream();
+        if (isReplicatedTable()) {
+            if (ec->drStream()->drProtocolVersion() >= DRTupleStream::NO_REPLICATED_STREAM_PROTOCOL_VERSION) {
+                return (ec->m_partitionId == 0) ? ec->drStream() : NULL;
+            }
+            return ec->drReplicatedStream();
+        }
+        return ec->drStream();
     }
 
     void setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tuple, bool update);
@@ -692,6 +699,12 @@ private:
     void swapTableIndexes(PersistentTable* otherTable,
                           std::vector<TableIndex*> const& theIndexes,
                           std::vector<TableIndex*> const& otherIndexes);
+
+    // pointers to chunks of data. Specific to table impl. Don't leak this type.
+    TBMap m_data;
+
+    // default iterator
+    TableIterator m_iter;
 
     // CONSTRAINTS
     std::vector<bool> m_allowNulls;
@@ -731,9 +744,6 @@ private:
 
     // Provides access to all table streaming apparati, including COW and recovery.
     boost::shared_ptr<TableStreamerInterface> m_tableStreamer;
-
-    // pointers to chunks of data. Specific to table impl. Don't leak this type.
-    TBMap m_data;
 
     int m_failedCompactionCount;
 

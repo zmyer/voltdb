@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Pattern;
 
 import javax.servlet.http.HttpServletResponse;
 
@@ -56,6 +57,7 @@ public class HTTPClientInterface {
 
     public static final String QUERY_TIMEOUT_PARAM = "Querytimeout";
     public static final String JSONP = "jsonp";
+    public static final Pattern JSONP_PATTERN = Pattern.compile("^[a-zA-Z0-9_$]*$");
     private static final VoltLogger m_log = new VoltLogger("HOST");
     private static final RateLimitedLogger m_rate_limited_log = new RateLimitedLogger(10 * 1000, m_log, Level.WARN);
 
@@ -194,13 +196,22 @@ public class HTTPClientInterface {
         simpleJsonResponse(jsonp, message, rsp, HttpServletResponse.SC_OK);
     }
 
+    public static boolean validateJSONP(String jsonp, Request request, HttpServletResponse response) {
+        if (jsonp != null && !JSONP_PATTERN.matcher(jsonp).matches()) {
+            badRequest(null, "Invalid jsonp callback function name", response);
+            request.setHandled(true);
+            return false;
+        }
+        return true;
+    }
+
     public void process(Request request, HttpServletResponse response) {
         AuthenticationResult authResult = null;
         boolean suspended = false;
 
         String jsonp = request.getHeader(JSONP);
-        if (jsonp != null && jsonp.trim().isEmpty()) {
-            jsonp = null;
+        if (!validateJSONP(jsonp, request, response)) {
+            return;
         }
         String authHeader = request.getHeader(HttpHeader.AUTHORIZATION.asString());
         if (m_spnegoEnabled && (authHeader == null || !authHeader.startsWith(HttpHeader.NEGOTIATE.asString()))) {
@@ -258,6 +269,9 @@ public class HTTPClientInterface {
             }
             if (jsonp == null) {
                 jsonp = request.getParameter(JSONP);
+                if (!validateJSONP(jsonp, request, response)) {
+                    return;
+                }
             }
             String procName = request.getParameter("Procedure");
             String params = request.getParameter("Parameters");
@@ -286,7 +300,7 @@ public class HTTPClientInterface {
 
             authResult = authenticate(request);
             if (!authResult.isAuthenticated()) {
-                ok(jsonp, authResult.m_message, response);
+                unauthorized(jsonp, authResult.m_message, response);
                 request.setHandled(true);
                 return;
             }
@@ -296,6 +310,7 @@ public class HTTPClientInterface {
 
             JSONProcCallback cb = new JSONProcCallback(continuation, jsonp);
             boolean success;
+            String hostname = request.getRemoteHost();
             if (params != null) {
                 ParameterSet paramSet = null;
                 try {
@@ -315,10 +330,10 @@ public class HTTPClientInterface {
                     continuation.complete();
                     return;
                 }
-                success = callProcedure(authResult, queryTimeout, cb, procName, paramSet.toArray());
+                success = callProcedure(hostname, authResult, queryTimeout, cb, procName, paramSet.toArray());
             }
             else {
-                success = callProcedure(authResult, queryTimeout, cb, procName);
+                success = callProcedure(hostname, authResult, queryTimeout, cb, procName);
             }
             if (!success) {
                 ok(jsonp, "Server is not accepting work at this time.", response);
@@ -341,12 +356,12 @@ public class HTTPClientInterface {
         }
     }
 
-    public boolean callProcedure(final AuthenticationResult ar, int timeout, ProcedureCallback cb, String procName, Object...args) {
-        return m_invocationHandler.get().callProcedure(ar.m_authUser, ar.m_adminMode, timeout, cb, procName, args);
+    public boolean callProcedure(String hostname, final AuthenticationResult ar, int timeout, ProcedureCallback cb, String procName, Object...args) {
+        return m_invocationHandler.get().callProcedure(hostname, ar.m_authUser, ar.m_adminMode, timeout, cb, false, null, procName, args);
     }
 
-    public boolean callProcedure(final AuthUser user, boolean adminMode, int timeout, ProcedureCallback cb, String procName, Object...args) {
-        return m_invocationHandler.get().callProcedure(user, adminMode, timeout, cb, procName, args);
+    public boolean callProcedure(String hostname, final AuthUser user, boolean adminMode, int timeout, ProcedureCallback cb, String procName, Object...args) {
+        return m_invocationHandler.get().callProcedure(hostname, user, adminMode, timeout, cb, false, null, procName, args);
     }
 
     Configuration getVoltDBConfig() {
@@ -428,13 +443,16 @@ public class HTTPClientInterface {
 
         assert((hashedPasswordBytes == null) || (hashedPasswordBytes.length == 20) || (hashedPasswordBytes.length == 32));
 
+        String fromAddress = request.getRemoteAddr();
+        if (fromAddress == null) fromAddress = "NULL";
+
         if (m_spnegoEnabled) {
             final String principal = spnegoLogin(token);
             AuthenticationRequest authReq = getAuthSystem().new SpnegoPassthroughRequest(principal);
-            if (!authReq.authenticate(ClientAuthScheme.SPNEGO)) {
+            if (!authReq.authenticate(ClientAuthScheme.SPNEGO, fromAddress)) {
                 return new AuthenticationResult(
                         false, null, adminMode, principal,
-                        "User " + principal + " failed to authorize"
+                        "User " + principal + " from " + fromAddress + " failed to authenticate"
                         );
             }
             return new AuthenticationResult(true, ClientAuthScheme.SPNEGO, adminMode, principal, "");
@@ -443,10 +461,10 @@ public class HTTPClientInterface {
             ClientAuthScheme scheme = hashedPasswordBytes != null ?
                     ClientAuthScheme.getByUnencodedLength(hashedPasswordBytes.length)
                     : ClientAuthScheme.HASH_SHA256;
-            if (!authReq.authenticate(scheme)) {
+            if (!authReq.authenticate(scheme, fromAddress)) {
                 return new AuthenticationResult(
                         false, null, adminMode, username,
-                        "User " + username + " failed to authorize"
+                        "User " + username + " from " + fromAddress + " failed to authenticate"
                         );
             }
             return new AuthenticationResult(true, scheme, adminMode, username, "");

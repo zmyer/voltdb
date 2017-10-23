@@ -33,16 +33,11 @@ public abstract class VoltProtocolHandler implements InputHandler {
         }
     }
 
-    /** messages read by this connection */
-    private int m_sequenceId;
     /** serial number of this VoltPort */
     private final long m_connectionId;
     private int m_nextLength;
 
-    private static int MAX_MESSAGE_LENGTH = 52428800;
-
     public VoltProtocolHandler() {
-        m_sequenceId = 0;
         m_connectionId = m_globalConnectionCounter.incrementAndGet();
     }
 
@@ -67,10 +62,10 @@ public abstract class VoltProtocolHandler implements InputHandler {
                 throw new BadMessageLength(
                         "Next message length is " + m_nextLength + " which is less than 1 and is nonsense");
             }
-            if (m_nextLength > MAX_MESSAGE_LENGTH) {
+            if (m_nextLength > VoltPort.MAX_MESSAGE_LENGTH) {
                 throw new BadMessageLength(
                         "Next message length is " + m_nextLength + " which is greater then the hard coded " +
-                        "max of " + MAX_MESSAGE_LENGTH + ". Break up the work into smaller chunks (2 megabytes is reasonable) " +
+                        "max of " + VoltPort.MAX_MESSAGE_LENGTH + ". Break up the work into smaller chunks (2 megabytes is reasonable) " +
                         "and send as multiple messages or stored procedure invocations");
             }
             assert m_nextLength > 0;
@@ -80,7 +75,6 @@ public abstract class VoltProtocolHandler implements InputHandler {
             // Copy read buffers to result, move read buffers back to memory pool
             inputStream.getBytes(result.array());
             m_nextLength = 0;
-            m_sequenceId++;
         }
         return result;
     }
@@ -104,10 +98,6 @@ public abstract class VoltProtocolHandler implements InputHandler {
     @Override
     public long connectionId() {
         return m_connectionId;
-    }
-
-    public int sequenceId() {
-        return m_sequenceId;
     }
 
     protected int getNextMessageLength() {

@@ -31,6 +31,7 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.Deque;
 import java.util.GregorianCalendar;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -41,13 +42,17 @@ import java.util.regex.Pattern;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.ReplicationRole;
+import org.voltcore.utils.CoreUtils;
+import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.licensetool.LicenseException;
 
@@ -136,7 +141,17 @@ public class MiscUtils {
                 }
 
                 @Override
-                public boolean isTrial() {
+                public boolean isAnyKindOfTrial() {
+                    return false;
+                }
+
+                @Override
+                public boolean isProTrial() {
+                    return false;
+                }
+
+                @Override
+                public boolean isEnterpriseTrial() {
                     return false;
                 }
 
@@ -334,7 +349,7 @@ public class MiscUtils {
 
         if (yesterday.after(licenseApi.expires())) {
             if (licenseApi.hardExpiration()) {
-                if (licenseApi.isTrial()) {
+                if (licenseApi.isAnyKindOfTrial()) {
                     hostLog.fatal("VoltDB trial license expired on " + expiresStr + ".");
                 }
                 else {
@@ -391,7 +406,7 @@ public class MiscUtils {
         long diffDays = diff / (24 * 60 * 60 * 1000);
 
         // print out trial success message
-        if (licenseApi.isTrial()) {
+        if (licenseApi.isAnyKindOfTrial()) {
             consoleLog.info("Starting VoltDB with trial license. License expires on " + expiresStr + " (" + diffDays + " days remaining).");
             return true;
         }
@@ -989,5 +1004,62 @@ public class MiscUtils {
             assert this.value != null;
             return this.value;
         }
+    }
+
+    public static String hsIdTxnIdToString(long hsId, long txnId) {
+        final StringBuilder sb = new StringBuilder();
+        CoreUtils.hsIdToString(hsId, sb);
+        sb.append(" ");
+        TxnEgo.txnIdToString(txnId, sb);
+        return sb.toString();
+    }
+
+    public static String hsIdPairTxnIdToString(final long srcHsId, final long destHsId,
+                                               final long txnId, final long uniqID) {
+        final StringBuilder sb = new StringBuilder(32);
+        CoreUtils.hsIdToString(srcHsId, sb);
+        sb.append("->");
+        CoreUtils.hsIdToString(destHsId, sb);
+        sb.append(" ");
+        TxnEgo.txnIdToString(txnId, sb);
+        sb.append(" ").append(uniqID);
+        return sb.toString();
+    }
+
+    /**
+     * Get VARBINARY partition keys for the current topology.
+     * @return A map from partition IDs to partition keys, null if failed to get the keys.
+     */
+    public static Map<Integer, byte[]> getBinaryPartitionKeys() {
+        return getBinaryPartitionKeys(null);
+    }
+
+    /**
+     * Get VARBINARY partition keys for the specified topology.
+     * @return A map from partition IDs to partition keys, null if failed to get the keys.
+     */
+    public static Map<Integer, byte[]> getBinaryPartitionKeys(TheHashinator hashinator) {
+        Map<Integer, byte[]> partitionMap = new HashMap<>();
+
+        VoltTable partitionKeys = null;
+        if (hashinator == null) {
+            partitionKeys = TheHashinator.getPartitionKeys(VoltType.VARBINARY);
+        }
+        else {
+            partitionKeys = TheHashinator.getPartitionKeys(hashinator, VoltType.VARBINARY);
+        }
+        if (partitionKeys == null) {
+            return null;
+        } else {
+            // This is a shared resource so make a copy of the table to protect the cache copy in TheHashinator
+            ByteBuffer buf = ByteBuffer.allocate(partitionKeys.getSerializedSize());
+            partitionKeys.flattenToBuffer(buf);
+            buf.flip();
+            VoltTable keyCopy = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(buf);
+            while (keyCopy.advanceRow()) {
+                partitionMap.put((int) keyCopy.getLong(0), keyCopy.getVarbinary(1));
+            }
+        }
+        return partitionMap;
     }
 }
