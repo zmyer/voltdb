@@ -395,6 +395,10 @@ public final class InvocationDispatcher {
                 CoreUtils.logProcedureInvocation(hostLog, user.m_name, clientInfo, procName);
                 return dispatchStopNode(task);
             }
+            else if ("@LoadSinglepartitionTable".equals(procName)) {
+                // FUTURE: When we get rid of the legacy hashinator, this should go away
+                return dispatchLoadSinglepartitionTable(catProc, task, handler, ccxn);
+            }
             else if ("@SnapshotSave".equals(procName)) {
                 m_snapshotDaemon.requestUserSnapshot(task, ccxn);
                 return null;

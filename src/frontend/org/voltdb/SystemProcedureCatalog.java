@@ -199,6 +199,8 @@ public class SystemProcedureCatalog {
         builder.put("@ExplainProc",             new Config("org.voltdb.sysprocs.ExplainProc",              false, true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,false ));
         builder.put("@ExplainView",             new Config("org.voltdb.sysprocs.ExplainView",              false, true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,false ));
         builder.put("@SendSentinel",            new Config(null,                                           true,  false, false, 0,    VoltType.INVALID,   true,  false, false, true,      false,  false,            true, false ));
+        builder.put("@CatalogPayload",          new Config(null,                                           true,  true,  false, 0,    VoltType.INVALID,   false, false, true,  true,       false,  false,           false, false));
+        builder.put("@JSONPlan",                new Config(null,                                           true,  true,  false, 0,    VoltType.INVALID,   false, false, true,  true,       false,  false,           false, false));
         builder.put("@PrepareShutdown",         new Config("org.voltdb.sysprocs.PrepareShutdown",          false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  true ,            true, false ));
         builder.put("@SwapTables",              new Config("org.voltdb.sysprocs.SwapTables",               false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      true,   false,            false,false ));
         builder.put("@SwapTablesCore",          new Config("org.voltdb.sysprocs.SwapTablesCore",           false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      true,   false,            true, false ));
@@ -211,8 +213,6 @@ public class SystemProcedureCatalog {
                                                            false, false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            false, false ));
         builder.put("@StartNodeDRConsumerNT",   new Config("org.voltdb.sysprocs.RestartDRConsumerNT$StartNodeDRConsumerNT",
                                                            false, false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            false, false ));
-        builder.put("@CatalogPayload",          new Config(null,                                           true,  true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,           false, false));
-        builder.put("@JSONPlan",                new Config(null,                                           true,  true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,           false, false));
         listing = builder.build();
     }
 }

@@ -1085,6 +1085,10 @@ public class SQLCommand
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@ExplainView",
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
+        Procedures.put("@CatalogPayload",
+                ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
+        Procedures.put("@JSONPlan",
+                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@ValidatePartitioning",
                 ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("int", "varbinary")).build());
         Procedures.put("@GetPartitionKeys",
@@ -1099,10 +1103,6 @@ public class SQLCommand
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>())
                                                              .put( 1, Arrays.asList("varchar"))
                                                              .put( 2, Arrays.asList("varchar", "varchar")).build());
-        Procedures.put("@CatalogPayload",
-                ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
-        Procedures.put("@JSONPlan",
-                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
     }
 
     private static Client getClient(ClientConfig config, String[] servers, int port) throws Exception

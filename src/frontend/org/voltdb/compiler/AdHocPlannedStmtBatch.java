@@ -350,6 +350,16 @@ public class AdHocPlannedStmtBatch implements Cloneable {
      * @param i the index
      * @param db the database context (for adding catalog details).
      */
+    public String explainStatement(int i, Database db) {
+        return explainStatement(i, db, false);
+    }
+
+    /**
+     * Return the "EXPLAIN" string of the batched statement at the index
+     * @param i the index
+     * @param db the database context (for adding catalog details).
+     * @param getJSONString whether get the normal explain string or the JSON plan.
+     */
     public String explainStatement(int i, Database db, boolean getJSONString) {
         AdHocPlannedStatement plannedStatement = plannedStatements.get(i);
         String aggplan = new String(plannedStatement.core.aggregatorFragment, Constants.UTF8ENCODING);
