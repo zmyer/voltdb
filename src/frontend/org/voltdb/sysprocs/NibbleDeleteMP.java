@@ -74,6 +74,7 @@ public class NibbleDeleteMP extends VoltSystemProcedure {
         // This unusual to do, as they are typically required to be final instance variables.
         // This only works because the SQL text and plan is identical from the borrowed procedure.
         SQLStmt stmt = new SQLStmt(catStmt.getSqltext());
+        stmt.setInCatalog(false);
         m_runner.initSQLStmt(stmt, catStmt);
 
         voltQueueSQL(stmt, params);

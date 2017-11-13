@@ -77,7 +77,7 @@ public class TestNibbleDelete {
         builder.addPartitionInfo("part", "id");
         builder.addStmtProcedure("partcount", "select count(*) from part;");
         builder.addStmtProcedure("repcount", "select count(*) from rep;");
-        m_cluster = new LocalCluster("foo.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        m_cluster = new LocalCluster("foo.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         m_cluster.setHasLocalServer(true);
         m_cluster.compile(builder);
         m_cluster.startUp();
