@@ -26,6 +26,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
+import org.voltdb.ProcedureRunner;
 import org.voltdb.SQLStmt;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
@@ -37,7 +38,6 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
-import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.sysprocs.NibbleDeleteSP.ComparisonConstant;
 import org.voltdb.utils.CatalogUtil;
 
@@ -63,15 +63,16 @@ public class NibbleDeleteMP extends VoltSystemProcedure {
     }
 
     /**
-     * Execute a set of queued inserts. Ensure each insert successfully
-     * inserts one row. Throw exception if not.
+     * Execute a pre-compiled adHoc SQL statement, since it's not in the catalog,
+     * every site will cache the plan in its own plan repository.
+     * Throw exception if not.
      *
      * @return Count of rows inserted or upserted.
      * @throws VoltAbortException if any failure at all.
      */
     VoltTable executeSQLOnTheFly(Statement catStmt, Object[] params) throws VoltAbortException {
         // Create a SQLStmt instance on the fly
-        // This unusual to do, as they are typically required to be final instance variables.
+        // This is unusual to do, as they are typically required to be final instance variables.
         // This only works because the SQL text and plan is identical from the borrowed procedure.
         SQLStmt stmt = new SQLStmt(catStmt.getSqltext());
         stmt.setInCatalog(false);
@@ -101,7 +102,9 @@ public class NibbleDeleteMP extends VoltSystemProcedure {
         // Some basic checks
         Table catTable = ctx.getDatabase().getTables().getIgnoreCase(tableName);
         if (catTable == null) {
-            throw new VoltAbortException("Table not present in catalog");
+            throw new VoltAbortException(
+                    String.format("Table %s doesn't present in catalog",
+                            tableName));
         }
         if (!catTable.getIsreplicated()) {
             throw new VoltAbortException(
@@ -125,7 +128,7 @@ public class NibbleDeleteMP extends VoltSystemProcedure {
         // so far should only be single column, single row table
         int columnCount = table.getColumnCount();
         if (columnCount > 1) {
-            throw new VoltAbortException("Only support one input parameter now.");
+            throw new VoltAbortException("More than one input parameter is not supported right now.");
         }
         assert(columnCount == 1);
         table.resetRowPosition();
@@ -144,15 +147,14 @@ public class NibbleDeleteMP extends VoltSystemProcedure {
                             actualType.toString(), expectedType.toString()));
         }
 
-        if (comparison < ComparisonConstant.GREATER_THAN.ordinal() ||
-                comparison > ComparisonConstant.EQUAL.ordinal()) {
+        ComparisonConstant op = ComparisonConstant.fromInteger(comparison);
+        if (op == null) {
             throw new VoltAbortException("Invalid comparison constant: " + comparison);
         }
-        ComparisonConstant comparisonConstant = ComparisonConstant.values()[comparison];
 
-        // TODO: should cache the plan in somewhere
-        Procedure newCatProc = StatementCompiler.compileNibbleDeleteProcedure(catTable,
-                this.getClass().getName() + "-" + tableName, column, comparisonConstant);
+        ProcedureRunner pr = ctx.getSiteProcedureConnection().getNibbleDeleteProcRunner(
+                tableName + ".nibbleDelete", catTable, column, op);
+        Procedure newCatProc = pr.getCatalogProcedure();
 
         Statement countStmt = newCatProc.getStatements().get(VoltDB.ANON_STMT_NAME + "0");
         Statement deleteStmt = newCatProc.getStatements().get(VoltDB.ANON_STMT_NAME + "1");

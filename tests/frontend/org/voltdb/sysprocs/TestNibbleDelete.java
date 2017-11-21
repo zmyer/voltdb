@@ -147,7 +147,6 @@ public class TestNibbleDelete {
         return results;
     }
 
-
     @Test
     public void testPartitionedTable() throws IOException, InterruptedException {
 
