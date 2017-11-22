@@ -82,6 +82,17 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public static final CopyOnWriteArraySet<Long> VERBOTEN_THREADS = new CopyOnWriteArraySet<Long>();
 
     /**
+     * Callback for watching for host failures.
+     */
+    public interface HostWatcher {
+        /**
+         * Called when host failures are detected.
+         * @param failedHosts    List of failed hosts, including hosts currently unknown to this host.
+         */
+        void hostsFailed(Set<Integer> failedHosts);
+    }
+
+    /**
      * Configuration for a host messenger. The leader binds to the coordinator ip and
      * not the internal interface or port. Nodes that fail to become the leader will
      * connect to the leader using any interface, and will then advertise using the specified
@@ -217,6 +228,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private InstanceId m_instanceId = null;
     private boolean m_shuttingDown = false;
 
+    private final HostWatcher m_hostWatcher;
+
     private final Object m_mapLock = new Object();
 
     /*
@@ -245,17 +258,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         return m_siteMailboxes.get(hsId);
     }
 
-    /**
-     *
-     * @param network
-     * @param coordinatorIp
-     * @param expectedHosts
-     * @param catalogCRC
-     * @param hostLog
-     */
-    public HostMessenger(
-            Config config)
+    public HostMessenger(Config config, HostWatcher hostWatcher)
     {
+        m_hostWatcher = hostWatcher;
         m_config = config;
         m_network = new VoltNetworkPool(m_config.networkThreads, 0, m_config.coreBindIds, "Server");
         m_joiner = new SocketJoiner(
@@ -297,6 +302,11 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                         // info to avoid printing on the console more than once
                         // reportForeignHostFailed should print on the console once
                         m_networkLog.info(String.format("Host %d failed (DisconnectFailedHostsCallback)", hostId));
+                    }
+                    // notifying any watchers who are interested in failure -- used
+                    // initially to do ZK cleanup when rejoining nodes die
+                    if (m_hostWatcher != null) {
+                        m_hostWatcher.hostsFailed(failedHostIds);
                     }
                 }
             }
@@ -437,8 +447,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     }
 
     //For test only
-    protected HostMessenger() {
-        this(new Config());
+    public HostMessenger(Config config) {
+        this(config, null);
     }
 
     /*

@@ -139,6 +139,7 @@ import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -151,7 +152,7 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
  * namespace. A lot of the global namespace is described by VoltDBInterface
  * to allow test mocking.
  */
-public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
+public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostMessenger.HostWatcher{
     private static final boolean DISABLE_JMX = Boolean.valueOf(System.getProperty("DISABLE_JMX", "false"));
 
     /** Default deployment file contents if path to deployment is null */
@@ -1683,7 +1684,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         hmconfig.factory = new VoltDbMessageFactory();
         hmconfig.coreBindIds = m_config.m_networkCoreBindings;
 
-        m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig);
+        m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig, this);
 
         hostLog.info(String.format("Beginning inter-node communication on port %d.", m_config.m_internalPort));
 
@@ -3001,5 +3002,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         PathsType paths = catalogContext.getDeployment().getPaths();
         File voltDbRoot = CatalogUtil.getVoltDbRoot(paths);
         return CatalogUtil.getSnapshot(paths.getSnapshots(), voltDbRoot);
+    }
+
+    @Override
+    public void hostsFailed(Set<Integer> failedHosts) {
+        final ScheduledExecutorService es = getSES(true);
+        if (es != null && !es.isShutdown()) {
+            es.submit(new Runnable() {
+                @Override
+                public void run() {
+                    //check to make sure that the cluster still is viable
+                    Set<Integer> hostsOnRing = Sets.newHashSet();
+                    if (!m_leaderAppointer.isClusterKSafe(failedHosts, hostsOnRing)) {
+                        VoltDB.crashLocalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
+                                false, null);
+                    }
+                }
+            });
+        }
     }
 }
