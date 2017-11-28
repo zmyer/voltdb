@@ -50,7 +50,7 @@ import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.plannodes.UpdatePlanNode;
-import org.voltdb.sysprocs.NibbleDeleteSP.ComparisonConstant;
+import org.voltdb.sysprocs.NibbleDeleteBase.ComparisonConstant;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
@@ -642,11 +642,17 @@ public abstract class StatementCompiler {
         return sb.toString();
     }
 
-    private static String genValueAtOffsetSql(Table table, Column column) {
+    private static String genValueAtOffsetSql(Table table, Column column,
+            ComparisonConstant comparison) {
         StringBuilder sb = new StringBuilder();
         sb.append("SELECT " + column.getName() + " FROM " + table.getTypeName());
+        sb.append(" WHERE " + column.getName() + " " + comparison.toString() + " ?");
         sb.append(" ORDER BY " + column.getName());
-        sb.append(" ASC OFFSET ? LIMIT 1;");
+        if (comparison == ComparisonConstant.LESS_THAN_OR_EQUAL) {
+            sb.append(" ASC OFFSET ? LIMIT 1;");
+        } else {
+            sb.append(" DESC OFFSET ? LIMIT 1;");
+        }
         return sb.toString();
     }
 
@@ -761,6 +767,14 @@ public abstract class StatementCompiler {
         }
     }
 
+    /**
+     * Generate small deletion queries by using count - select - delete pattern.
+     *
+     * 1) First query finds number of rows meet the delete condition.
+     * 2) Second query finds the cut-off value if number of rows to be deleted is
+     *    higher than maximum delete chunk size.
+     * 3) Third query deletes rows selected by above queries.
+     */
     public static Procedure compileNibbleDeleteProcedure(Table catTable, String procName,
             Column col, ComparisonConstant comp) {
         Procedure newCatProc = addProcedure(catTable, procName);
@@ -771,7 +785,7 @@ public abstract class StatementCompiler {
         String deleteQuery = genDeleteSql(catTable, col, comp);
         addStatement(catTable, newCatProc, deleteQuery, "1");
 
-        String valueAtQuery = genValueAtOffsetSql(catTable, col);
+        String valueAtQuery = genValueAtOffsetSql(catTable, col, comp);
         addStatement(catTable, newCatProc, valueAtQuery, "2");
 
         return newCatProc;

@@ -23,41 +23,59 @@
 
 package org.voltdb.sysprocs;
 
+
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
+import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
+import org.voltdb.CatalogContext;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Statement;
+import org.voltdb.catalog.Table;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.SyncCallback;
+import org.voltdb.compiler.PlannerTool;
+import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
-import org.voltdb.sysprocs.NibbleDeleteSP.ComparisonConstant;
+import org.voltdb.sysprocs.NibbleDeleteBase.ComparisonConstant;
 import org.voltdb.types.TimestampType;
 
 public class TestNibbleDelete {
 
     LocalCluster m_cluster = null;
     Client m_client = null;
+    static int SPH = 2;
+    static int HOSTCOUNT = 3;
+    static int KFACTOR = 1;
 
     @Before
     public void setUp() throws IOException {
         String testSchema =
                 "CREATE TABLE part (\n"
               + "    id BIGINT not null, \n"
-              + "    ts TIMESTAMP not null, \n"
+              + "    ts TIMESTAMP, \n"
               + "    description VARCHAR(200), "
               + "    PRIMARY KEY (id) \n"
               + " ); \n"
@@ -66,7 +84,7 @@ public class TestNibbleDelete {
 
               + "CREATE TABLE rep (\n"
               + "    id BIGINT not null, \n"
-              + "    ts TIMESTAMP not null, \n"
+              + "    ts TIMESTAMP, \n"
               + "    description VARCHAR(200), "
               + "    PRIMARY KEY (id) \n"
               + " ); \n"
@@ -77,10 +95,13 @@ public class TestNibbleDelete {
         builder.addPartitionInfo("part", "id");
         builder.addStmtProcedure("partcount", "select count(*) from part;");
         builder.addStmtProcedure("repcount", "select count(*) from rep;");
-        m_cluster = new LocalCluster("foo.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        m_cluster = new LocalCluster("foo.jar", SPH, HOSTCOUNT, KFACTOR, BackendTarget.NATIVE_EE_JNI);
         m_cluster.setHasLocalServer(true);
         m_cluster.compile(builder);
         m_cluster.startUp();
+
+        m_client = ClientFactory.createClient();
+        m_client.createConnection(m_cluster.getListenerAddress(0));
     }
 
     @After
@@ -94,22 +115,49 @@ public class TestNibbleDelete {
         }
     }
 
-    private VoltTable createTable(int numberOfItems, int indexBase)
+    /**
+     * nullRatio, zeroRatio and sameValRatio can't be set at the same time. They are mutual exclusive.
+     */
+    private VoltTable createTable(long numberOfItems, int indexBase,
+            double nullRatio, double zeroRatio, double sameValRatio)
     {
-        VoltTable partition_table =
-            new VoltTable(new ColumnInfo("ID", VoltType.BIGINT),
-            new ColumnInfo("TS", VoltType.TIMESTAMP),
-            new ColumnInfo("DESCRIPTION", VoltType.STRING)
-        );
+        VoltTable table =
+                new VoltTable(new ColumnInfo("ID", VoltType.BIGINT),
+                new ColumnInfo("TS", VoltType.TIMESTAMP),
+                new ColumnInfo("DESCRIPTION", VoltType.STRING)
+            );
 
         for (int i = indexBase; i < numberOfItems + indexBase; i++)
         {
+            TimestampType ts;
+            if (nullRatio != 0) {
+                int numberOfNulls = (int)(numberOfItems * nullRatio);
+                if (i < numberOfNulls) {
+                    ts = null;
+                } else {
+                    ts = new TimestampType(i);
+                }
+            } else if (zeroRatio != 0) {
+                int numberOfZeros = (int)(numberOfItems * zeroRatio);
+                if (i < numberOfZeros) {
+                    ts = new TimestampType(0);
+                } else {
+                    ts = new TimestampType(i);
+                }
+            } else if (sameValRatio != 0) {
+                int numberOfSameValues = (int)(numberOfItems * sameValRatio);
+                int val = (i / numberOfSameValues) * numberOfSameValues;
+                ts = new TimestampType(val);
+            } else {
+                ts = new TimestampType(i);
+            }
+
             Object[] row = new Object[] { i,
-                                          new TimestampType(i),
+                                          ts,
                                           "name_" + i };
-            partition_table.addRow(row);
+            table.addRow(row);
         }
-        return partition_table;
+        return table;
     }
 
 
@@ -147,15 +195,15 @@ public class TestNibbleDelete {
         return results;
     }
 
-    @Test
-    public void testPartitionedTable() throws IOException, InterruptedException {
-
-        m_client = ClientFactory.createClient();
-        m_client.createConnection(m_cluster.getListenerAddress(0));
-
-        int numberOfItems = 10000;
-        VoltTable part_table = createTable(numberOfItems, 0);
-        loadTable(m_client, "part", false, part_table);
+    private Pair<Long, Long> nibbleDeletePartitioned(ComparisonConstant op,
+            int ts, long numberOfItems)
+            throws NoConnectionsException, IOException
+    {
+        TimestampType value = new TimestampType(ts);
+        VoltTable parameter = new VoltTable(new ColumnInfo[] {
+                new ColumnInfo("col1", VoltType.typeFromObject(value)),
+        });
+        parameter.addRow(value);
 
         VoltTable partitionKeys = null;
         try {
@@ -163,12 +211,11 @@ public class TestNibbleDelete {
         } catch (ProcCallException e1) {
             fail("Failed to get partition keys.");
         }
-        TimestampType value = new TimestampType(8888);
-        VoltTable table = new VoltTable(new ColumnInfo[] {
-                new ColumnInfo("col1", VoltType.typeFromObject(value)),
-        });
-        table.addRow(value);
-        long totalRowsDeleted = 0;
+
+        long start = System.currentTimeMillis();
+
+        long deleted = 0;
+        long toBeDeleted = 0;
         while (partitionKeys.advanceRow()) {
             int partitionKey = (int)partitionKeys.getLong("PARTITION_KEY");
             try {
@@ -176,66 +223,208 @@ public class TestNibbleDelete {
                         partitionKey,
                         "part",
                         "ts",
-                        ComparisonConstant.LESS_THAN.ordinal(),
-                        table,
-                        1000);
+                        op.ordinal(),
+                        parameter,
+                        500);
                 VoltTable result = response.getResults()[0];
                 assertEquals(1, result.getRowCount());
                 result.advanceRow();
                 long deletedRows = result.getLong("DELETED_ROWS");
-                totalRowsDeleted += deletedRows;
-                assertEquals(1000, deletedRows);
+                deleted += deletedRows;
+//                // deleted rows is at least 1000 due to some duplicate time stamps, e.g. null values.
+//                assertTrue(deletedRows >= 1000);
                 long leftoverRows = result.getLong("LEFTOVER_ROWS");
+                toBeDeleted += leftoverRows;
             } catch (ProcCallException e) {
                 fail("Failed to run NibbleDeleteSP: " + e.getMessage());
             }
         }
+        System.out.println("Delete " + deleted +
+                " rows on partitioned table, " + toBeDeleted + " rows pending, cost " +
+                (System.currentTimeMillis() - start) + " ms");
         try {
             long rowCount = m_client.callProcedure("partcount").getResults()[0].asScalarLong();
-            assertEquals(numberOfItems - totalRowsDeleted, rowCount);
+            assertEquals(numberOfItems - deleted, rowCount);
         } catch (ProcCallException e) {
             fail("Failed to get row count from Table part");
         }
+        return new Pair<>(deleted, toBeDeleted);
     }
 
-    @Test
-    public void testReplicatedTable() throws NoConnectionsException, IOException {
-
-        m_client = ClientFactory.createClient();
-        m_client.createConnection(m_cluster.getListenerAddress(0));
-
-        int numberOfItems = 10000;
-        VoltTable rep_table = createTable(numberOfItems, 0);
-        loadTable(m_client, "rep", true, rep_table);
-
-        TimestampType value = new TimestampType(8888);
+    private Pair<Long, Long> nibbleDeleteReplicated(ComparisonConstant op, int ts, long numberOfItems)
+            throws NoConnectionsException, IOException
+    {
+        TimestampType value = new TimestampType(ts);
         VoltTable table = new VoltTable(new ColumnInfo[] {
                 new ColumnInfo("col1", VoltType.typeFromObject(value)),
         });
         table.addRow(value);
-        long deletedRows = 0;
+        long deleted = 0;
+        long toBeDeleted = 0;
+        long start = System.currentTimeMillis();
         try {
             ClientResponse response = m_client.callProcedure("@NibbleDeleteMP",
                     "rep",
                     "ts",
-                    ComparisonConstant.LESS_THAN.ordinal(),
+                    op.ordinal(),
                     table,
-                    1000);
+                    500);
             VoltTable result = response.getResults()[0];
             assertEquals(1, result.getRowCount());
             result.advanceRow();
-            deletedRows = result.getLong("DELETED_ROWS");
-            assertEquals(1000, deletedRows);
+            deleted = result.getLong("DELETED_ROWS");
             long leftoverRows = result.getLong("LEFTOVER_ROWS");
+            toBeDeleted += leftoverRows;
         } catch (ProcCallException e) {
             fail("Fail to run NibbleDeleteSP: " + e.getMessage());
         }
+        System.out.println("Delete " + deleted +
+                " rows on replicated table, " + toBeDeleted + " rows pending, cost " +
+                (System.currentTimeMillis() - start) + " ms");
         try {
             long rowCount = m_client.callProcedure("repcount").getResults()[0].asScalarLong();
-            assertEquals(numberOfItems - deletedRows, rowCount);
+            assertEquals(numberOfItems - deleted, rowCount);
         } catch (ProcCallException e) {
             fail("Failed to get row count from Table part");
         }
+        return new Pair<>(deleted, toBeDeleted);
+    }
+
+    private void runTester(long numberOfItems, ComparisonConstant op, int ts)
+            throws NoConnectionsException, IOException
+    {
+        Pair<Long, Long> pair = new Pair<>(0l, Long.MAX_VALUE); // <deleted, toBeDeleted>
+        int loop = 0;
+        long existingRows = numberOfItems;
+        while (pair.getSecond() > 0) {
+            pair = nibbleDeletePartitioned(op, ts, existingRows);
+            existingRows -= pair.getFirst();
+            if (++loop > 100) {
+                fail("Make no progress on delete, something wrong happens in @NibbleDeleteSP");
+            }
+        }
+
+        pair = new Pair<>(0l, Long.MAX_VALUE); // <deleted, toBeDeleted>
+        loop = 0;
+        existingRows = numberOfItems;
+        while (pair.getSecond() > 0) {
+            pair = nibbleDeleteReplicated(op, ts, existingRows);
+            existingRows -= pair.getFirst();
+            if (++loop > 100) {
+                fail("Make no progress on delete, something wrong happens in @NibbleDeleteSP");
+            }
+        }
+    }
+
+    /**
+     * Delete on column with non-unique index, data in uniform distribution.
+     */
+    @Test
+    public void testBasic() throws NoConnectionsException, IOException
+    {
+        System.out.println("testBasic");
+
+        long numberOfItems = 10000;
+        VoltTable inputTable = createTable(numberOfItems, 0, 0, 0, 0);
+        loadTable(m_client, "part", false, inputTable);
+        loadTable(m_client, "rep", true, inputTable);
+        runTester(numberOfItems, ComparisonConstant.LESS_THAN_OR_EQUAL, 9000);
+    }
+
+    /**
+     * Delete table on column with non-unique index, data has lots of NULLs.
+     */
+    @Test
+    public void testDeleteTableHasLotsNulls() throws NoConnectionsException, IOException
+    {
+        System.out.println("testDeleteTableHasLotsNulls");
+
+        int numberOfItems = 10000;
+        VoltTable table = createTable(numberOfItems, 0, 0.5f, 0, 0);
+        loadTable(m_client, "part", false, table);
+        loadTable(m_client, "rep", true, table);
+        runTester(numberOfItems, ComparisonConstant.LESS_THAN_OR_EQUAL, 6000);
+    }
+
+    @Test
+    public void testDeleteTableHasLotsZeros() throws NoConnectionsException, IOException
+    {
+        System.out.println("testDeleteTableHasLotsZeros");
+
+        int numberOfItems = 10000;
+        VoltTable table = createTable(numberOfItems, 0, 0, 0.5f, 0);
+        loadTable(m_client, "part", false, table);
+        loadTable(m_client, "rep", true, table);
+        runTester(numberOfItems, ComparisonConstant.LESS_THAN_OR_EQUAL, 6000);
+    }
+
+    @Test
+    public void testDeleteTableHasLotsDuplicates() throws NoConnectionsException, IOException
+    {
+        System.out.println("testDeleteTableHasLotsDuplicates");
+
+        int numberOfItems = 10000;
+        VoltTable table = createTable(numberOfItems, 0, 0, 0, 0.3f);
+        loadTable(m_client, "part", false, table);
+        loadTable(m_client, "rep", true, table);
+        runTester(numberOfItems, ComparisonConstant.GREATER_THAN_OR_EQUAL, 0);
+    }
+
+    /**
+     * Two batches of execution should have similar latency
+     */
+    @Test
+    public void testNoSawToothPerformance()
+            throws NoConnectionsException, IOException, InterruptedException
+    {
+        System.out.println("testNoSawToothPerformance");
+
+        int numberOfItems = 20000;
+        VoltTable table = createTable(numberOfItems, 0, 0, 0, 0);
+        loadTable(m_client, "part", false, table);
+        loadTable(m_client, "rep", true, table);
+        // Warm up, let system compiles the plan
+        runTester(numberOfItems, ComparisonConstant.LESS_THAN_OR_EQUAL, 0);
+        // Start timing
+        long start = System.currentTimeMillis();
+        runTester(numberOfItems - 1, ComparisonConstant.LESS_THAN_OR_EQUAL, 10000);
+        long firstBatch = System.currentTimeMillis() - start;
+        Thread.sleep(1000);
+        start = System.currentTimeMillis();
+        runTester(numberOfItems - 10001, ComparisonConstant.LESS_THAN_OR_EQUAL, 20000);
+        long secondBatch = System.currentTimeMillis() - start;
+        assertTrue(secondBatch <= firstBatch);
+    }
+
+    /**
+     * Test the cost of select query with offset constraint on a indexed column
+     */
+    @Test
+    @Ignore
+    public void testSelectByOffsetOnIndexColumn() throws UnknownHostException, IOException
+    {
+        System.out.println("testSelectByOffsetOnIndexColumn");
+
+        int numberOfItems = 100000;
+        VoltTable part_table = createTable(numberOfItems, 0, 0, 0, 0);
+        loadTable(m_client, "part", false, part_table);
+
+        String query = "select * from part order by ts offset 1000 limit 1";
+        CatalogContext context = VoltDB.instance().getCatalogContext();
+        PlannerTool plannerTool = context.m_ptool;
+
+        Table catTable = mock(Table.class);
+        when(catTable.getTypeName()).thenReturn("part");
+        Column partitionCol = new Column();
+        partitionCol.setType(VoltType.TIMESTAMP.getValue());
+        partitionCol.setIndex(1);
+        partitionCol.setName("ts");
+        when(catTable.getPartitioncolumn()).thenReturn(partitionCol);
+        Procedure p = StatementCompiler.compileNibbleDeleteProcedure(catTable,
+                "proc1", partitionCol, ComparisonConstant.LESS_THAN_OR_EQUAL);
+        Statement countStmt = p.getStatements().get(VoltDB.ANON_STMT_NAME + "2");
+        String explain = countStmt.getExplainplan();
+        System.out.println("explain plan:" + explain);
     }
 
 }

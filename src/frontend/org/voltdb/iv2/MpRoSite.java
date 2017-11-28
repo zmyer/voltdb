@@ -61,7 +61,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
-import org.voltdb.sysprocs.NibbleDeleteSP.ComparisonConstant;
+import org.voltdb.sysprocs.NibbleDeleteBase.ComparisonConstant;
 
 /**
  * An implementation of Site which provides only the functionality
