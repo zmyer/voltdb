@@ -85,8 +85,8 @@ public class Test2PTransactionExport {
         testExport(true, "TestPartitionedStream");
     }
 
-    @Test
-    public void TestReplicatedStream() throws Exception {
+    //@Test
+    public void noTestReplicatedStream() throws Exception {
         testExport(false, "TestReplicatedStream");
     }
 
@@ -132,7 +132,7 @@ public class Test2PTransactionExport {
                                    BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING,
                                    true, false, additionalEnv);
         cluster.setNewCli(true);
-        cluster.setHasLocalServer(false);
+        cluster.setHasLocalServer(true);
         cluster.setCallingMethodName(method);
         assertTrue(cluster.compile(builder));
         cluster.startUp();
