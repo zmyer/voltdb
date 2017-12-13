@@ -73,17 +73,6 @@ public class Test2PTransaction {
             }
         }
 
-        ClientResponse cr;
-
-//        for (int i = 0; i < 10; i += 2) {
-//            VoltTable vt = client.callProcedure("Test2PTransaction$Transfer", i, 100 + i, 1).getResults()[0];
-//            System.out.println(i + " -> " + vt);
-//        }
-
-//        client.callProcedure(nullcallback, "Test2PTransaction$Transfer", 0, 100, 1);
-//        client.callProcedure(nullcallback, "Test2PTransaction$Transfer", 0, 100, 1);
-//        client.callProcedure(nullcallback, "Test2PTransaction$Transfer", 0, 100, 1);
-
         client.drain();
 
         cleanup();

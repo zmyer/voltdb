@@ -42,7 +42,7 @@ import org.voltdb.messaging.FragmentTaskMessage;
  */
 public class MpTransactionTaskQueue extends TransactionTaskQueue
 {
-    protected static final VoltLogger tmLog = new VoltLogger("TM");
+    protected static final VoltLogger tmLog = new VoltLogger("MpTxnQueue");
 
     // Track the current writes and reads in progress.  If writes contains anything, reads must be empty,
     // and vice versa
@@ -58,7 +58,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     private final Map<Long, List<Integer>> m_npTxnIdToPartitions = new HashMap<>();
 
     private final Map<Integer, Map<Long, TransactionTask>> m_currentNpTxnsByPartition = new HashMap<>();
-    private final int MAX_TASK_DEPTH = 20;
+    private final int MAX_TASK_DEPTH = 50;
     private final int MAX_TRIED_TIMES = 3;
 
     MpTransactionTaskQueue(SiteTaskerQueue queue)
@@ -238,7 +238,6 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         if (! allowToRun(state, isNpTxn)) {
             return false;
         }
-        tmLog.error(TxnEgo.txnIdToString(task.getTxnId()) + " is NpTxn " + isNpTxn + ", read only " + isReadOnly);
 
         // Np task or MP write task
         if (isNpTxn || !isReadOnly) {
@@ -266,20 +265,15 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             return true;
         }
 
-        boolean retval = false;
-        while (task != null && task.getTransactionState().isReadOnly() &&
-                m_sitePool.canAcceptWork())
-        {
-            task = m_backlog.pollFirst();
-            assert(task.getTransactionState().isReadOnly());
-            m_currentMpReads.put(task.getTxnId(), task);
-            taskQueueOffer(task);
-            retval = true;
-            // Prime the pump with the head task, if any.  If empty,
-            // task will be null
-            task = pollFirstTask(isPriorityTask);
+        assert(isReadOnly);
+        // handle read only tasks
+        if (!m_sitePool.canAcceptWork()) {
+            return false;
         }
-        return retval;
+        task = pollFirstTask(isPriorityTask);
+        m_currentMpReads.put(task.getTxnId(), task);
+        taskQueueOffer(task);
+        return true;
     }
 
     /**
@@ -288,8 +282,6 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
      */
     private int taskQueueOffer()
     {
-        tmLog.warn("[taskQueueOffer]: " + this.toString());
-
         int tasksTaken = 0;
         if (m_priorityBacklog.isEmpty() && m_backlog.isEmpty()) {
             return tasksTaken;
@@ -312,11 +304,9 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             }
 
             if (taskQueueOfferInternal(task, true)) {
-                tmLog.error("[priority queue taken]: " + task);
                 tasksTaken++;
                 continue;
             }
-            tmLog.error("[priority queue not taken, requeue it back]: " + task);
             m_priorityBacklog.pollFirst();
             m_priorityBacklog.addLast(new Pair<TransactionTask, Integer>(task, item.getSecond() + 1));
         }
@@ -333,9 +323,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
 
             if (taskQueueOfferInternal(task, false)) {
                 tasksTaken++;
-                tmLog.error("[normal queue taken]: " + task);
             } else {
-                tmLog.error("[normal queue not taken, queue it into priority]: " + task);
                 task = m_backlog.pollFirst();
                 m_priorityBacklog.add(new Pair<TransactionTask, Integer>(task, 1));
             }
