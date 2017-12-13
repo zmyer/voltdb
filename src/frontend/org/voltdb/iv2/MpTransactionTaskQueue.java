@@ -42,7 +42,8 @@ import org.voltdb.messaging.FragmentTaskMessage;
  */
 public class MpTransactionTaskQueue extends TransactionTaskQueue
 {
-    protected static final VoltLogger tmLog = new VoltLogger("MpTxnQueue");
+    protected static final VoltLogger tmLog = new VoltLogger("MpTxnTskQ");
+    protected static final VoltLogger npLog = new VoltLogger("MpTxnTskQnp");
 
     // Track the current writes and reads in progress.  If writes contains anything, reads must be empty,
     // and vice versa
@@ -233,6 +234,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         boolean isNpTxn = task instanceof NpProcedureTask;
         MpTransactionState state = ((MpTransactionState) task.getTransactionState());
 
+
         // read only task optimization for MP reads currently
         // no 2p read only pool yet for further optimization
         if (! allowToRun(state, isNpTxn)) {
@@ -282,6 +284,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
      */
     private int taskQueueOffer()
     {
+        tmLog.trace("[taskQueueOffer]: \n" + this.toString());
         int tasksTaken = 0;
         if (m_priorityBacklog.isEmpty() && m_backlog.isEmpty()) {
             return tasksTaken;
@@ -300,13 +303,17 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                 // put this hot partition transaction at the end of the normal queue to calm it down
                 m_priorityBacklog.pollFirst();
                 m_backlog.addLast(task);
+                npLog.trace("task " + TxnEgo.txnIdToString(task.getTxnId()) +
+                        " is tried too many times, queue it to normal backlog");
                 continue;
             }
 
             if (taskQueueOfferInternal(task, true)) {
                 tasksTaken++;
+                npLog.trace("task " + TxnEgo.txnIdToString(task.getTxnId()) + " taken from priority queue");
                 continue;
             }
+            npLog.trace("task " + TxnEgo.txnIdToString(task.getTxnId()) + " NOT taken from priority queue, requeue it back");
             m_priorityBacklog.pollFirst();
             m_priorityBacklog.addLast(new Pair<TransactionTask, Integer>(task, item.getSecond() + 1));
         }
@@ -323,7 +330,10 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
 
             if (taskQueueOfferInternal(task, false)) {
                 tasksTaken++;
+                npLog.trace("task " + TxnEgo.txnIdToString(task.getTxnId()) + " taken from normal queue");
             } else {
+                npLog.trace("task " + TxnEgo.txnIdToString(task.getTxnId()) +
+                        " NOT taken from normal queue, queue it to priority");
                 task = m_backlog.pollFirst();
                 m_priorityBacklog.add(new Pair<TransactionTask, Integer>(task, 1));
             }
@@ -409,38 +419,31 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     {
         StringBuilder sb = new StringBuilder();
         sb.append("MpTransactionTaskQueue:").append("\n");
-        if (!m_currentMpReads.isEmpty()) {
-            sb.append("current mp reads size: " + m_currentMpReads.size()).append("\n");
-        }
-
-        if (!m_currentMpWrites.isEmpty()) {
-            sb.append("current mp writes size: ").append(m_currentMpWrites.size()).append("\n");
-        }
-
+        sb.append("\tcurrent mp reads size: " + m_currentMpReads.size()).append("\n");
+        sb.append("\tcurrent mp writes size: ").append(m_currentMpWrites.size()).append("\n");
+        sb.append("\tcurrent np transaction size: ").append(m_npTxnIdToPartitions.size()).append("\n");
         if (!m_npTxnIdToPartitions.isEmpty()) {
-            sb.append("current np transaction size: ").append(m_npTxnIdToPartitions.size()).append("\n");
             for (Long txnId: m_npTxnIdToPartitions.keySet()) {
-                sb.append("\tTxn ").append(TxnEgo.txnIdToString(txnId)).append(" -> ");
+                sb.append("\t\tnp txn ").append(TxnEgo.txnIdToString(txnId)).append(" -> ");
                 m_npTxnIdToPartitions.get(txnId).forEach(item -> sb.append(item).append(" "));
             }
             sb.append("\n");
             for (Integer pid: m_currentNpTxnsByPartition.keySet()) {
-                sb.append("\tPartition ").append(pid).append(" -> ");
+                sb.append("\t\tPartition ").append(pid).append(" -> ");
                 m_currentNpTxnsByPartition.get(pid).keySet().forEach(
                         txnId -> sb.append(TxnEgo.txnIdToString(txnId)).append(" "));
             }
             sb.append("\n");
         }
-
+        sb.append("\tpriority backlog size: ").append(m_priorityBacklog.size()).append(", ");
         if (!m_priorityBacklog.isEmpty()) {
-            sb.append("\tPriority queue HEAD: ").append(m_priorityBacklog.getFirst().getFirst())
-                .append(" tried with ").append(m_priorityBacklog.getFirst().getSecond()).append("\n");
+            sb.append("Priority queue HEAD: ").append(TxnEgo.txnIdToString(m_priorityBacklog.getFirst().getFirst().getTxnId()));
+        }
+        sb.append("\tnormal backlog size: ").append(m_backlog.size()).append(", ");
+        if (!m_backlog.isEmpty()) {
+            sb.append("backlog queue HEAD: ").append(TxnEgo.txnIdToString(m_backlog.getFirst().getTxnId())).append("\n");
         }
 
-        sb.append("\tBacklog SIZE: ").append(m_backlog.size()).append("\n");
-        if (!m_backlog.isEmpty()) {
-            sb.append("\tbacklog queue HEAD: ").append(m_backlog.getFirst()).append("\n");
-        }
         return sb.toString();
     }
 }
