@@ -59,7 +59,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
 
     private final Map<Integer, Map<Long, TransactionTask>> m_currentNpTxnsByPartition = new HashMap<>();
     private final int MAX_TASK_DEPTH = 20;
-    private final int MAX_TRIED_TIMES = 5;
+    private final int MAX_TRIED_TIMES = 3;
 
     MpTransactionTaskQueue(SiteTaskerQueue queue)
     {
@@ -305,7 +305,10 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             Pair<TransactionTask, Integer> item = m_priorityBacklog.peekFirst();
             task = item.getFirst();
             if (item.getSecond() > MAX_TRIED_TIMES) {
-                return tasksTaken;
+                // put this hot partition transaction at the end of the normal queue to calm it down
+                m_priorityBacklog.pollFirst();
+                m_backlog.addLast(task);
+                continue;
             }
 
             if (taskQueueOfferInternal(task, true)) {

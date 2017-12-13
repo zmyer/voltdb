@@ -59,12 +59,30 @@ public class Test2PTransaction {
         NullProcedureCallback nullcallback = new NullProcedureCallback();
 
         for (int i = 0; i < 1000; i++) {
-            client.callProcedure(nullcallback, "@AdHoc", "INSERT INTO table1 VALUES (" + i + ", 100, 'wx" + i + "');");
+            client.callProcedure("@AdHoc", "INSERT INTO table1 VALUES (" + i + ", 100, 'wx" + i + "');");
         }
 
-        for (int i = 0; i < 10; i += 2) {
-            client.callProcedure(nullcallback, "Test2PTransaction$Transfer", i, 100 + i, 1);
+        for (int i = 0; i < 500; i += 2) {
+            client.callProcedure(nullcallback, "Test2PTransaction$Transfer", i, 500 + i, 1);
+
+            if ( i % 4 == 0) {
+                client.callProcedure(nullcallback, "@AdHoc", "INSERT INTO table1 VALUES (" + i + 1000 + ", 100, 'wx" + i + "');");
+            }
+            if ( i % 4 == 1) {
+                client.callProcedure(nullcallback, "@AdHoc", "select * from table1 where id < 300 order by id limit 10;");
+            }
         }
+
+        ClientResponse cr;
+
+//        for (int i = 0; i < 10; i += 2) {
+//            VoltTable vt = client.callProcedure("Test2PTransaction$Transfer", i, 100 + i, 1).getResults()[0];
+//            System.out.println(i + " -> " + vt);
+//        }
+
+//        client.callProcedure(nullcallback, "Test2PTransaction$Transfer", 0, 100, 1);
+//        client.callProcedure(nullcallback, "Test2PTransaction$Transfer", 0, 100, 1);
+//        client.callProcedure(nullcallback, "Test2PTransaction$Transfer", 0, 100, 1);
 
         client.drain();
 
@@ -86,7 +104,7 @@ public class Test2PTransaction {
                                    BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING,
                                    true, false, null);
         cluster.setNewCli(true);
-        cluster.setHasLocalServer(true);
+        cluster.setHasLocalServer(false);
 
         assertTrue(cluster.compile(builder));
         cluster.startUp();
