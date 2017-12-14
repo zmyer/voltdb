@@ -889,7 +889,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     public void initFromBuffer(ByteBuffer buf) throws IOException
     {
         initFromSubMessageBuffer(buf);
-        assert(buf.capacity() == buf.position());
+//        assert(buf.capacity() == buf.position());
     }
 
     /**

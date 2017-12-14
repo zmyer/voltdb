@@ -60,6 +60,8 @@ public class NpProcedureTask extends MpProcedureTask {
         super(mailbox, procName, queue, msg, Lists.newArrayList(partitionMasters.values()), partitionMasters,
                 buddyHSId, isRestart);
 
+        ((MpTransactionState)m_txnState).m_isNpTxn = true;
+
         if (execLog.isTraceEnabled()) {
             execLog.trace("Created N-partition txn " + m_procName + " with partition masters " +
                     CoreUtils.hsIdValueMapToString(partitionMasters));

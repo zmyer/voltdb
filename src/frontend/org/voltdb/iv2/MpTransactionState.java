@@ -72,6 +72,7 @@ public class MpTransactionState extends TransactionState
     final List<Long> m_useHSIds = new ArrayList<Long>();
     final Map<Integer, Long> m_masterHSIds = Maps.newHashMap();
     long m_buddyHSId;
+    public boolean m_isNpTxn = false;
     FragmentTaskMessage m_remoteWork = null;
     FragmentTaskMessage m_localWork = null;
     boolean m_haveDistributedInitTask = false;
@@ -195,6 +196,9 @@ public class MpTransactionState extends TransactionState
             // send to all non-local sites
             if (non_local_hsids.length > 0) {
                 m_mbox.send(non_local_hsids, m_remoteWork);
+                if (m_isNpTxn) {
+                    m_buddyHSId = non_local_hsids[0];
+                }
             }
         }
         else {
@@ -291,6 +295,9 @@ public class MpTransactionState extends TransactionState
                                                     "txnId", TxnEgo.txnIdToString(txnId),
                                                     "dest", CoreUtils.hsIdToString(m_buddyHSId)));
         }
+
+        tmLog.trace("[MpTxnState BorrowTaskMsg] " + borrowmsg);
+
         m_mbox.send(m_buddyHSId, borrowmsg);
 
         FragmentResponseMessage msg;

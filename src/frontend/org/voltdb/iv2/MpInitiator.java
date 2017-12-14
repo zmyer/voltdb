@@ -91,6 +91,13 @@ public class MpInitiator extends BaseInitiator implements Promotable
                 m_initiatorMailbox);
         sched.setMpRoSitePool(sitePool);
 
+        NpSitePool npSitePool = new NpSitePool(m_initiatorMailbox.getHSId(),
+                backend,
+                catalogContext,
+                m_partitionId,
+                m_initiatorMailbox);
+        sched.setNpSitePool(npSitePool);
+
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),

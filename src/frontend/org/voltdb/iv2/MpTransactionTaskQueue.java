@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -53,6 +54,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     private Deque<TransactionTask> m_priorityBacklog = new ArrayDeque<>(128);
 
     private MpRoSitePool m_sitePool = null;
+    private NpSitePool m_npSitePool = null;
 
     private final Map<Long, List<Integer>> m_npTxnIdToPartitions = new HashMap<>();
 
@@ -69,20 +71,30 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         m_sitePool = sitePool;
     }
 
+    void setNpSitePool(NpSitePool sitePool)
+    {
+        m_npSitePool = sitePool;
+    }
+
     synchronized void updateCatalog(String diffCmds, CatalogContext context)
     {
         m_sitePool.updateCatalog(diffCmds, context);
+        m_npSitePool.updateCatalog(diffCmds, context);
     }
 
     synchronized void updateSettings(CatalogContext context)
     {
         m_sitePool.updateSettings(context);
+        m_npSitePool.updateSettings(context);
     }
 
     void shutdown()
     {
         if (m_sitePool != null) {
             m_sitePool.shutdown();
+        }
+        if (m_npSitePool != null) {
+            m_npSitePool.shutdown();
         }
     }
 
@@ -186,9 +198,13 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     private void taskQueueOffer(TransactionTask task)
     {
         Iv2Trace.logSiteTaskerQueueOffer(task);
-        if (task instanceof NpProcedureTask || !task.getTransactionState().isReadOnly()) {
+        if (task instanceof NpProcedureTask) {
+            m_npSitePool.doWork(task.getTxnId(), task);
+        }
+        else if (!task.getTransactionState().isReadOnly()) {
             m_taskQueue.offer(task);
-        } else {
+        }
+        else {
             m_sitePool.doWork(task.getTxnId(), task);
         }
     }
@@ -203,15 +219,17 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             for (Integer pid: partitions) {
                 Map<Long, TransactionTask> partitionMap = m_currentNpTxnsByPartition.get(pid);
                 if (partitionMap != null && !partitionMap.isEmpty()) {
+                    npLog.trace(TxnEgo.txnIdToString(state.txnId) + " not able to run on partitions: "
+                            + Arrays.toString(partitions.toArray()));
+
                     return false;
                 }
             }
-        } else {
-            for (Map<Long, TransactionTask> partitionMap : m_currentNpTxnsByPartition.values()) {
-                if (!partitionMap.isEmpty()) {
-                    return false;
-                }
-            }
+            return true;
+        }
+        // for MP reads or writes task
+        if (!m_npTxnIdToPartitions.isEmpty()) {
+            return false;
         }
         return true;
     }
@@ -229,7 +247,6 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         boolean isNpTxn = task instanceof NpProcedureTask;
         MpTransactionState state = ((MpTransactionState) task.getTransactionState());
 
-
         // read only task optimization for MP reads currently
         // no 2p read only pool yet for further optimization
         if (! allowToRun(state, isNpTxn)) {
@@ -243,6 +260,9 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                 return false;
             }
             if (isNpTxn) {
+                if (!m_npSitePool.canAcceptWork()) {
+                    return false;
+                }
                 Set<Integer> partitions = state.getInvolvedPartitionIds();
                 for (Integer pid: partitions) {
                     Map<Long, TransactionTask> txnsMap = m_currentNpTxnsByPartition.get(pid);
@@ -279,7 +299,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
      */
     private int taskQueueOffer(boolean isFlush)
     {
-        tmLog.trace("[taskQueueOffer]: \n" + this.toString());
+//        npLog.trace("[taskQueueOffer]: \n" + this.toString());
         int tasksTaken = 0;
         if (m_priorityBacklog.isEmpty() && m_backlog.isEmpty()) {
             return tasksTaken;
@@ -295,14 +315,14 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             task = m_priorityBacklog.peekFirst();
             if (taskQueueOfferInternal(task, true)) {
                 tasksTaken++;
-                npLog.trace("task " + TxnEgo.txnIdToString(task.getTxnId()) + " taken from priority queue");
+//                npLog.trace("task " + TxnEgo.txnIdToString(task.getTxnId()) + " taken from priority queue");
                 if (isFlush) {
                     // early return, do not be aggressive to schedule tasks
                     return tasksTaken;
                 }
                 continue;
             }
-            npLog.trace("task " + TxnEgo.txnIdToString(task.getTxnId()) + " NOT taken from priority queue, queue it back to normal");
+//            npLog.trace("task " + TxnEgo.txnIdToString(task.getTxnId()) + " NOT taken from priority queue, queue it back to normal");
             m_priorityBacklog.pollFirst();
             m_backlog.addLast(task);
         }
@@ -319,14 +339,14 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
 
             if (taskQueueOfferInternal(task, false)) {
                 tasksTaken++;
-                npLog.trace("task " + TxnEgo.txnIdToString(task.getTxnId()) + " taken from normal queue");
+//                npLog.trace("task " + TxnEgo.txnIdToString(task.getTxnId()) + " taken from normal queue");
                 if (isFlush) {
                     // early return, do not be aggressive to schedule tasks
                     return tasksTaken;
                 }
             } else {
-                npLog.trace("task " + TxnEgo.txnIdToString(task.getTxnId()) +
-                        " NOT taken from normal queue, queue it to priority");
+//                npLog.trace("task " + TxnEgo.txnIdToString(task.getTxnId()) +
+//                        " NOT taken from normal queue, queue it to priority");
                 task = m_backlog.pollFirst();
                 m_priorityBacklog.add(task);
             }
@@ -359,6 +379,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                 txnsMap.remove(txnId);
             }
             m_npTxnIdToPartitions.remove(txnId);
+            m_npSitePool.completeWork(txnId);
         }
         offered += taskQueueOffer(true);
         return offered;

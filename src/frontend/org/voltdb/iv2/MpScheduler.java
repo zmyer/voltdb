@@ -98,6 +98,11 @@ public class MpScheduler extends Scheduler
         m_pendingTasks.setMpRoSitePool(sitePool);
     }
 
+    void setNpSitePool(NpSitePool sitePool)
+    {
+        m_pendingTasks.setNpSitePool(sitePool);
+    }
+
     void updateCatalog(String diffCmds, CatalogContext context)
     {
         m_pendingTasks.updateCatalog(diffCmds, context);
@@ -491,12 +496,6 @@ public class MpScheduler extends Scheduler
     public void handleFragmentResponseMessage(FragmentResponseMessage message)
     {
         TransactionState txn = m_outstandingTxns.get(message.getTxnId());
-        // We could already have received the CompleteTransactionMessage from
-        // the local site and the transaction is dead, despite FragmentResponses
-        // in flight from remote sites.  Drop those on the floor.
-        // IZZY: After implementing BorrowTasks, I'm not sure that the above sequence
-        // can actually happen any longer, but leaving this and logging it for now.
-        // RTB: Didn't we decide early rollback can do this legitimately.
         if (txn != null) {
             SerializableException ex = message.getException();
             if (ex != null && ex instanceof TransactionRestartException) {

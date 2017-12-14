@@ -54,6 +54,8 @@ public class VoltDbMessageFactory extends VoltMessageFactory
     final public static byte DUMP_PLAN_ID = VOLTCORE_MESSAGE_ID_MAX + 28;
     final public static byte Migrate_Partition_Leader_MESSAGE_ID = VOLTCORE_MESSAGE_ID_MAX + 29;
 
+    final public static byte BORROW_TASK_ID = VOLTCORE_MESSAGE_ID_MAX + 30;
+
     /**
      * Overridden by subclasses to create message types unknown by voltcore
      * @param messageType
@@ -152,6 +154,9 @@ public class VoltDbMessageFactory extends VoltMessageFactory
             break;
         case DUMP_PLAN_ID:
             message = new DumpPlanThenExitMessage();
+            break;
+        case BORROW_TASK_ID:
+            message = new BorrowTaskMessage();
             break;
         default:
             message = null;

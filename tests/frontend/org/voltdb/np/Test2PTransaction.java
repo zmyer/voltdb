@@ -59,10 +59,10 @@ public class Test2PTransaction {
         NullProcedureCallback nullcallback = new NullProcedureCallback();
 
         for (int i = 0; i < 1000; i++) {
-            client.callProcedure("@AdHoc", "INSERT INTO table1 VALUES (" + i + ", 100, 'wx" + i + "');");
+            client.callProcedure("@AdHoc", "INSERT INTO table1 VALUES (" + i + ", 1000, 'wx" + i + "');");
         }
 
-        for (int i = 0; i < 500; i += 2) {
+        for (int i = 0; i < 200; i += 2) {
             client.callProcedure(nullcallback, "Test2PTransaction$Transfer", i, 500 + i, 1);
 
             if ( i % 4 == 0) {
