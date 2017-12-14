@@ -29,7 +29,6 @@ import java.util.Set;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -50,17 +49,15 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     private final Map<Long, TransactionTask> m_currentMpWrites = new HashMap<Long, TransactionTask>();
     private final Map<Long, TransactionTask> m_currentMpReads = new HashMap<Long, TransactionTask>();
 
-    private Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
-
-    private Deque<Pair<TransactionTask, Integer>> m_priorityBacklog = new ArrayDeque<>();
+    private Deque<TransactionTask> m_backlog = new ArrayDeque<>(128);
+    private Deque<TransactionTask> m_priorityBacklog = new ArrayDeque<>(128);
 
     private MpRoSitePool m_sitePool = null;
 
     private final Map<Long, List<Integer>> m_npTxnIdToPartitions = new HashMap<>();
 
     private final Map<Integer, Map<Long, TransactionTask>> m_currentNpTxnsByPartition = new HashMap<>();
-    private final int MAX_TASK_DEPTH = 50;
-    private final int MAX_TRIED_TIMES = 3;
+    private final int MAX_TASK_DEPTH = 20;
 
     MpTransactionTaskQueue(SiteTaskerQueue queue)
     {
@@ -101,7 +98,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     {
         Iv2Trace.logTransactionTaskQueueOffer(task);
         m_backlog.addLast(task);
-        taskQueueOffer();
+        taskQueueOffer(false);
         return true;
     }
 
@@ -221,9 +218,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
 
     private TransactionTask pollFirstTask(boolean isPriorityTask) {
         if (isPriorityTask) {
-            Pair<TransactionTask, Integer> item = m_priorityBacklog.pollFirst();
-            if (item == null) return null;
-            return item.getFirst();
+            return m_priorityBacklog.pollFirst();
         } else {
             return m_backlog.pollFirst();
         }
@@ -282,7 +277,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
      *
      * @return how many tasks get offered
      */
-    private int taskQueueOffer()
+    private int taskQueueOffer(boolean isFlush)
     {
         tmLog.trace("[taskQueueOffer]: \n" + this.toString());
         int tasksTaken = 0;
@@ -297,25 +292,19 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                 return tasksTaken;
             }
 
-            Pair<TransactionTask, Integer> item = m_priorityBacklog.peekFirst();
-            task = item.getFirst();
-            if (item.getSecond() > MAX_TRIED_TIMES) {
-                // put this hot partition transaction at the end of the normal queue to calm it down
-                m_priorityBacklog.pollFirst();
-                m_backlog.addLast(task);
-                npLog.trace("task " + TxnEgo.txnIdToString(task.getTxnId()) +
-                        " is tried too many times, queue it to normal backlog");
-                continue;
-            }
-
+            task = m_priorityBacklog.peekFirst();
             if (taskQueueOfferInternal(task, true)) {
                 tasksTaken++;
                 npLog.trace("task " + TxnEgo.txnIdToString(task.getTxnId()) + " taken from priority queue");
+                if (isFlush) {
+                    // early return, do not be aggressive to schedule tasks
+                    return tasksTaken;
+                }
                 continue;
             }
-            npLog.trace("task " + TxnEgo.txnIdToString(task.getTxnId()) + " NOT taken from priority queue, requeue it back");
+            npLog.trace("task " + TxnEgo.txnIdToString(task.getTxnId()) + " NOT taken from priority queue, queue it back to normal");
             m_priorityBacklog.pollFirst();
-            m_priorityBacklog.addLast(new Pair<TransactionTask, Integer>(task, item.getSecond() + 1));
+            m_backlog.addLast(task);
         }
 
         // start to process MAX_TASK_DEPTH tasks from normal backlog, stop when hitting MP task
@@ -331,11 +320,15 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             if (taskQueueOfferInternal(task, false)) {
                 tasksTaken++;
                 npLog.trace("task " + TxnEgo.txnIdToString(task.getTxnId()) + " taken from normal queue");
+                if (isFlush) {
+                    // early return, do not be aggressive to schedule tasks
+                    return tasksTaken;
+                }
             } else {
                 npLog.trace("task " + TxnEgo.txnIdToString(task.getTxnId()) +
                         " NOT taken from normal queue, queue it to priority");
                 task = m_backlog.pollFirst();
-                m_priorityBacklog.add(new Pair<TransactionTask, Integer>(task, 1));
+                m_priorityBacklog.add(task);
             }
         }
         return tasksTaken;
@@ -367,7 +360,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             }
             m_npTxnIdToPartitions.remove(txnId);
         }
-        offered += taskQueueOffer();
+        offered += taskQueueOffer(true);
         return offered;
     }
 
@@ -437,7 +430,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         }
         sb.append("\tpriority backlog size: ").append(m_priorityBacklog.size()).append(", ");
         if (!m_priorityBacklog.isEmpty()) {
-            sb.append("Priority queue HEAD: ").append(TxnEgo.txnIdToString(m_priorityBacklog.getFirst().getFirst().getTxnId()));
+            sb.append("Priority queue HEAD: ").append(TxnEgo.txnIdToString(m_priorityBacklog.getFirst().getTxnId()));
         }
         sb.append("\tnormal backlog size: ").append(m_backlog.size()).append(", ");
         if (!m_backlog.isEmpty()) {
