@@ -181,7 +181,7 @@ public class LocalCluster extends VoltServerConfig {
     // instance.
     private final CommandLine templateCmdLine = new CommandLine(StartAction.CREATE);
     //NEW_CLI can be picked up from env var or -D to JVM.
-    private boolean isNewCli = Boolean.valueOf(System.getenv("NEW_CLI") == null ? System.getProperty("NEW_CLI", "true") : System.getenv("NEW_CLI"));
+    private boolean isNewCli = Boolean.valueOf(System.getProperty("NEW_CLI") == null ? (System.getenv("NEW_CLI") == null ? "true" : System.getenv("NEW_CLI")) : System.getProperty("NEW_CLI"));
     public boolean isNewCli() { return isNewCli; };
     public void setNewCli(boolean flag) {
         isNewCli = flag;
