@@ -476,9 +476,9 @@ class VerbRunner(object):
                 If a username was specified and a password was not, prompt the user for the pwd.
                 """
                 kwargs['password'] = getpass('Enter your password: ')
-        if ssl_config:
+        if ssl_config is not None:
             kwargs['usessl'] = True
-            kwargs['ssl_config_file'] = ssl_config
+            kwargs['ssl_config_file'] = None if len(ssl_config) == 0 else ssl_config[0]
         if kerberos:
             kwargs['kerberos'] = True
 

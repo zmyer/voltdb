@@ -465,9 +465,11 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             c_config = new ClientConfig(config.user, config.password, listener);
             c_config.setReconnectOnConnectionLoss(true);
         }
-        if (config.ssl != null && !config.ssl.trim().isEmpty()) {
-            c_config.setTrustStoreConfigFromPropertyFile(config.ssl);
+        if (config.ssl != null) {
             c_config.enableSSL();
+            if (!config.ssl.trim().isEmpty()) {
+                c_config.setTrustStoreConfigFromPropertyFile(config.ssl);
+            }
         }
         if (!config.kerberos.trim().isEmpty()) {
             c_config.enableKerberosAuthentication(config.kerberos);

@@ -608,6 +608,11 @@ class BaseClientBundle(ConnectionBundle):
         ConnectionBundle.__init__(self, default_port = default_port, min_count = 1, max_count = 1)
 
     def start(self, verb, runner):
+        if runner.opts.ssl_config is not None:
+            if runner.opts.ssl_config.strip():
+                runner.opts.ssl_config = [runner.opts.ssl_config]
+            else:
+                runner.opts.ssl_config = []
         runner.voltdb_connect(runner.opts.host.host,
                               runner.opts.host.port,
                               username=runner.opts.username,

@@ -341,9 +341,11 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
             c_config = new ClientConfig(m_config.user, m_config.password, listener);
             c_config.setReconnectOnConnectionLoss(true);
         }
-        if (m_config.ssl != null && !m_config.ssl.trim().isEmpty()) {
-            c_config.setTrustStoreConfigFromPropertyFile(m_config.ssl);
+        if (m_config.ssl != null) {
             c_config.enableSSL();
+            if (!m_config.ssl.trim().isEmpty()) {
+                c_config.setTrustStoreConfigFromPropertyFile(m_config.ssl);
+            }
         }
         c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
         Client csvClient = null;
