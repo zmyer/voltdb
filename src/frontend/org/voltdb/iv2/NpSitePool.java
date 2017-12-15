@@ -39,7 +39,7 @@ import org.voltdb.StarvationTracker;
 class NpSitePool {
     final static VoltLogger tmLog = new VoltLogger("TM");
 
-    static int DEFAULT_MAX_POOL_SIZE = 20;
+    static int DEFAULT_MAX_POOL_SIZE = 35;
     static int INITIAL_POOL_SIZE = 1;
 
     class NpSiteContext {
