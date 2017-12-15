@@ -306,7 +306,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         boolean noquotechar = false;
 
         @Option(desc = "Enable SSL, Optionally provide configuration file.")
-        String ssl = "";
+        String ssl = null;
 
         @Option(desc = "Enable Kerberos and use provided JAAS login configuration entry key.")
         String kerberos = "";

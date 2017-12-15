@@ -211,7 +211,10 @@ public abstract class CLIConfig {
                     }
 
                     field.setAccessible(true);
-                    kvMap.put(opt, field.get(this).toString());
+                    Object value = field.get(this);
+                    if (value != null) {
+                        kvMap.put(opt, value.toString());
+                    }
                 }
             }
 

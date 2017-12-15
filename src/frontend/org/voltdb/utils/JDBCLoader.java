@@ -244,7 +244,7 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
         boolean update = false;
 
         @Option(desc = "Enable SSL, Optionally provide configuration file.")
-        String ssl = "";
+        String ssl = null;
 
         @Option(desc = "Stop when all connections are lost", hasArg = false)
         boolean stopondisconnect = false;
