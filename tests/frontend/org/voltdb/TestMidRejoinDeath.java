@@ -48,7 +48,6 @@ public class TestMidRejoinDeath extends RejoinTestBase {
 
             cluster = new LocalCluster("rejoin.jar", 3, 2, 1, BackendTarget.NATIVE_EE_JNI, false);
             //TODO: Till we figure out snapshot save on same machine.
-            cluster.setNewCli(false);
             cluster.setJavaProperty("rejoindeathtest", null);
             cluster.overrideAnyRequestForValgrind();
             cluster.setMaxHeap(1024);

@@ -950,11 +950,17 @@ public class VoltDB {
         public boolean validate() {
             boolean isValid = true;
 
-            EnumSet<StartAction> hostNotRequred = EnumSet.of(StartAction.INITIALIZE,StartAction.GET);
             if (m_startAction == null) {
                 isValid = false;
                 hostLog.fatal("The startup action is missing (either create, recover or rejoin).");
             }
+            EnumSet<StartAction> invalidExternalstartAction = EnumSet.complementOf(
+                    EnumSet.of(StartAction.GET, StartAction.INITIALIZE, StartAction.PROBE));
+            if (invalidExternalstartAction.contains(m_startAction)) {
+                hostLog.fatal("Invalid start action " + m_startAction.verb() + " Please use init|start|get commands.");
+                return false;
+            }
+            EnumSet<StartAction> hostNotRequred = EnumSet.of(StartAction.INITIALIZE,StartAction.GET);
             if (m_leader == null && !hostNotRequred.contains(m_startAction)) {
                 isValid = false;
                 hostLog.fatal("The hostname is missing.");
@@ -968,8 +974,7 @@ public class VoltDB {
                 msg += " is an Enterprise Edition feature. An evaluation edition is available at http://voltdb.com.";
                 hostLog.fatal(msg);
             }
-            EnumSet<StartAction> requiresDeployment = EnumSet.complementOf(
-                    EnumSet.of(StartAction.REJOIN,StartAction.LIVE_REJOIN,StartAction.JOIN,StartAction.INITIALIZE, StartAction.PROBE));
+            EnumSet<StartAction> requiresDeployment = EnumSet.of(StartAction.INITIALIZE);
             // require deployment file location
             if (requiresDeployment.contains(m_startAction)) {
                 // require deployment file location (null is allowed to receive default deployment)
@@ -979,12 +984,6 @@ public class VoltDB {
                 }
             }
 
-            //--paused only allowed in CREATE/RECOVER/SAFE_RECOVER
-            EnumSet<StartAction> pauseNotAllowed = EnumSet.of(StartAction.JOIN,StartAction.LIVE_REJOIN,StartAction.REJOIN);
-            if (m_isPaused && pauseNotAllowed.contains(m_startAction)) {
-                isValid = false;
-                hostLog.fatal("Starting in admin mode is only allowed when using start, create or recover.");
-            }
             if (!hostNotRequred.contains(m_startAction) && m_coordinators.isEmpty()) {
                 isValid = false;
                 hostLog.fatal("List of hosts is missing");

@@ -83,7 +83,6 @@ public class TestRejoinWithCatalogUpdates extends RejoinTestBase {
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI, false);
         //TODO: Do this in new cli when snapshot is updated.
-        cluster.setNewCli(false);
         cluster.setMaxHeap(256);
         cluster.overrideAnyRequestForValgrind();
         ServerThread localServer = null;

@@ -140,7 +140,6 @@ public class TestExportSnapshotPreservesSequenceNumber extends TestExportBaseSoc
         TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(2));
         config.setHasLocalServer(false);
         //TODO: export overflow why is this test expects it to hang around?
-        config.setNewCli(false);
         config.setMaxHeap(768);
         boolean compile = config.compile(project);
         assertTrue(compile);
