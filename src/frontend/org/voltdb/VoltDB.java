@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import com.google_voltpatches.common.base.Throwables;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -1243,7 +1244,8 @@ public class VoltDB {
         }
         if (CoreUtils.isJunitTest()) {
             VoltLogger log = new VoltLogger("HOST");
-            log.warn("Declining to drop a crash file during a junit test.");
+            String s = Throwables.getStackTraceAsString(new Exception());
+            log.warn("Declining to drop a crash file during a junit test. Trace: " + s);
         }
         // end test code
         // send a snmp trap crash notification

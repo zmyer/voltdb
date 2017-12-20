@@ -204,7 +204,7 @@ public abstract class LocalSingleProcessServer extends VoltServerConfig {
         // m_jarFileName is already prefixed with test output path.
         config.m_pathToCatalog = m_jarFileName;
         config.m_pathToDeployment = m_pathToDeployment;
-        config.m_startAction = StartAction.CREATE;
+        config.m_startAction = StartAction.INITIALIZE;
         config.m_isPaused = m_paused;
         if (m_adminPort != -1) {
             config.m_adminPort = m_adminPort;
@@ -214,6 +214,11 @@ public abstract class LocalSingleProcessServer extends VoltServerConfig {
         config.m_ipcPort = m_siteProcess.port();
 
         m_server = new ServerThread(config);
+        try {
+            m_server.initialize();
+        } catch (Exception sim) {
+        }
+        config.m_startAction = StartAction.PROBE;
         m_server.start();
         m_server.waitForInitialization();
     }
