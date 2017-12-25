@@ -23,20 +23,24 @@
 package org.voltdb.compiler;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+import org.voltcore.utils.CoreUtils;
+import org.voltdb.VoltDB;
 
 import com.google_voltpatches.common.collect.HashMultimap;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Multimap;
 import com.google_voltpatches.common.collect.Sets;
-import org.json_voltpatches.JSONArray;
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
 
 import junit.framework.TestCase;
-import org.voltdb.VoltDB;
 
 public class TestClusterCompiler extends TestCase
 {
@@ -262,6 +266,49 @@ public class TestClusterCompiler extends TestCase
         runConfigAndVerifyTopology(hostGroups, 2);
     }
 
+    public void testRejoinOneNode() throws JSONException
+    {
+        Map<Integer, String> hostGroups = Maps.newHashMap();
+        hostGroups.put(0, "0");
+        hostGroups.put(1, "0");
+        killAndRejoinNodes(hostGroups, 1, 1);
+    }
+
+    public void testRejoinTwoNodes() throws JSONException
+    {
+        Map<Integer, String> hostGroups = Maps.newHashMap();
+        hostGroups.put(0, "0");
+        hostGroups.put(1, "1");
+        hostGroups.put(2, "2");
+        killAndRejoinNodes(hostGroups, 2, 2);
+    }
+
+    public void testRejoinTwoNodesToTwo() throws JSONException
+    {
+        Map<Integer, String> hostGroups = Maps.newHashMap();
+        hostGroups.put(0, "0");
+        hostGroups.put(1, "0");
+        hostGroups.put(2, "1");
+        hostGroups.put(3, "1");
+        hostGroups.put(4, "2");
+        hostGroups.put(5, "2");
+        killAndRejoinNodes(hostGroups, 1, 2);
+    }
+
+    public void testRejoinThreeNodesToFour() throws JSONException
+    {
+        Map<Integer, String> hostGroups = Maps.newHashMap();
+        hostGroups.put(0, "0");
+        hostGroups.put(1, "1");
+        hostGroups.put(2, "0");
+        hostGroups.put(3, "0");
+        hostGroups.put(4, "0");
+        hostGroups.put(5, "1");
+        hostGroups.put(6, "1");
+        killAndRejoinNodes(hostGroups, 2, 3);
+    }
+
+
     private static void runConfigAndVerifyTopology(Map<Integer, String> hostGroups, int kfactor) throws JSONException
     {
         final int maxSites = 20;
@@ -333,4 +380,160 @@ public class TestClusterCompiler extends TestCase
             assertEquals(partitionCount, Sets.newHashSet(partitions).size());
         }
     }
+
+    private static Set<Integer> pickNodesInDiffGroupsToKill(
+            Map<Integer, String> topo,
+            Multimap<Integer, Integer> hostPartitions,
+            int kfactor,
+            int nodesToKill)
+    {
+        for (Set<Integer> perm : Sets.powerSet(topo.keySet())) {
+            // Skip permutation size not equal to the node count to kill
+            if (perm.size() != nodesToKill) {
+            continue;
+            }
+            // If the nodes in the list share the group, skip
+            if (perm.stream().map( hostId -> topo.get(hostId)).distinct().count() != nodesToKill) {
+                continue;
+            }
+
+            // Count the occurrences of each partition in the candidate nodes
+            Map<Integer, Integer> partitionOccurrances = new HashMap<>();
+            perm.stream().map(hostPartitions::get).forEach(s -> s.forEach(a -> {
+                if (partitionOccurrances.containsKey(a)) {
+                    partitionOccurrances.put(a, partitionOccurrances.get(a) + 1);
+                } else {
+                    partitionOccurrances.put(a, 1);
+                }
+            }));
+
+            // If a partition appears k+1 times in the candidate nodes, killing
+            // them will take the cluster down, so skip this set of candidate nodes
+            boolean skip = false;
+            for (int count : partitionOccurrances.values()) {
+                if (count > kfactor) {
+                    skip = true;
+                }
+            }
+            if (skip) {
+                continue;
+            }
+            return new HashSet<>(perm);
+        }
+        return new HashSet<>();
+    }
+
+    private static void killAndRejoinNodes(
+            Map<Integer, String> fullHostGroup,
+            int kfactor,
+            int nodesToKill) throws JSONException
+    {
+        final int maxSph = 20;
+        for (int sph = 1; sph < maxSph; sph++) {
+            final Map<Integer, String> rejoinHostGroup = new HashMap<>(fullHostGroup);
+            final ClusterConfig initialConfig = new ClusterConfig(rejoinHostGroup.size(), sph, kfactor);
+            if (!initialConfig.validate()) {
+                // Invalid config, skip
+                continue;
+            }
+            final JSONObject initialTopo = initialConfig.getTopology(rejoinHostGroup);
+
+            final Multimap<Integer, Integer> partitionToHosts = HashMultimap.create();
+            final Multimap<Integer, Integer> hostPartitions = HashMultimap.create();
+            final Multimap<Integer, Integer> hostMasters = HashMultimap.create();
+            for (int hostId : rejoinHostGroup.keySet()) {
+                for (int pid : ClusterConfig.partitionsForHost(initialTopo, hostId)) {
+                    partitionToHosts.put(pid, hostId);
+                }
+                hostPartitions.putAll(hostId, ClusterConfig.partitionsForHost(initialTopo, hostId));
+                hostMasters.putAll(hostId, ClusterConfig.partitionsForHost(initialTopo, hostId, true));
+            }
+
+            // Pick nodes to kill from different groups. if this is
+            // not a valid topology for multiple rejoins in different
+            // groups, the returned set will be empty.
+            final Set<Integer> hostIdsToKill = pickNodesInDiffGroupsToKill(fullHostGroup, hostPartitions, kfactor, nodesToKill);
+            if (hostIdsToKill.isEmpty()) {
+                System.out.println("Not a valid topology for multi node rejoin, skipping. Sites per host " + sph);
+                continue;
+            }
+            System.out.println("Running config: sites " + sph + ", host partitions: " + hostPartitions +
+                               ", nodes to kill: " + hostIdsToKill);
+
+            // Remove all partitions and masters from the failed nodes, migrate masters to remaining nodes
+            final Multimap<Integer, Integer> expectedRejoinHostPartitions = HashMultimap.create();
+            final HashSet<Integer> liveHosts = new HashSet<>(hostPartitions.keySet());
+            final Map<Integer, String> rejoinHostGroups = new HashMap<>();
+            for (int toKill : hostIdsToKill) {
+                liveHosts.remove(toKill);
+                for (int masterToRedistribute : hostMasters.get(toKill)) {
+                    for (int hostCandidate : partitionToHosts.get(masterToRedistribute)) {
+                        if (hostCandidate != toKill && liveHosts.contains(hostCandidate)) {
+                            hostMasters.put(hostCandidate, masterToRedistribute);
+                            break;
+                        }
+                    }
+                }
+                expectedRejoinHostPartitions.putAll(toKill, hostPartitions.removeAll(toKill));
+                hostMasters.removeAll(toKill);
+                rejoinHostGroups.put(toKill, rejoinHostGroup.remove(toKill));
+            }
+
+            // Fake partition to HSID mappings
+            Multimap<Integer, Long> replicas = HashMultimap.create();
+            for (Map.Entry<Integer, Integer> e : hostPartitions.entries()) {
+                replicas.put(e.getValue(), CoreUtils.getHSIdFromHostAndSite(e.getKey(), e.getValue()));
+            }
+            Map<Integer, Long> masters = new HashMap<>();
+            for (Map.Entry<Integer, Integer> e : hostMasters.entries()) {
+                masters.put(e.getValue(), CoreUtils.getHSIdFromHostAndSite(e.getKey(), e.getValue()));
+            }
+
+            // Rejoin one node at a time and verify that they have the correct partitions
+            for (Map.Entry<Integer, String> rejoin : rejoinHostGroups.entrySet()) {
+                final int rejoinHostId = rejoin.getKey() + fullHostGroup.size();
+                System.out.println("Rejoining H" + rejoin.getKey() + " as H" + rejoinHostId + " in group " + rejoin.getValue());
+                rejoinHostGroup.put(rejoinHostId, rejoin.getValue());
+                final JSONObject rejoinTopo = initialConfig.getTopology(rejoinHostGroup);
+                final List<Integer> partitionsOnRejoinHost = ClusterConfig.partitionsForHost(rejoinTopo, rejoinHostId);
+
+                // Verify rejoined host first. Partitions on rejoined host should have
+                // at least one replica in a different group.
+                if (fullHostGroup.values().stream().distinct().count() > 1) {
+                    for (int partitionOnRejoined : partitionsOnRejoinHost) {
+                        final String rejoinedHostGroup = rejoin.getValue();
+                        boolean foundHostInOtherGroup = false;
+                        for (long hsId : replicas.get(partitionOnRejoined)) {
+                            if (!rejoinHostGroup.get(CoreUtils.getHostIdFromHSId(hsId)).equals(rejoinedHostGroup)) {
+                                foundHostInOtherGroup = true;
+                                break;
+                            }
+                        }
+                        assertTrue("Host " + rejoin.getKey() + " partition " + partitionOnRejoined + " rejoined: " +
+                                   partitionsOnRejoinHost + " current " + replicas,
+                                   foundHostInOtherGroup);
+                    }
+                }
+                assertTrue(ClusterConfig.partitionsForHost(rejoinTopo, rejoinHostId, true).isEmpty()); // No master on rejoined host
+
+                // Verify existing hosts remain the same
+                for (Map.Entry<Integer, Collection<Integer>> e : hostPartitions.asMap().entrySet()) {
+                    int hostId = e.getKey();
+                    if (rejoinHostGroups.containsKey(e.getKey())) {
+                        hostId = e.getKey() + fullHostGroup.size();
+                    }
+                    assertEquals("host " + hostId + " key " + e.getKey(), e.getValue(), new HashSet<>(ClusterConfig.partitionsForHost(rejoinTopo, hostId)));
+                    assertEquals(hostMasters.get(e.getKey()), new HashSet<>(ClusterConfig.partitionsForHost(rejoinTopo, hostId, true)));
+                }
+
+                // Now add the rejoined host to the live host maps
+                hostPartitions.putAll(rejoin.getKey(), partitionsOnRejoinHost);
+                for (int pid : partitionsOnRejoinHost) {
+                    replicas.put(pid, CoreUtils.getHSIdFromHostAndSite(rejoinHostId, pid));
+                }
+            }
+        }
+    }
+
+
 }
