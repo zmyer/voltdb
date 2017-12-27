@@ -120,6 +120,11 @@ public final class InvocationDispatcher {
 
     private final NTProcedureService m_NTProcedureService;
 
+    // Next partition to service adhoc replicated table reads
+    private static int m_nextPartition = -1;
+    // Number of partitions, will change when new node joins cluster.
+    private static int m_partitionCount;
+
     public final static class Builder {
 
         ClientInterface m_clientInterface;
@@ -207,6 +212,7 @@ public final class InvocationDispatcher {
                 checkNotNull(replicationRole, "given replication role is null")
                 );
         m_cartographer = checkNotNull(cartographer, "given cartographer is null");
+        m_partitionCount = m_cartographer.getPartitionCount();
         m_snapshotDaemon = checkNotNull(snapshotDaemon,"given snapshot daemon is null");
 
         // try to get the global default setting for read consistency, but fall back to SAFE
@@ -1257,14 +1263,26 @@ public final class InvocationDispatcher {
                 (CatalogContext.ProcedurePartitionInfo) procedure.getAttachment();
         if (procedure.getSinglepartition()) {
             // break out the Hashinator and calculate the appropriate partition
-            return new int[] { getPartitionForProcedureParameter( ppi.index, ppi.type, task) };
+            Object invocationParameter = task.getParameterAtIndex(ppi.index);
+            if (invocationParameter == null) {
+                // AdHoc replicated table reads are optimized as single partition,
+                // but without partition params, since replicated table reads can
+                // be done on any partition, round-robin the procedure to local
+                // partitions to spread the traffic.
+                assert (task.getProcName().startsWith("AdHoc"));
+                return new int[] { (Math.abs(++m_nextPartition)) % m_partitionCount};
+            }
+
+            return new int[] { TheHashinator.getPartitionForParameter( ppi.type, invocationParameter) };
         } else if (procedure.getPartitioncolumn2() != null) {
             // two-partition procedure
             VoltType partitionParamType1 = VoltType.get((byte)procedure.getPartitioncolumn().getType());
             VoltType partitionParamType2 = VoltType.get((byte)procedure.getPartitioncolumn2().getType());
+            Object invocationParameter1 = task.getParameterAtIndex(procedure.getPartitionparameter());
+            Object invocationParameter2 = task.getParameterAtIndex(procedure.getPartitionparameter2());
 
-            int p1 = getPartitionForProcedureParameter(procedure.getPartitionparameter(), partitionParamType1, task);
-            int p2 = getPartitionForProcedureParameter(procedure.getPartitionparameter2(), partitionParamType2, task);
+            int p1 = TheHashinator.getPartitionForParameter(partitionParamType1, invocationParameter1);
+            int p2 = TheHashinator.getPartitionForParameter(partitionParamType2, invocationParameter2);
 
             return new int[] { p1, p2 };
         } else {
@@ -1295,16 +1313,6 @@ public final class InvocationDispatcher {
         ClientResponseImpl clientResponse = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
                 new VoltTable[0], errorMessage, task.clientHandle);
         return clientResponse;
-    }
-
-
-    /**
-     * Identify the partition for an execution site task.
-     * @return The partition best set up to execute the procedure.
-     */
-    final static int getPartitionForProcedureParameter(int partitionIndex, VoltType partitionType, StoredProcedureInvocation task) {
-        Object invocationParameter = task.getParameterAtIndex(partitionIndex);
-        return TheHashinator.getPartitionForParameter(partitionType, invocationParameter);
     }
 
     private final static ClientResponseImpl errorResponse(Connection c, long handle, byte status, String reason, Exception e, boolean log) {

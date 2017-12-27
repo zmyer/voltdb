@@ -247,6 +247,7 @@ public abstract class TheHashinator {
      * @throws VoltTypeException
      */
     public static int getPartitionForParameter(VoltType partitionType, Object invocationParameter) {
+        assert (invocationParameter != null);
         return instance.get().getSecond().getHashedPartitionForParameter(partitionType, invocationParameter);
     }
 
