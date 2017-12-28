@@ -955,6 +955,7 @@ public class VoltDB {
                     EnumSet.of(StartAction.GET, StartAction.INITIALIZE, StartAction.PROBE));
             if (invalidExternalstartAction.contains(m_startAction)) {
                 hostLog.fatal("Invalid start action " + m_startAction.verb() + " Please use init|start|get commands.");
+                hostLog.error(com.google.common.base.Throwables.getStackTraceAsString(new Exception("Invalid start action...")));
                 return false;
             }
             EnumSet<StartAction> hostNotRequred = EnumSet.of(StartAction.INITIALIZE,StartAction.GET);
