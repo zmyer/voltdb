@@ -24,6 +24,12 @@
 package org.voltdb;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -47,24 +53,21 @@ public class TestExportOverflow extends RegressionSuite {
         super(name);
     }
 
-    private File findExportOverflowDir(File root) {
-        if (!root.isDirectory()) {
-            return null;
-        }
-
-        File foundFile = null;
-        for (File f : root.listFiles()) {
-            if (f.getName().contains("export_overflow")) {
-                foundFile = f;
-            } else {
-                foundFile = findExportOverflowDir(f);
-            }
-            if (foundFile!=null) {
-                break;
+    public static Map<String, FileTime> getFileTimeAttributesRecursively(File root) throws IOException {
+        Map<String, FileTime> attributes = new HashMap<>();
+        if (root.isDirectory()) {
+            for (File f: root.listFiles()) {
+                Path path = Paths.get(f.toURI());
+                BasicFileAttributes attr = Files.readAttributes(path, BasicFileAttributes.class);
+                attributes.put(f.getName(), attr.creationTime());
             }
         }
-
-        return foundFile;
+        else {
+            Path path = Paths.get(root.toURI());
+            BasicFileAttributes attr = Files.readAttributes(path, BasicFileAttributes.class);
+            attributes.put(root.getName(), attr.creationTime());
+        }
+        return attributes;
     }
 
     public void testExportOverflowAutomoticDeletion() throws Exception {
@@ -87,16 +90,34 @@ public class TestExportOverflow extends RegressionSuite {
         client.drain();
         File overflowDir;
         overflowDir = new File(((LocalCluster)m_config).getServerSpecificRoot("0") + "/export_overflow");
+        Map<String, FileTime> fileTimes = getFileTimeAttributesRecursively(overflowDir);
         String[] oldOverflowFiles = overflowDir.list();
         assertTrue(oldOverflowFiles.length>0);
 
         // shutdown and startup with force flag
         // and verify that export overflow directory is cleared
         m_config.shutDown();
+        Map<String, Long> lastModifiedMap = new HashMap<>();
+        for (String f : oldOverflowFiles) {
+            lastModifiedMap.put(f, (new File(f)).lastModified());
+        }
         ((LocalCluster) m_config).setForceVoltdbCreate(true);
         m_config.startUp(false);
-        for (int i=0; i<oldOverflowFiles.length; i++) {
-            assertFalse(new File(overflowDir, oldOverflowFiles[i]).exists());
+        Map<String, FileTime> newFileTimes = getFileTimeAttributesRecursively(overflowDir);
+        assertTrue(fileTimes.size() == newFileTimes.size());
+
+        assertTrue(oldOverflowFiles.length == newFileTimes.size());
+
+        String fileName;
+        FileTime newer;
+        FileTime older;
+        for (int i = 0; i < oldOverflowFiles.length; i++) {
+            fileName = oldOverflowFiles[i];
+            newer = newFileTimes.get(fileName);
+            older = fileTimes.get(fileName);
+            assertTrue(newer != null);
+            assertTrue(older != null);
+            assertTrue(newer.compareTo(older) > 0);
         }
     }
 
