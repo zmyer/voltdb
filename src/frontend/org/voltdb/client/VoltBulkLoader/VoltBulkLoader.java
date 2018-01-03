@@ -127,6 +127,8 @@ public class VoltBulkLoader {
 
         m_vblGlobals = vblGlobals;
 
+        VoltLogger.startAsynchronousLogging();
+
         // Get table details and then build partition and column information.
         // Table analysis could be done once per unique table name but then the
         // m_TableNameToLoader lock would have to be held for a much longer.
@@ -422,6 +424,7 @@ public class VoltBulkLoader {
         }
 
         assert m_outstandingRowCount.get() == 0;
+        VoltLogger.shutdownAsynchronousLogging();
     }
 
     // Let all partition table continue their pending works

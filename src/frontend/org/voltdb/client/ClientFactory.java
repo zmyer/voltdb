@@ -17,7 +17,6 @@
 
 package org.voltdb.client;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.ReverseDNSCache;
 import org.voltcore.utils.EstTimeUpdater;
 
@@ -55,7 +54,6 @@ public abstract class ClientFactory {
         Client client = null;
         synchronized (ClientFactory.class) {
             if (!m_preserveResources && ++m_activeClientCount == 1) {
-                VoltLogger.startAsynchronousLogging();
                 EstTimeUpdater.start();
                 ReverseDNSCache.start();
             }
@@ -68,8 +66,6 @@ public abstract class ClientFactory {
         // the client is the last alive client. Before exit, close all the static resources and threads.
         if (!m_preserveResources && m_activeClientCount <= 1) {
             m_activeClientCount = 0;
-            //Shut down the logger.
-            VoltLogger.shutdownAsynchronousLogging();
             //Estimate Time Updater stop updates.
             EstTimeUpdater.stop();
             //stop ReverseDNSCache.
@@ -84,7 +80,6 @@ public abstract class ClientFactory {
         // This method is intended to ensure that the resources needed to create clients
         // are always initialized and won't be released with the active client count goes to zero.
         m_preserveResources = true;
-        VoltLogger.startAsynchronousLogging();
         EstTimeUpdater.start();
         ReverseDNSCache.start();
         m_activeClientCount = 1;
