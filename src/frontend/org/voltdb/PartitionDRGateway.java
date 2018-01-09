@@ -22,6 +22,7 @@ import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutionException;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
@@ -36,6 +37,8 @@ import org.voltdb.utils.MiscUtils;
  *
  */
 public class PartitionDRGateway implements DurableUniqueIdListener {
+
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     public enum DRRecordType {
         INSERT, DELETE, UPDATE, BEGIN_TXN, END_TXN, TRUNCATE_TABLE, DELETE_BY_INDEX, UPDATE_BY_INDEX, HASH_DELIMITER;
@@ -124,6 +127,8 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
             VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
         }
 
+        hostLog.info("Initializing partition dr gateway for partition id: " + partitionId);
+        Thread.dumpStack();
         // Regarding apparent lack of thread safety: this is called serially
         // while looping over the SPIs during database initialization
         assert !m_partitionDRGateways.containsKey(partitionId);
