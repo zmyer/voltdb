@@ -215,6 +215,7 @@ public class SystemProcedureCatalog {
                                                                                                            false, false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            false,        false ));
         builder.put("@StartNodeDRConsumerNT",   new Config("org.voltdb.sysprocs.RestartDRConsumerNT$StartNodeDRConsumerNT",
                                                                                                            false, false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            false,        false ));
+        builder.put("@LowImpactDelete",         new Config("org.voltdb.sysprocs.LowImpactDelete",          true,  false, false, 0,    VoltType.INVALID,   false, false, false, true,      false,  false,            false,        false ));
         listing = builder.build();
     }
 }
